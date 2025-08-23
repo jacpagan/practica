@@ -9,3 +9,7 @@ redis
 django-prometheus
 django-health-check
 django-debug-toolbar
+gunicorn
+pytest
+pytest-django
+model-bakery
