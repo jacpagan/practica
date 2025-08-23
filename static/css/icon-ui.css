@@ -1,0 +1,424 @@
+/* Icon-First UI Design System */
+
+/* Design Tokens */
+:root {
+  --icon-size: 24px;
+  --icon-size-large: 32px;
+  --icon-size-xl: 44px;
+  --hit-target: 44px;
+  --focus-ring: 3px solid #3498db;
+  --focus-ring-offset: 2px;
+  --icon-color: currentColor;
+  --icon-color-primary: #3498db;
+  --icon-color-success: #27ae60;
+  --icon-color-danger: #e74c3c;
+  --icon-color-warning: #f39c12;
+  --icon-color-muted: #95a5a6;
+}
+
+/* Icon Base Styles */
+.icon {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  display: inline-block;
+  vertical-align: middle;
+  fill: var(--icon-color);
+  flex-shrink: 0;
+}
+
+.icon-large {
+  width: var(--icon-size-large);
+  height: var(--icon-size-large);
+}
+
+.icon-xl {
+  width: var(--icon-size-xl);
+  height: var(--icon-size-xl);
+}
+
+/* Icon-Only Mode (Default) */
+.icon-only .label-text {
+  display: none !important;
+}
+
+.icon-only .btn {
+  min-width: var(--hit-target);
+  min-height: var(--hit-target);
+  padding: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.icon-only .btn .icon {
+  margin: 0;
+}
+
+/* Focus & Accessibility */
+.btn:focus,
+a:focus,
+button:focus {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: 8px;
+}
+
+.btn:focus-visible,
+a:focus-visible,
+button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Screen Reader Only Text */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Icon Legend Toggle */
+.icon-legend-toggle {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1000;
+  background: rgba(52, 152, 219, 0.9);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: var(--hit-target);
+  height: var(--hit-target);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.icon-legend-toggle:hover {
+  background: rgba(52, 152, 219, 1);
+  transform: scale(1.1);
+}
+
+.icon-legend-toggle .icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* Icon Legend Modal */
+.icon-legend {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.icon-legend.show {
+  display: flex;
+}
+
+.icon-legend-content {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.icon-legend-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #ecf0f1;
+}
+
+.icon-legend-header h3 {
+  margin: 0;
+  color: #2c3e50;
+}
+
+.icon-legend-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #7f8c8d;
+  padding: 0.5rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.icon-legend-close:hover {
+  background: #ecf0f1;
+  color: #2c3e50;
+}
+
+.icon-legend-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.icon-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid #ecf0f1;
+  border-radius: 8px;
+  background: #f8f9fa;
+}
+
+.icon-legend-item .icon {
+  width: 20px;
+  height: 20px;
+  color: var(--icon-color-primary);
+}
+
+.icon-legend-item .meaning {
+  font-size: 0.9rem;
+  color: #2c3e50;
+  font-weight: 500;
+}
+
+/* Icon Button Variants */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-width: var(--hit-target);
+  min-height: var(--hit-target);
+  padding: 0.75rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  background: var(--icon-color-primary);
+  color: white;
+}
+
+.btn-icon:hover {
+  background: #2980b9;
+  transform: translateY(-1px);
+}
+
+.btn-icon:active {
+  transform: translateY(0);
+}
+
+.btn-icon.btn-secondary {
+  background: var(--icon-color-muted);
+}
+
+.btn-icon.btn-secondary:hover {
+  background: #7f8c8d;
+}
+
+.btn-icon.btn-success {
+  background: var(--icon-color-success);
+}
+
+.btn-icon.btn-success:hover {
+  background: #229954;
+}
+
+.btn-icon.btn-danger {
+  background: var(--icon-color-danger);
+}
+
+.btn-icon.btn-danger:hover {
+  background: #c0392b;
+}
+
+.btn-icon.btn-warning {
+  background: var(--icon-color-warning);
+}
+
+.btn-icon.btn-warning:hover {
+  background: #e67e22;
+}
+
+/* Icon Navigation */
+.nav-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: white;
+  text-decoration: none;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  min-height: var(--hit-target);
+}
+
+.nav-icon:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.nav-icon .icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* Icon Form Controls */
+.form-icon-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.form-icon-group .icon {
+  color: var(--icon-color-primary);
+}
+
+.form-icon-group input,
+.form-icon-group textarea {
+  flex: 1;
+}
+
+/* Icon Status Indicators */
+.status-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.status-icon.recording {
+  background: rgba(231, 76, 60, 0.1);
+  color: var(--icon-color-danger);
+}
+
+.status-icon.processing {
+  background: rgba(52, 152, 219, 0.1);
+  color: var(--icon-color-primary);
+}
+
+.status-icon.ready {
+  background: rgba(39, 174, 96, 0.1);
+  color: var(--icon-color-success);
+}
+
+.status-icon.error {
+  background: rgba(231, 76, 60, 0.1);
+  color: var(--icon-color-danger);
+}
+
+/* Icon Progress Steps */
+.progress-step-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 8px;
+  background: white;
+  border: 1px solid #dee2e6;
+  transition: all 0.2s ease;
+}
+
+.progress-step-icon.active {
+  border-color: var(--icon-color-primary);
+  background: #e3f2fd;
+}
+
+.progress-step-icon.completed {
+  border-color: var(--icon-color-success);
+  background: #e8f5e8;
+}
+
+.progress-step-icon.error {
+  border-color: var(--icon-color-danger);
+  background: #fdf2f2;
+}
+
+.progress-step-icon .step-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: white;
+}
+
+.progress-step-icon.active .step-icon {
+  background: var(--icon-color-primary);
+}
+
+.progress-step-icon.completed .step-icon {
+  background: var(--icon-color-success);
+}
+
+.progress-step-icon.error .step-icon {
+  background: var(--icon-color-danger);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .icon-legend-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .btn-icon {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0.5rem;
+  }
+  
+  .icon-xl {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  :root {
+    --focus-ring: 3px solid #000;
+    --focus-ring-offset: 1px;
+  }
+  
+  .btn-icon {
+    border: 2px solid currentColor;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .btn-icon,
+  .nav-icon,
+  .icon-legend-toggle {
+    transition: none;
+  }
+  
+  .btn-icon:hover {
+    transform: none;
+  }
+}

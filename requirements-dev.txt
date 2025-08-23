@@ -1,0 +1,5 @@
+pytest
+pytest-django
+model-bakery
+ruff
+black

@@ -1,0 +1,42 @@
+{% extends 'exercises/base.html' %}
+
+{% block title %}Exercises - LMS{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Available Exercises</h2>
+    {% if exercises %}
+        <div class="exercise-grid">
+            {% for exercise in exercises %}
+            <div class="card">
+                <h3>{{ exercise.name }}</h3>
+                {% if exercise.description %}
+                    <p>{{ exercise.description }}</p>
+                {% endif %}
+                <p><strong>Created by:</strong> {{ exercise.created_by.username }}</p>
+                <p><strong>Created:</strong> {{ exercise.created_at|date:"M d, Y" }}</p>
+                
+                <div class="video-container">
+                    <video class="video-player" controls>
+                        <source src="/media/{{ exercise.video_asset.storage_path }}" type="{{ exercise.video_asset.mime_type }}">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+
+                <!-- Exercise Actions -->
+                <div class="exercise-actions" style="margin: 1rem 0;">
+                    <a href="{% url 'exercise_detail' exercise.id %}" class="btn btn-secondary" 
+                       aria-label="View exercise details and {{ exercise.videocomment_set.count }} comments" 
+                       title="View Details & Comments">
+                        <svg class="icon"><use href="/static/icons/icons.svg#play"/></svg>
+                        <span class="label-text">View Details & Comments ({{ exercise.videocomment_set.count }})</span>
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No exercises available yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,225 @@
+{% extends 'exercises/base.html' %}
+
+{% block title %}{{ exercise.name }} - LMS{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>{{ exercise.name }}</h2>
+    {% if exercise.description %}
+        <p>{{ exercise.description }}</p>
+    {% endif %}
+    
+    <div class="meta">
+        <p><strong>Created by:</strong> {{ exercise.created_by.username }}</p>
+        <p><strong>Created:</strong> {{ exercise.created_at|date:"M d, Y H:i" }}</p>
+        <p><strong>Last updated:</strong> {{ exercise.updated_at|date:"M d, Y H:i" }}</p>
+    </div>
+    
+    <div class="video-container">
+        <h3>Exercise Video</h3>
+        <video class="video-player" controls>
+            <source src="/media/{{ exercise.video_asset.storage_path }}" type="{{ exercise.video_asset.mime_type }}">
+            Your browser does not support the video tag.
+        </video>
+    </div>
+
+    <div class="comments-section">
+        <h3>Video Comments ({{ exercise.videocomment_set.count }})</h3>
+        
+        {% for comment in exercise.videocomment_set.all %}
+        <div class="comment">
+            <div class="meta">
+                <strong>{{ comment.author.username }}</strong>
+                {% if comment.author.is_staff %}<span class="admin-badge">Admin</span>{% endif %}
+                <span>{{ comment.created_at|date:"M d, Y H:i" }}</span>
+            </div>
+            
+            {% if comment.text %}
+                <p>{{ comment.text }}</p>
+            {% endif %}
+            
+            <div class="video-container">
+                <video class="video-player" controls>
+                    <source src="/media/{{ comment.video_asset.storage_path }}" type="{{ comment.video_asset.mime_type }}">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+        </div>
+        {% empty %}
+            <p>No comments yet. Be the first to comment!</p>
+        {% endfor %}
+        
+        {% if user.is_authenticated %}
+            <div class="card">
+                <h4>💬 Add Comment</h4>
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="comment-text">📝 Text (optional)</label>
+                    <textarea id="comment-text" rows="2" placeholder="Add text..."></textarea>
+                </div>
+                <div id="recorder-container-main"></div>
+                
+                <!-- Minimal Comment Progress -->
+                <div id="comment-progress-main" style="display: none;">
+                    <div class="minimal-progress">
+                        <div class="status-dots">
+                            <div class="status-dot" id="comment-dot-1" data-state="processing"></div>
+                            <div class="status-dot" id="comment-dot-2" data-state="uploading"></div>
+                            <div class="status-dot" id="comment-dot-3" data-state="saving"></div>
+                        </div>
+                        <div class="minimal-status">
+                            <div class="status-text" id="comment-status-text">Processing...</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <button class="btn btn-success" onclick="submitComment()" aria-label="Submit video comment" title="Submit Comment">
+                    <svg class="icon"><use href="/static/icons/icons.svg#upload"/></svg>
+                    <span class="label-text">Submit</span>
+                </button>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    // Initialize main video recorder
+    document.addEventListener('DOMContentLoaded', function() {
+        if (document.getElementById('recorder-container-main')) {
+            window.videoRecorders['main'] = new VideoRecorder('recorder-container-main');
+        }
+    });
+
+    // Update comment progress dots
+    function updateCommentDot(dotNumber, state) {
+        const dot = document.getElementById(`comment-dot-${dotNumber}`);
+        if (dot) {
+            dot.className = `status-dot ${state}`;
+            dot.setAttribute('data-state', state);
+        }
+    }
+
+    function updateCommentStatus(text) {
+        const statusText = document.getElementById('comment-status-text');
+        if (statusText) {
+            statusText.textContent = text;
+        }
+    }
+
+    async function submitComment() {
+        const text = document.getElementById('comment-text').value;
+        const recorder = window.videoRecorders['main'];
+        const videoBlob = recorder.getVideoBlob();
+
+        if (!videoBlob) {
+            alert('Please record a video comment first.');
+            return;
+        }
+
+        // Show progress section
+        document.getElementById('comment-progress-main').style.display = 'block';
+
+        // Step 1: Process video
+        updateCommentDot(1, 'active');
+        updateCommentStatus('Processing...');
+        
+        // Simulate processing time
+        await new Promise(resolve => setTimeout(resolve, 800));
+        updateCommentDot(1, 'completed');
+        updateCommentStatus('Uploading...');
+
+        // Step 2: Upload
+        updateCommentDot(2, 'active');
+        
+        const formData = new FormData();
+        formData.append('exercise_id', '{{ exercise.id }}');
+        formData.append('text', text);
+        formData.append('video', videoBlob, 'comment.webm');
+
+        try {
+            // Simulate upload time based on file size
+            const fileSize = videoBlob.size;
+            const uploadTime = Math.min(1500, Math.max(300, fileSize / 1000)); // 0.3s to 1.5s
+            await new Promise(resolve => setTimeout(resolve, uploadTime));
+            
+            updateCommentDot(2, 'completed');
+            updateCommentStatus('Saving...');
+
+            // Step 3: Create comment
+            updateCommentDot(3, 'active');
+            
+            // Debug: Check if CSRF token is available
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+            let csrfTokenValue = null;
+            
+            if (csrfToken) {
+                csrfTokenValue = csrfToken.value;
+                console.log('CSRF Token found in form:', csrfTokenValue);
+            } else {
+                // Fallback: try to get from cookies
+                csrfTokenValue = getCookie('csrftoken');
+                if (csrfTokenValue) {
+                    console.log('CSRF Token found in cookies:', csrfTokenValue);
+                } else {
+                    console.error('CSRF token not found in form or cookies');
+                    updateCommentDot(3, 'error');
+                    updateCommentStatus('CSRF error');
+                    return;
+                }
+            }
+            
+            const response = await fetch('/api/video-comments/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': csrfTokenValue
+                }
+            });
+
+            if (response.ok) {
+                updateCommentDot(3, 'completed');
+                updateCommentStatus('Success!');
+                
+                // Hide progress after success
+                setTimeout(() => {
+                    document.getElementById('comment-progress-main').style.display = 'none';
+                    // Reset form
+                    document.getElementById('comment-text').value = '';
+                    recorder.reset();
+                }, 1500);
+                
+                // Reload page to show new comment
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+                
+            } else {
+                const errorData = await response.json();
+                console.error('Comment creation failed:', errorData);
+                updateCommentDot(3, 'error');
+                updateCommentStatus('Upload failed');
+            }
+            
+        } catch (error) {
+            console.error('Error creating comment:', error);
+            updateCommentDot(3, 'error');
+            updateCommentStatus('Network error');
+        }
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
+{% endblock %}

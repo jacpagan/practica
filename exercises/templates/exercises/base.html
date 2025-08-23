@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en" class="icon-only">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}LMS{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/icon-ui.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { background: #2c3e50; color: white; padding: 1rem 0; margin-bottom: 2rem; }
+        .header h1 { text-align: center; }
+        .nav { background: #34495e; padding: 0.5rem 0; margin-bottom: 2rem; }
+        .nav a { color: white; text-decoration: none; padding: 0.5rem 1rem; margin: 0 0.25rem; }
+        .nav a:hover { background: #2c3e50; }
+        .card { background: white; border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .btn { background: #3498db; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 4px; cursor: pointer; font-size: 1rem; }
+        .btn:hover { background: #2980b9; }
+        .btn-danger { background: #e74c3c; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-success { background: #27ae60; }
+        .btn-success:hover { background: #229954; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; }
+        .form-group input, .form-group textarea { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; }
+        .video-container { margin: 1rem 0; }
+        .video-player { width: 100%; max-width: 600px; border-radius: 8px; }
+        .recorder { background: #f8f9fa; padding: 1rem; border-radius: 8px; margin: 1rem 0; }
+        .recorder video { width: 100%; max-width: 400px; border-radius: 4px; margin-bottom: 1rem; }
+        .recorder .controls { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+        .alert { padding: 1rem; border-radius: 4px; margin-bottom: 1rem; }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .exercise-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+        .comment { background: #f8f9fa; padding: 1rem; border-radius: 8px; margin: 1rem 0; border-left: 4px solid #3498db; }
+        .comment .meta { font-size: 0.9rem; color: #666; margin-bottom: 0.5rem; }
+        .hidden { display: none; }
+        .admin-badge { background: #e74c3c; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.8rem; margin-left: 0.5rem; }
+        .simple-loop { background: #e8f5e8; border: 2px solid #27ae60; }
+        
+        /* Transparent Progress Tracking */
+        .progress-container { background: rgba(255,255,255,0.9); border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+        .progress-step { display: flex; align-items: center; margin: 0.5rem 0; padding: 0.5rem; border-radius: 4px; }
+        .progress-step.active { background: #e3f2fd; border-left: 4px solid #2196f3; }
+        .progress-step.completed { background: #e8f5e8; border-left: 4px solid #4caf50; }
+        .progress-step.pending { background: #f5f5f5; border-left: 4px solid #9e9e9e; }
+        .step-icon { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 0.75rem; font-size: 12px; font-weight: bold; }
+        .step-icon.active { background: #2196f3; color: white; }
+        .step-icon.completed { background: #4caf50; color: white; }
+        .step-icon.pending { background: #9e9e9e; color: white; }
+        .step-text { flex: 1; }
+        .step-status { font-size: 0.9rem; color: #666; }
+        .progress-bar { width: 100%; height: 8px; background: #f0f0f0; border-radius: 4px; overflow: hidden; margin: 1rem 0; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #4caf50, #2196f3); transition: width 0.3s ease; }
+        .status-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 0.5rem; }
+        .status-recording { background: #ff9800; animation: pulse 1s infinite; }
+        .status-processing { background: #2196f3; animation: pulse 1s infinite; }
+        .status-uploading { background: #9c27b0; animation: pulse 1s infinite; }
+        .status-complete { background: #4caf50; }
+        .status-error { background: #f44336; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        
+        /* File Processing Status */
+        .file-status { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 1rem; margin: 1rem 0; }
+        .file-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+        .file-size { font-size: 0.9rem; color: #666; }
+        .processing-steps { margin-top: 1rem; }
+        .processing-step { display: flex; align-items: center; margin: 0.25rem 0; }
+        .step-dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 0.5rem; }
+        .step-dot.pending { background: #dee2e6; }
+        .step-dot.processing { background: #2196f3; animation: pulse 1s infinite; }
+        .step-dot.complete { background: #4caf50; }
+        .step-dot.error { background: #f44336; }
+        
+        /* Simplified Create Exercise Styles */
+        .create-exercise-container { max-width: 800px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 2rem; }
+        .header h2 { color: #2c3e50; margin-bottom: 0.5rem; font-size: 2rem; }
+        .subtitle { color: #7f8c8d; font-size: 1.1rem; }
+        
+        .form-section { background: white; border: 1px solid #ecf0f1; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        
+        .video-source-toggle { margin-bottom: 1.5rem; }
+        .toggle-label { display: block; margin-bottom: 0.75rem; font-weight: 600; color: #2c3e50; }
+        .toggle-buttons { display: flex; gap: 0.5rem; }
+        .toggle-btn { flex: 1; padding: 0.75rem 1rem; border: 2px solid #ecf0f1; background: white; color: #7f8c8d; border-radius: 8px; cursor: pointer; font-size: 1rem; transition: all 0.2s ease; }
+        .toggle-btn:hover { border-color: #bdc3c7; }
+        .toggle-btn.active { border-color: #3498db; background: #3498db; color: white; }
+        
+        .video-section { display: none; }
+        .video-section.active { display: block; }
+        
+        .recorder-simple { text-align: center; }
+        .camera-preview { position: relative; margin-bottom: 1.5rem; }
+        .camera-preview video { width: 100%; max-width: 500px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .camera-overlay { position: absolute; top: 1rem; left: 1rem; right: 1rem; display: flex; justify-content: space-between; align-items: center; }
+        .recording-status { background: rgba(0,0,0,0.7); color: white; padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.9rem; font-weight: 500; }
+        .recording-status.recording { background: rgba(231, 76, 60, 0.9); animation: pulse 1s infinite; }
+        .recording-status.processing { background: rgba(52, 152, 219, 0.9); }
+        .recording-status.ready { background: rgba(39, 174, 96, 0.9); }
+        .recording-time { background: rgba(0,0,0,0.7); color: white; padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.9rem; font-weight: 500; }
+        
+        .recording-controls { display: flex; gap: 1rem; justify-content: center; margin-bottom: 1.5rem; }
+        .btn-large { padding: 1rem 2rem; font-size: 1.1rem; font-weight: 600; border-radius: 8px; }
+        .btn-primary { background: #3498db; }
+        .btn-primary:hover { background: #2980b9; }
+        .btn-secondary { background: #95a5a6; }
+        .btn-secondary:hover { background: #7f8c8d; }
+        
+        .recording-info { display: flex; justify-content: center; gap: 2rem; }
+        .info-item { display: flex; align-items: center; gap: 0.5rem; color: #7f8c8d; }
+        .info-item .icon { font-size: 1.2rem; }
+        
+        .file-upload-area { text-align: center; }
+        .upload-zone { border: 2px dashed #bdc3c7; border-radius: 12px; padding: 3rem 2rem; cursor: pointer; transition: all 0.2s ease; }
+        .upload-zone:hover, .upload-zone.dragover { border-color: #3498db; background: #f8f9fa; }
+        .upload-icon { font-size: 3rem; margin-bottom: 1rem; color: #bdc3c7; }
+        .upload-text { color: #7f8c8d; line-height: 1.5; }
+        .upload-text strong { color: #2c3e50; }
+        
+        .file-preview { margin-top: 1.5rem; }
+        .file-preview video { width: 100%; max-width: 500px; border-radius: 8px; margin-bottom: 1rem; }
+        .file-info { display: flex; justify-content: space-between; color: #7f8c8d; font-size: 0.9rem; }
+        
+        .progress-section { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0; }
+        .progress-header { text-align: center; margin-bottom: 1.5rem; }
+        .progress-header h4 { color: #2c3e50; margin-bottom: 1rem; }
+        .progress-bar { width: 100%; height: 8px; background: #e9ecef; border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #3498db, #27ae60); transition: width 0.5s ease; width: 0%; }
+        
+        .progress-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+        .step { display: flex; align-items: center; padding: 1rem; border-radius: 8px; background: white; border: 1px solid #dee2e6; }
+        .step.active { border-color: #3498db; background: #e3f2fd; }
+        .step.completed { border-color: #27ae60; background: #e8f5e8; }
+        .step.error { border-color: #e74c3c; background: #fdf2f2; }
+        .step-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 0.75rem; font-weight: bold; color: white; }
+        .step.active .step-icon { background: #3498db; }
+        .step.completed .step-icon { background: #27ae60; }
+        .step.error .step-icon { background: #e74c3c; }
+        .step-content { flex: 1; }
+        .step-title { font-weight: 600; color: #2c3e50; margin-bottom: 0.25rem; }
+        .step-status { font-size: 0.9rem; color: #7f8c8d; }
+        
+        .form-actions { display: flex; gap: 1rem; justify-content: center; margin-top: 2rem; }
+
+        /* Status Dots - Minimal Interface */
+        .status-dots {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 25px;
+        }
+
+        .status-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #6c757d;
+            transition: all 0.3s ease;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .status-dot[data-state="camera"] {
+            background: #17a2b8;
+        }
+
+        .status-dot[data-state="recording"] {
+            background: #dc3545;
+        }
+
+        .status-dot[data-state="processing"] {
+            background: #ffc107;
+        }
+
+        .status-dot[data-state="ready"] {
+            background: #28a745;
+        }
+
+        .status-dot.active {
+            background: #007bff;
+            box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
+            transform: scale(1.2);
+        }
+
+        .status-dot.completed {
+            background: #28a745;
+            box-shadow: 0 0 8px rgba(40, 167, 69, 0.4);
+        }
+
+        .status-dot.error {
+            background: #dc3545;
+            box-shadow: 0 0 8px rgba(220, 53, 69, 0.4);
+            animation: pulse 1s infinite;
+        }
+
+        .status-dot.pending {
+            background: #6c757d;
+            opacity: 0.5;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+            100% { transform: scale(1); }
+        }
+
+        .minimal-status {
+            text-align: center;
+            margin: 15px 0;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+        }
+
+        .status-text {
+            font-size: 14px;
+            font-weight: 500;
+            color: #fff;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .minimal-progress {
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+        }
+
+        .minimal-progress .status-dots {
+            margin-bottom: 15px;
+        }
+
+        .minimal-progress .status-dot[data-state="processing"] {
+            background: #17a2b8;
+        }
+
+        .minimal-progress .status-dot[data-state="uploading"] {
+            background: #ffc107;
+        }
+
+        .minimal-progress .status-dot[data-state="saving"] {
+            background: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Learning Management System</h1>
+    </div>
+    
+    <div class="nav">
+        <a href="{% url 'exercise_list' %}" class="nav-icon" aria-label="Exercise List" title="Exercises">
+            <svg class="icon"><use href="/static/icons/icons.svg#list"/></svg>
+            <span class="label-text">Exercises</span>
+        </a>
+        {% if user.is_staff %}
+        <a href="{% url 'exercise_create' %}" class="nav-icon" aria-label="Create New Exercise" title="Create Exercise">
+            <svg class="icon"><use href="/static/icons/icons.svg#new-ex"/></svg>
+            <span class="label-text">Create Exercise</span>
+        </a>
+        {% endif %}
+        {% if user.is_authenticated %}
+        <a href="{% url 'logout' %}" class="nav-icon" aria-label="Logout ({{ user.username }})" title="Logout">
+            <svg class="icon"><use href="/static/icons/icons.svg#settings"/></svg>
+            <span class="label-text">Logout ({{ user.username }})</span>
+        </a>
+        {% else %}
+        <a href="{% url 'login' %}" class="nav-icon" aria-label="Login" title="Login">
+            <svg class="icon"><use href="/static/icons/icons.svg#settings"/></svg>
+            <span class="label-text">Login</span>
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="container">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </div>
+    
+    <script>
+        // Icon-Only Mode Toggle
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check for text mode query parameter
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('text') === '1') {
+                document.documentElement.classList.remove('icon-only');
+            }
+            
+        });
+        
+        // Transparent Video Recorder - Shows every step of the process
+        class VideoRecorder {
+            constructor(containerId) {
+                this.container = document.getElementById(containerId);
+                this.containerId = containerId;
+                this.stream = null;
+                this.mediaRecorder = null;
+                this.recordedChunks = [];
+                this.isRecording = false;
+                this.recordingStartTime = null;
+                this.setupUI();
+            }
+
+            setupUI() {
+                this.container.innerHTML = `
+                    <div class="recorder">
+                        <h3>📹 Record Video</h3>
+                        
+                        <!-- Minimal Status Dots -->
+                        <div class="status-dots">
+                            <div class="status-dot" id="dot-1-${this.containerId}" data-state="camera"></div>
+                            <div class="status-dot" id="dot-2-${this.containerId}" data-state="recording"></div>
+                            <div class="status-dot" id="dot-3-${this.containerId}" data-state="processing"></div>
+                            <div class="status-dot" id="dot-4-${this.containerId}" data-state="ready"></div>
+                        </div>
+                        
+                        <video id="preview-${this.containerId}" autoplay muted></video>
+                        
+                        <!-- Recording Controls -->
+                        <div class="controls">
+                            <button id="start-${this.containerId}" class="btn btn-success" aria-label="Start recording video" title="Start Recording">
+                                <svg class="icon"><use href="/static/icons/icons.svg#record"/></svg>
+                                <span class="label-text">Start</span>
+                            </button>
+                            <button id="stop-${this.containerId}" class="btn btn-danger hidden" aria-label="Stop recording video" title="Stop Recording">
+                                <svg class="icon"><use href="/static/icons/icons.svg#stop"/></svg>
+                                <span class="label-text">Stop</span>
+                            </button>
+                        </div>
+                        
+                        <!-- Minimal Status -->
+                        <div id="status-${this.containerId}" class="minimal-status">
+                            <div class="status-text" id="status-text-${this.containerId}">Ready</div>
+                        </div>
+                    </div>
+                `;
+
+                this.bindEvents();
+                this.updateDot(1, 'active');
+            }
+
+            bindEvents() {
+                const startBtn = document.getElementById(`start-${this.containerId}`);
+                const stopBtn = document.getElementById(`stop-${this.containerId}`);
+                
+                startBtn.addEventListener('click', () => this.startRecording());
+                stopBtn.addEventListener('click', () => this.stopRecording());
+            }
+
+            updateDot(dotNumber, state) {
+                const dot = document.getElementById(`dot-${dotNumber}-${this.containerId}`);
+                if (dot) {
+                    dot.className = `status-dot ${state}`;
+                    dot.setAttribute('data-state', state);
+                }
+            }
+
+            updateStatus(text) {
+                const statusText = document.getElementById(`status-text-${this.containerId}`);
+                if (statusText) {
+                    statusText.textContent = text;
+                }
+            }
+
+            async startRecording() {
+                try {
+                    this.updateDot(1, 'completed');
+                    this.updateDot(2, 'active');
+                    this.updateStatus('Recording...');
+                    
+                    this.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                    const preview = document.getElementById(`preview-${this.containerId}`);
+                    preview.srcObject = this.stream;
+
+                    this.mediaRecorder = new MediaRecorder(this.stream, {
+                        mimeType: 'video/webm;codecs=vp8,opus'
+                    });
+
+                    this.mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            this.recordedChunks.push(event.data);
+                        }
+                    };
+
+                    this.mediaRecorder.start();
+                    this.isRecording = true;
+                    this.recordingStartTime = Date.now();
+                    this.updateUI();
+                    
+                    // Update recording duration
+                    this.startDurationTimer();
+                    
+                } catch (error) {
+                    this.updateDot(1, 'error');
+                    this.updateStatus('Camera denied');
+                }
+            }
+
+            startDurationTimer() {
+                this.durationTimer = setInterval(() => {
+                    if (this.isRecording && this.recordingStartTime) {
+                        const duration = Math.floor((Date.now() - this.recordingStartTime) / 1000);
+                        const minutes = Math.floor(duration / 60);
+                        const seconds = duration % 60;
+                        const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                        
+                        this.updateStatus(`Recording ${timeString}`);
+                    }
+                }, 1000);
+            }
+
+            stopRecording() {
+                if (this.mediaRecorder && this.isRecording) {
+                    clearInterval(this.durationTimer);
+                    
+                    this.updateDot(2, 'completed');
+                    this.updateDot(3, 'active');
+                    this.updateStatus('Processing...');
+                    
+                    this.mediaRecorder.stop();
+                    this.stream.getTracks().forEach(track => track.stop());
+                    this.isRecording = false;
+                    
+                    // Simulate processing time
+                    setTimeout(() => {
+                        this.updateDot(3, 'completed');
+                        this.updateDot(4, 'active');
+                        this.updateStatus('Ready!');
+                    }, 1500);
+                    
+                    this.updateUI();
+                }
+            }
+
+            updateUI() {
+                const startBtn = document.getElementById(`start-${this.containerId}`);
+                const stopBtn = document.getElementById(`stop-${this.containerId}`);
+
+                if (this.isRecording) {
+                    startBtn.classList.add('hidden');
+                    stopBtn.classList.remove('hidden');
+                } else {
+                    startBtn.classList.remove('hidden');
+                    stopBtn.classList.add('hidden');
+                }
+            }
+
+            getVideoBlob() {
+                if (this.recordedChunks.length > 0) {
+                    return new Blob(this.recordedChunks, { type: 'video/webm' });
+                }
+                return null;
+            }
+
+            reset() {
+                this.recordedChunks = [];
+                this.updateUI();
+                
+                // Reset all dots
+                for (let i = 1; i <= 4; i++) {
+                    this.updateDot(i, i === 1 ? 'active' : 'pending');
+                }
+                
+                this.updateStatus('Ready');
+                
+                const preview = document.getElementById(`preview-${this.containerId}`);
+                preview.srcObject = null;
+                preview.src = '';
+            }
+        }
+
+        // Global video recorder instances
+        window.videoRecorders = {};
+        
+        // Global progress tracking
+        window.progressTracker = {
+            showUploadProgress: function(containerId, steps) {
+                const container = document.getElementById(containerId);
+                if (!container) return;
+                
+                const progressHTML = `
+                    <div class="progress-container">
+                        <h4>Upload Progress</h4>
+                        ${steps.map((step, index) => `
+                            <div class="progress-step pending" id="upload-step-${index}-${containerId}">
+                                <div class="step-icon pending">${index + 1}</div>
+                                <div class="step-text">
+                                    <strong>${step.title}</strong>
+                                    <div class="step-status">${step.status}</div>
+                                </div>
+                            </div>
+                        `).join('')}
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                `;
+                
+                container.insertAdjacentHTML('beforeend', progressHTML);
+            },
+            
+            updateUploadStep: function(containerId, stepIndex, status, message) {
+                const step = document.getElementById(`upload-step-${stepIndex}-${containerId}`);
+                if (!step) return;
+                
+                const icon = step.querySelector('.step-icon');
+                const statusDiv = step.querySelector('.step-status');
+                
+                step.className = `progress-step ${status}`;
+                icon.className = `step-icon ${status}`;
+                statusDiv.textContent = message;
+                
+                // Update progress bar
+                const progressBar = step.closest('.progress-container').querySelector('.progress-fill');
+                const totalSteps = step.closest('.progress-container').querySelectorAll('.progress-step').length;
+                const completedSteps = step.closest('.progress-container').querySelectorAll('.progress-step.completed').length;
+                const progress = (completedSteps / totalSteps) * 100;
+                progressBar.style.width = progress + '%';
+            }
+        };
+    </script>
+</body>
+</html>
