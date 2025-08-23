@@ -2,18 +2,6 @@
 
 A Django-based Learning Management System focused on video-based exercises and comments. This platform allows administrators to create exercises with video content and authenticated users to view exercises and create video comments.
 
-## 🚀 New: Video Creation Loop System
-
-The platform now includes an advanced **Video Creation Loop** system designed to keep users continuously engaged in creating video content:
-
-- **🎬 Video Creation Hub**: Dedicated space for continuous video creation
-- **🔄 Continuous Recording Mode**: Auto-reset after submissions for seamless workflow
-- **📦 Bulk Upload System**: Build up multiple recordings and upload all at once
-- **🎯 Engagement Gamification**: Streak tracking, progress metrics, and motivational messages
-- **🚀 Quick Session Mode**: Rapid-fire video creation for power users
-
-**Access the Video Hub**: Navigate to `/hub/` or click "🎬 Video Hub" in the navigation
-
 ## Features
 
 - **Admin CRUD Operations**: Staff users can create, read, update, and delete exercises
@@ -21,16 +9,16 @@ The platform now includes an advanced **Video Creation Loop** system designed to
 - **Video Comments**: Users can create video comments on exercises using webcam recording or file upload
 - **Permission System**: Role-based access control for exercises and comments
 - **Video Storage**: Local file storage with MIME type validation and checksum calculation
-- **🎬 Continuous Engagement**: Advanced video creation loop that keeps users engaged
+- **Basic Video Recording**: Webcam recording functionality for creating exercises and comments
 
 ## Technology Stack
 
-- **Backend**: Django 5.x + Django REST Framework 3.15+
+- **Backend**: Django 4.2 + Django REST Framework
 - **Database**: SQLite (local development)
 - **Storage**: FileSystemStorage at `./media`
 - **Authentication**: Session-based authentication
-- **Frontend**: Server-rendered HTML with minimal JavaScript for webcam recording
-- **🎥 Video Loop**: Enhanced JavaScript with MediaRecorder API and engagement features
+- **Frontend**: Server-rendered HTML with JavaScript for webcam recording
+- **Video Support**: MP4, WebM, QuickTime, AVI formats
 
 ## Setup Instructions
 
@@ -80,27 +68,27 @@ The platform now includes an advanced **Video Creation Loop** system designed to
 
 8. **Access the application**
    - Admin interface: http://localhost:8000/admin/
-   - Exercise list: http://localhost:8000/ex/
-   - **🎬 Video Hub**: http://localhost:8000/ex/hub/
-   - API endpoints: http://localhost:8000/api/v1/
+   - Exercise list: http://localhost:8000/
+   - Exercise creation: http://localhost:8000/create/
+   - API endpoints: http://localhost:8000/api/
 
 ## Project Structure
 
 ```
 LMS/
 ├── core/                    # Core functionality and VideoAsset model
-│   ├── models.py           # VideoAsset model
+│   ├── models.py           # VideoAsset model with validation and monitoring
 │   ├── services/           # Storage service for video files
 │   └── admin.py            # Admin interface for VideoAsset
 ├── exercises/               # Exercise management
 │   ├── models.py           # Exercise model
-│   ├── views.py            # API ViewSets
+│   ├── views.py            # API ViewSets and HTML views
 │   ├── serializers.py      # DRF serializers
 │   ├── permissions.py      # Custom permissions
 │   ├── admin.py            # Admin interface
 │   ├── templates/          # HTML templates
 │   │   ├── exercises/      # Exercise templates
-│   │   └── video_hub.html  # 🎬 Video Creation Hub
+│   │   └── base.html       # Base template
 │   └── html_views.py       # HTML views for web interface
 ├── comments/                # Video comment management
 │   ├── models.py           # VideoComment model
@@ -119,53 +107,50 @@ LMS/
 ├── requirements.txt        # Production dependencies
 ├── requirements-dev.txt    # Development dependencies
 ├── pytest.ini             # Pytest configuration
-├── VIDEO_LOOP_README.md    # 🎬 Video Creation Loop documentation
 └── README.md               # This file
 ```
 
-## 🎬 Video Creation Loop Features
+## Core Functionality
 
-### Continuous Recording Mode
-- **Auto-reset**: Recorder automatically resets after each submission
-- **Seamless Flow**: No page reloads or interruptions
-- **Visual Feedback**: Clear indicators for active continuous mode
+### Exercise Management
+- **Create Exercises**: Staff users can create exercises with video content
+- **Video Input**: Support for both webcam recording and file upload
+- **Exercise Details**: View exercise information and associated video
 
-### Bulk Upload System
-- **Recording Queue**: Build up multiple videos before uploading
-- **Batch Processing**: Upload all recordings at once with progress tracking
-- **Queue Management**: Add, remove, and edit queued recordings
+### Video Comments
+- **Create Comments**: Authenticated users can add video comments to exercises
+- **Webcam Recording**: Record video comments directly in the browser
+- **File Upload**: Upload video files as comments
+- **Comment Display**: View all comments on an exercise
 
-### Video Creation Hub
-- **Centralized Space**: Dedicated location for all video activities
-- **Multiple Modes**: Quick session, targeted exercise, and free-form recording
-- **Progress Tracking**: Real-time statistics and achievements
-
-### Engagement Gamification
-- **Streak Tracking**: Daily contribution streaks
-- **Progress Metrics**: Session recordings, total contributions, community impact
-- **Motivational Messages**: Dynamic encouragement that rotates automatically
+### Video Asset Management
+- **File Validation**: MIME type and format validation
+- **Integrity Checks**: SHA256 checksum calculation
+- **Storage Management**: Organized file storage with metadata tracking
+- **Access Monitoring**: Track file access and usage statistics
 
 ## API Endpoints
 
 ### Exercises
-- `GET /api/v1/exercises/` - List all exercises (authenticated)
-- `POST /api/v1/exercises/` - Create exercise (staff only)
-- `GET /api/v1/exercises/{id}/` - Get exercise details (authenticated)
-- `PATCH /api/v1/exercises/{id}/` - Update exercise (staff only)
-- `DELETE /api/v1/exercises/{id}/` - Delete exercise (staff only)
+- `GET /api/exercises/` - List all exercises (authenticated)
+- `POST /api/exercises/` - Create exercise (staff only)
+- `GET /api/exercises/{id}/` - Get exercise details (authenticated)
+- `PATCH /api/exercises/{id}/` - Update exercise (staff only)
+- `DELETE /api/exercises/{id}/` - Delete exercise (staff only)
 
 ### Video Comments
-- `GET /api/v1/video-comments/` - List all comments (authenticated)
-- `POST /api/v1/video-comments/` - Create comment (authenticated)
-- `GET /api/v1/video-comments/{id}/` - Get comment details (authenticated)
-- `PATCH /api/v1/video-comments/{id}/` - Update comment (author or staff)
-- `DELETE /api/v1/video-comments/{id}/` - Delete comment (author or staff)
+- `GET /api/video-comments/` - List all comments (authenticated)
+- `POST /api/video-comments/` - Create comment (authenticated)
+- `GET /api/video-comments/{id}/` - Get comment details (authenticated)
+- `PATCH /api/video-comments/{id}/` - Update comment (author or staff)
+- `DELETE /api/video-comments/{id}/` - Delete comment (author or staff)
 
 ## Supported Video Formats
 
 - MP4 (`video/mp4`)
 - WebM (`video/webm`)
 - QuickTime (`video/quicktime`)
+- AVI (`video/x-msvideo`)
 
 ## File Upload Limits
 
@@ -193,9 +178,8 @@ python -m pytest tests/ --cov=. --cov-report=html
 
 ### Code Quality
 
-- **Formatting**: Black
-- **Linting**: Ruff
 - **Testing**: pytest + pytest-django
+- **Code Style**: Follow Django coding standards
 
 ### Adding New Features
 
@@ -211,6 +195,8 @@ python -m pytest tests/ --cov=. --cov-report=html
 - CSRF protection
 - File type validation
 - Input sanitization
+- Rate limiting for login attempts
+- Account lockout protection
 
 ## Local Development Notes
 
@@ -218,19 +204,20 @@ python -m pytest tests/ --cov=. --cov-report=html
 - Media files: Stored locally in `./media/`
 - No external services or cloud dependencies
 - Webcam recording uses MediaRecorder API (WebM format)
-- **🎬 Video Loop**: Enhanced engagement features with local storage
+- Basic video recording and playback functionality
 
-## 🎯 User Engagement Strategy
+## User Workflow
 
-The platform implements a comprehensive engagement loop:
+### For Staff Users
+1. **Create Exercise**: Navigate to `/create/` to create new exercises
+2. **Upload Video**: Record with webcam or upload video file
+3. **Manage Content**: Use admin interface to manage exercises and users
 
-1. **Easy Access**: One-click video recording with webcam
-2. **Continuous Flow**: Auto-reset and seamless workflow
-3. **Progress Tracking**: Visual feedback and statistics
-4. **Gamification**: Streaks, achievements, and motivation
-5. **Community Building**: Shared content and interactions
-
-This creates a positive feedback loop where users want to keep creating content, building a rich learning environment.
+### For Regular Users
+1. **Browse Exercises**: View all available exercises on the main page
+2. **Watch Videos**: Play exercise videos to learn
+3. **Add Comments**: Record or upload video comments to exercises
+4. **Engage**: View other users' comments and feedback
 
 ## Troubleshooting
 
@@ -252,17 +239,25 @@ python manage.py migrate  # Re-run migrations
 - Check file size (max 100MB)
 - Verify MIME type detection
 
-### 🎬 Video Loop Issues
+### Webcam Recording Issues
 - Check browser MediaRecorder API support
 - Verify camera permissions
-- Clear browser storage if queue issues occur
-- Check console for JavaScript errors
+- Ensure HTTPS in production (required for camera access)
 
-## 📚 Additional Documentation
+## Dependencies
 
-- **VIDEO_LOOP_README.md**: Comprehensive guide to the video creation loop system
-- **COMPLIANCE.md**: Feature compliance and testing status
-- **FRONTEND_README.md**: Frontend implementation details
+### Production Dependencies
+- Django 4.2+
+- Django REST Framework
+- Pillow (image processing)
+- python-magic (file type detection)
+- django-filter
+- django-cors-headers
+- psutil (system monitoring)
+- redis (caching)
+- django-prometheus (metrics)
+- django-health-check (health monitoring)
+- django-debug-toolbar (development)
 
 ## License
 
@@ -270,4 +265,4 @@ This project is for educational and development purposes.
 
 ---
 
-**🎬 Transform your LMS into an engaging video creation platform!**
+**A simple, focused LMS platform for video-based learning exercises.**
