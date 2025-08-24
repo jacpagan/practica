@@ -1,8 +1,8 @@
-# 🐳 LMS Docker Setup Summary
+# 🐳 Practika Docker Setup Summary
 
 ## ✅ Successfully Completed
 
-The LMS application has been successfully dockerized and is running properly in Docker containers.
+The Practika application has been successfully dockerized and is running properly in Docker containers.
 
 ## 🏗️ Docker Configuration Created
 
@@ -237,7 +237,7 @@ make shell                           # Open Django shell
 
 ## 🏆 Conclusion
 
-The LMS application has been successfully dockerized and is running properly in both development and production configurations. The Docker setup includes:
+The Practika application has been successfully dockerized and is running properly in both development and production configurations. The Docker setup includes:
 
 - **Multi-environment support** (dev/prod)
 - **Security hardening** (non-root users, security headers)

@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Simple Docker test script for LMS application
+# Simple Docker test script for Practika application
 
-echo "🐳 Testing LMS Docker Setup"
+echo "🐳 Testing Practika Docker Setup"
 echo "============================"
 
 # Check if Docker is running

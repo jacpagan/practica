@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Docker helper script for LMS application
+# Docker helper script for Practika application
 
 set -e
 
@@ -164,7 +164,7 @@ status() {
 
 # Function to show help
 show_help() {
-    echo "LMS Docker Helper Script"
+    echo "Practika Docker Helper Script"
     echo ""
     echo "Usage: $0 [COMMAND]"
     echo ""

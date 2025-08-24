@@ -1,4 +1,4 @@
-# LMS Exercise Platform
+# Practika Exercise Platform
 
 A Django-based Learning Management System focused on video-based exercises and comments. This platform allows administrators to create exercises with video content and authenticated users to view exercises and create video comments.
 
@@ -6,7 +6,7 @@ A Django-based Learning Management System focused on video-based exercises and c
 
 1. **Start the server:**
    ```bash
-   source .venv/bin/activate
+   source .practika-venv/bin/activate
    python manage.py runserver
    ```
 
@@ -101,7 +101,7 @@ The application uses an SVG sprite system with consistent icon mappings across a
 ## 📁 Project Structure
 
 ```
-LMS/
+Practika/
 ├── core/                    # Core functionality and VideoAsset model
 │   ├── models.py           # VideoAsset model with validation and monitoring
 │   ├── services/           # Storage service for video files
@@ -133,7 +133,7 @@ LMS/
 │   ├── test_security.py    # Security and rate limiting tests
 │   ├── test_a11y_icons.py # Icon accessibility tests
 │   └── test_ui_nonreader_flow.py # UI flow tests
-├── lms_project/            # Django project settings
+├── practika_project/            # Django project settings
 ├── media/                  # Video file storage
 ├── requirements.txt        # Production dependencies
 ├── requirements-dev.txt    # Development dependencies
@@ -153,13 +153,13 @@ LMS/
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd LMS
+   cd Practika
    ```
 
 2. **Create and activate virtual environment**
    ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
+   python3 -m venv .practika-venv
+source .practika-venv/bin/activate
    ```
 
 3. **Install dependencies**
@@ -401,7 +401,7 @@ This project is for educational and development purposes.
 
 ---
 
-**A simple, focused LMS platform for video-based learning exercises with accessibility features.**
+**A simple, focused Practika platform for video-based learning exercises with accessibility features.**
 
 **Built with Django, HTML5, and modern JavaScript**  
 **Video recording powered by MediaRecorder API**  

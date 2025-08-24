@@ -2,7 +2,7 @@
 
 # Default target
 help:
-	@echo "LMS Docker Management"
+	@echo "Practika Docker Management"
 	@echo ""
 	@echo "Available commands:"
 	@echo "  make dev-up      - Start development environment"

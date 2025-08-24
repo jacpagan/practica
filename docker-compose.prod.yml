@@ -22,7 +22,7 @@ services:
     depends_on:
       - redis
     networks:
-      - lms-network
+      - practika-network
     restart: unless-stopped
     deploy:
       replicas: 2
@@ -41,7 +41,7 @@ services:
     volumes:
       - redis_data:/data
     networks:
-      - lms-network
+      - practika-network
     restart: unless-stopped
     deploy:
       resources:
@@ -61,12 +61,12 @@ services:
     depends_on:
       - web
     networks:
-      - lms-network
+      - practika-network
     restart: unless-stopped
 
 volumes:
   redis_data:
 
 networks:
-  lms-network:
+  practika-network:
     driver: bridge

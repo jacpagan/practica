@@ -1,6 +1,6 @@
-# Docker Setup for LMS Application
+# Docker Setup for Practika Application
 
-This document provides comprehensive instructions for running the LMS application using Docker.
+This document provides comprehensive instructions for running the Practika application using Docker.
 
 ## 🐳 Prerequisites
 

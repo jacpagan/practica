@@ -11,7 +11,7 @@ from django.core.files.storage import FileSystemStorage
 from django.core.files.base import ContentFile
 from django.core.exceptions import ValidationError
 from core.models import VideoAsset
-from core.exceptions import VideoProcessingError, StorageError, ValidationError as LMSValidationError
+from core.exceptions import VideoProcessingError, StorageError, ValidationError as PractikaValidationError
 
 logger = logging.getLogger(__name__)
 

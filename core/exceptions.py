@@ -235,13 +235,13 @@ def _get_client_ip(request):
     return ip
 
 
-class LMSException(APIException):
+class PractikaException(APIException):
     """
-    Base exception class for LMS-specific errors
+    Base exception class for Practika-specific errors
     """
     status_code = status.HTTP_400_BAD_REQUEST
-    default_detail = 'An error occurred in the LMS system.'
-    default_code = 'lms_error'
+    default_detail = 'An error occurred in the Practika system.'
+    default_code = 'practika_error'
     
     def __init__(self, detail=None, code=None, error_code=None, suggestions=None):
         super().__init__(detail, code)
@@ -249,21 +249,21 @@ class LMSException(APIException):
         self.suggestions = suggestions or []
 
 
-class VideoProcessingError(LMSException):
+class VideoProcessingError(PractikaException):
     """Exception for video processing errors"""
     status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
     default_detail = 'Video processing failed.'
     default_code = 'video_processing_error'
 
 
-class StorageError(LMSException):
+class StorageError(PractikaException):
     """Exception for storage-related errors"""
     status_code = status.HTTP_507_INSUFFICIENT_STORAGE
     default_detail = 'Storage operation failed.'
     default_code = 'storage_error'
 
 
-class ValidationError(LMSException):
+class ValidationError(PractikaException):
     """Exception for validation errors"""
     status_code = status.HTTP_400_BAD_REQUEST
     default_detail = 'Data validation failed.'

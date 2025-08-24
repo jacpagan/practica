@@ -5,7 +5,7 @@ FROM python:3.11-slim as base
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
-    DJANGO_SETTINGS_MODULE=lms_project.settings \
+    DJANGO_SETTINGS_MODULE=practika_project.settings \
     DJANGO_ENVIRONMENT=production \
     DJANGO_DEBUG=False
 

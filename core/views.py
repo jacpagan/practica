@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 @permission_classes([AllowAny])
 def health_check(request):
     """
-    Comprehensive health check endpoint for the LMS system
+    Comprehensive health check endpoint for the Practika system
     """
     start_time = time.time()
     health_status = {
@@ -273,25 +273,25 @@ def metrics(request):
         disk = psutil.disk_usage('/')
         
         metrics_data.extend([
-            f'# HELP lms_cpu_percent CPU usage percentage',
-            f'# TYPE lms_cpu_percent gauge',
-            f'lms_cpu_percent {cpu_percent}',
+            f'# HELP practika_cpu_percent CPU usage percentage',
+            f'# TYPE practika_cpu_percent gauge',
+            f'practika_cpu_percent {cpu_percent}',
             '',
-            f'# HELP lms_memory_percent Memory usage percentage',
-            f'# TYPE lms_memory_percent gauge',
-            f'lms_memory_percent {memory.percent}',
+            f'# HELP practika_memory_percent Memory usage percentage',
+            f'# TYPE practika_memory_percent gauge',
+            f'practika_memory_percent {memory.percent}',
             '',
-            f'# HELP lms_memory_bytes Memory usage in bytes',
-            f'# TYPE lms_memory_bytes gauge',
-            f'lms_memory_bytes {memory.used}',
+            f'# HELP practika_memory_bytes Memory usage in bytes',
+            f'# TYPE practika_memory_bytes gauge',
+            f'practika_memory_bytes {memory.used}',
             '',
-            f'# HELP lms_disk_percent Disk usage percentage',
-            f'# TYPE lms_disk_percent gauge',
-            f'lms_disk_percent {disk.percent}',
+            f'# HELP practika_disk_percent Disk usage percentage',
+            f'# TYPE practika_disk_percent gauge',
+            f'practika_disk_percent {disk.percent}',
             '',
-            f'# HELP lms_disk_free_bytes Free disk space in bytes',
-            f'# TYPE lms_disk_free_bytes gauge',
-            f'lms_disk_free_bytes {disk.free}',
+            f'# HELP practika_disk_free_bytes Free disk space in bytes',
+            f'# TYPE practika_disk_free_bytes gauge',
+            f'practika_disk_free_bytes {disk.free}',
         ])
     except Exception as e:
         logger.error(f"Failed to collect system metrics: {e}")
@@ -304,9 +304,9 @@ def metrics(request):
             
         metrics_data.extend([
             '',
-            f'# HELP lms_database_tables Total number of database tables',
-            f'# TYPE lms_database_tables gauge',
-            f'lms_database_tables {table_count}',
+            f'# HELP practika_database_tables Total number of database tables',
+            f'# TYPE practika_database_tables gauge',
+            f'practika_database_tables {table_count}',
         ])
     except Exception as e:
         logger.error(f"Failed to collect database metrics: {e}")
@@ -321,13 +321,13 @@ def metrics(request):
             
             metrics_data.extend([
                 '',
-                f'# HELP lms_storage_free_bytes Free storage space in bytes',
-                f'# TYPE lms_storage_free_bytes gauge',
-                f'lms_storage_free_bytes {free_space}',
+                            f'# HELP practika_storage_free_bytes Free storage space in bytes',
+            f'# TYPE practika_storage_free_bytes gauge',
+            f'practika_storage_free_bytes {free_space}',
                 '',
-                f'# HELP lms_storage_total_bytes Total storage space in bytes',
-                f'# TYPE lms_storage_total_bytes gauge',
-                f'lms_storage_total_bytes {total_space}',
+                            f'# HELP practika_storage_total_bytes Total storage space in bytes',
+            f'# TYPE practika_storage_total_bytes gauge',
+            f'practika_storage_total_bytes {total_space}',
             ])
     except Exception as e:
         logger.error(f"Failed to collect storage metrics: {e}")
@@ -336,9 +336,9 @@ def metrics(request):
     request_id = getattr(request, 'request_id', 'unknown')
     metrics_data.extend([
         '',
-        f'# HELP lms_request_id Current request ID for correlation',
-        f'# TYPE lms_request_id gauge',
-        f'lms_request_id{{id="{request_id}"}} 1',
+        f'# HELP practika_request_id Current request ID for correlation',
+        f'# TYPE practika_request_id gauge',
+        f'practika_request_id{{id="{request_id}"}} 1',
     ])
     
     return Response('\n'.join(metrics_data), content_type='text/plain')

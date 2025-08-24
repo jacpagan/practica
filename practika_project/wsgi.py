@@ -1,5 +1,5 @@
 """
-WSGI config for lms_project project.
+WSGI config for practika_project project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
 
@@ -11,6 +11,6 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "lms_project.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "practika_project.settings")
 
 application = get_wsgi_application()

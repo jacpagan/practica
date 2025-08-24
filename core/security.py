@@ -1,5 +1,5 @@
 """
-Security utilities for the LMS system
+Security utilities for the Practika system
 """
 import re
 import hashlib
