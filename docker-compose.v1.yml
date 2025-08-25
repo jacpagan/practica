@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.v1
+    ports:
+      - "8000:8000"
+    environment:
+      - DJANGO_ENVIRONMENT=development
+      - DJANGO_DEBUG=True
+      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+      - DJANGO_DB_ENGINE=django.db.backends.sqlite3
+      - DJANGO_DB_NAME=db.sqlite3
+      - USE_S3=False
+      - DJANGO_CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+    volumes:
+      - .:/app
+      - media_data:/app/media
+    command: python manage.py runserver 0.0.0.0:8000
+
+volumes:
+  media_data:
+

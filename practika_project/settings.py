@@ -64,16 +64,6 @@ if IS_DEVELOPMENT:
     
     # Additional security headers
     SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
-    
-    # Rate limiting settings
-    RATE_LIMIT_ENABLED = True
-    LOGIN_RATE_LIMIT = '5/minute'  # 5 attempts per minute
-    UPLOAD_RATE_LIMIT = '10/minute'  # 10 uploads per minute
-    
-    # Security logging
-    SECURITY_LOGGING_ENABLED = True
-    FAILED_LOGIN_ATTEMPTS_LIMIT = 5
-    ACCOUNT_LOCKOUT_DURATION = 300  # 5 minutes
 
 # Application definition
 
@@ -102,10 +92,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "core.middleware.RequestLoggingMiddleware",
-    "core.middleware.PerformanceMonitoringMiddleware",
-    "core.middleware.SecurityMiddleware",
-    "core.middleware.MobileOptimizationMiddleware",  # Mobile optimization middleware
 ]
 
 ROOT_URLCONF = "practika_project.urls"
@@ -150,7 +136,6 @@ DATABASES = {
 # Database connection pooling and optimization
 if not IS_DEVELOPMENT:
     DATABASES['default']['CONN_MAX_AGE'] = 600
-    DATABASES['default']['OPTIONS']['MAX_CONNS'] = 20
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -238,7 +223,6 @@ REST_FRAMEWORK = {
         "anon": "100/hour",
         "user": "1000/hour"
     },
-    "EXCEPTION_HANDLER": "core.exceptions.custom_exception_handler",
 }
 
 # Default primary key field type
@@ -255,193 +239,77 @@ FILE_UPLOAD_TEMP_DIR = os.getenv('DJANGO_FILE_UPLOAD_TEMP_DIR', None)
 CORS_ALLOWED_ORIGINS = os.getenv('DJANGO_CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',')
 CORS_ALLOW_CREDENTIALS = True
 
-# Cache settings
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache" if not IS_DEVELOPMENT else "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": os.getenv('DJANGO_REDIS_URL', '127.0.0.1:6379/1'),
-        "OPTIONS": {
-            "CLIENT_CLASS": "redis.client.DefaultClient",
-            "CONNECTION_POOL_KWARGS": {
-                "ssl_cert_reqs": None,  # Disable SSL certificate verification for Heroku Redis
-                "ssl": True,
-            } if not IS_DEVELOPMENT else {},
-        } if not IS_DEVELOPMENT else {},
-        "TIMEOUT": 300,
-        "KEY_PREFIX": "practika",
+# Storage configuration
+USE_S3 = os.getenv('USE_S3', 'False').lower() == 'true'
+
+if USE_S3:
+    # S3 storage configuration
+    AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+    AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
+    AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME', 'us-east-1')
+    AWS_S3_CUSTOM_DOMAIN = os.getenv('AWS_S3_CUSTOM_DOMAIN')
+    
+    # S3 storage backend
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+    
+    # S3 settings
+    AWS_S3_OBJECT_PARAMETERS = {
+        'CacheControl': 'max-age=86400',
     }
-}
+    AWS_DEFAULT_ACL = 'public-read'
+    AWS_QUERYSTRING_AUTH = False
+else:
+    # Local file system storage
+    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
 
 # Logging configuration
-LOGGING_CONFIG = None
-
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
-        },
         'simple': {
-            'format': '{levelname} {message}',
+            'format': '{levelname} {asctime} {module} {message}',
             'style': '{',
         },
         'json': {
-            'format': '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "message": "%(message)s", "module": "%(module)s", "function": "%(funcName)s", "line": "%(lineno)d"}',
-        },
-    },
-    'filters': {
-        'require_debug_true': {
-            '()': 'django.utils.log.RequireDebugTrue',
-        },
-        'require_debug_false': {
-            '()': 'django.utils.log.RequireDebugFalse',
+            'format': '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "message": "%(message)s"}',
         },
     },
     'handlers': {
         'console': {
-            'level': 'DEBUG' if DEBUG else 'INFO',
+            'level': 'INFO',
             'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
-        },
-        'file': {
-            'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'django.log',
-            'maxBytes': 1024 * 1024 * 10,  # 10MB
-            'backupCount': 5,
-            'formatter': 'verbose',
-        },
-        'error_file': {
-            'level': 'ERROR',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'error.log',
-            'maxBytes': 1024 * 1024 * 10,  # 10MB
-            'backupCount': 5,
-            'formatter': 'verbose',
-        },
-        'security_file': {
-            'level': 'WARNING',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'security.log',
-            'maxBytes': 1024 * 1024 * 10,  # 10MB
-            'backupCount': 5,
-            'formatter': 'verbose',
-        },
-    },
-    'loggers': {
-        'django': {
-            'handlers': ['console', 'file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'django.request': {
-            'handlers': ['console', 'error_file'],
-            'level': 'ERROR',
-            'propagate': False,
-        },
-        'django.security': {
-            'handlers': ['console', 'security_file'],
-            'level': 'WARNING',
-            'propagate': False,
-        },
-        'django.db.backends': {
-            'handlers': ['console'] if DEBUG else [],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-        'core': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG' if DEBUG else 'INFO',
-            'propagate': False,
-        },
-        'exercises': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG' if DEBUG else 'INFO',
-            'propagate': False,
-        },
-        'comments': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG' if DEBUG else 'INFO',
-            'propagate': False,
+            'formatter': 'json' if not DEBUG else 'simple',
         },
     },
     'root': {
-        'handlers': ['console', 'file'],
+        'handlers': ['console'],
         'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'core': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'exercises': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'comments': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
 
 # Initialize logging
-# Create logs directory if it doesn't exist
-os.makedirs(BASE_DIR / 'logs', exist_ok=True)
-
-# Initialize logging after directory creation
 logging.config.dictConfig(LOGGING)
-
-# Performance monitoring
-PERFORMANCE_MONITORING = {
-    'ENABLED': os.getenv('DJANGO_PERFORMANCE_MONITORING', 'True').lower() == 'true',
-    'SLOW_QUERY_THRESHOLD': float(os.getenv('DJANGO_SLOW_QUERY_THRESHOLD', 1.0)),  # seconds
-    'LOG_SLOW_QUERIES': True,
-    'LOG_MEMORY_USAGE': True,
-}
-
-# Health check settings
-HEALTH_CHECK = {
-    'ENABLED': True,
-    'DATABASE_CHECK': True,
-    'CACHE_CHECK': True,
-    'STORAGE_CHECK': True,
-}
-
-# API Documentation
-API_DOCUMENTATION = {
-    'ENABLED': True,
-    'TITLE': 'Practika API',
-    'DESCRIPTION': 'Learning Management System API',
-    'VERSION': '1.0.0',
-}
-
-# Rate limiting
-RATE_LIMITING = {
-    'ENABLED': True,
-    'DEFAULT_RATE': '100/hour',
-    'BURST_RATE': '200/hour',
-}
-
-# Security headers
-SECURITY_HEADERS = {
-    'X_CONTENT_TYPE_OPTIONS': 'nosniff',
-    'X_FRAME_OPTIONS': 'DENY',
-    'X_XSS_PROTECTION': '1; mode=block',
-    'STRICT_TRANSPORT_SECURITY': 'max-age=31536000; includeSubDomains' if IS_PRODUCTION else None,
-}
-
-# Monitoring and metrics
-METRICS = {
-    'ENABLED': True,
-    'PROMETHEUS_ENABLED': os.getenv('DJANGO_PROMETHEUS_ENABLED', 'False').lower() == 'true',
-    'HEALTH_CHECK_ENDPOINT': '/health/',
-    'METRICS_ENDPOINT': '/metrics/',
-}
-
-# Mobile optimization settings
-MOBILE_OPTIMIZATION = {
-    'ENABLED': os.getenv('MOBILE_OPTIMIZATION_ENABLED', 'True').lower() == 'true',
-    'PWA_ENABLED': os.getenv('PWA_ENABLED', 'True').lower() == 'true',
-    'VIDEO_COMPRESSION_ENABLED': os.getenv('VIDEO_COMPRESSION_ENABLED', 'False').lower() == 'true',
-    'CAMERA_QUALITY': os.getenv('MOBILE_CAMERA_QUALITY', '720p'),
-    'MAX_RECORDING_TIME': int(os.getenv('MOBILE_MAX_RECORDING_TIME', 300)),
-    'TOUCH_TARGET_SIZE': os.getenv('MOBILE_TOUCH_TARGET_SIZE', 'standard'),  # standard, medium, large
-    'PERFORMANCE_MODE': os.getenv('MOBILE_PERFORMANCE_MODE', 'balanced'),  # conservative, balanced, optimized
-}
-
-# Log mobile optimization status
-import logging
-logger = logging.getLogger(__name__)
-logger.info(f"Mobile optimization enabled: {MOBILE_OPTIMIZATION['ENABLED']}")
-logger.info(f"PWA enabled: {MOBILE_OPTIMIZATION['PWA_ENABLED']}")
-logger.info(f"Mobile camera quality: {MOBILE_OPTIMIZATION['CAMERA_QUALITY']}")
-logger.info(f"Mobile max recording time: {MOBILE_OPTIMIZATION['MAX_RECORDING_TIME']} seconds")
