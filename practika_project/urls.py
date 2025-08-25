@@ -20,5 +20,5 @@ urlpatterns = [
     path('app/', home_redirect, name='app_home'),
     path('core/', include('core.urls')),
     path('exercises/', include('exercises.urls')),
-    path('comments/', include('core.urls')),
+    path('comments/', include('comments.urls')),
 ]

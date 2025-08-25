@@ -4,7 +4,7 @@ Simplified configuration for Heroku stability
 """
 
 import os
-import multiprocessing
+
 
 # Server socket
 bind = f"0.0.0.0:{os.environ.get('PORT', '8000')}"
@@ -64,7 +64,7 @@ limit_request_field_size = 8190
 
 # Environment variables
 raw_env = [
-    'DJANGO_SETTINGS_MODULE=practika_project.settings_production',
+    'DJANGO_SETTINGS_MODULE=practika_project.settings',
     'PYTHONPATH=/app',
 ]
 
