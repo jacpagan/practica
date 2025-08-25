@@ -611,6 +611,7 @@ def upload_test_page(request):
 
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def debug_settings(request):
     """Debug endpoint to show current video upload settings"""
     from django.conf import settings
