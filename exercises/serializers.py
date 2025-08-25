@@ -26,10 +26,13 @@ class ExerciseSerializer(serializers.ModelSerializer):
         if not video_file:
             raise serializers.ValidationError("Video file is required")
         
-        # Create video asset first
+        # Create video asset first with user context
         from core.services.storage import VideoStorageService
         storage_service = VideoStorageService()
-        video_asset = storage_service.store_uploaded_video(video_file)
+        
+        # Get user from context
+        user = self.context.get('request').user if self.context.get('request') else None
+        video_asset = storage_service.store_uploaded_video(video_file, user)
         
         # Create exercise
         validated_data['video_asset'] = video_asset

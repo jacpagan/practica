@@ -50,30 +50,25 @@ def exercise_create(request):
                 messages.error(request, 'Video file is required.')
                 return render(request, 'exercises/exercise_create.html')
             
-            # Create the exercise using the API serializer
-            from exercises.serializers import ExerciseSerializer
-            from core.models import VideoAsset
-            from core.services.storage import VideoStorageService
-            
-            # Store the video first
-            storage_service = VideoStorageService()
-            video_asset = storage_service.store_uploaded_video(video_file, request.user)
-            
-            # Create exercise data
+            # Create exercise data - let the serializer handle video processing
             exercise_data = {
                 'name': name,
                 'description': description,
-                'video_asset': video_asset.id,
-                'created_by': request.user.id
+                'video': video_file,  # Pass the video file directly
             }
             
-            serializer = ExerciseSerializer(data=exercise_data)
+            # Create serializer with request context for user access
+            from exercises.serializers import ExerciseSerializer
+            serializer = ExerciseSerializer(data=exercise_data, context={'request': request})
+            
             if serializer.is_valid():
                 exercise = serializer.save()
                 messages.success(request, f'Exercise "{exercise.name}" created successfully!')
                 return redirect('exercise_detail', exercise_id=exercise.id)
             else:
                 messages.error(request, f'Error creating exercise: {serializer.errors}')
+                # Log the validation errors for debugging
+                logger.error(f"Exercise creation validation failed: {serializer.errors}")
                 
         except Exception as e:
             logger.error(f"Error creating exercise: {e}")

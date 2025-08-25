@@ -224,7 +224,7 @@ class VideoStorageService:
         logger.info("Malware scan simulation completed")
     
     def _detect_mime_type(self, uploaded_file):
-        """Detect MIME type using multiple methods"""
+        """Detect MIME type using multiple methods with fallback for webcam recordings"""
         try:
             # Method 1: Use python-magic
             if hasattr(magic, 'from_buffer'):
@@ -232,15 +232,22 @@ class VideoStorageService:
                 uploaded_file.seek(0)
                 logger.debug(f"MIME type detected by magic: {mime_type}")
                 
-                if mime_type not in self.accepted_mime_types:
+                # Accept the MIME type if it's in our accepted list
+                if mime_type in self.accepted_mime_types:
+                    return mime_type
+                
+                # Special handling for webcam recordings that might be detected as text/plain
+                # Check if this is likely a video file despite MIME type detection
+                if mime_type == 'text/plain' and self._is_likely_video_file(uploaded_file):
+                    logger.warning(f"MIME type detected as 'text/plain' but file appears to be video. Using extension-based detection.")
+                    # Fall through to extension-based detection
+                elif mime_type not in self.accepted_mime_types:
                     raise ValidationError(
                         f"MIME type '{mime_type}' is not allowed. "
                         f"Accepted types: {', '.join(self.accepted_mime_types)}"
                     )
-                
-                return mime_type
             
-            # Method 2: Fallback to file extension
+            # Method 2: Fallback to file extension (more reliable for webcam recordings)
             file_extension = Path(uploaded_file.name).suffix.lower()
             extension_mime_map = {
                 '.mp4': 'video/mp4',
@@ -250,6 +257,7 @@ class VideoStorageService:
             }
             
             if file_extension in extension_mime_map:
+                logger.debug(f"Using extension-based MIME type detection: {extension_mime_map[file_extension]}")
                 return extension_mime_map[file_extension]
             
             raise ValidationError(f"Could not determine MIME type for file: {uploaded_file.name}")
@@ -257,6 +265,50 @@ class VideoStorageService:
         except Exception as e:
             logger.error(f"MIME type detection failed: {e}")
             raise ValidationError(f"MIME type validation failed: {e}")
+    
+    def _is_likely_video_file(self, uploaded_file):
+        """Check if a file is likely a video file despite MIME type detection issues"""
+        try:
+            # Check file extension
+            file_extension = Path(uploaded_file.name).suffix.lower()
+            video_extensions = ['.mp4', '.webm', '.mov', '.avi']
+            
+            if file_extension in video_extensions:
+                # For webcam recordings, even small files can be valid
+                # Check if file size is reasonable (at least 16 bytes for minimal headers)
+                if uploaded_file.size >= 16:
+                    # Check first few bytes for video file signatures
+                    uploaded_file.seek(0)
+                    header = uploaded_file.read(16)
+                    uploaded_file.seek(0)
+                    
+                    # Common video file signatures
+                    video_signatures = [
+                        b'\x00\x00\x00',  # MP4/QuickTime
+                        b'\x1a\x45\xdf\xa3',  # WebM
+                        b'RIFF',  # AVI
+                        b'\x00\x00\x00\x18',  # MP4
+                    ]
+                    
+                    for sig in video_signatures:
+                        if header.startswith(sig):
+                            logger.debug(f"Video signature detected: {sig}")
+                            return True
+                    
+                    # If extension is video and size is reasonable, assume it's a video file
+                    # This handles cases where webcam recordings might not have proper headers
+                    # Webcam recordings can be small initially, so we're more lenient
+                    logger.debug(f"Assuming video file based on extension {file_extension} and size {uploaded_file.size}")
+                    return True
+                else:
+                    logger.warning(f"File too small to be a valid video: {uploaded_file.size} bytes")
+                    return False
+            
+            return False
+            
+        except Exception as e:
+            logger.warning(f"Error checking if file is likely video: {e}")
+            return False
     
     def _generate_file_path(self, uploaded_file):
         """Generate unique filename and full path"""
