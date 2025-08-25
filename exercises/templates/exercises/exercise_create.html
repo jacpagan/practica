@@ -3,8 +3,8 @@
 {% block title %}Create Exercise - Practika{% endblock %}
 
 {% block content %}
-<div class="container">
-    <h1>🎬 Create New Exercise</h1>
+<div class="card">
+    <h1>Create New Exercise</h1>
     
     <form id="exerciseForm" method="post" enctype="multipart/form-data">
         {% csrf_token %}
@@ -19,60 +19,53 @@
             <textarea id="description" name="description" rows="3"></textarea>
         </div>
         
-        <!-- Cross-Device Video Recording Section -->
         <div class="form-group">
             <label>Video Recording:</label>
             <div id="videoSection" class="video-section">
-                <!-- Device Detection & Compatibility Info -->
                 <div id="deviceInfo" class="device-info">
                     <div id="compatibilityStatus"></div>
                     <div id="deviceCapabilities"></div>
                 </div>
                 
-                <!-- Camera Selection -->
                 <div class="camera-controls">
                     <button type="button" id="switchCamera" class="btn btn-secondary" style="display: none;">
-                        📷 Switch Camera
+                        Switch Camera
                     </button>
                     <select id="cameraSelect" class="form-control" style="display: none;">
                         <option value="">Select Camera...</option>
                     </select>
                 </div>
                 
-                <!-- Video Preview -->
                 <div class="video-preview">
                     <video id="videoPreview" playsinline muted style="display: none;"></video>
                     <canvas id="videoCanvas" style="display: none;"></canvas>
                     <div id="videoPlaceholder" class="video-placeholder">
-                        📱 Ready to record video
+                        Ready to record video
                     </div>
                 </div>
                 
-                <!-- Recording Controls -->
                 <div class="recording-controls">
                     <button type="button" id="startRecording" class="btn btn-primary">
-                        🎥 Start Recording
+                        Start Recording
                     </button>
                     <button type="button" id="stopRecording" class="btn btn-danger" style="display: none;">
-                        ⏹️ Stop Recording
+                        Stop Recording
                     </button>
                     <button type="button" id="retakeVideo" class="btn btn-warning" style="display: none;">
-                        🔄 Retake Video
+                        Retake Video
                     </button>
                 </div>
                 
-                <!-- Recording Status -->
                 <div id="recordingStatus" class="recording-status" style="display: none;">
-                    <div class="recording-indicator">🔴 Recording...</div>
+                    <div class="recording-indicator">Recording...</div>
                     <div id="recordingTimer">00:00</div>
                 </div>
                 
-                <!-- Fallback File Upload -->
                 <div id="fallbackUpload" class="fallback-upload" style="display: none;">
-                    <p>📁 Camera not available? Upload a video file instead:</p>
+                    <p>Camera not available? Upload a video file instead:</p>
                     <input type="file" id="videoFile" name="video" accept="video/*" capture="environment">
                     <label for="videoFile" class="file-upload-label">
-                        📁 Choose Video File
+                        Choose Video File
                     </label>
                 </div>
             </div>
@@ -82,12 +75,12 @@
             <label for="category">Category:</label>
             <select id="category" name="category" required>
                 <option value="">Select Category...</option>
-                <option value="strength">💪 Strength</option>
-                <option value="cardio">❤️ Cardio</option>
-                <option value="flexibility">🧘 Flexibility</option>
-                <option value="balance">⚖️ Balance</option>
-                <option value="sports">⚽ Sports</option>
-                <option value="other">📚 Other</option>
+                <option value="strength">Strength</option>
+                <option value="cardio">Cardio</option>
+                <option value="flexibility">Flexibility</option>
+                <option value="balance">Balance</option>
+                <option value="sports">Sports</option>
+                <option value="other">Other</option>
             </select>
         </div>
         
@@ -95,550 +88,320 @@
             <label for="difficulty">Difficulty Level:</label>
             <select id="difficulty" name="difficulty" required>
                 <option value="">Select Difficulty...</option>
-                <option value="beginner">🟢 Beginner</option>
-                <option value="intermediate">🟡 Intermediate</option>
-                <option value="advanced">🔴 Advanced</option>
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="advanced">Advanced</option>
             </select>
         </div>
         
         <div class="form-group">
-            <label for="tags">Tags (comma-separated):</label>
-            <input type="text" id="tags" name="tags" placeholder="e.g., push-ups, chest, bodyweight">
+            <label for="duration">Estimated Duration (minutes):</label>
+            <input type="number" id="duration" name="duration" min="1" max="180" value="10">
         </div>
         
-        <button type="submit" class="btn btn-success">✅ Create Exercise</button>
+        <div class="form-group">
+            <label for="equipment">Equipment Needed:</label>
+            <input type="text" id="equipment" name="equipment" placeholder="None, dumbbells, yoga mat, etc.">
+        </div>
+        
+        <div class="form-group">
+            <label for="instructions">Step-by-step Instructions:</label>
+            <textarea id="instructions" name="instructions" rows="5" placeholder="Provide clear, numbered instructions for the exercise..."></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="safety_notes">Safety Notes:</label>
+            <textarea id="safety_notes" name="safety_notes" rows="3" placeholder="Any safety precautions or contraindications..."></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="tags">Tags (comma-separated):</label>
+            <input type="text" id="tags" name="tags" placeholder="e.g., core, balance, beginner-friendly">
+        </div>
+        
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="is_public" name="is_public" checked>
+                Make this exercise public
+            </label>
+        </div>
+        
+        <div class="form-group">
+            <button type="submit" class="btn btn-success" id="submitBtn">
+                Create Exercise
+            </button>
+            <a href="/exercises/" class="btn btn-secondary">Cancel</a>
+        </div>
     </form>
 </div>
 
 <script>
-class CrossDeviceVideoRecorder {
-    constructor() {
-        this.stream = null;
-        this.mediaRecorder = null;
-        this.recordedChunks = [];
-        this.isRecording = false;
-        this.recordingStartTime = 0;
-        this.recordingTimer = null;
-        this.currentCamera = 'environment'; // Default to back camera
-        this.deviceCapabilities = this.detectDeviceCapabilities();
-        this.fallbackMethods = [];
-        
-        this.initializeElements();
-        this.setupEventListeners();
-        this.checkCompatibility();
-        this.setupFallbacks();
-    }
-    
-    detectDeviceCapabilities() {
-        const userAgent = navigator.userAgent.toLowerCase();
-        const isIOS = /iphone|ipad|ipod/.test(userAgent);
-        const isAndroid = /android/.test(userAgent);
-        const isOldDevice = this.isOldDevice(userAgent);
-        
-        return {
-            isIOS,
-            isAndroid,
-            isOldDevice,
-            hasMediaRecorder: typeof MediaRecorder !== 'undefined',
-            hasGetUserMedia: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
-            hasCanvasCapture: !!HTMLCanvasElement.prototype.captureStream,
-            hasFileAPI: !!window.File && !!window.FileReader,
-            userAgent: userAgent
-        };
-    }
-    
-    isOldDevice(userAgent) {
-        // Detect older iOS versions (before iOS 14)
-        const iosMatch = userAgent.match(/os (\d+)_/);
-        if (iosMatch && parseInt(iosMatch[1]) < 14) return true;
-        
-        // Detect older Android versions (before Android 10)
-        const androidMatch = userAgent.match(/android (\d+)/);
-        if (androidMatch && parseInt(androidMatch[1]) < 10) return true;
-        
-        // Detect older Safari versions
-        const safariMatch = userAgent.match(/version\/(\d+)/);
-        if (safariMatch && parseInt(safariMatch[1]) < 13) return true;
-        
-        return false;
-    }
-    
-    initializeElements() {
-        this.videoPreview = document.getElementById('videoPreview');
-        this.videoCanvas = document.getElementById('videoCanvas');
-        this.startRecordingBtn = document.getElementById('startRecording');
-        this.stopRecordingBtn = document.getElementById('stopRecording');
-        this.retakeVideoBtn = document.getElementById('retakeVideo');
-        this.switchCameraBtn = document.getElementById('switchCamera');
-        this.cameraSelect = document.getElementById('cameraSelect');
-        this.recordingStatus = document.getElementById('recordingStatus');
-        this.recordingTimer = document.getElementById('recordingTimer');
-        this.compatibilityStatus = document.getElementById('compatibilityStatus');
-        this.deviceCapabilities = document.getElementById('deviceCapabilities');
-        this.fallbackUpload = document.getElementById('fallbackUpload');
-        this.videoFile = document.getElementById('videoFile');
-    }
-    
-    setupEventListeners() {
-        this.startRecordingBtn.addEventListener('click', () => this.startRecording());
-        this.stopRecordingBtn.addEventListener('click', () => this.stopRecording());
-        this.retakeVideoBtn.addEventListener('click', () => this.retakeVideo());
-        this.switchCameraBtn.addEventListener('click', () => this.switchCamera());
-        this.videoFile.addEventListener('change', (e) => this.handleFileUpload(e));
-    }
-    
-    checkCompatibility() {
-        const capabilities = this.deviceCapabilities;
-        let status = '';
-        let capabilitiesText = '';
-        
-        if (capabilities.isOldDevice) {
-            status = '⚠️ Older Device Detected - Using Fallback Methods';
-            capabilitiesText = '📱 Device: ' + (capabilities.isIOS ? 'iOS' : capabilities.isAndroid ? 'Android' : 'Other') + 
-                             ' | 🎥 MediaRecorder: ' + (capabilities.hasMediaRecorder ? '✅' : '❌') +
-                             ' | 📹 Camera: ' + (capabilities.hasGetUserMedia ? '✅' : '❌');
-        } else {
-            status = '✅ Modern Device - Full Features Available';
-            capabilitiesText = '📱 Device: ' + (capabilities.isIOS ? 'iOS' : capabilities.isAndroid ? 'Android' : 'Other') + 
-                             ' | 🎥 MediaRecorder: ✅ | 📹 Camera: ✅';
+    // Video recording functionality
+    class VideoRecorder {
+        constructor(containerId) {
+            this.container = document.getElementById(containerId);
+            this.videoBlob = null;
+            this.mediaRecorder = null;
+            this.stream = null;
+            this.recordedChunks = [];
+            this.recordingTimer = null;
+            this.recordingStartTime = null;
+            
+            this.initializeCamera();
         }
         
-        this.compatibilityStatus.innerHTML = status;
-        this.deviceCapabilities.innerHTML = capabilitiesText;
-        
-        // Show fallback upload for older devices
-        if (capabilities.isOldDevice || !capabilities.hasMediaRecorder) {
-            this.fallbackUpload.style.display = 'block';
-        }
-    }
-    
-    setupFallbacks() {
-        // Add fallback methods for older devices
-        if (this.deviceCapabilities.isOldDevice) {
-            this.fallbackMethods.push('file_upload');
-            this.fallbackMethods.push('canvas_capture');
-        }
-        
-        // If no MediaRecorder, force file upload
-        if (!this.deviceCapabilities.hasMediaRecorder) {
-            this.startRecordingBtn.style.display = 'none';
-            this.fallbackUpload.style.display = 'block';
-        }
-    }
-    
-    async startRecording() {
-        try {
-            if (this.deviceCapabilities.isOldDevice && !this.deviceCapabilities.hasMediaRecorder) {
-                this.showError('Recording not supported on this device. Please use file upload instead.');
-                return;
-            }
-            
-            const constraints = {
-                video: {
-                    facingMode: this.currentCamera,
-                    width: { ideal: this.deviceCapabilities.isOldDevice ? 640 : 1280 },
-                    height: { ideal: this.deviceCapabilities.isOldDevice ? 480 : 720 },
-                    frameRate: { ideal: this.deviceCapabilities.isOldDevice ? 24 : 30 }
-                },
-                audio: true
-            };
-            
-            this.stream = await navigator.mediaDevices.getUserMedia(constraints);
-            this.videoPreview.srcObject = this.stream;
-            this.videoPreview.style.display = 'block';
-            this.videoPlaceholder.style.display = 'none';
-            
-            // Start recording
-            this.startMediaRecorder();
-            
-        } catch (error) {
-            console.error('Error starting recording:', error);
-            this.handleRecordingError(error);
-        }
-    }
-    
-    startMediaRecorder() {
-        try {
-            // Determine best MIME type for device
-            let mimeType = 'video/webm;codecs=vp9';
-            if (this.deviceCapabilities.isIOS) {
-                mimeType = 'video/mp4';
-            } else if (this.deviceCapabilities.isAndroid) {
-                mimeType = 'video/webm;codecs=vp8';
-            }
-            
-            // Check if MIME type is supported
-            if (!MediaRecorder.isTypeSupported(mimeType)) {
-                mimeType = 'video/webm';
-                if (!MediaRecorder.isTypeSupported(mimeType)) {
-                    mimeType = 'video/mp4';
+        async initializeCamera() {
+            try {
+                this.stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: 'user'
+                    }, 
+                    audio: true 
+                });
+                
+                const video = document.getElementById('videoPreview');
+                video.srcObject = this.stream;
+                video.style.display = 'block';
+                document.getElementById('videoPlaceholder').style.display = 'none';
+                
+                // Show camera controls
+                document.getElementById('startRecording').style.display = 'inline-block';
+                document.getElementById('switchCamera').style.display = 'inline-block';
+                
+                // Check for multiple cameras
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                
+                if (videoDevices.length > 1) {
+                    const cameraSelect = document.getElementById('cameraSelect');
+                    cameraSelect.style.display = 'inline-block';
+                    
+                    videoDevices.forEach(device => {
+                        const option = document.createElement('option');
+                        option.value = device.deviceId;
+                        option.textContent = device.label || `Camera ${cameraSelect.options.length + 1}`;
+                        cameraSelect.appendChild(option);
+                    });
+                    
+                    cameraSelect.addEventListener('change', () => this.switchCamera(device.deviceId));
                 }
+                
+            } catch (error) {
+                console.error('Camera access failed:', error);
+                this.showFallbackUpload();
+            }
+        }
+        
+        async switchCamera(deviceId) {
+            if (this.stream) {
+                this.stream.getTracks().forEach(track => track.stop());
             }
             
-            this.mediaRecorder = new MediaRecorder(this.stream, { mimeType });
+            try {
+                this.stream = await navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        deviceId: deviceId ? { exact: deviceId } : undefined,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: true
+                });
+                
+                const video = document.getElementById('videoPreview');
+                video.srcObject = this.stream;
+                
+            } catch (error) {
+                console.error('Failed to switch camera:', error);
+            }
+        }
+        
+        startRecording() {
+            if (!this.stream) return;
+            
+            this.recordedChunks = [];
+            this.mediaRecorder = new MediaRecorder(this.stream, {
+                mimeType: 'video/webm;codecs=vp9'
+            });
+            
             this.mediaRecorder.ondataavailable = (event) => {
                 if (event.data.size > 0) {
                     this.recordedChunks.push(event.data);
                 }
             };
             
-            this.mediaRecorder.onstop = () => this.handleRecordingComplete();
-            this.mediaRecorder.onerror = (error) => this.handleRecordingError(error);
+            this.mediaRecorder.onstop = () => {
+                this.videoBlob = new Blob(this.recordedChunks, { type: 'video/webm' });
+                this.showRecordingPreview();
+            };
             
-            // Start recording
-            this.mediaRecorder.start(1000); // 1 second chunks
-            this.isRecording = true;
-            this.recordingStartTime = Date.now();
+            this.mediaRecorder.start();
             this.startRecordingTimer();
-            
-            // Update UI
-            this.startRecordingBtn.style.display = 'none';
-            this.stopRecordingBtn.style.display = 'inline-block';
-            this.recordingStatus.style.display = 'block';
-            
-        } catch (error) {
-            console.error('Error starting MediaRecorder:', error);
-            this.handleRecordingError(error);
+            this.updateRecordingUI(true);
         }
-    }
-    
-    startRecordingTimer() {
-        this.recordingTimer = setInterval(() => {
-            const elapsed = Math.floor((Date.now() - this.recordingStartTime) / 1000);
-            const minutes = Math.floor(elapsed / 60);
-            const seconds = elapsed % 60;
-            this.recordingTimer.textContent = 
-                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            
-            // Auto-stop after 3 minutes for older devices
-            if (this.deviceCapabilities.isOldDevice && elapsed >= 180) {
-                this.stopRecording();
+        
+        stopRecording() {
+            if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+                this.mediaRecorder.stop();
+                this.stopRecordingTimer();
+                this.updateRecordingUI(false);
             }
-        }, 1000);
-    }
-    
-    stopRecording() {
-        if (this.mediaRecorder && this.isRecording) {
-            this.mediaRecorder.stop();
-            this.isRecording = false;
-            
+        }
+        
+        startRecordingTimer() {
+            this.recordingStartTime = Date.now();
+            this.recordingTimer = setInterval(() => {
+                const elapsed = Date.now() - this.recordingStartTime;
+                const seconds = Math.floor(elapsed / 1000);
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = seconds % 60;
+                
+                document.getElementById('recordingTimer').textContent = 
+                    `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+        
+        stopRecordingTimer() {
             if (this.recordingTimer) {
                 clearInterval(this.recordingTimer);
                 this.recordingTimer = null;
             }
-            
-            // Stop camera stream
-            if (this.stream) {
-                this.stream.getTracks().forEach(track => track.stop());
-                this.stream = null;
-            }
-            
-            // Update UI
-            this.stopRecordingBtn.style.display = 'none';
-            this.retakeVideoBtn.style.display = 'inline-block';
-            this.recordingStatus.style.display = 'none';
-        }
-    }
-    
-    handleRecordingComplete() {
-        if (this.recordedChunks.length > 0) {
-            const blob = new Blob(this.recordedChunks, { type: this.mediaRecorder.mimeType });
-            const url = URL.createObjectURL(blob);
-            
-            // Create video element for preview
-            this.videoPreview.src = url;
-            this.videoPreview.style.display = 'block';
-            
-            // Store blob for form submission
-            this.recordedVideoBlob = blob;
-            
-            this.showSuccess('Video recorded successfully!');
-        }
-    }
-    
-    handleRecordingError(error) {
-        console.error('Recording error:', error);
-        let message = 'Recording failed. ';
-        
-        if (error.name === 'NotAllowedError') {
-            message += 'Camera access denied. Please allow camera access and try again.';
-        } else if (error.name === 'NotFoundError') {
-            message += 'No camera found. Please use file upload instead.';
-        } else if (error.name === 'NotSupportedError') {
-            message += 'Your device does not support video recording. Please use file upload.';
-        } else {
-            message += 'Please try again or use file upload.';
         }
         
-        this.showError(message);
-        this.fallbackUpload.style.display = 'block';
-    }
-    
-    retakeVideo() {
-        this.recordedChunks = [];
-        this.recordedVideoBlob = null;
-        this.videoPreview.style.display = 'none';
-        this.videoPlaceholder.style.display = 'block';
-        this.retakeVideoBtn.style.display = 'none';
-        this.startRecordingBtn.style.display = 'inline-block';
-        
-        // Clean up previous blob URL
-        if (this.videoPreview.src) {
-            URL.revokeObjectURL(this.videoPreview.src);
-            this.videoPreview.src = '';
-        }
-    }
-    
-    async switchCamera() {
-        this.currentCamera = this.currentCamera === 'environment' ? 'user' : 'environment';
-        this.switchCameraBtn.textContent = `📷 ${this.currentCamera === 'environment' ? 'Front' : 'Back'} Camera`;
-        
-        if (this.stream) {
-            this.stopRecording();
-        }
-        
-        // Restart with new camera
-        setTimeout(() => this.startRecording(), 100);
-    }
-    
-    handleFileUpload(event) {
-        const file = event.target.files[0];
-        if (file) {
-            if (file.type.startsWith('video/')) {
-                this.recordedVideoBlob = file;
-                this.showSuccess('Video file selected successfully!');
-                
-                // Show preview
-                const url = URL.createObjectURL(file);
-                this.videoPreview.src = url;
-                this.videoPreview.style.display = 'block';
-                this.videoPlaceholder.style.display = 'none';
+        updateRecordingUI(isRecording) {
+            const startBtn = document.getElementById('startRecording');
+            const stopBtn = document.getElementById('stopRecording');
+            const retakeBtn = document.getElementById('retakeVideo');
+            const status = document.getElementById('recordingStatus');
+            
+            if (isRecording) {
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'inline-block';
+                status.style.display = 'block';
             } else {
-                this.showError('Please select a valid video file.');
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'none';
+                retakeBtn.style.display = 'inline-block';
+                status.style.display = 'none';
             }
         }
-    }
-    
-    showSuccess(message) {
-        this.showAlert(message, 'success');
-    }
-    
-    showError(message) {
-        this.showAlert(message, 'error');
-    }
-    
-    showAlert(message, type) {
-        const alertDiv = document.createElement('div');
-        alertDiv.className = `alert alert-${type === 'success' ? 'success' : 'danger'}`;
-        alertDiv.textContent = message;
         
-        const container = document.querySelector('.container');
-        container.insertBefore(alertDiv, container.firstChild);
-        
-        setTimeout(() => alertDiv.remove(), 5000);
-    }
-}
-
-// Initialize the cross-device video recorder
-document.addEventListener('DOMContentLoaded', () => {
-    const videoRecorder = new CrossDeviceVideoRecorder();
-    
-    // Form submission
-    document.getElementById('exerciseForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const formData = new FormData(e.target);
-        
-        // Add video data
-        if (videoRecorder.recordedVideoBlob) {
-            formData.append('video', videoRecorder.recordedVideoBlob, 'recorded_video.webm');
+        showRecordingPreview() {
+            const video = document.getElementById('videoPreview');
+            const canvas = document.getElementById('videoCanvas');
+            const placeholder = document.getElementById('videoPlaceholder');
+            
+            // Create preview from recorded video
+            const url = URL.createObjectURL(this.videoBlob);
+            video.src = url;
+            video.style.display = 'block';
+            placeholder.style.display = 'none';
+            
+            // Show retake button
+            document.getElementById('retakeVideo').style.display = 'inline-block';
         }
         
-        try {
-            const response = await fetch('/api/exercises/', {
+        reset() {
+            this.videoBlob = null;
+            this.recordedChunks = [];
+            
+            const video = document.getElementById('videoPreview');
+            const placeholder = document.getElementById('videoPlaceholder');
+            
+            if (this.stream) {
+                video.srcObject = this.stream;
+                video.style.display = 'block';
+                placeholder.style.display = 'none';
+            } else {
+                video.style.display = 'none';
+                placeholder.style.display = 'block';
+            }
+            
+            document.getElementById('startRecording').style.display = 'inline-block';
+            document.getElementById('stopRecording').style.display = 'none';
+            document.getElementById('retakeVideo').style.display = 'none';
+            document.getElementById('recordingStatus').style.display = 'none';
+        }
+        
+        showFallbackUpload() {
+            document.getElementById('fallbackUpload').style.display = 'block';
+            document.getElementById('startRecording').style.display = 'none';
+            document.getElementById('switchCamera').style.display = 'none';
+        }
+    }
+    
+    // Initialize video recorder
+    let videoRecorder;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        videoRecorder = new VideoRecorder('videoSection');
+        
+        // Event listeners
+        document.getElementById('startRecording').addEventListener('click', () => {
+            videoRecorder.startRecording();
+        });
+        
+        document.getElementById('stopRecording').addEventListener('click', () => {
+            videoRecorder.stopRecording();
+        });
+        
+        document.getElementById('retakeVideo').addEventListener('click', () => {
+            videoRecorder.reset();
+        });
+        
+        // Form submission
+        document.getElementById('exerciseForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const title = document.getElementById('title').value.trim();
+            if (!title) {
+                alert('Please enter an exercise title');
+                return;
+            }
+            
+            if (!videoRecorder.videoBlob && !document.getElementById('videoFile').files[0]) {
+                alert('Please record or upload a video');
+                return;
+            }
+            
+            // Create FormData
+            const formData = new FormData(this);
+            
+            // Add video data
+            if (videoRecorder.videoBlob) {
+                formData.set('video', videoRecorder.videoBlob, 'exercise.webm');
+            }
+            
+            // Submit form
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.textContent = 'Creating...';
+            submitBtn.disabled = true;
+            
+            fetch('/exercises/create/', {
                 method: 'POST',
                 body: formData,
                 headers: {
                     'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
                 }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.href = `/exercises/${data.exercise_id}/`;
+                } else {
+                    alert('Error creating exercise: ' + data.error);
+                    submitBtn.textContent = 'Create Exercise';
+                    submitBtn.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error creating exercise. Please try again.');
+                submitBtn.textContent = 'Create Exercise';
+                submitBtn.disabled = false;
             });
-            
-            if (response.ok) {
-                videoRecorder.showSuccess('Exercise created successfully!');
-                setTimeout(() => window.location.href = '/exercises/', 2000);
-            } else {
-                const error = await response.json();
-                videoRecorder.showError('Error creating exercise: ' + (error.message || 'Unknown error'));
-            }
-        } catch (error) {
-            console.error('Form submission error:', error);
-            videoRecorder.showError('Error submitting form. Please try again.');
-        }
+        });
     });
-});
 </script>
-
-<style>
-.video-section {
-    border: 2px dashed #ddd;
-    padding: 20px;
-    border-radius: 8px;
-    margin: 20px 0;
-}
-
-.device-info {
-    background: #f8f9fa;
-    padding: 15px;
-    border-radius: 5px;
-    margin-bottom: 20px;
-}
-
-.compatibility-status {
-    font-weight: bold;
-    margin-bottom: 10px;
-}
-
-.device-capabilities {
-    font-size: 0.9em;
-    color: #666;
-}
-
-.camera-controls {
-    margin-bottom: 20px;
-}
-
-.video-preview {
-    text-align: center;
-    margin: 20px 0;
-}
-
-.video-preview video {
-    max-width: 100%;
-    max-height: 300px;
-    border-radius: 8px;
-    border: 2px solid #007bff;
-}
-
-.video-placeholder {
-    padding: 40px;
-    background: #f8f9fa;
-    border: 2px dashed #ccc;
-    border-radius: 8px;
-    color: #666;
-    font-size: 1.2em;
-}
-
-.recording-controls {
-    text-align: center;
-    margin: 20px 0;
-}
-
-.recording-controls button {
-    margin: 0 10px;
-    padding: 10px 20px;
-    font-size: 1.1em;
-}
-
-.recording-status {
-    text-align: center;
-    background: #dc3545;
-    color: white;
-    padding: 15px;
-    border-radius: 8px;
-    margin: 20px 0;
-}
-
-.recording-indicator {
-    font-size: 1.2em;
-    font-weight: bold;
-    margin-bottom: 10px;
-}
-
-.recording-timer {
-    font-size: 2em;
-    font-weight: bold;
-    font-family: monospace;
-}
-
-.fallback-upload {
-    background: #fff3cd;
-    border: 1px solid #ffeaa7;
-    padding: 20px;
-    border-radius: 8px;
-    margin-top: 20px;
-}
-
-.file-upload-label {
-    display: inline-block;
-    padding: 10px 20px;
-    background: #007bff;
-    color: white;
-    border-radius: 5px;
-    cursor: pointer;
-    margin-top: 10px;
-}
-
-.file-upload-label:hover {
-    background: #0056b3;
-}
-
-#videoFile {
-    display: none;
-}
-
-.alert {
-    padding: 15px;
-    margin-bottom: 20px;
-    border-radius: 5px;
-}
-
-.alert-success {
-    background: #d4edda;
-    border: 1px solid #c3e6cb;
-    color: #155724;
-}
-
-.alert-danger {
-    background: #f8d7da;
-    border: 1px solid #f5c6cb;
-    color: #721c24;
-}
-
-/* Mobile-first responsive design */
-@media (max-width: 768px) {
-    .video-preview video {
-        max-height: 250px;
-    }
-    
-    .recording-controls button {
-        display: block;
-        width: 100%;
-        margin: 10px 0;
-    }
-    
-    .camera-controls {
-        text-align: center;
-    }
-    
-    .device-info {
-        font-size: 0.9em;
-    }
-}
-
-/* Older device optimizations */
-@media (max-width: 480px) {
-    .video-preview video {
-        max-height: 200px;
-    }
-    
-    .recording-timer {
-        font-size: 1.5em;
-    }
-    
-    .video-placeholder {
-        padding: 30px 20px;
-        font-size: 1em;
-    }
-}
-</style>
 {% endblock %}

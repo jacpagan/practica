@@ -27,7 +27,7 @@ if ! heroku auth:whoami &> /dev/null; then
 fi
 
 # Get the app name from the current git remote
-APP_NAME=$(git remote get-url origin | sed -n 's/.*heroku\.com[:/]\([^.]*\).*/\1/p')
+APP_NAME=$(git remote get-url heroku | sed -n 's/.*heroku\.com[:/]\([^.]*\).*/\1/p')
 
 if [ -z "$APP_NAME" ]; then
     echo "❌ Error: Could not determine Heroku app name from git remote."
