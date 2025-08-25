@@ -78,6 +78,10 @@
                             <span class="icon">⏱️</span>
                             <span id="video-duration">0:00</span>
                         </div>
+                        <div class="info-item" id="video-ready-indicator" style="display: none;">
+                            <span class="icon">✅</span>
+                            <span style="color: green; font-weight: bold;">Video Ready!</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -198,6 +202,10 @@
         async startRecording() {
             try {
                 this.status.textContent = 'Starting...';
+                
+                // Clear any previous recordings
+                this.recordedChunks = [];
+                
                 this.stream = await navigator.mediaDevices.getUserMedia({ 
                     video: true, 
                     audio: true 
@@ -211,10 +219,12 @@
                 this.mediaRecorder.ondataavailable = (event) => {
                     if (event.data.size > 0) {
                         this.recordedChunks.push(event.data);
+                        console.log('Video chunk received:', { size: event.data.size, totalChunks: this.recordedChunks.length });
                     }
                 };
                 
-                this.mediaRecorder.start();
+                // Request data every second to ensure we get chunks
+                this.mediaRecorder.start(1000);
                 this.isRecording = true;
                 this.recordingStartTime = Date.now();
                 this.startDurationTimer();
@@ -222,6 +232,8 @@
                 
                 this.status.textContent = 'Recording...';
                 this.status.className = 'recording-status recording';
+                
+                console.log('Recording started');
                 
             } catch (error) {
                 this.status.textContent = 'Camera access denied';
@@ -254,13 +266,27 @@
                 this.status.textContent = 'Processing...';
                 this.status.className = 'recording-status processing';
                 
-                // Simulate processing
-                setTimeout(() => {
-                    this.status.textContent = 'Ready!';
-                    this.status.className = 'recording-status ready';
-                    this.videoStatus.textContent = 'Video ready for upload';
-                    this.updateUI();
-                }, 1000);
+                // Wait for the final data to be available
+                this.mediaRecorder.onstop = () => {
+                    setTimeout(() => {
+                        this.status.textContent = 'Ready!';
+                        this.status.className = 'recording-status ready';
+                        this.videoStatus.textContent = 'Video ready for upload';
+                        this.updateUI();
+                        
+                        // Show video ready indicator
+                        document.getElementById('video-ready-indicator').style.display = 'block';
+                        
+                        // Enable the submit button
+                        document.getElementById('submit-btn').disabled = false;
+                        
+                        // Add visual feedback
+                        document.getElementById('submit-btn').classList.add('btn-success');
+                        document.getElementById('submit-btn').classList.remove('btn-secondary');
+                        
+                        console.log('Video recording completed and ready');
+                    }, 500);
+                };
             }
         }
         
@@ -282,9 +308,17 @@
         
         getVideoBlob() {
             if (this.recordedChunks.length > 0) {
-                return new Blob(this.recordedChunks, { type: 'video/webm' });
+                const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
+                console.log('Video blob created:', { size: blob.size, chunks: this.recordedChunks.length });
+                return blob;
             }
+            console.log('No video chunks available');
             return null;
+        }
+        
+        hasVideo() {
+            const blob = this.getVideoBlob();
+            return blob !== null && blob.size > 0;
         }
         
         reset() {
@@ -296,6 +330,10 @@
             this.time.textContent = '';
             this.videoStatus.textContent = 'No video recorded yet';
             this.videoDuration.textContent = '0:00';
+            
+            // Hide video ready indicator
+            document.getElementById('video-ready-indicator').style.display = 'none';
+            
             this.updateUI();
         }
     }
@@ -413,21 +451,24 @@
             let hasVideo = false;
             
             if (activeSource === 'webcam') {
-                hasVideo = videoRecorder.getVideoBlob() !== null;
+                hasVideo = videoRecorder.hasVideo();
+                console.log('Webcam video check:', { hasVideo, hasVideoMethod: videoRecorder.hasVideo() });
             } else {
-                hasVideo = document.getElementById('video-file').files.length > 0;
+                const fileInput = document.getElementById('video-file');
+                hasVideo = fileInput.files.length > 0 && fileInput.files[0].size > 0;
+                console.log('File upload check:', { hasVideo, fileCount: fileInput.files.length });
             }
             
             if (!hasVideo) {
                 e.preventDefault();
-                alert('Please record or upload a video first');
+                alert('Please record or upload a video first. Make sure the video is complete and ready.');
                 return;
             }
             
             // Convert webcam video to file if needed
             if (activeSource === 'webcam') {
                 const videoBlob = videoRecorder.getVideoBlob();
-                if (videoBlob) {
+                if (videoBlob && videoBlob.size > 0) {
                     // Create a file input for the webcam video
                     const fileInput = document.createElement('input');
                     fileInput.type = 'file';
@@ -444,6 +485,8 @@
                     
                     // Add to form
                     document.getElementById('exercise-form').appendChild(fileInput);
+                    
+                    console.log('Webcam video converted to file:', { fileName: videoFile.name, fileSize: videoFile.size });
                 }
             }
             
