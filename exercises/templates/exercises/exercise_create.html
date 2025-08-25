@@ -359,9 +359,12 @@
     }
     
     // Initialize when page loads
+    let videoRecorder; // Declare globally
+    
     document.addEventListener('DOMContentLoaded', function() {
         // Initialize video recorder
-        const videoRecorder = new SimpleVideoRecorder();
+        videoRecorder = new SimpleVideoRecorder();
+        console.log('VideoRecorder initialized:', videoRecorder);
         
         // Toggle between webcam and file upload
         const toggleBtns = document.querySelectorAll('.toggle-btn');
@@ -539,39 +542,50 @@
     
     // Debug function to check video status
     function debugVideoStatus() {
-        const activeSource = document.querySelector('.toggle-btn.active').dataset.source;
-        console.log('=== VIDEO DEBUG INFO ===');
-        console.log('Active source:', activeSource);
-        
-        if (activeSource === 'webcam') {
-            console.log('VideoRecorder state:', {
-                isRecording: videoRecorder.isRecording,
-                chunks: videoRecorder.recordedChunks ? videoRecorder.recordedChunks.length : 0,
-                hasVideo: videoRecorder.hasVideo(),
-                getVideoBlob: videoRecorder.getVideoBlob(),
-                forceRefresh: videoRecorder.forceRefreshVideo()
+        try {
+            const activeSource = document.querySelector('.toggle-btn.active').dataset.source;
+            console.log('=== VIDEO DEBUG INFO ===');
+            console.log('Active source:', activeSource);
+            
+            if (activeSource === 'webcam') {
+                if (typeof videoRecorder === 'undefined') {
+                    console.error('ERROR: videoRecorder is not defined!');
+                    console.log('Available global variables:', Object.keys(window).filter(key => key.includes('video') || key.includes('recorder')));
+                    return;
+                }
+                
+                console.log('VideoRecorder state:', {
+                    isRecording: videoRecorder.isRecording,
+                    chunks: videoRecorder.recordedChunks ? videoRecorder.recordedChunks.length : 0,
+                    hasVideo: videoRecorder.hasVideo(),
+                    getVideoBlob: videoRecorder.getVideoBlob(),
+                    forceRefresh: videoRecorder.forceRefreshVideo()
+                });
+            } else {
+                const fileInput = document.getElementById('video-file');
+                console.log('File input state:', {
+                    files: fileInput.files,
+                    fileCount: fileInput.files.length,
+                    firstFile: fileInput.files[0] ? {
+                        name: fileInput.files[0].name,
+                        size: fileInput.files[0].size,
+                        type: fileInput.files[0].type
+                    } : null
+                });
+            }
+            
+            // Test form validation
+            const name = document.getElementById('name').value.trim();
+            console.log('Form validation test:', {
+                name: name,
+                nameValid: !!name
             });
-        } else {
-            const fileInput = document.getElementById('video-file');
-            console.log('File input state:', {
-                files: fileInput.files,
-                fileCount: fileInput.files.length,
-                firstFile: fileInput.files[0] ? {
-                    name: fileInput.files[0].name,
-                    size: fileInput.files[0].size,
-                    type: fileInput.files[0].type
-                } : null
-            });
+            
+            alert('Check browser console for detailed video debug information');
+        } catch (error) {
+            console.error('Debug function error:', error);
+            alert('Error in debug function: ' + error.message);
         }
-        
-        // Test form validation
-        const name = document.getElementById('name').value.trim();
-        console.log('Form validation test:', {
-            name: name,
-            nameValid: !!name
-        });
-        
-        alert('Check browser console for detailed video debug information');
     }
 </script>
 {% endblock %}
