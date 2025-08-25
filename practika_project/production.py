@@ -94,25 +94,52 @@ if os.environ.get('DATABASE_URL'):
 
 # Redis configuration for production
 REDIS_URL = os.environ.get('DJANGO_REDIS_URL', 'redis://localhost:6379/1')
-CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': REDIS_URL,
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-            'CONNECTION_POOL_KWARGS': {
-                'max_connections': 50,
-                'retry_on_timeout': True,
-            },
-        },
-        'KEY_PREFIX': 'practika_prod',
-        'TIMEOUT': int(os.environ.get('DJANGO_CACHE_TIMEOUT', 300)),
-    }
-}
 
-# Session engine
-SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
-SESSION_CACHE_ALIAS = 'default'
+# Check if Redis is available and configure cache accordingly
+try:
+    import redis
+    redis_client = redis.from_url(REDIS_URL, socket_connect_timeout=1, socket_timeout=1)
+    redis_client.ping()
+    REDIS_AVAILABLE = True
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Redis connection successful: {REDIS_URL}")
+except Exception as e:
+    REDIS_AVAILABLE = False
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning(f"Redis connection failed: {e}. Falling back to local memory cache.")
+
+if REDIS_AVAILABLE:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': REDIS_URL,
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                'CONNECTION_POOL_KWARGS': {
+                    'max_connections': 50,
+                    'retry_on_timeout': True,
+                },
+            },
+            'KEY_PREFIX': 'practika_prod',
+            'TIMEOUT': int(os.environ.get('DJANGO_CACHE_TIMEOUT', 300)),
+        }
+    }
+    # Session engine
+    SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+    SESSION_CACHE_ALIAS = 'default'
+else:
+    # Fallback to local memory cache
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'unique-snowflake',
+            'TIMEOUT': int(os.environ.get('DJANGO_CACHE_TIMEOUT', 300)),
+        }
+    }
+    # Session engine
+    SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 
 # Static files configuration
 STATIC_ROOT = BASE_DIR / 'staticfiles'
@@ -321,9 +348,30 @@ RATE_LIMITING = {
     'ENABLED': RATE_LIMIT_ENABLED,
     'DEFAULT_RATE': '100/hour',
     'BURST_RATE': '200/hour',
-    'LOGIN_RATE': os.environ.get('LOGIN_RATE_LIMIT', '5/minute'),
-    'UPLOAD_RATE': UPLOAD_RATE_LIMIT,
 }
+
+# Conditionally configure REST framework based on Redis availability
+if REDIS_AVAILABLE:
+    # Use Redis-based throttling when available
+    REST_FRAMEWORK = {
+        'DEFAULT_THROTTLE_CLASSES': [
+            'rest_framework.throttling.AnonRateThrottle',
+            'rest_framework.throttling.UserRateThrottle'
+        ],
+        'DEFAULT_THROTTLE_RATES': {
+            'anon': '100/hour',
+            'user': '1000/hour'
+        },
+    }
+else:
+    # Disable throttling when Redis is not available
+    REST_FRAMEWORK = {
+        'DEFAULT_THROTTLE_CLASSES': [],
+        'DEFAULT_THROTTLE_RATES': {},
+    }
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning("Rate limiting disabled due to Redis unavailability")
 
 # Security monitoring
 SECURITY_LOGGING_ENABLED = True

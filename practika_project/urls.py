@@ -2,7 +2,7 @@
 URL configuration for practika_project project.
 """
 
-from django.urls import path
+from django.urls import path, include
 from django.http import HttpResponse
 
 def simple_home(request):
@@ -10,4 +10,7 @@ def simple_home(request):
 
 urlpatterns = [
     path('', simple_home, name='home'),
+    path('core/', include('core.urls')),
+    path('exercises/', include('exercises.urls')),
+    path('comments/', include('comments.urls')),
 ]
