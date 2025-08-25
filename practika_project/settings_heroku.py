@@ -20,6 +20,7 @@ ALLOWED_HOSTS = ['*']
 
 # Application definition - minimal apps to start
 INSTALLED_APPS = [
+    'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
