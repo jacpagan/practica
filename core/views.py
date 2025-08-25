@@ -608,3 +608,20 @@ def upload_test_page(request):
     Render the video upload test page
     """
     return render(request, 'test_video_upload.html')
+
+
+@api_view(['GET'])
+def debug_settings(request):
+    """Debug endpoint to show current video upload settings"""
+    from django.conf import settings
+    
+    debug_info = {
+        'ALLOWED_VIDEO_MIME_TYPES': getattr(settings, 'ALLOWED_VIDEO_MIME_TYPES', 'NOT_SET'),
+        'ALLOWED_VIDEO_EXTENSIONS': getattr(settings, 'ALLOWED_VIDEO_EXTENSIONS', 'NOT_SET'),
+        'MAX_UPLOAD_SIZE': getattr(settings, 'MAX_UPLOAD_SIZE', 'NOT_SET'),
+        'DEFAULT_FILE_STORAGE': getattr(settings, 'DEFAULT_FILE_STORAGE', 'NOT_SET'),
+        'AWS_STORAGE_BUCKET_NAME': getattr(settings, 'AWS_STORAGE_BUCKET_NAME', 'NOT_SET'),
+        'DJANGO_SETTINGS_MODULE': os.environ.get('DJANGO_SETTINGS_MODULE', 'NOT_SET'),
+    }
+    
+    return Response(debug_info)

@@ -12,4 +12,5 @@ urlpatterns = [
     path('api/videos/', views.list_videos, name='list_videos'),
     path('api/videos/<uuid:video_id>/delete/', views.delete_video, name='delete_video'),
     path('upload-test/', views.upload_test_page, name='upload_test_page'),
+    path('debug-settings/', views.debug_settings, name='debug_settings'),
 ]
