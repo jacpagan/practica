@@ -4,7 +4,21 @@
 
 {% block content %}
 <div class="card">
-    <h2>Available Exercises</h2>
+    <div class="header-controls">
+        <h2>Available Exercises</h2>
+        <div class="user-controls">
+            {% if user.is_authenticated %}
+                {% if user.is_staff %}
+                    <a href="{% url 'exercise_create' %}" class="btn btn-success">+ Create Exercise</a>
+                {% endif %}
+                <span class="user-info">Welcome, {{ user.username }}</span>
+                <a href="{% url 'logout' %}" class="btn btn-secondary">Logout</a>
+            {% else %}
+                <a href="{% url 'login' %}" class="btn btn-primary">Login</a>
+            {% endif %}
+        </div>
+    </div>
+    
     {% if exercise_list %}
         <div class="exercise-grid">
             {% for exercise in exercise_list %}
@@ -18,7 +32,7 @@
                 
                 <div class="video-container">
                     <video class="video-player" controls>
-                        <source src="/media/{{ exercise.video_asset.storage_path }}" type="{{ exercise.video_asset.mime_type }}">
+                        <source src="{{ exercise.video_asset.get_public_url }}" type="{{ exercise.video_asset.mime_type }}">
                         Your browser does not support the video tag.
                     </video>
                 </div>
@@ -33,6 +47,9 @@
         </div>
     {% else %}
         <p>No exercises available yet.</p>
+        {% if user.is_staff %}
+            <p><a href="{% url 'exercise_create' %}" class="btn btn-success">Create Your First Exercise</a></p>
+        {% endif %}
     {% endif %}
 </div>
 {% endblock %}

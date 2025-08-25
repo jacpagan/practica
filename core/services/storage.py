@@ -103,3 +103,67 @@ class VideoStorageService:
     def delete_video(self, storage_path):
         """Delete video file"""
         return self.backend.delete(storage_path)
+    
+    def store_uploaded_video(self, video_file):
+        """Store uploaded video and create VideoAsset record"""
+        try:
+            import magic
+            import os
+            from core.models import VideoAsset
+            
+            # Generate unique filename
+            import uuid
+            file_extension = os.path.splitext(video_file.name)[1]
+            unique_filename = f"videos/{uuid.uuid4()}{file_extension}"
+            
+            # Upload file to storage
+            storage_path = self.backend.upload(video_file, unique_filename)
+            
+            # Detect MIME type
+            try:
+                mime_type = magic.from_buffer(video_file.read(1024), mime=True)
+                video_file.seek(0)  # Reset file pointer
+            except Exception:
+                # Fallback to extension-based detection
+                mime_type = self._get_mime_type_from_extension(file_extension)
+            
+            # Create VideoAsset record
+            video_asset = VideoAsset.objects.create(
+                orig_filename=video_file.name,
+                storage_path=storage_path,
+                mime_type=mime_type,
+                size_bytes=video_file.size,
+                processing_status='completed'  # For now, assume completed
+            )
+            
+            logger.info(f"Video asset created: {video_asset.id} for file {video_file.name}")
+            return video_asset
+            
+        except Exception as e:
+            logger.error(f"Failed to store uploaded video: {e}")
+            raise
+    
+    def delete_video_asset(self, video_asset):
+        """Delete video asset and associated file"""
+        try:
+            # Delete the file
+            if self.backend.delete(video_asset.storage_path):
+                # Delete the database record
+                video_asset.delete()
+                logger.info(f"Video asset deleted: {video_asset.id}")
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Failed to delete video asset: {e}")
+            return False
+    
+    def _get_mime_type_from_extension(self, extension):
+        """Get MIME type from file extension"""
+        mime_types = {
+            '.mp4': 'video/mp4',
+            '.avi': 'video/avi',
+            '.mov': 'video/mov',
+            '.webm': 'video/webm',
+            '.ogg': 'video/ogg',
+        }
+        return mime_types.get(extension.lower(), 'video/mp4')
