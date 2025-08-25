@@ -69,20 +69,28 @@ LOGGING = {
 # Disable debug toolbar in production
 INSTALLED_APPS = [app for app in INSTALLED_APPS if app != 'django_debug_toolbar']
 
-# Cache settings for Heroku Redis
+# Cache settings for Heroku Redis - temporarily using local memory cache
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': os.environ.get('REDIS_URL', 'redis://localhost:6379/0'),
-        'OPTIONS': {
-            'CLIENT_CLASS': 'redis.client.DefaultClient',
-            'CONNECTION_POOL_KWARGS': {
-                'ssl_cert_reqs': None,  # Disable SSL certificate verification for Heroku Redis
-                'ssl': True,
-            },
-        },
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
     }
 }
+
+# Redis configuration for future use (commented out until SSL issues are resolved)
+# CACHES = {
+#     'default': {
+#         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+#         'LOCATION': os.environ.get('REDIS_URL', 'redis://localhost:6379/0'),
+#         'OPTIONS': {
+#             'CLIENT_CLASS': 'redis.client.DefaultClient',
+#             'CONNECTION_POOL_KWARGS': {
+#                 'ssl_cert_reqs': None,  # Disable SSL certificate verification for Heroku Redis
+#                 'ssl': True,
+#             },
+#         },
+#     }
+# }
 
 # File upload settings for Heroku
 FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100MB
