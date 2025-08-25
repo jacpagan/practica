@@ -3,14 +3,22 @@ URL configuration for practika_project project.
 """
 
 from django.urls import path, include
-from django.http import HttpResponse
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
 
-def simple_home(request):
-    return HttpResponse("Django app is running successfully! Test 2", content_type="text/plain")
+def home_landing(request):
+    """Show landing page with app introduction"""
+    return render(request, 'home.html')
+
+@login_required
+def home_redirect(request):
+    """Redirect authenticated users to exercises list"""
+    return redirect('exercises:exercise_list')
 
 urlpatterns = [
-    path('', simple_home, name='home'),
+    path('', home_landing, name='home'),
+    path('app/', home_redirect, name='app_home'),
     path('core/', include('core.urls')),
     path('exercises/', include('exercises.urls')),
-    path('comments/', include('comments.urls')),
+    path('comments/', include('core.urls')),
 ]
