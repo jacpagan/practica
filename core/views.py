@@ -44,9 +44,9 @@ def health_check(request):
         
         # Storage health check
         try:
-            # Check if we can write to temp directory
-            temp_dir = getattr(settings, 'FILE_UPLOAD_TEMP_DIR', '/tmp')
-            test_file = os.path.join(temp_dir, 'health_check_test.txt')
+            # Check if we can write to media directory
+            media_dir = getattr(settings, 'MEDIA_ROOT', '/app/media')
+            test_file = os.path.join(media_dir, 'health_check_test.txt')
             with open(test_file, 'w') as f:
                 f.write('health check')
             os.remove(test_file)
