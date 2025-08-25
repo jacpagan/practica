@@ -22,11 +22,15 @@ timeout = int(os.environ.get('GUNICORN_TIMEOUT', 30))
 keepalive = int(os.environ.get('GUNICORN_KEEPALIVE', 2))
 graceful_timeout = int(os.environ.get('GUNICORN_GRACEFUL_TIMEOUT', 30))
 
-# Logging
+# Logging - ensure all logs go to stdout/stderr for Heroku
 accesslog = '-'
 errorlog = '-'
 loglevel = os.environ.get('GUNICORN_LOG_LEVEL', 'info')
-access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" %(D)s'
+access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" %(D)s %(L)s'
+
+# Ensure logs are not buffered
+disable_redirect_access_to_syslog = True
+disable_redirect_error_to_syslog = True
 
 # Process naming
 proc_name = 'practika'

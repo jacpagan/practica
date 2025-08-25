@@ -9,16 +9,26 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'your-secret-key-here')
+# Import production settings as base
+from .production import *
 
-# SECURITY WARNING: don't run with debug turned on in production!
+# Override specific settings for Heroku
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'your-secret-key-here')
 DEBUG = False
 
-# Heroku will set this automatically
-ALLOWED_HOSTS = ['*']
+# Ensure ALLOWED_HOSTS includes Heroku domain
+ALLOWED_HOSTS = ['*', 'practika-d127ed6da5d2.herokuapp.com']
 
-# Application definition - minimal apps to start
+# Use PostgreSQL from DATABASE_URL if available
+if os.environ.get('DATABASE_URL'):
+    DATABASES['default'] = dj_database_url.parse(os.environ.get('DATABASE_URL'))
+
+# Ensure Redis is configured from environment
+if os.environ.get('REDIS_URL'):
+    REDIS_URL = os.environ.get('REDIS_URL')
+    CACHES['default']['LOCATION'] = REDIS_URL
+
+# Ensure all apps are included
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -26,101 +36,35 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
+    'django_filters',
+    'corsheaders',
+    'core',
+    'exercises',
+    'comments',
 ]
 
-# Security settings for production
-SECURE_BROWSER_XSS_FILTER = True
-SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = 'DENY'
-
-# HTTPS settings - temporarily disabled to test startup
-SECURE_SSL_REDIRECT = False
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_SECURE = False
-
-# Database - use SQLite for now to test startup
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
-
-# Static files
-STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-
-# Templates
-TEMPLATES = [
-    {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
-            ],
-        },
-    },
+# Ensure all middleware is included
+MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "core.middleware.RequestLoggingMiddleware",
+    "core.middleware.PerformanceMonitoringMiddleware",
+    "core.middleware.SecurityMiddleware",
+    "core.middleware.MobileOptimizationMiddleware",
 ]
 
-# URL Configuration
-ROOT_URLCONF = 'practika_project.urls'
+# Ensure templates include the correct directories
+TEMPLATES[0]['DIRS'] = [BASE_DIR / "templates"]
 
-# WSGI Application
-WSGI_APPLICATION = 'practika_project.wsgi.application'
+# Ensure static files are properly configured
+STATICFILES_DIRS = [BASE_DIR / "static"]
 
-# Password validation
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-        'OPTIONS': {
-            'min_length': 8,
-        }
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
-]
-
-# Internationalization
-LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
-USE_I18N = True
-USE_TZ = True
-
-# Minimal middleware - no middleware at all to isolate the issue
-MIDDLEWARE = []
-
-# CSRF settings - completely disable CSRF
-CSRF_USE_SESSIONS = False
-CSRF_COOKIE_HTTPONLY = False
-CSRF_TRUSTED_ORIGINS = ['https://practika-d127ed6da5d2.herokuapp.com']
-CSRF_COOKIE_SECURE = False
-CSRF_COOKIE_SAMESITE = None
-
-# Basic logging
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-        },
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': 'INFO',
-    },
-}
-
-print("Minimal Heroku settings loaded - testing startup")
+print("Heroku settings loaded with production configuration")

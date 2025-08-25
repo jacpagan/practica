@@ -24,6 +24,12 @@ ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.
 if os.environ.get('HEROKU_APP_NAME'):
     ALLOWED_HOSTS.append(f"{os.environ.get('HEROKU_APP_NAME')}.herokuapp.com")
 
+# Explicitly add the known Heroku domain
+ALLOWED_HOSTS.append('practika-d127ed6da5d2.herokuapp.com')
+
+# Ensure no duplicates and clean up
+ALLOWED_HOSTS = list(set(ALLOWED_HOSTS))
+
 # Security headers and HTTPS
 SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True').lower() == 'true'
 SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', 31536000))
@@ -102,12 +108,23 @@ SESSION_CACHE_ALIAS = 'default'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
+# WhiteNoise configuration for production
+WHITENOISE_USE_FINDERS = True
+WHITENOISE_AUTOREFRESH = False
+WHITENOISE_INDEX_FILE = True
+WHITENOISE_ROOT = BASE_DIR / 'staticfiles'
+
+# Ensure staticfiles directory exists
+os.makedirs(STATIC_ROOT, exist_ok=True)
+
 # Media files configuration with S3
-if os.environ.get('AWS_STORAGE_BUCKET_NAME'):
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
+
+# Only configure S3 if all required credentials are present
+if all([AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_STORAGE_BUCKET_NAME]):
     # S3 Configuration
-    AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
-    AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
-    AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
     AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-1')
     AWS_S3_CUSTOM_DOMAIN = os.environ.get('AWS_S3_CUSTOM_DOMAIN')
     
@@ -136,12 +153,17 @@ if os.environ.get('AWS_STORAGE_BUCKET_NAME'):
     logger = logging.getLogger(__name__)
     logger.info(f"S3 storage configured: bucket={AWS_STORAGE_BUCKET_NAME}, region={AWS_S3_REGION_NAME}")
 else:
-    # Fallback to local storage
+    # Fallback to local storage - ensure app boots without AWS credentials
     MEDIA_URL = '/media/'
     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+    
+    # Ensure media directory exists
+    os.makedirs(BASE_DIR / 'media' / 'videos', exist_ok=True)
+    
     import logging
     logger = logging.getLogger(__name__)
     logger.warning("S3 not configured, using local file storage")
+    logger.info("Required S3 environment variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_STORAGE_BUCKET_NAME")
 
 # Mobile optimization settings
 MOBILE_OPTIMIZATION_ENABLED = os.environ.get('MOBILE_OPTIMIZATION_ENABLED', 'True').lower() == 'true'
@@ -165,12 +187,20 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'format': '[{levelname}] {asctime} {module} {process:d} {thread:d} {request_id} {message}',
             'style': '{',
         },
         'simple': {
-            'format': '{levelname} {message}',
+            'format': '[{levelname}] {request_id} {message}',
             'style': '{',
+        },
+        'gunicorn': {
+            'format': '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" %(D)s %(L)s',
+        },
+    },
+    'filters': {
+        'request_id': {
+            '()': 'core.middleware.RequestIDFilter',
         },
     },
     'handlers': {
@@ -178,58 +208,69 @@ LOGGING = {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
+            'filters': ['request_id'],
         },
-        'file': {
-            'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'django.log',
-            'maxBytes': 1024 * 1024 * 10,  # 10MB
-            'backupCount': 5,
-            'formatter': 'verbose',
-        },
-        'error_file': {
+        'error_console': {
             'level': 'ERROR',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'error.log',
-            'maxBytes': 1024 * 1024 * 10,  # 10MB
-            'backupCount': 5,
-            'formatter': 'verbose',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+            'filters': ['request_id'],
+        },
+        'gunicorn_access': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'gunicorn',
+        },
+        'gunicorn_error': {
+            'level': 'ERROR',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
         },
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console', 'error_console'],
             'level': 'INFO',
             'propagate': False,
         },
         'django.request': {
-            'handlers': ['console', 'error_file'],
+            'handlers': ['error_console'],
             'level': 'ERROR',
             'propagate': False,
         },
         'django.security': {
-            'handlers': ['console', 'error_file'],
+            'handlers': ['error_console'],
             'level': 'WARNING',
             'propagate': False,
         },
+        'gunicorn.access': {
+            'handlers': ['gunicorn_access'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'gunicorn.error': {
+            'handlers': ['gunicorn_error'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
         'core': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console', 'error_console'],
             'level': 'INFO',
             'propagate': False,
         },
         'exercises': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console', 'error_console'],
             'level': 'INFO',
             'propagate': False,
         },
         'comments': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console', 'error_console'],
             'level': 'INFO',
             'propagate': False,
         },
     },
     'root': {
-        'handlers': ['console', 'file'],
+        'handlers': ['console', 'error_console'],
         'level': 'INFO',
     },
 }

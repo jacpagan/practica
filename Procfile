@@ -1,1 +1,1 @@
-web: gunicorn practika_project.wsgi --log-file -
+web: gunicorn practika_project.wsgi --config gunicorn.conf.py
