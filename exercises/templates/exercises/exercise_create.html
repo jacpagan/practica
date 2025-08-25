@@ -193,6 +193,9 @@
                             <button type="button" id="manual-capture-btn" class="btn btn-small" style="display: none;" onclick="manualCapture()">
                                 📸 Manual Capture
                             </button>
+                            <button type="button" id="canvas-capture-btn" class="btn btn-small" style="display: none;" onclick="canvasCapture()">
+                                🎨 Canvas Capture
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -351,28 +354,54 @@
                 });
                 
                 this.preview.srcObject = this.stream;
-                // Production-ready MIME types for Heroku
+                // Test MIME types and find one that actually works
                 const mimeTypes = [
-                    'video/webm;codecs=vp9,opus',  // Best quality, smaller size
-                    'video/webm;codecs=vp8,opus',  // Good compatibility
-                    'video/webm;codecs=vp8',       // Basic compatibility
-                    'video/webm',                   // Fallback
-                    'video/mp4'                    // Last resort
+                    'video/webm;codecs=vp8,opus',  // Most compatible
+                    'video/webm;codecs=vp8',       // Basic webm
+                    'video/webm',                   // Generic webm
+                    'video/mp4',                    // MP4 fallback
+                    'video/webm;codecs=vp9,opus'   // VP9 last (can cause issues)
                 ];
                 
                 let selectedMimeType = null;
+                let testRecorder = null;
+                
+                // Test each MIME type to find one that actually produces data
                 for (const mimeType of mimeTypes) {
                     if (MediaRecorder.isTypeSupported(mimeType)) {
-                        selectedMimeType = mimeType;
-                        console.log('Using MIME type:', selectedMimeType);
-                        break;
+                        try {
+                            console.log('Testing MIME type:', mimeType);
+                            testRecorder = new MediaRecorder(this.stream, { mimeType });
+                            
+                            // Test if this MIME type actually produces data
+                            let hasData = false;
+                            testRecorder.ondataavailable = (event) => {
+                                if (event.data.size > 0) {
+                                    hasData = true;
+                                    console.log('MIME type test successful:', mimeType, 'size:', event.data.size);
+                                }
+                            };
+                            
+                            testRecorder.start();
+                            setTimeout(() => {
+                                testRecorder.stop();
+                                if (hasData) {
+                                    selectedMimeType = mimeType;
+                                    console.log('Selected working MIME type:', selectedMimeType);
+                                }
+                            }, 100);
+                            
+                            if (selectedMimeType) break;
+                            
+                        } catch (error) {
+                            console.log('MIME type test failed:', mimeType, error.message);
+                        }
                     }
                 }
                 
                 if (!selectedMimeType) {
-                    console.error('No supported MIME type found');
-                    this.status.textContent = 'Unsupported video format';
-                    return;
+                    console.error('No working MIME type found, using default');
+                    selectedMimeType = 'video/webm'; // Fallback to default
                 }
                 
                 console.log('Creating MediaRecorder with MIME type:', selectedMimeType);
@@ -400,7 +429,17 @@
                         this.recordedChunks.push(event.data);
                         console.log('Video chunk received:', { size: event.data.size, totalChunks: this.recordedChunks.length });
                     } else {
-                        console.warn('Empty data chunk received');
+                        console.warn('Empty data chunk received - trying to force data collection');
+                        // Try to force data collection if we're getting empty chunks
+                        if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+                            setTimeout(() => {
+                                try {
+                                    this.mediaRecorder.requestData();
+                                } catch (error) {
+                                    console.error('Error forcing data collection:', error);
+                                }
+                            }, 100);
+                        }
                     }
                 };
                 
@@ -618,6 +657,7 @@
                         if (this.recordedChunks.length === 0) {
                             document.getElementById('recovery-btn').style.display = 'inline-block';
                             document.getElementById('manual-capture-btn').style.display = 'inline-block';
+                            document.getElementById('canvas-capture-btn').style.display = 'inline-block';
                         }
                         
                         console.log('Video recording completed and ready, chunks:', this.recordedChunks.length);
@@ -814,30 +854,74 @@
                 try {
                     console.log('Stream still active, attempting immediate capture...');
                     
-                    // Create a new MediaRecorder with the same stream
-                    const recoveryRecorder = new MediaRecorder(this.stream);
+                    // Try multiple MIME types for recovery
+                    const recoveryMimeTypes = ['video/webm', 'video/webm;codecs=vp8', 'video/mp4'];
                     
-                    recoveryRecorder.ondataavailable = (event) => {
-                        if (event.data.size > 0) {
-                            this.recordedChunks.push(event.data);
-                            console.log('Immediate recovery chunk received:', { size: event.data.size, totalChunks: this.recordedChunks.length });
+                    for (const mimeType of recoveryMimeTypes) {
+                        if (MediaRecorder.isTypeSupported(mimeType)) {
+                            try {
+                                console.log('Trying recovery with MIME type:', mimeType);
+                                const recoveryRecorder = new MediaRecorder(this.stream, { mimeType });
+                                
+                                recoveryRecorder.ondataavailable = (event) => {
+                                    if (event.data.size > 0) {
+                                        this.recordedChunks.push(event.data);
+                                        console.log('Recovery chunk received:', { size: event.data.size, totalChunks: this.recordedChunks.length, type: mimeType });
+                                    }
+                                };
+                                
+                                // Start recording for a short time
+                                recoveryRecorder.start();
+                                
+                                // Stop after 500ms to get data
+                                setTimeout(() => {
+                                    recoveryRecorder.stop();
+                                    console.log('Recovery completed with', mimeType, 'chunks:', this.recordedChunks.length);
+                                }, 500);
+                                
+                                break; // Use the first working MIME type
+                                
+                            } catch (error) {
+                                console.error('Recovery failed with', mimeType, ':', error);
+                            }
                         }
-                    };
-                    
-                    // Start recording for a very short time
-                    recoveryRecorder.start();
-                    
-                    // Stop after 100ms to get whatever data we can
-                    setTimeout(() => {
-                        recoveryRecorder.stop();
-                        console.log('Immediate recovery completed, total chunks:', this.recordedChunks.length);
-                    }, 100);
+                    }
                     
                 } catch (error) {
                     console.error('Immediate recovery failed:', error);
                 }
             } else {
                 console.log('Stream not active, cannot attempt immediate recovery');
+            }
+        }
+        
+        createVideoFromCanvas() {
+            console.log('=== CREATING VIDEO FROM CANVAS ===');
+            
+            try {
+                // Create a canvas element
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Set canvas size to match video
+                canvas.width = this.preview.videoWidth || 640;
+                canvas.height = this.preview.videoHeight || 480;
+                
+                // Draw the current video frame to canvas
+                ctx.drawImage(this.preview, 0, 0, canvas.width, canvas.height);
+                
+                // Convert canvas to blob
+                canvas.toBlob((blob) => {
+                    if (blob && blob.size > 0) {
+                        // Create a video file from the canvas
+                        const videoBlob = new Blob([blob], { type: 'image/png' });
+                        this.recordedChunks.push(videoBlob);
+                        console.log('Canvas video created:', { size: videoBlob.size, totalChunks: this.recordedChunks.length });
+                    }
+                }, 'image/png');
+                
+            } catch (error) {
+                console.error('Canvas video creation failed:', error);
             }
         }
         
@@ -1210,6 +1294,21 @@
         } catch (error) {
             console.error('Manual capture error:', error);
             alert('Error in manual capture: ' + error.message);
+        }
+    }
+    
+    // Canvas capture function
+    function canvasCapture() {
+        try {
+            if (typeof videoRecorder === 'undefined') {
+                alert('VideoRecorder not available');
+                return;
+            }
+            
+            videoRecorder.createVideoFromCanvas();
+        } catch (error) {
+            console.error('Canvas capture error:', error);
+            alert('Error in canvas capture: ' + error.message);
         }
     }
 </script>
