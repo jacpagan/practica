@@ -3,27 +3,24 @@ Gunicorn configuration for Practika production deployment
 Optimized for mobile workloads and video processing
 """
 
-import multiprocessing
 import os
+import multiprocessing
 
 # Server socket
-bind = "0.0.0.0:8000"
+bind = f"0.0.0.0:{os.environ.get('PORT', '8000')}"
 backlog = 2048
 
 # Worker processes
-workers = int(os.environ.get('GUNICORN_WORKERS', multiprocessing.cpu_count() * 2 + 1))
-worker_class = os.environ.get('GUNICORN_WORKER_CLASS', 'sync')  # Changed from 'gevent' to 'sync'
+workers = int(os.environ.get('GUNICORN_WORKERS', 1))  # Reduced to 1 worker for stability
+worker_class = os.environ.get('GUNICORN_WORKER_CLASS', 'sync')
 worker_connections = int(os.environ.get('GUNICORN_WORKER_CONNECTIONS', 1000))
 max_requests = int(os.environ.get('GUNICORN_MAX_REQUESTS', 1000))
 max_requests_jitter = int(os.environ.get('GUNICORN_MAX_REQUESTS_JITTER', 100))
 
 # Timeout settings
-timeout = int(os.environ.get('GUNICORN_TIMEOUT', 120))
+timeout = int(os.environ.get('GUNICORN_TIMEOUT', 30))
 keepalive = int(os.environ.get('GUNICORN_KEEPALIVE', 2))
 graceful_timeout = int(os.environ.get('GUNICORN_GRACEFUL_TIMEOUT', 30))
-
-# Process naming
-proc_name = 'practika'
 
 # Logging
 accesslog = '-'
@@ -31,17 +28,35 @@ errorlog = '-'
 loglevel = os.environ.get('GUNICORN_LOG_LEVEL', 'info')
 access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" %(D)s'
 
-# Process management
-preload_app = True
+# Process naming
+proc_name = 'practika'
+
+# Server mechanics
 daemon = False
-pidfile = '/tmp/gunicorn.pid'
+pidfile = None
 user = None
 group = None
 tmp_upload_dir = None
 
-# SSL (if needed)
-keyfile = os.environ.get('GUNICORN_KEYFILE', None)
-certfile = os.environ.get('GUNICORN_CERTFILE', None)
+# SSL (not needed for Heroku)
+keyfile = None
+certfile = None
+
+# Preload app for better performance
+preload_app = False
+
+# Worker timeout for startup
+worker_tmp_dir = '/dev/shm'  # Use shared memory for better performance
+
+# Disable worker restart on file changes
+reload = False
+reload_engine = 'auto'
+
+# Enable worker restart on memory threshold
+max_requests_jitter = 50
+
+# Worker lifecycle
+worker_abort_on_error = True
 
 # Security
 limit_request_line = 4094
