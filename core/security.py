@@ -332,22 +332,5 @@ class SecurityAuditor:
         return suspicious_patterns
 
 
-# Convenience functions
-def validate_password(password: str) -> Dict[str, Any]:
-    """Validate password strength"""
-    return SecurityValidator.validate_password_strength(password)
-
-
-def sanitize_input(input_string: str, max_length: int = 1000) -> str:
-    """Sanitize user input"""
-    return SecurityValidator.sanitize_input(input_string, max_length)
-
-
-def validate_file_upload(filename: str, file_size: int, mime_type: str = None) -> Dict[str, Any]:
-    """Validate file upload"""
-    return SecurityValidator.validate_file_upload(filename, file_size, mime_type)
-
-
-def log_security_event(event_type: str, details: Dict[str, Any], severity: str = 'info'):
-    """Log security event"""
-    SecurityAuditor.log_security_event(event_type, details, severity)
+# Note: The SecurityAuditor class is primarily used for testing and security monitoring
+# The convenience functions below were removed as they were duplicates and unused

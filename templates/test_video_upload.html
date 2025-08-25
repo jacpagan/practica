@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Upload Test - Practika</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .upload-section {
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: border-color 0.3s;
+        }
+        .upload-section:hover {
+            border-color: #007bff;
+        }
+        .upload-section.dragover {
+            border-color: #007bff;
+            background-color: #f8f9fa;
+        }
+        .file-input {
+            display: none;
+        }
+        .upload-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .upload-btn:hover {
+            background: #0056b3;
+        }
+        .upload-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 20px 0;
+            display: none;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #007bff;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .video-list {
+            margin-top: 30px;
+        }
+        .video-item {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .video-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .video-details {
+            flex: 1;
+        }
+        .video-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .btn-small {
+            padding: 5px 10px;
+            font-size: 12px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .btn-view {
+            background: #28a745;
+            color: white;
+        }
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+        }
+        .drag-text {
+            color: #666;
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+        .file-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎥 Video Upload Test</h1>
+        
+        <!-- Upload Section -->
+        <div class="upload-section" id="uploadSection">
+            <div class="drag-text">Drag & drop your video here or click to select</div>
+            <input type="file" id="videoFile" class="file-input" accept="video/*">
+            <button class="upload-btn" onclick="document.getElementById('videoFile').click()">
+                Choose Video File
+            </button>
+            <button class="upload-btn" id="uploadBtn" onclick="uploadVideo()" disabled>
+                Upload Video
+            </button>
+            
+            <!-- File Info -->
+            <div class="file-info" id="fileInfo"></div>
+            
+            <!-- Progress Bar -->
+            <div class="progress" id="progress">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            
+            <!-- Status Messages -->
+            <div class="status" id="status"></div>
+        </div>
+        
+        <!-- Video List -->
+        <div class="video-list">
+            <h3>📋 Uploaded Videos</h3>
+            <button class="upload-btn" onclick="loadVideos()">Refresh List</button>
+            <div id="videoList"></div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        
+        // File selection handling
+        document.getElementById('videoFile').addEventListener('change', function(e) {
+            selectedFile = e.target.files[0];
+            if (selectedFile) {
+                showFileInfo(selectedFile);
+                document.getElementById('uploadBtn').disabled = false;
+            }
+        });
+        
+        // Drag and drop handling
+        const uploadSection = document.getElementById('uploadSection');
+        
+        uploadSection.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+        
+        uploadSection.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+        });
+        
+        uploadSection.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].type.startsWith('video/')) {
+                selectedFile = files[0];
+                document.getElementById('videoFile').files = files;
+                showFileInfo(selectedFile);
+                document.getElementById('uploadBtn').disabled = false;
+            }
+        });
+        
+        function showFileInfo(file) {
+            const fileInfo = document.getElementById('fileInfo');
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+            
+            fileInfo.innerHTML = `
+                <strong>Selected File:</strong> ${file.name}<br>
+                <strong>Size:</strong> ${sizeMB} MB<br>
+                <strong>Type:</strong> ${file.type}
+            `;
+            fileInfo.style.display = 'block';
+        }
+        
+        async function uploadVideo() {
+            if (!selectedFile) {
+                showStatus('Please select a video file first.', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('video', selectedFile);
+            
+            // Show progress
+            document.getElementById('progress').style.display = 'block';
+            document.getElementById('uploadBtn').disabled = true;
+            
+            try {
+                const response = await fetch('/core/api/upload-video/', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    showStatus(`✅ Upload successful! Video ID: ${result.video_id}`, 'success');
+                    
+                    // Reset form
+                    document.getElementById('videoFile').value = '';
+                    selectedFile = null;
+                    document.getElementById('fileInfo').style.display = 'none';
+                    document.getElementById('uploadBtn').disabled = true;
+                    
+                    // Refresh video list
+                    loadVideos();
+                } else {
+                    const error = await response.json();
+                    showStatus(`❌ Upload failed: ${error.error}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`❌ Upload error: ${error.message}`, 'error');
+            } finally {
+                // Hide progress
+                document.getElementById('progress').style.display = 'none';
+                document.getElementById('uploadBtn').disabled = false;
+            }
+        }
+        
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                status.style.display = 'none';
+            }, 5000);
+        }
+        
+        async function loadVideos() {
+            try {
+                const response = await fetch('/core/api/videos/');
+                if (response.ok) {
+                    const result = await response.json();
+                    displayVideos(result.videos);
+                } else {
+                    console.error('Failed to load videos');
+                }
+            } catch (error) {
+                console.error('Error loading videos:', error);
+            }
+        }
+        
+        function displayVideos(videos) {
+            const videoList = document.getElementById('videoList');
+            
+            if (videos.length === 0) {
+                videoList.innerHTML = '<p>No videos uploaded yet.</p>';
+                return;
+            }
+            
+            const videoHtml = videos.map(video => `
+                <div class="video-item">
+                    <div class="video-info">
+                        <div class="video-details">
+                            <strong>${video.filename}</strong><br>
+                            <small>Size: ${video.size_mb}MB | Type: ${video.mime_type}</small><br>
+                            <small>Uploaded: ${new Date(video.created_at).toLocaleString()}</small>
+                        </div>
+                        <div class="video-actions">
+                            <button class="btn-small btn-view" onclick="window.open('${video.url}', '_blank')">
+                                View
+                            </button>
+                            <button class="btn-small btn-delete" onclick="deleteVideo('${video.id}')">
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            videoList.innerHTML = videoHtml;
+        }
+        
+        async function deleteVideo(videoId) {
+            if (!confirm('Are you sure you want to delete this video?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/core/api/videos/${videoId}/delete/`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    showStatus('✅ Video deleted successfully', 'success');
+                    loadVideos(); // Refresh list
+                } else {
+                    const error = await response.json();
+                    showStatus(`❌ Delete failed: ${error.error}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`❌ Delete error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Load videos on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadVideos();
+        });
+    </script>
+</body>
+</html>

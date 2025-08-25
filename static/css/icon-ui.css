@@ -16,6 +16,14 @@
   --icon-color-muted: #95a5a6;
 }
 
+/* Enhanced Mobile Compatibility */
+@supports not (aspect-ratio: 1) {
+  .icon {
+    /* Fallback for older browsers that don't support aspect-ratio */
+    aspect-ratio: 1;
+  }
+}
+
 /* Icon Base Styles */
 .icon {
   width: var(--icon-size);
@@ -24,6 +32,10 @@
   vertical-align: middle;
   fill: var(--icon-color);
   flex-shrink: 0;
+  /* Ensure icons render properly on older devices */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .icon-large {
@@ -50,6 +62,11 @@
   justify-content: center;
   border-radius: 8px;
   transition: all 0.2s ease;
+  /* Enhanced touch support for older devices */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .icon-only .btn .icon {
@@ -70,6 +87,14 @@ a:focus-visible,
 button:focus-visible {
   outline: var(--focus-ring);
   outline-offset: var(--focus-ring-offset);
+}
+
+/* Enhanced touch feedback for older devices */
+.btn:active,
+a:active,
+button:active {
+  transform: scale(0.98);
+  transition: transform 0.1s ease;
 }
 
 /* Screen Reader Only Text */
@@ -102,6 +127,9 @@ button:focus-visible {
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+  /* Enhanced touch support */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .icon-legend-toggle:hover {
@@ -127,6 +155,9 @@ button:focus-visible {
   align-items: center;
   justify-content: center;
   padding: 2rem;
+  /* Fallback for older browsers */
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 .icon-legend.show {
@@ -140,6 +171,9 @@ button:focus-visible {
   max-width: 600px;
   max-height: 80vh;
   overflow-y: auto;
+  /* Enhanced scrolling for older devices */
+  -webkit-overflow-scrolling: touch;
+  overflow-scrolling: touch;
 }
 
 .icon-legend-header {
@@ -165,6 +199,12 @@ button:focus-visible {
   padding: 0.5rem;
   border-radius: 4px;
   transition: all 0.2s ease;
+  /* Enhanced touch support */
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .icon-legend-close:hover {
@@ -217,6 +257,11 @@ button:focus-visible {
   transition: all 0.2s ease;
   background: var(--icon-color-primary);
   color: white;
+  /* Enhanced touch support */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .btn-icon:hover {
@@ -271,6 +316,9 @@ button:focus-visible {
   border-radius: 6px;
   transition: all 0.2s ease;
   min-height: var(--hit-target);
+  /* Enhanced touch support */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .nav-icon:hover {
@@ -380,21 +428,62 @@ button:focus-visible {
   background: var(--icon-color-danger);
 }
 
-/* Responsive Design */
+/* Enhanced Responsive Design for Older Devices */
 @media (max-width: 768px) {
   .icon-legend-grid {
     grid-template-columns: 1fr;
   }
   
   .btn-icon {
-    min-width: 40px;
-    min-height: 40px;
+    min-width: 44px; /* Ensure minimum touch target on older devices */
+    min-height: 44px;
     padding: 0.5rem;
   }
   
   .icon-xl {
     width: 36px;
     height: 36px;
+  }
+  
+  /* Enhanced touch targets for older mobile devices */
+  .icon-legend-toggle {
+    width: 48px;
+    height: 48px;
+    top: 0.5rem;
+    right: 0.5rem;
+  }
+  
+  .icon-legend-content {
+    margin: 1rem;
+    max-height: calc(100vh - 2rem);
+  }
+}
+
+/* iPhone SE and older device optimizations */
+@media (max-width: 375px) {
+  .btn-icon {
+    min-width: 48px;
+    min-height: 48px;
+    padding: 0.75rem;
+    font-size: 0.9rem;
+  }
+  
+  .icon-legend-toggle {
+    width: 52px;
+    height: 52px;
+  }
+  
+  .icon-legend-content {
+    padding: 1.5rem;
+    margin: 0.5rem;
+  }
+  
+  .icon-legend-grid {
+    gap: 0.75rem;
+  }
+  
+  .icon-legend-item {
+    padding: 1rem;
   }
 }
 
@@ -419,6 +508,43 @@ button:focus-visible {
   }
   
   .btn-icon:hover {
+    transform: none;
+  }
+}
+
+/* Legacy Browser Support */
+@supports not (display: grid) {
+  .icon-legend-grid {
+    display: block;
+  }
+  
+  .icon-legend-item {
+    display: block;
+    margin-bottom: 1rem;
+  }
+}
+
+@supports not (backdrop-filter: blur(10px)) {
+  .icon-legend {
+    background: rgba(0, 0, 0, 0.95);
+  }
+}
+
+/* Performance optimizations for older devices */
+@media (max-width: 480px) {
+  .btn-icon,
+  .nav-icon {
+    will-change: transform;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+  
+  /* Reduce animations on older devices for better performance */
+  .btn-icon:hover {
+    transform: none;
+  }
+  
+  .icon-legend-toggle:hover {
     transform: none;
   }
 }

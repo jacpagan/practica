@@ -30,9 +30,8 @@ class ExerciseSerializer(serializers.ModelSerializer):
         from core.services.storage import VideoStorageService
         storage_service = VideoStorageService()
         
-        # Get user from context
-        user = self.context.get('request').user if self.context.get('request') else None
-        video_asset = storage_service.store_uploaded_video(video_file, user)
+        # Create video asset
+        video_asset = storage_service.store_uploaded_video(video_file)
         
         # Create exercise
         validated_data['video_asset'] = video_asset

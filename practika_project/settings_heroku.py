@@ -167,6 +167,21 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 # Add WhiteNoise middleware for static files
+# Initialize MIDDLEWARE if it doesn't exist (should inherit from base settings)
+if 'MIDDLEWARE' not in locals():
+    MIDDLEWARE = [
+        'corsheaders.middleware.CorsMiddleware',
+        'django.middleware.security.SecurityMiddleware',
+        'whitenoise.middleware.WhiteNoiseMiddleware',
+        'django.contrib.sessions.middleware.SessionMiddleware',
+        'django.middleware.common.CommonMiddleware',
+        'django.middleware.csrf.CsrfViewMiddleware',
+        'django.contrib.auth.middleware.AuthenticationMiddleware',
+        'django.contrib.messages.middleware.MessageMiddleware',
+        'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    ]
+
+# Remove performance monitoring middleware if present (to avoid conflicts)
 MIDDLEWARE = [
     middleware for middleware in MIDDLEWARE 
     if 'core.middleware.PerformanceMonitoringMiddleware' not in str(middleware)
@@ -197,3 +212,49 @@ logger = logging.getLogger(__name__)
 logger.info(f"Production settings loaded - Video MIME types: {ALLOWED_VIDEO_MIME_TYPES}")
 logger.info(f"Production settings loaded - Video extensions: {ALLOWED_VIDEO_EXTENSIONS}")
 logger.info(f"Production settings loaded - Max upload size: {MAX_UPLOAD_SIZE}")
+
+# Mobile optimization settings for Heroku
+MOBILE_OPTIMIZATION_ENABLED = os.environ.get('MOBILE_OPTIMIZATION_ENABLED', 'True').lower() == 'true'
+PWA_ENABLED = os.environ.get('PWA_ENABLED', 'True').lower() == 'true'
+VIDEO_COMPRESSION_ENABLED = False  # Keep disabled for now
+MOBILE_CAMERA_QUALITY = os.environ.get('MOBILE_CAMERA_QUALITY', '720p')
+MOBILE_MAX_RECORDING_TIME = int(os.environ.get('MOBILE_MAX_RECORDING_TIME', 300))
+
+# Ensure mobile optimization middleware is included
+if 'core.middleware.MobileOptimizationMiddleware' not in MIDDLEWARE:
+    # Insert mobile optimization middleware after CORS middleware
+    cors_index = None
+    for i, middleware in enumerate(MIDDLEWARE):
+        if 'CorsMiddleware' in middleware:
+            cors_index = i
+            break
+    
+    if cors_index is not None:
+        MIDDLEWARE.insert(cors_index + 1, 'core.middleware.MobileOptimizationMiddleware')
+    else:
+        # Insert at the beginning if CORS middleware not found
+        MIDDLEWARE.insert(1, 'core.middleware.MobileOptimizationMiddleware')
+
+# Mobile-specific caching and performance settings
+if MOBILE_OPTIMIZATION_ENABLED:
+    # Enhanced caching for mobile devices
+    CACHE_MIDDLEWARE_KEY_PREFIX = 'practika_mobile'
+    CACHE_MIDDLEWARE_SECONDS = 300  # 5 minutes for mobile
+    
+    # Mobile-specific headers
+    SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+    
+    # Log mobile optimization status
+    logger.info("Mobile optimization enabled for Heroku deployment")
+    logger.info(f"Mobile camera quality: {MOBILE_CAMERA_QUALITY}")
+    logger.info(f"Mobile max recording time: {MOBILE_MAX_RECORDING_TIME} seconds")
+else:
+    logger.warning("Mobile optimization disabled for Heroku deployment")
+
+# Performance monitoring for mobile devices
+if 'core.middleware.PerformanceMonitoringMiddleware' not in MIDDLEWARE:
+    # Add performance monitoring middleware for mobile optimization
+    MIDDLEWARE.append('core.middleware.PerformanceMonitoringMiddleware')
+
+# Final middleware configuration logging
+logger.info(f"Final middleware configuration: {MIDDLEWARE}")
