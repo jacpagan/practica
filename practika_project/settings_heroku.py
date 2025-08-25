@@ -170,7 +170,6 @@ CORS_ALLOWED_ORIGINS = [
 # Initialize MIDDLEWARE if it doesn't exist (should inherit from base settings)
 if 'MIDDLEWARE' not in locals():
     MIDDLEWARE = [
-        'corsheaders.middleware.CorsMiddleware',
         'django.middleware.security.SecurityMiddleware',
         'whitenoise.middleware.WhiteNoiseMiddleware',
         'django.contrib.sessions.middleware.SessionMiddleware',
@@ -179,15 +178,11 @@ if 'MIDDLEWARE' not in locals():
         'django.contrib.auth.middleware.AuthenticationMiddleware',
         'django.contrib.messages.middleware.MessageMiddleware',
         'django.middleware.clickjacking.XFrameOptionsMiddleware',
-        'core.middleware.RequestLoggingMiddleware',
-        'core.middleware.SecurityMiddleware',
-        'core.middleware.MobileOptimizationMiddleware',
-        'core.middleware.PerformanceMonitoringMiddleware',
     ]
 else:
     # Ensure required middleware is present
     required_middleware = [
-        'core.middleware.MobileOptimizationMiddleware',
+        'whitenoise.middleware.WhiteNoiseMiddleware',
     ]
     
     for middleware in required_middleware:
