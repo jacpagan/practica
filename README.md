@@ -277,128 +277,55 @@ make test
 - **Total Tests**: 9 test files
 - **Test Areas**: Models, permissions, API endpoints, media validation, security, accessibility, UI flows
 
-## 🚀 Deployment
+## 🚀 **Deployment**
 
-### Heroku Container Deployment (Recommended)
+### **Container Stack Deployment (Recommended)**
 
-This is the **recommended deployment method** for production use with Docker containers.
+The platform is now deployed using Heroku's container stack. For complete deployment instructions, see [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
-#### Prerequisites
-- Heroku CLI installed and logged in
-- Docker Desktop running
-- Git repository initialized
-
-#### Quick Deploy Commands
+#### **Quick Deploy Commands**
 
 ```bash
-# 1. Set up Heroku app (if not exists)
-heroku create your-app-name
-# or use existing: heroku git:remote -a your-app-name
+# 1. Create new container app
+heroku create your-app-name --stack container
 
 # 2. Set required environment variables
-heroku config:set DJANGO_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(50))')"
+heroku config:set DJANGO_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')"
 heroku config:set DJANGO_ENVIRONMENT=production
 heroku config:set DJANGO_DEBUG=False
 heroku config:set DJANGO_SETTINGS_MODULE=practika_project.production
 
-# 3. Set database (PostgreSQL recommended for production)
-heroku addons:create heroku-postgresql:mini
-
-# 4. Set Redis for caching
+# 3. Add PostgreSQL and Redis
+heroku addons:create heroku-postgresql:essential-0
 heroku addons:create heroku-redis:mini
 
-# 5. Deploy with container stack
-git add .
-git commit -m "Deploy to Heroku with container stack"
-git push heroku main
+# 4. Deploy container
+heroku container:push web
+heroku container:release web
 
-# 6. Run migrations and collect static
+# 5. Run release phase commands
 heroku run python manage.py migrate
 heroku run python manage.py collectstatic --noinput
-
-# 7. Create superuser
-heroku run python manage.py shell -c "
-from django.contrib.auth.models import User
-if not User.objects.filter(username='admin').exists():
-    User.objects.create_superuser('admin', 'admin@example.com', 'admin123')
-    print('Superuser created: admin/admin123')
-else:
-    print('Superuser already exists')
-"
 ```
 
-#### Container Stack Configuration
+#### **One-Liner Deployment**
 
-The deployment uses `heroku.yml` for container stack configuration:
-
-- **Build Phase**: Uses `Dockerfile.prod` for optimized production image
-- **Release Phase**: Runs migrations and collects static files
-- **Run Phase**: Starts Gunicorn with production settings
-
-#### Environment Variables
-
-**Required:**
-```bash
-DJANGO_SECRET_KEY=your-secret-key-here
-DJANGO_ENVIRONMENT=production
-DJANGO_DEBUG=False
-DJANGO_SETTINGS_MODULE=practika_project.production
-```
-
-**Optional (S3 Storage):**
-```bash
-AWS_ACCESS_KEY_ID=your-aws-access-key
-AWS_SECRET_ACCESS_KEY=your-aws-secret-key
-AWS_STORAGE_BUCKET_NAME=your-s3-bucket
-AWS_S3_REGION_NAME=us-east-1
-```
-
-**Optional (Performance):**
-```bash
-GUNICORN_WORKERS=1
-GUNICORN_TIMEOUT=30
-GUNICORN_LOG_LEVEL=info
-```
-
-#### Monitoring and Debugging
+Use the automated deployment script:
 
 ```bash
-# View real-time logs
-heroku logs --tail
-
-# Check app status
-heroku ps
-
-# Run Django shell
-heroku run python manage.py shell
-
-# Check environment variables
-heroku config
-
-# Restart app
-heroku restart
+./deploy-heroku-container.sh
 ```
 
-#### Troubleshooting Container Deployments
+### **Documentation**
 
-**Common Issues:**
-1. **Build fails**: Check Dockerfile.prod syntax and requirements.txt
-2. **App won't start**: Check logs with `heroku logs --tail`
-3. **Static files missing**: Ensure collectstatic runs in release phase
-4. **Database connection**: Verify DATABASE_URL is set
-5. **Port binding**: Gunicorn automatically binds to $PORT
+- **Complete Operations Guide**: [docs/OPERATIONS.md](docs/OPERATIONS.md)
+- **Release Audit Report**: [docs/RELEASE_AUDIT.md](docs/RELEASE_AUDIT.md)
+- **Smoke Test Checklist**: [HEROKU_SMOKE_TEST.md](HEROKU_SMOKE_TEST.md)
+- **Docker Guide**: [DOCKER.md](DOCKER.md)
 
-**Debug Commands:**
-```bash
-# Check build logs
-heroku builds:output
+### **Current Production Status**
 
-# View release phase logs
-heroku releases:info
-
-# Test app locally with Docker
-docker build -f Dockerfile.prod -t practika-prod .
-docker run -p 8000:8000 -e PORT=8000 practika-prod
-```
-
-### Heroku Deployment (Legacy)
+- **App**: practika-container-1e918c8ae02b.herokuapp.com
+- **Stack**: Container
+- **Status**: ✅ Production Ready
+- **Last Deploy**: August 25, 2025
