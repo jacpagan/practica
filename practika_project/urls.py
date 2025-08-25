@@ -24,7 +24,7 @@ urlpatterns = [
     path('', home_landing, name='home'),
     path('app/', home_redirect, name='app_home'),
     path('core/', include('core.urls')),
-    path('exercises/', include('exercises.urls')),
+    path('exercises/', include('exercises.urls', namespace='exercises')),
     path('comments/', include('comments.urls')),
 ]
 

@@ -5,6 +5,8 @@ from exercises.views import (
     exercise_create, user_login, user_logout
 )
 
+app_name = 'exercises'
+
 router = DefaultRouter()
 router.register(r'exercises', ExerciseViewSet)
 
