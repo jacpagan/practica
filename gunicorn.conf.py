@@ -26,7 +26,7 @@ graceful_timeout = int(os.environ.get('GUNICORN_GRACEFUL_TIMEOUT', 30))
 accesslog = '-'
 errorlog = '-'
 loglevel = os.environ.get('GUNICORN_LOG_LEVEL', 'info')
-access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" %(D)s %(L)s'
+access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" %(D)s'
 
 # Ensure logs are not buffered
 disable_redirect_access_to_syslog = True
