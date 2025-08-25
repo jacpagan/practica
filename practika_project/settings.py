@@ -70,16 +70,6 @@ if IS_DEVELOPMENT:
     LOGIN_RATE_LIMIT = '5/minute'  # 5 attempts per minute
     UPLOAD_RATE_LIMIT = '10/minute'  # 10 uploads per minute
     
-    # File upload security
-    MAX_UPLOAD_SIZE = 100 * 1024 * 1024  # 100MB
-    ALLOWED_VIDEO_EXTENSIONS = ['.mp4', '.webm', '.mov', '.avi']
-    ALLOWED_VIDEO_MIME_TYPES = [
-        'video/mp4',
-        'video/webm', 
-        'video/quicktime',
-        'video/x-msvideo',  # .avi
-    ]
-    
     # Security logging
     SECURITY_LOGGING_ENABLED = True
     FAILED_LOGIN_ATTEMPTS_LIMIT = 5
@@ -259,32 +249,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv('DJANGO_FILE_UPLOAD_MAX_MEMORY_SIZE', 100 * 1024 * 1024))  # 100MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv('DJANGO_DATA_UPLOAD_MAX_MEMORY_SIZE', 100 * 1024 * 1024))  # 100MB
 FILE_UPLOAD_TEMP_DIR = os.getenv('DJANGO_FILE_UPLOAD_TEMP_DIR', None)
-
-# AWS S3 Storage Configuration
-AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
-AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
-AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
-AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-1')
-AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com' if AWS_STORAGE_BUCKET_NAME else None
-
-# Use S3 for media files if configured, otherwise fall back to local
-if AWS_STORAGE_BUCKET_NAME:
-    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/'
-    # Keep local media root for fallback
-    MEDIA_ROOT = BASE_DIR / 'media'
-    print(f"S3 storage configured: bucket={AWS_STORAGE_BUCKET_NAME}, region={AWS_S3_REGION_NAME}")
-else:
-    # Fallback to local storage
-    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
-    print("S3 not configured, using local file storage")
-
-# Accepted video MIME types
-ACCEPTED_VIDEO_MIME_TYPES = [
-    "video/mp4",
-    "video/webm", 
-    "video/quicktime",
-]
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = os.getenv('DJANGO_CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',')
