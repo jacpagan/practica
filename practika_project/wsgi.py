@@ -11,8 +11,8 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-# Use Heroku settings if available, otherwise fall back to base settings
-if os.environ.get('DYNO') or os.environ.get('HEROKU'):
+# Use Heroku settings for Heroku deployment
+if os.environ.get('DYNO') or os.environ.get('HEROKU') or os.environ.get('PORT'):
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "practika_project.settings_heroku")
 else:
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "practika_project.settings")

@@ -179,27 +179,20 @@ if 'MIDDLEWARE' not in locals():
         'django.contrib.auth.middleware.AuthenticationMiddleware',
         'django.contrib.messages.middleware.MessageMiddleware',
         'django.middleware.clickjacking.XFrameOptionsMiddleware',
+        'core.middleware.RequestLoggingMiddleware',
+        'core.middleware.SecurityMiddleware',
+        'core.middleware.MobileOptimizationMiddleware',
+        'core.middleware.PerformanceMonitoringMiddleware',
     ]
-
-# Remove performance monitoring middleware if present (to avoid conflicts)
-MIDDLEWARE = [
-    middleware for middleware in MIDDLEWARE 
-    if 'core.middleware.PerformanceMonitoringMiddleware' not in str(middleware)
-]
-
-# Ensure WhiteNoise is present for static files
-if 'whitenoise.middleware.WhiteNoiseMiddleware' not in MIDDLEWARE:
-    # Insert WhiteNoise after SecurityMiddleware
-    security_index = None
-    for i, middleware in enumerate(MIDDLEWARE):
-        if 'SecurityMiddleware' in middleware:
-            security_index = i
-            break
+else:
+    # Ensure required middleware is present
+    required_middleware = [
+        'core.middleware.MobileOptimizationMiddleware',
+    ]
     
-    if security_index is not None:
-        MIDDLEWARE.insert(security_index + 1, 'whitenoise.middleware.WhiteNoiseMiddleware')
-    else:
-        MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
+    for middleware in required_middleware:
+        if middleware not in MIDDLEWARE:
+            MIDDLEWARE.append(middleware)
 
 # WhiteNoise configuration for static files
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
@@ -220,21 +213,6 @@ VIDEO_COMPRESSION_ENABLED = False  # Keep disabled for now
 MOBILE_CAMERA_QUALITY = os.environ.get('MOBILE_CAMERA_QUALITY', '720p')
 MOBILE_MAX_RECORDING_TIME = int(os.environ.get('MOBILE_MAX_RECORDING_TIME', 300))
 
-# Ensure mobile optimization middleware is included
-if 'core.middleware.MobileOptimizationMiddleware' not in MIDDLEWARE:
-    # Insert mobile optimization middleware after CORS middleware
-    cors_index = None
-    for i, middleware in enumerate(MIDDLEWARE):
-        if 'CorsMiddleware' in middleware:
-            cors_index = i
-            break
-    
-    if cors_index is not None:
-        MIDDLEWARE.insert(cors_index + 1, 'core.middleware.MobileOptimizationMiddleware')
-    else:
-        # Insert at the beginning if CORS middleware not found
-        MIDDLEWARE.insert(1, 'core.middleware.MobileOptimizationMiddleware')
-
 # Mobile-specific caching and performance settings
 if MOBILE_OPTIMIZATION_ENABLED:
     # Enhanced caching for mobile devices
@@ -250,11 +228,6 @@ if MOBILE_OPTIMIZATION_ENABLED:
     logger.info(f"Mobile max recording time: {MOBILE_MAX_RECORDING_TIME} seconds")
 else:
     logger.warning("Mobile optimization disabled for Heroku deployment")
-
-# Performance monitoring for mobile devices
-if 'core.middleware.PerformanceMonitoringMiddleware' not in MIDDLEWARE:
-    # Add performance monitoring middleware for mobile optimization
-    MIDDLEWARE.append('core.middleware.PerformanceMonitoringMiddleware')
 
 # Final middleware configuration logging
 logger.info(f"Final middleware configuration: {MIDDLEWARE}")
