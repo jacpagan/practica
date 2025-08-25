@@ -33,7 +33,7 @@ def exercise_create(request):
     """Create new exercise (admin only)"""
     if not request.user.is_staff:
         messages.error(request, 'Only staff members can create exercises.')
-        return redirect('exercise_list')
+        return redirect('exercises:exercise_list')
     
     if request.method == 'POST':
         try:
@@ -64,7 +64,7 @@ def exercise_create(request):
             if serializer.is_valid():
                 exercise = serializer.save()
                 messages.success(request, f'Exercise "{exercise.name}" created successfully!')
-                return redirect('exercise_detail', exercise_id=exercise.id)
+                return redirect('exercises:exercise_detail', exercise_id=exercise.id)
             else:
                 messages.error(request, f'Error creating exercise: {serializer.errors}')
                 # Log the validation errors for debugging
@@ -135,7 +135,7 @@ def user_login(request):
                 request.session['user_agent'] = request.META.get('HTTP_USER_AGENT', '')
                 
                 messages.success(request, f'Welcome back, {username}!')
-                return redirect('exercise_list')
+                return redirect('exercises:exercise_list')
             else:
                 logger.warning(f"Login attempt for inactive user: {username}")
                 messages.error(request, 'Account is disabled. Please contact administrator.')
@@ -161,7 +161,7 @@ def user_logout(request):
     else:
         messages.info(request, 'You were not logged in.')
     
-    return redirect('exercise_list')
+    return redirect('exercises:exercise_list')
 
 
 def _get_client_ip(request):
