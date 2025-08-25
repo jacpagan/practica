@@ -187,6 +187,9 @@
                             <button type="button" id="test-recording-btn" class="btn btn-small" style="display: none;" onclick="testRecording()">
                                 🧪 Test Recording
                             </button>
+                            <button type="button" id="recovery-btn" class="btn btn-small" style="display: none;" onclick="attemptRecovery()">
+                                🔄 Attempt Recovery
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -337,6 +340,11 @@
                         echoCancellation: true,
                         noiseSuppression: true
                     } 
+                });
+                
+                console.log('Stream obtained:', {
+                    active: this.stream.active,
+                    tracks: this.stream.getTracks().map(t => ({ kind: t.kind, enabled: t.enabled, readyState: t.readyState }))
                 });
                 
                 this.preview.srcObject = this.stream;
@@ -547,7 +555,7 @@
                 
                 this.isRecording = false;
                 
-                // Stop the media recorder first
+                // Stop the media recorder first but DON'T stop the stream yet
                 try {
                     this.mediaRecorder.stop();
                     console.log('MediaRecorder.stop() called');
@@ -555,13 +563,8 @@
                     console.error('Error stopping MediaRecorder:', error);
                 }
                 
-                // Stop the stream
-                if (this.stream) {
-                    this.stream.getTracks().forEach(track => {
-                        track.stop();
-                        console.log('Track stopped:', track.kind);
-                    });
-                }
+                // DON'T stop the stream yet - wait for data collection
+                console.log('Keeping stream active for data collection...');
                 
                 this.status.textContent = 'Processing...';
                 this.status.className = 'recording-status processing';
@@ -578,6 +581,14 @@
                         if (this.recordedChunks.length === 0) {
                             console.warn('No chunks collected, trying to force data collection...');
                             this.forceDataCollection();
+                            
+                            // Add a timeout fallback to ensure we get data
+                            setTimeout(() => {
+                                if (this.recordedChunks.length === 0) {
+                                    console.warn('Still no chunks after timeout, forcing final collection...');
+                                    this.mediaRecorder.requestData();
+                                }
+                            }, 2000);
                         }
                         
                         this.status.textContent = 'Video Ready!';
@@ -596,7 +607,21 @@
                         // Show test recording button
                         document.getElementById('test-recording-btn').style.display = 'inline-block';
                         
+                        // Show recovery button if no chunks
+                        if (this.recordedChunks.length === 0) {
+                            document.getElementById('recovery-btn').style.display = 'inline-block';
+                        }
+                        
                         console.log('Video recording completed and ready, chunks:', this.recordedChunks.length);
+                        
+                        // NOW stop the stream after we have data
+                        if (this.stream) {
+                            this.stream.getTracks().forEach(track => {
+                                track.stop();
+                                console.log('Track stopped after data collection:', track.kind);
+                            });
+                            this.stream = null;
+                        }
                         
                         // Update UI to show upload button
                         this.updateUI();
@@ -735,6 +760,41 @@
             if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
                 console.log('Requesting data from active MediaRecorder...');
                 this.mediaRecorder.requestData();
+            }
+            
+            // Try to recover if we have no chunks but stream is active
+            if (this.recordedChunks.length === 0 && this.stream && this.stream.active) {
+                console.log('Attempting to recover recording data...');
+                this.attemptDataRecovery();
+            }
+        }
+        
+        attemptDataRecovery() {
+            console.log('=== ATTEMPTING DATA RECOVERY ===');
+            
+            // Try to create a new MediaRecorder if the old one is inactive
+            if (this.stream && this.stream.active) {
+                try {
+                    console.log('Creating new MediaRecorder for recovery...');
+                    const newRecorder = new MediaRecorder(this.stream);
+                    
+                    newRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            this.recordedChunks.push(event.data);
+                            console.log('Recovery chunk received:', { size: event.data.size, totalChunks: this.recordedChunks.length });
+                        }
+                    };
+                    
+                    // Start recording for a short time to capture data
+                    newRecorder.start();
+                    setTimeout(() => {
+                        newRecorder.stop();
+                        console.log('Recovery recording stopped, chunks:', this.recordedChunks.length);
+                    }, 1000);
+                    
+                } catch (error) {
+                    console.error('Recovery failed:', error);
+                }
             }
         }
         
@@ -1077,6 +1137,21 @@
         } catch (error) {
             console.error('Test recording error:', error);
             alert('Error in test recording: ' + error.message);
+        }
+    }
+    
+    // Attempt recovery function
+    function attemptRecovery() {
+        try {
+            if (typeof videoRecorder === 'undefined') {
+                alert('VideoRecorder not available');
+                return;
+            }
+            
+            videoRecorder.attemptDataRecovery();
+        } catch (error) {
+            console.error('Recovery error:', error);
+            alert('Error in recovery: ' + error.message);
         }
     }
 </script>
