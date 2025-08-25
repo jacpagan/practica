@@ -63,15 +63,34 @@ AWS_S3_OBJECT_PARAMETERS = {
 AWS_DEFAULT_ACL = 'public-read'
 AWS_QUERYSTRING_AUTH = False
 
+# Enhanced S3 Security Settings for Docker/Heroku
+AWS_S3_SECURE_URLS = True  # Force HTTPS
+AWS_S3_VERIFY = True  # Verify SSL certificates
+AWS_S3_SIGNATURE_VERSION = 's3v4'  # Latest signature version
+
+# S3 CORS and bucket policy settings (configure in AWS console)
+AWS_S3_ADDRESSING_STYLE = 'virtual'  # Use virtual-hosted style URLs
+
 # Use S3 for media files if configured, otherwise fall back to local
 if AWS_STORAGE_BUCKET_NAME:
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
     MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/'
     # Keep local media root for fallback
     MEDIA_ROOT = BASE_DIR / 'media'
+    
+    # S3 storage backend configuration
+    AWS_S3_FILE_OVERWRITE = False  # Don't overwrite files with same name
+    AWS_S3_MAX_AGE_SECONDS = 31536000  # 1 year cache for videos
+    
+    # Log S3 configuration
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"S3 storage configured: bucket={AWS_STORAGE_BUCKET_NAME}, region={AWS_S3_REGION_NAME}")
 else:
     # Fallback to local storage
     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+    logger = logging.getLogger(__name__)
+    logger.warning("S3 not configured, using local file storage")
 
 # Simplified logging for production
 LOGGING = {
@@ -118,6 +137,29 @@ CACHES = {
 FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100MB
 
+# Video upload security and validation settings
+MAX_UPLOAD_SIZE = 100 * 1024 * 1024  # 100MB maximum
+ALLOWED_VIDEO_EXTENSIONS = ['.mp4', '.webm', '.mov', '.avi', '.ogg', '.wmv', '.flv', '.mkv']
+ALLOWED_VIDEO_MIME_TYPES = [
+    'video/mp4',
+    'video/webm', 
+    'video/quicktime',
+    'video/x-msvideo',  # .avi
+    'video/ogg',
+    'video/x-ms-wmv',
+    'video/x-flv',
+    'video/x-matroska'
+]
+
+# Rate limiting for video uploads
+UPLOAD_RATE_LIMIT = '10/minute'  # 10 uploads per minute per IP
+RATE_LIMIT_ENABLED = True
+
+# Video processing settings
+VIDEO_PROCESSING_ENABLED = True
+VIDEO_THUMBNAIL_GENERATION = False  # Disable for now to reduce complexity
+VIDEO_COMPRESSION_ENABLED = False   # Disable for now to reduce complexity
+
 # CORS settings for production
 CORS_ALLOWED_ORIGINS = [
     "https://your-app-name.herokuapp.com",
@@ -148,3 +190,10 @@ if 'whitenoise.middleware.WhiteNoiseMiddleware' not in MIDDLEWARE:
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 WHITENOISE_USE_FINDERS = True
 WHITENOISE_AUTOREFRESH = True
+
+# Debug: Log the video upload settings to confirm they're loaded
+import logging
+logger = logging.getLogger(__name__)
+logger.info(f"Production settings loaded - Video MIME types: {ALLOWED_VIDEO_MIME_TYPES}")
+logger.info(f"Production settings loaded - Video extensions: {ALLOWED_VIDEO_EXTENSIONS}")
+logger.info(f"Production settings loaded - Max upload size: {MAX_UPLOAD_SIZE}")
