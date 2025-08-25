@@ -82,7 +82,7 @@ class VideoAsset(models.Model):
             raise ValidationError("File size must be greater than 0")
         
         # Validate MIME type
-        if self.mime_type and self.mime_type not in getattr(settings, 'ACCEPTED_VIDEO_MIME_TYPES', []):
+        if self.mime_type and self.mime_type not in getattr(settings, 'ALLOWED_VIDEO_MIME_TYPES', []):
             raise ValidationError(f"Unsupported MIME type: {self.mime_type}")
         
         # Validate checksum format
