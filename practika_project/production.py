@@ -24,8 +24,8 @@ ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.
 if os.environ.get('HEROKU_APP_NAME'):
     ALLOWED_HOSTS.append(f"{os.environ.get('HEROKU_APP_NAME')}.herokuapp.com")
 
-# Explicitly add the known Heroku domain
-ALLOWED_HOSTS.append('practika-d127ed6da5d2.herokuapp.com')
+# Ensure ALLOWED_HOSTS includes Heroku domain
+ALLOWED_HOSTS = ['*', 'practika-d127ed6da5d2.herokuapp.com', 'practika-container-1e918c8ae02b.herokuapp.com']
 
 # Ensure no duplicates and clean up
 ALLOWED_HOSTS = list(set(ALLOWED_HOSTS))
