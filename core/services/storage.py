@@ -66,10 +66,16 @@ class VideoStorageService:
             filename = f"{uuid.uuid4()}{file_extension}"
             
             # Store file using cloud storage if available, otherwise local
-            if self.cloud_storage:
-                # Use cloud storage
-                storage_path = self.cloud_storage.store_video(uploaded_file, filename, user)
-                logger.info(f"Video stored in cloud storage: {storage_path}")
+            if self.cloud_storage and self.cloud_storage.s3_client:
+                try:
+                    # Use cloud storage
+                    storage_path = self.cloud_storage.store_video(uploaded_file, filename, user)
+                    logger.info(f"Video stored in cloud storage: {storage_path}")
+                except Exception as cloud_error:
+                    logger.warning(f"Cloud storage failed, falling back to local: {cloud_error}")
+                    # Fallback to local storage
+                    storage_path = default_storage.save(f"videos/{filename}", uploaded_file)
+                    logger.info(f"Video stored locally (fallback): {storage_path}")
             else:
                 # Fallback to local storage
                 storage_path = default_storage.save(f"videos/{filename}", uploaded_file)
@@ -80,8 +86,7 @@ class VideoStorageService:
                 orig_filename=uploaded_file.name,
                 storage_path=storage_path,
                 size_bytes=uploaded_file.size,
-                mime_type=validation_result['mime_type'],
-                uploaded_by=user
+                mime_type=validation_result['mime_type']
             )
             
             logger.info(f"VideoAsset created: {video_asset.id} - {filename}")
@@ -245,3 +250,7 @@ class VideoStorageService:
         except Exception as e:
             logger.error(f"Error deleting video: {e}")
             raise
+
+    def delete_video_asset(self, video_asset):
+        """Alias for delete_video method for consistency"""
+        return self.delete_video(video_asset)

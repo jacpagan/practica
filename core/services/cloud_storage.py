@@ -10,6 +10,7 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 import boto3
 from botocore.exceptions import ClientError
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -38,14 +39,27 @@ class CloudStorageService:
             if self.s3_client and self.bucket_name:
                 # Store in S3
                 key = f"videos/{filename}"
+                
+                # Detect proper MIME type for the video
+                mime_type = self._detect_video_mime_type(video_file, filename)
+                
+                # Prepare S3 upload parameters
+                extra_args = {
+                    'ContentType': mime_type,
+                    'ACL': 'public-read',
+                    'Metadata': {
+                        'original-filename': video_file.name,
+                        'uploaded-by': str(user) if user else 'anonymous',
+                        'upload-timestamp': str(int(time.time()))
+                    }
+                }
+                
+                # Upload to S3
                 self.s3_client.upload_fileobj(
                     video_file,
                     self.bucket_name,
                     key,
-                    ExtraArgs={
-                        'ContentType': 'video/webm',
-                        'ACL': 'public-read'
-                    }
+                    ExtraArgs=extra_args
                 )
                 
                 # Generate public URL
@@ -62,6 +76,32 @@ class CloudStorageService:
         except Exception as e:
             logger.error(f"Error storing video: {e}")
             raise
+    
+    def _detect_video_mime_type(self, video_file, filename):
+        """Detect proper MIME type for video file"""
+        try:
+            # Check file extension first
+            file_extension = Path(filename).suffix.lower()
+            extension_mime_map = {
+                '.mp4': 'video/mp4',
+                '.webm': 'video/webm',
+                '.ogg': 'video/ogg',
+                '.mov': 'video/quicktime',
+                '.avi': 'video/x-msvideo',
+                '.wmv': 'video/x-ms-wmv',
+                '.flv': 'video/x-flv',
+                '.mkv': 'video/x-matroska'
+            }
+            
+            if file_extension in extension_mime_map:
+                return extension_mime_map[file_extension]
+            
+            # Fallback to webm for webcam recordings
+            return 'video/webm'
+            
+        except Exception as e:
+            logger.warning(f"Error detecting MIME type: {e}")
+            return 'video/webm'  # Safe fallback
     
     def get_video_url(self, filename):
         """Get public URL for video file"""

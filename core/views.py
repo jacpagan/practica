@@ -15,6 +15,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 import json
+from django.shortcuts import render
 
 logger = logging.getLogger(__name__)
 
@@ -387,6 +388,201 @@ def logs(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+def upload_video(request):
+    """
+    Secure video upload endpoint leveraging existing VideoStorageService
+    """
+    try:
+        # Check rate limiting using existing middleware
+        client_ip = _get_client_ip(request)
+        if not _check_upload_rate_limit(client_ip):
+            return Response({
+                'error': 'Upload rate limit exceeded. Please wait before uploading again.',
+                'retry_after': 60
+            }, status=status.HTTP_429_TOO_MANY_REQUESTS)
+        
+        # Validate request has video file
+        if 'video' not in request.FILES:
+            return Response({
+                'error': 'No video file provided. Please include a video file in the request.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        video_file = request.FILES['video']
+        
+        # Use existing security validation
+        from core.security import SecurityValidator
+        validation_result = SecurityValidator.validate_file_upload(
+            filename=video_file.name,
+            file_size=video_file.size,
+            mime_type=video_file.content_type
+        )
+        
+        if not validation_result['valid']:
+            return Response({
+                'error': 'File validation failed',
+                'details': validation_result['errors'],
+                'warnings': validation_result.get('warnings', [])
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Use existing VideoStorageService to store the video
+        from core.services.storage import VideoStorageService
+        storage_service = VideoStorageService()
+        
+        # Store video using existing service (handles S3/local fallback)
+        video_asset = storage_service.store_uploaded_video(video_file, request.user)
+        
+        # Get video URL using existing service
+        video_url = storage_service.get_video_url(video_asset)
+        
+        # Return success response with video details
+        return Response({
+            'success': True,
+            'video_id': str(video_asset.id),
+            'filename': video_asset.orig_filename,
+            'size_bytes': video_asset.size_bytes,
+            'mime_type': video_asset.mime_type,
+            'url': video_url,
+            'storage_path': video_asset.storage_path,
+            'processing_status': video_asset.processing_status,
+            'created_at': video_asset.created_at.isoformat(),
+            'message': 'Video uploaded and stored successfully'
+        }, status=status.HTTP_201_CREATED)
+        
+    except ValueError as e:
+        # Handle validation errors from storage service
+        logger.warning(f"Video upload validation failed: {e}")
+        return Response({
+            'error': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
+        
+    except Exception as e:
+        logger.error(f"Video upload error: {e}")
+        return Response({
+            'error': 'Upload failed. Please try again.',
+            'details': str(e) if settings.DEBUG else None
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def list_videos(request):
+    """
+    List uploaded videos (for debugging and management)
+    """
+    try:
+        from core.models import VideoAsset
+        from core.services.storage import VideoStorageService
+        
+        # Get recent videos
+        videos = VideoAsset.objects.filter(is_valid=True).order_by('-created_at')[:20]
+        
+        storage_service = VideoStorageService()
+        video_list = []
+        
+        for video in videos:
+            video_data = {
+                'id': str(video.id),
+                'filename': video.orig_filename,
+                'size_mb': round(video.size_bytes / (1024 * 1024), 2),
+                'mime_type': video.mime_type,
+                'processing_status': video.processing_status,
+                'created_at': video.created_at.isoformat(),
+                'url': storage_service.get_video_url(video),
+                'access_count': video.access_count
+            }
+            video_list.append(video_data)
+        
+        return Response({
+            'videos': video_list,
+            'total_count': len(video_list),
+            'message': 'Videos retrieved successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error listing videos: {e}")
+        return Response({
+            'error': 'Failed to retrieve videos'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['DELETE'])
+@permission_classes([AllowAny])
+def delete_video(request, video_id):
+    """
+    Delete a video asset
+    """
+    try:
+        from core.models import VideoAsset
+        from core.services.storage import VideoStorageService
+        
+        # Get video asset
+        try:
+            video_asset = VideoAsset.objects.get(id=video_id)
+        except VideoAsset.DoesNotExist:
+            return Response({
+                'error': 'Video not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Delete using existing service
+        storage_service = VideoStorageService()
+        storage_service.delete_video(video_asset)
+        
+        return Response({
+            'success': True,
+            'message': f'Video {video_id} deleted successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error deleting video {video_id}: {e}")
+        return Response({
+            'error': 'Failed to delete video'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def _get_client_ip(request):
+    """Extract client IP address from request"""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0].strip()
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+
+
+def _check_upload_rate_limit(client_ip):
+    """Check upload rate limiting using existing cache infrastructure"""
+    from django.core.cache import cache
+    
+    key = f"upload_rate_limit:{client_ip}"
+    current_count = cache.get(key, 0)
+    
+    # Use existing rate limit from settings
+    max_uploads = getattr(settings, 'UPLOAD_RATE_LIMIT', '10/minute')
+    if isinstance(max_uploads, str):
+        # Parse "10/minute" format
+        try:
+            limit, period = max_uploads.split('/')
+            limit = int(limit)
+            if period == 'minute':
+                period_seconds = 60
+            elif period == 'hour':
+                period_seconds = 3600
+            else:
+                period_seconds = 60  # Default to 1 minute
+        except:
+            limit, period_seconds = 10, 60  # Default fallback
+    else:
+        limit, period_seconds = max_uploads, 60
+    
+    if current_count >= limit:
+        return False
+    
+    cache.set(key, current_count + 1, period_seconds)
+    return True
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
 def test_endpoint(request):
     """
     Test endpoint for monitoring and debugging
@@ -405,3 +601,10 @@ def test_endpoint(request):
     logger.info(f"Test endpoint called: {test_data}")
     
     return Response(test_data)
+
+
+def upload_test_page(request):
+    """
+    Render the video upload test page
+    """
+    return render(request, 'test_video_upload.html')

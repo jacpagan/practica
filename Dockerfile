@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     gcc \
     libmagic1 \
     libmagic-dev \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app directory
@@ -26,8 +27,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project files
 COPY . .
 
-# Create necessary directories
-RUN mkdir -p /app/logs /app/media /app/staticfiles
+# Create necessary directories with proper permissions
+RUN mkdir -p /app/logs /app/media /app/staticfiles /app/media/videos && \
+    chmod -R 755 /app/media && \
+    chmod -R 755 /app/logs
 
 # Collect static files
 RUN python manage.py collectstatic --noinput
