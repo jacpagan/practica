@@ -9,12 +9,12 @@
         <div class="user-controls">
             {% if user.is_authenticated %}
                 {% if user.is_staff %}
-                    <a href="{% url 'exercise_create' %}" class="btn btn-success">+ Create Exercise</a>
+                    <a href="{% url 'exercises:exercise_create' %}" class="btn btn-success">+ Create Exercise</a>
                 {% endif %}
                 <span class="user-info">Welcome, {{ user.username }}</span>
-                <a href="{% url 'logout' %}" class="btn btn-secondary">Logout</a>
+                <a href="{% url 'exercises:logout' %}" class="btn btn-secondary">Logout</a>
             {% else %}
-                <a href="{% url 'login' %}" class="btn btn-primary">Login</a>
+                <a href="{% url 'exercises:login' %}" class="btn btn-primary">Login</a>
             {% endif %}
         </div>
     </div>
@@ -38,7 +38,7 @@
                 </div>
 
                 <div class="exercise-actions">
-                    <a href="{% url 'exercise_detail' exercise.id %}" class="btn btn-primary">
+                    <a href="{% url 'exercises:exercise_detail' exercise.id %}" class="btn btn-primary">
                         View Details & Comments ({{ exercise.videocomment_set.count }})
                     </a>
                 </div>
@@ -48,7 +48,7 @@
     {% else %}
         <p>No exercises available yet.</p>
         {% if user.is_staff %}
-            <p><a href="{% url 'exercise_create' %}" class="btn btn-success">Create Your First Exercise</a></p>
+            <p><a href="{% url 'exercises:exercise_create' %}" class="btn btn-success">Create Your First Exercise</a></p>
         {% endif %}
     {% endif %}
 </div>
