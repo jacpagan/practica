@@ -898,3 +898,12 @@ class DeviceCompatibilityMiddleware(MiddlewareMixin):
             return ['webm', 'mp4', 'ogg']
         else:
             return ['mp4', 'mov', 'avi']  # Fallback formats
+
+class RequestIDFilter(logging.Filter):
+    """Filter to add request_id to log records."""
+    
+    def filter(self, record):
+        # Get request_id from thread local storage
+        request_id = getattr(threading.current_thread(), '_request_id', 'unknown')
+        record.request_id = request_id
+        return True

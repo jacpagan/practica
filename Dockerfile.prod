@@ -79,6 +79,9 @@ RUN mkdir -p /app/ssl /app/cache /app/temp \
 # Copy production configuration (files are already in the correct locations)
 # The files are copied in the base stage when we do "COPY . ."
 
+# Collect static files for production
+RUN python manage.py collectstatic --noinput
+
 # Set environment variables for mobile optimization
 ENV PYTHONPATH=/app
 ENV DJANGO_SETTINGS_MODULE=practika_project.production

@@ -1,0 +1,12 @@
+build:
+  docker:
+    web: Dockerfile.prod
+
+release:
+  command:
+    - python manage.py migrate --noinput
+    - python manage.py collectstatic --noinput
+    - echo "Release phase completed successfully"
+
+run:
+  web: gunicorn practika_project.wsgi --config gunicorn.conf.py

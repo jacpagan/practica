@@ -279,163 +279,126 @@ make test
 
 ## 🚀 Deployment
 
-### Heroku Deployment
-```bash
-# Deploy to Heroku
-./deploy-heroku.sh
+### Heroku Container Deployment (Recommended)
 
-# Check deployment status
-heroku logs --tail --app your-app-name
+This is the **recommended deployment method** for production use with Docker containers.
+
+#### Prerequisites
+- Heroku CLI installed and logged in
+- Docker Desktop running
+- Git repository initialized
+
+#### Quick Deploy Commands
+
+```bash
+# 1. Set up Heroku app (if not exists)
+heroku create your-app-name
+# or use existing: heroku git:remote -a your-app-name
+
+# 2. Set required environment variables
+heroku config:set DJANGO_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(50))')"
+heroku config:set DJANGO_ENVIRONMENT=production
+heroku config:set DJANGO_DEBUG=False
+heroku config:set DJANGO_SETTINGS_MODULE=practika_project.production
+
+# 3. Set database (PostgreSQL recommended for production)
+heroku addons:create heroku-postgresql:mini
+
+# 4. Set Redis for caching
+heroku addons:create heroku-redis:mini
+
+# 5. Deploy with container stack
+git add .
+git commit -m "Deploy to Heroku with container stack"
+git push heroku main
+
+# 6. Run migrations and collect static
+heroku run python manage.py migrate
+heroku run python manage.py collectstatic --noinput
+
+# 7. Create superuser
+heroku run python manage.py shell -c "
+from django.contrib.auth.models import User
+if not User.objects.filter(username='admin').exists():
+    User.objects.create_superuser('admin', 'admin@example.com', 'admin123')
+    print('Superuser created: admin/admin123')
+else:
+    print('Superuser already exists')
+"
 ```
 
-### Environment Variables
+#### Container Stack Configuration
+
+The deployment uses `heroku.yml` for container stack configuration:
+
+- **Build Phase**: Uses `Dockerfile.prod` for optimized production image
+- **Release Phase**: Runs migrations and collects static files
+- **Run Phase**: Starts Gunicorn with production settings
+
+#### Environment Variables
+
+**Required:**
 ```bash
-# Required for production
-DJANGO_SECRET_KEY=your-production-secret-key
+DJANGO_SECRET_KEY=your-secret-key-here
 DJANGO_ENVIRONMENT=production
 DJANGO_DEBUG=False
+DJANGO_SETTINGS_MODULE=practika_project.production
+```
 
-# S3 Configuration (optional)
-AWS_ACCESS_KEY_ID=your_access_key
-AWS_SECRET_ACCESS_KEY=your_secret_key
-AWS_STORAGE_BUCKET_NAME=your_bucket_name
+**Optional (S3 Storage):**
+```bash
+AWS_ACCESS_KEY_ID=your-aws-access-key
+AWS_SECRET_ACCESS_KEY=your-aws-secret-key
+AWS_STORAGE_BUCKET_NAME=your-s3-bucket
 AWS_S3_REGION_NAME=us-east-1
 ```
 
-## 🔒 Security Features
+**Optional (Performance):**
+```bash
+GUNICORN_WORKERS=1
+GUNICORN_TIMEOUT=30
+GUNICORN_LOG_LEVEL=info
+```
 
-### Authentication & Login Security
-- **Rate Limiting**: 5 login attempts per minute per IP address
-- **Account Lockout**: 5 minutes after 5 failed login attempts
-- **Password Security**: Minimum 8 characters with complexity requirements
-- **Session Security**: 1 hour timeout with secure cookies
+#### Monitoring and Debugging
 
-### File Upload Security
-- **Video File Validation**: MP4, WebM, QuickTime, AVI formats only
-- **File Size Limit**: 100MB maximum
-- **Malware Protection**: Executable and script detection
-- **Content Validation**: Magic bytes and header analysis
+```bash
+# View real-time logs
+heroku logs --tail
 
-### Security Monitoring
-- **Security Events Logged**: Failed logins, account lockouts, rate limit violations
-- **Audit Trail**: User actions, resource access, security violations
-- **Security Headers**: X-Frame-Options, X-Content-Type-Options, X-XSS-Protection
+# Check app status
+heroku ps
 
-## 📱 Browser Compatibility
+# Run Django shell
+heroku run python manage.py shell
 
-### Required Features
-- **MediaRecorder API**: For video recording
-- **getUserMedia**: For camera/microphone access
-- **Modern JavaScript**: ES6+ features
-- **HTML5 Video**: For video playback
+# Check environment variables
+heroku config
 
-### Supported Browsers
-- **Chrome**: 47+ (full support)
-- **Firefox**: 44+ (full support)
-- **Safari**: 14.1+ (limited support)
-- **Edge**: 79+ (full support)
+# Restart app
+heroku restart
+```
 
-## 🔧 Development
+#### Troubleshooting Container Deployments
 
-### Code Quality
-- **Testing**: pytest + pytest-django
-- **Code Style**: Follow Django coding standards
-- **Linting**: ruff for code quality
-- **Formatting**: black for consistent formatting
+**Common Issues:**
+1. **Build fails**: Check Dockerfile.prod syntax and requirements.txt
+2. **App won't start**: Check logs with `heroku logs --tail`
+3. **Static files missing**: Ensure collectstatic runs in release phase
+4. **Database connection**: Verify DATABASE_URL is set
+5. **Port binding**: Gunicorn automatically binds to $PORT
 
-### Adding New Features
-1. Write tests first (TDD approach)
-2. Implement the feature
-3. Ensure all tests pass
-4. Update documentation
+**Debug Commands:**
+```bash
+# Check build logs
+heroku builds:output
 
-## 🚨 Troubleshooting
+# View release phase logs
+heroku releases:info
 
-### Common Issues
+# Test app locally with Docker
+docker build -f Dockerfile.prod -t practika-prod .
+docker run -p 8000:8000 -e PORT=8000 practika-prod
+```
 
-1. **Camera Not Working**: Check browser permissions, ensure HTTPS in production
-2. **Video Upload Fails**: Check file size (max 100MB), verify file format
-3. **Page Not Loading**: Check Django server, verify database migrations
-4. **libmagic Issues**: Install with `brew install libmagic` on macOS
-5. **Docker Issues**: Use `make logs` to view container logs
-
-### Debug Mode
-- **Console Logging**: Detailed error information
-- **Performance Metrics**: Recording and upload timing
-- **State Inspection**: Current recorder status
-- **Network Monitoring**: API call tracking
-
-## 📊 Dependencies
-
-### Production Dependencies
-- Django 4.2+
-- Django REST Framework
-- Pillow (image processing)
-- python-magic (file type detection)
-- django-filter
-- django-cors-headers
-- psutil (system monitoring)
-- redis (caching)
-- django-prometheus (metrics)
-- django-health-check (health monitoring)
-- whitenoise (static files)
-- gunicorn (WSGI server)
-- boto3 (AWS S3)
-
-### Development Dependencies
-- pytest
-- pytest-django
-- model-bakery
-- ruff
-- black
-
-## 🔮 Future Enhancements
-
-### Planned Features
-- **Real-time Comments**: WebSocket integration
-- **Video Processing**: Thumbnail generation, transcoding
-- **User Profiles**: Avatar and bio support
-- **Search & Filter**: Advanced exercise discovery
-- **Mobile App**: React Native companion
-- **AI-powered Suggestions**: Content improvement recommendations
-- **Advanced Analytics**: Detailed engagement insights
-- **Social Features**: Community challenges and competitions
-
-### Technical Improvements
-- **CDN Integration**: CloudFront for video delivery
-- **Video Compression**: Automatic optimization
-- **Analytics**: User engagement tracking
-- **Caching**: Redis-based performance optimization
-- **WebSocket Integration**: Real-time updates
-- **Progressive Web App**: Offline functionality
-
-## 📚 Additional Resources
-
-### Security Documentation
-- [Django Security Documentation](https://docs.djangoproject.com/en/stable/topics/security/)
-- [OWASP Top 10](https://owasp.org/www-project-top-ten/)
-- [Security Headers](https://securityheaders.com/)
-
-### Development Tools
-- [Bandit](https://bandit.readthedocs.io/) - Python security linter
-- [Safety](https://pyup.io/safety/) - Dependency vulnerability checker
-- [Django Debug Toolbar](https://django-debug-toolbar.readthedocs.io/) - Security inspection
-
-### Docker Resources
-- [Docker Documentation](https://docs.docker.com/)
-- [Docker Compose Documentation](https://docs.docker.com/compose/)
-- [Django Deployment Checklist](https://docs.djangoproject.com/en/stable/howto/deployment/checklist/)
-
-## 📝 License
-
-This project is for educational and development purposes.
-
----
-
-**A simple, focused Practika platform for video-based learning exercises with accessibility features.**
-
-**Built with Django, HTML5, and modern JavaScript**  
-**Video recording powered by MediaRecorder API**  
-**Responsive design for all devices**  
-**Icon-first UI for universal accessibility**  
-**Production-ready with Docker and Heroku deployment**
+### Heroku Deployment (Legacy)
