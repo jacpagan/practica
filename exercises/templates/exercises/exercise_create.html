@@ -9,7 +9,7 @@
         <p class="subtitle">Record with webcam or upload a video file</p>
     </div>
     
-    <form id="exercise-form" enctype="multipart/form-data">
+    <form id="exercise-form" method="POST" enctype="multipart/form-data" action="{% url 'exercise_create' %}">
         {% csrf_token %}
         
         <!-- Basic Info Section -->
@@ -145,6 +145,9 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Hidden video input for form submission -->
+        <input type="hidden" id="video-data" name="video_data">
         
         <!-- Action Buttons -->
         <div class="form-actions">
@@ -396,100 +399,58 @@
         }
         
         // Form submission
-        document.getElementById('exercise-form').addEventListener('submit', async function(e) {
-            e.preventDefault();
+        document.getElementById('exercise-form').addEventListener('submit', function(e) {
+            // Validate form
+            const name = document.getElementById('name').value.trim();
+            if (!name) {
+                e.preventDefault();
+                alert('Exercise name is required');
+                return;
+            }
             
-            const submitBtn = document.getElementById('submit-btn');
-            const originalText = submitBtn.textContent;
+            // Check if video is available
+            const activeSource = document.querySelector('.toggle-btn.active').dataset.source;
+            let hasVideo = false;
+            
+            if (activeSource === 'webcam') {
+                hasVideo = videoRecorder.getVideoBlob() !== null;
+            } else {
+                hasVideo = document.getElementById('video-file').files.length > 0;
+            }
+            
+            if (!hasVideo) {
+                e.preventDefault();
+                alert('Please record or upload a video first');
+                return;
+            }
+            
+            // Convert webcam video to file if needed
+            if (activeSource === 'webcam') {
+                const videoBlob = videoRecorder.getVideoBlob();
+                if (videoBlob) {
+                    // Create a file input for the webcam video
+                    const fileInput = document.createElement('input');
+                    fileInput.type = 'file';
+                    fileInput.name = 'video';
+                    fileInput.style.display = 'none';
+                    
+                    // Convert blob to file
+                    const videoFile = new File([videoBlob], 'exercise.webm', { type: 'video/webm' });
+                    
+                    // Create a new DataTransfer and add the file
+                    const dt = new DataTransfer();
+                    dt.items.add(videoFile);
+                    fileInput.files = dt.files;
+                    
+                    // Add to form
+                    document.getElementById('exercise-form').appendChild(fileInput);
+                }
+            }
             
             // Show progress
-            document.getElementById('progress-section').style.display = 'block';
+            const submitBtn = document.getElementById('submit-btn');
             submitBtn.disabled = true;
             submitBtn.textContent = 'Creating...';
-            
-            try {
-                // Step 1: Validate
-                updateStep(1, 'active', 'Validating exercise details...');
-                const name = document.getElementById('name').value.trim();
-                if (!name) {
-                    updateStep(1, 'error', 'Exercise name is required');
-                    return;
-                }
-                updateStep(1, 'completed', 'Details validated');
-                
-                // Step 2: Process video
-                updateStep(2, 'active', 'Processing video...');
-                let videoBlob = null;
-                let fileName = '';
-                
-                const activeSource = document.querySelector('.toggle-btn.active').dataset.source;
-                
-                if (activeSource === 'webcam') {
-                    videoBlob = videoRecorder.getVideoBlob();
-                    fileName = 'exercise.webm';
-                    
-                    if (!videoBlob) {
-                        updateStep(2, 'error', 'Please record a video first');
-                        return;
-                    }
-                } else {
-                    const fileInput = document.getElementById('video-file');
-                    if (!fileInput.files[0]) {
-                        updateStep(2, 'error', 'Please select a video file');
-                        return;
-                    }
-                    videoBlob = fileInput.files[0];
-                    fileName = fileInput.files[0].name;
-                }
-                
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                updateStep(2, 'completed', 'Video processed');
-                
-                // Step 3: Upload
-                updateStep(3, 'active', 'Uploading video...');
-                const formData = new FormData();
-                formData.append('name', name);
-                formData.append('description', document.getElementById('description').value);
-                formData.append('video', videoBlob, fileName);
-                
-                await new Promise(resolve => setTimeout(resolve, 1500));
-                updateStep(3, 'completed', 'Video uploaded');
-                
-                // Step 4: Create exercise
-                updateStep(4, 'active', 'Saving to database...');
-                
-                const response = await fetch('/api/exercises/', {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                    }
-                });
-                
-                if (response.ok) {
-                    updateStep(4, 'completed', 'Exercise created!');
-                    
-                    const result = await response.json();
-                    const exerciseId = result.id;
-                    
-                    setTimeout(() => {
-                        const baseUrl = "{% url 'exercise_detail' '00000000-0000-0000-0000-000000000000' %}";
-                        const exerciseDetailUrl = baseUrl.replace('00000000-0000-0000-0000-000000000000', exerciseId);
-                        window.location.href = exerciseDetailUrl;
-                    }, 1000);
-                    
-                } else {
-                    const error = await response.json();
-                    updateStep(4, 'error', 'Failed: ' + (error.detail || 'Unknown error'));
-                }
-                
-            } catch (error) {
-                console.error('Error:', error);
-                updateStep(3, 'error', 'Upload failed: ' + error.message);
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = originalText;
-            }
         });
     });
 </script>

@@ -34,6 +34,51 @@ def exercise_create(request):
     if not request.user.is_staff:
         messages.error(request, 'Only staff members can create exercises.')
         return redirect('exercise_list')
+    
+    if request.method == 'POST':
+        try:
+            # Handle form submission
+            name = request.POST.get('name')
+            description = request.POST.get('description', '')
+            video_file = request.FILES.get('video')
+            
+            if not name:
+                messages.error(request, 'Exercise name is required.')
+                return render(request, 'exercises/exercise_create.html')
+            
+            if not video_file:
+                messages.error(request, 'Video file is required.')
+                return render(request, 'exercises/exercise_create.html')
+            
+            # Create the exercise using the API serializer
+            from exercises.serializers import ExerciseSerializer
+            from core.models import VideoAsset
+            from core.services.storage import VideoStorageService
+            
+            # Store the video first
+            storage_service = VideoStorageService()
+            video_asset = storage_service.store_uploaded_video(video_file, request.user)
+            
+            # Create exercise data
+            exercise_data = {
+                'name': name,
+                'description': description,
+                'video_asset': video_asset.id,
+                'created_by': request.user.id
+            }
+            
+            serializer = ExerciseSerializer(data=exercise_data)
+            if serializer.is_valid():
+                exercise = serializer.save()
+                messages.success(request, f'Exercise "{exercise.name}" created successfully!')
+                return redirect('exercise_detail', exercise_id=exercise.id)
+            else:
+                messages.error(request, f'Error creating exercise: {serializer.errors}')
+                
+        except Exception as e:
+            logger.error(f"Error creating exercise: {e}")
+            messages.error(request, f'Error creating exercise: {str(e)}')
+    
     return render(request, 'exercises/exercise_create.html')
 
 
