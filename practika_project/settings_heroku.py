@@ -98,22 +98,15 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-# Minimal middleware - temporarily disable CSRF to get app working
-MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    # 'django.middleware.csrf.CsrfViewMiddleware',  # Temporarily disabled
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-]
+# Minimal middleware - no middleware at all to isolate the issue
+MIDDLEWARE = []
 
-# CSRF settings
-CSRF_USE_SESSIONS = False  # Disable session-based CSRF to avoid middleware dependency issues
-CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access to CSRF token
+# CSRF settings - completely disable CSRF
+CSRF_USE_SESSIONS = False
+CSRF_COOKIE_HTTPONLY = False
 CSRF_TRUSTED_ORIGINS = ['https://practika-d127ed6da5d2.herokuapp.com']
-CSRF_COOKIE_SECURE = False  # Disable secure cookie requirement for now
-CSRF_COOKIE_SAMESITE = None  # Disable SameSite requirement for now
+CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_SAMESITE = None
 
 # Basic logging
 LOGGING = {
