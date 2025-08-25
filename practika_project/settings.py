@@ -240,6 +240,10 @@ FILE_UPLOAD_TEMP_DIR = os.getenv('DJANGO_FILE_UPLOAD_TEMP_DIR', None)
 CORS_ALLOWED_ORIGINS = os.getenv('DJANGO_CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',')
 CORS_ALLOW_CREDENTIALS = True
 
+# Media files configuration
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 # Storage configuration
 USE_S3 = os.getenv('USE_S3', 'False').lower() == 'true'
 
