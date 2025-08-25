@@ -105,6 +105,7 @@ MIDDLEWARE = [
     "core.middleware.RequestLoggingMiddleware",
     "core.middleware.PerformanceMonitoringMiddleware",
     "core.middleware.SecurityMiddleware",
+    "core.middleware.MobileOptimizationMiddleware",  # Mobile optimization middleware
 ]
 
 ROOT_URLCONF = "practika_project.urls"
@@ -425,3 +426,22 @@ METRICS = {
     'HEALTH_CHECK_ENDPOINT': '/health/',
     'METRICS_ENDPOINT': '/metrics/',
 }
+
+# Mobile optimization settings
+MOBILE_OPTIMIZATION = {
+    'ENABLED': os.getenv('MOBILE_OPTIMIZATION_ENABLED', 'True').lower() == 'true',
+    'PWA_ENABLED': os.getenv('PWA_ENABLED', 'True').lower() == 'true',
+    'VIDEO_COMPRESSION_ENABLED': os.getenv('VIDEO_COMPRESSION_ENABLED', 'False').lower() == 'true',
+    'CAMERA_QUALITY': os.getenv('MOBILE_CAMERA_QUALITY', '720p'),
+    'MAX_RECORDING_TIME': int(os.getenv('MOBILE_MAX_RECORDING_TIME', 300)),
+    'TOUCH_TARGET_SIZE': os.getenv('MOBILE_TOUCH_TARGET_SIZE', 'standard'),  # standard, medium, large
+    'PERFORMANCE_MODE': os.getenv('MOBILE_PERFORMANCE_MODE', 'balanced'),  # conservative, balanced, optimized
+}
+
+# Log mobile optimization status
+import logging
+logger = logging.getLogger(__name__)
+logger.info(f"Mobile optimization enabled: {MOBILE_OPTIMIZATION['ENABLED']}")
+logger.info(f"PWA enabled: {MOBILE_OPTIMIZATION['PWA_ENABLED']}")
+logger.info(f"Mobile camera quality: {MOBILE_OPTIMIZATION['CAMERA_QUALITY']}")
+logger.info(f"Mobile max recording time: {MOBILE_OPTIMIZATION['MAX_RECORDING_TIME']} seconds")

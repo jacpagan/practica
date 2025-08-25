@@ -4,16 +4,49 @@ A Django-based Learning Management System focused on video-based exercises and c
 
 ## 🚀 Quick Start
 
-1. **Start the server:**
-   ```bash
-   source .practika-venv/bin/activate
-   python manage.py runserver
-   ```
+### Option 1: Docker (Recommended)
 
-2. **Access the application:**
-   - **Main Frontend:** http://localhost:8000/
-   - **Admin Interface:** http://localhost:8000/admin/
-   - **Login Page:** http://localhost:8000/login/
+```bash
+# Development environment
+make dev-up
+# or
+./docker-helper.sh dev-up
+
+# Production environment
+make prod-up
+# or
+./docker-helper.sh prod-up
+```
+
+### Option 2: Local Development
+
+```bash
+# Create and activate virtual environment
+python3 -m venv .practika-venv
+source .practika-venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Install system dependencies (macOS)
+brew install libmagic
+
+# Run migrations
+python manage.py migrate
+
+# Create superuser
+python manage.py createsuperuser
+
+# Start server
+python manage.py runserver
+```
+
+### Access the Application
+
+- **Main Frontend:** http://localhost:8000/
+- **Admin Interface:** http://localhost:8000/admin/
+- **Login Page:** http://localhost:8000/login/
+- **Health Check:** http://localhost:8000/health/
 
 ## 👥 User Accounts
 
@@ -27,29 +60,36 @@ A Django-based Learning Management System focused on video-based exercises and c
 - **Password:** `user123`
 - **Capabilities:** View exercises, create video comments, reply to comments
 
-## 📚 Features
+## 📚 Core Features
 
+### Exercise Management
 - **Admin CRUD Operations**: Staff users can create, read, update, and delete exercises
 - **User Exercise Access**: Authenticated users can view all exercises
+- **Video Integration**: Exercises support video content with validation
+
+### Video Comments System
 - **Video Comments**: Users can create video comments on exercises using webcam recording or file upload
+- **Webcam Recording**: Real-time video recording via MediaRecorder API
+- **File Upload**: Support for video file uploads (MP4, WebM, QuickTime, AVI)
 - **Permission System**: Role-based access control for exercises and comments
-- **Video Storage**: Local file storage with MIME type validation and checksum calculation
-- **Basic Video Recording**: Webcam recording functionality for creating exercises and comments
-- **Icon-First UI**: Accessible interface with comprehensive icon system
+
+### Security & Validation
+- **File Validation**: MP4, WebM, QuickTime, AVI formats only, 100MB maximum
+- **Rate Limiting**: 5 login attempts per minute, 10 uploads per minute per IP
+- **Account Lockout**: 5 minutes after 5 failed login attempts
+- **Input Sanitization**: XSS, SQL injection, and command injection protection
 
 ## 🎨 Icon-First UI System
 
-The application uses an SVG sprite system with consistent icon mappings across all templates. Icons are designed to be universally intuitive and accessible, with proper ARIA labels and screen reader support.
+The application uses an SVG sprite system with consistent icon mappings across all templates. Icons are designed to be universally intuitive and accessible.
 
 ### Icon System Overview
-
 - **File**: `/static/icons/icons.svg`
 - **CSS**: `/static/css/icon-ui.css`
 - **Default Mode**: Icon-only (`.icon-only` class on `<html>`)
 - **Text Mode**: Add `?text=1` query parameter to reveal labels
 
 ### Core Icon Mappings
-
 | Action | Icon ID | Description |
 |--------|----------|-------------|
 | **Home/Main Page** | `#home` | House icon for main page |
@@ -61,52 +101,42 @@ The application uses an SVG sprite system with consistent icon mappings across a
 | **Upload/Submit** | `#upload` | Up arrow for file uploads |
 
 ### Accessibility Features
-
 - **ARIA Labels**: Every interactive element includes screen reader descriptions
 - **Keyboard Navigation**: Logical tab sequence with high-contrast focus rings
 - **Screen Reader Support**: Hidden labels and meaningful icon descriptions
 - **Icon Legend**: Modal overlay showing icon meanings (toggle with ⓘ button)
 
-## 🔐 Security Features
-
-### Authentication & Login Security
-
-- **Rate Limiting**: 5 login attempts per minute per IP address
-- **Account Lockout**: 5 minutes after 5 failed login attempts
-- **Password Security**: Minimum 8 characters with complexity requirements
-- **Session Security**: 1 hour timeout with secure cookies
-
-### File Upload Security
-
-- **Video File Validation**: MP4, WebM, QuickTime, AVI formats only
-- **File Size Limit**: 100MB maximum
-- **Malware Protection**: Executable and script detection
-- **Content Validation**: Magic bytes and header analysis
-
-### Security Monitoring
-
-- **Security Events Logged**: Failed logins, account lockouts, rate limit violations
-- **Audit Trail**: User actions, resource access, security violations
-- **Security Headers**: X-Frame-Options, X-Content-Type-Options, X-XSS-Protection
-
 ## 🛠️ Technology Stack
 
-- **Backend**: Django 4.2 + Django REST Framework
-- **Database**: SQLite (local development)
-- **Storage**: FileSystemStorage at `./media`
+### Backend
+- **Framework**: Django 4.2 + Django REST Framework
+- **Database**: SQLite (development), PostgreSQL (production)
+- **Storage**: FileSystemStorage (local) + S3 (cloud)
 - **Authentication**: Session-based authentication
-- **Frontend**: Server-rendered HTML with JavaScript for webcam recording
+- **Caching**: Redis
+
+### Frontend
+- **Templates**: Server-rendered HTML with Django templates
+- **JavaScript**: ES6+ with MediaRecorder API for video recording
+- **CSS**: Custom icon-first UI system
 - **Video Support**: MP4, WebM, QuickTime, AVI formats
+
+### Infrastructure
+- **Containerization**: Docker with multi-stage builds
+- **Deployment**: Heroku-ready with Procfile and buildpacks
+- **Monitoring**: Health checks, metrics, and logging
+- **Security**: Rate limiting, input validation, security headers
 
 ## 📁 Project Structure
 
 ```
 Practika/
 ├── core/                    # Core functionality and VideoAsset model
-│   ├── models.py           # VideoAsset model with validation and monitoring
-│   ├── services/           # Storage service for video files
-│   ├── views.py            # Health check and monitoring endpoints
-│   ├── middleware.py       # Security and rate limiting middleware
+│   ├── models.py           # VideoAsset model with validation
+│   ├── services/           # Storage and cloud storage services
+│   ├── views.py            # Health check and video API endpoints
+│   ├── middleware.py       # Security and monitoring middleware
+│   ├── security.py         # Security validation and auditing
 │   └── admin.py            # Admin interface for VideoAsset
 ├── exercises/               # Exercise management
 │   ├── models.py           # Exercise model
@@ -115,8 +145,6 @@ Practika/
 │   ├── permissions.py      # Custom permissions
 │   ├── admin.py            # Admin interface
 │   ├── templates/          # HTML templates
-│   │   ├── exercises/      # Exercise templates
-│   │   └── base.html       # Base template
 │   └── html_views.py       # HTML views for web interface
 ├── comments/                # Video comment management
 │   ├── models.py           # VideoComment model
@@ -124,7 +152,7 @@ Practika/
 │   ├── serializers.py      # DRF serializers
 │   ├── permissions.py      # Custom permissions
 │   └── admin.py            # Admin interface
-├── tests/                   # Test suite
+├── tests/                   # Comprehensive test suite
 │   ├── test_models.py      # Model tests
 │   ├── test_permissions.py # Permission tests
 │   ├── test_api_exercises.py # Exercise API tests
@@ -133,118 +161,56 @@ Practika/
 │   ├── test_security.py    # Security and rate limiting tests
 │   ├── test_a11y_icons.py # Icon accessibility tests
 │   └── test_ui_nonreader_flow.py # UI flow tests
-├── practika_project/            # Django project settings
-├── media/                  # Video file storage
-├── requirements.txt        # Production dependencies
-├── requirements-dev.txt    # Development dependencies
-├── pytest.ini             # Pytest configuration
+├── practika_project/        # Django project settings
+├── media/                   # Video file storage
+├── static/                  # Static files and icons
+├── templates/               # Base templates
+├── requirements.txt         # Production dependencies
+├── requirements-dev.txt     # Development dependencies
+├── pytest.ini              # Pytest configuration
+├── Dockerfile              # Development Docker image
+├── Dockerfile.prod         # Production Docker image
+├── docker-compose.yml      # Development environment
+├── docker-compose.prod.yml # Production environment
 └── README.md               # This file
 ```
 
-## 🚀 Setup Instructions
+## 🐳 Docker Setup
 
-### Prerequisites
+### Development Environment
+```bash
+# Start development environment
+make dev-up
 
-- Python 3.9+
-- macOS (for libmagic support)
+# View logs
+make logs
 
-### Installation
+# Run tests
+make test
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd Practika
-   ```
+# Stop services
+make down
+```
 
-2. **Create and activate virtual environment**
-   ```bash
-   python3 -m venv .practika-venv
-source .practika-venv/bin/activate
-   ```
+### Production Environment
+```bash
+# Start production environment
+make prod-up
 
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+# View production logs
+make logs-prod
 
-4. **Install system dependencies (macOS)**
-   ```bash
-   brew install libmagic
-   ```
+# Stop production services
+make prod-down
+```
 
-5. **Run migrations**
-   ```bash
-   python manage.py migrate
-   ```
-
-6. **Create superuser**
-   ```bash
-   python manage.py createsuperuser
-   ```
-
-7. **Run the development server**
-   ```bash
-   python manage.py runserver
-   ```
-
-8. **Access the application**
-   - Admin interface: http://localhost:8000/admin/
-   - Exercise list: http://localhost:8000/
-   - Exercise creation: http://localhost:8000/create/
-   - API endpoints: http://localhost:8000/api/
-
-## 📱 User Stories Covered
-
-### 1. Admin Creates Exercise
-- **Path:** `/create/` (admin only)
-- **Features:**
-  - Upload video files (MP4, WebM, QuickTime, AVI)
-  - Set exercise name (≤140 characters)
-  - Add optional description
-  - Video preview before upload
-  - Form validation and error handling
-
-### 2. Users Watch Exercises
-- **Path:** `/` (main page)
-- **Features:**
-  - View all available exercises
-  - Watch exercise videos with HTML5 player
-  - See exercise metadata (creator, date, description)
-  - Responsive grid layout
-
-### 3. Users Create Video Comments
-- **Path:** `/` (on any exercise)
-- **Features:**
-  - Webcam recording via MediaRecorder API
-  - Optional text comments
-  - Real-time video preview
-  - Start/stop recording controls
-  - Automatic video upload on submission
-
-### 4. Admin Comments on User Comments
-- **Path:** `/` (reply to any comment)
-- **Features:**
-  - Reply to any video comment with video
-  - Admin badge identification
-  - Nested comment structure
-  - Same video recording interface
-
-## 🎥 Video Recording Features
-
-### Webcam Integration
-- **Technology:** MediaRecorder API
-- **Format:** WebM with VP8 video + Opus audio
-- **Features:**
-  - Live preview during recording
-  - Start/stop controls
-  - Playback of recorded video
-  - Automatic blob creation for upload
-
-### Video Upload
-- **Accepted Formats:** MP4, WebM, QuickTime, AVI
-- **Size Limit:** 100MB
-- **Processing:** SHA256 checksums, metadata extraction
-- **Storage:** Local filesystem with UUID naming
+### Available Commands
+```bash
+make help              # Show all available commands
+make status            # Check service status
+make shell             # Open Django shell
+make clean             # Clean up all containers
+```
 
 ## 🔌 API Endpoints
 
@@ -262,15 +228,37 @@ source .practika-venv/bin/activate
 - `PATCH /api/video-comments/{id}/` - Update comment (author or staff)
 - `DELETE /api/video-comments/{id}/` - Delete comment (author or staff)
 
+### Video Upload (Core)
+- `POST /core/api/upload-video/` - Upload video file (authenticated)
+- `GET /core/api/videos/` - List uploaded videos (authenticated)
+- `DELETE /core/api/videos/{id}/delete/` - Delete video (authenticated)
+
 ### Health & Monitoring
 - `GET /health/` - System health check
 - `GET /api/health/` - Detailed health status
 - `GET /api/metrics/` - Prometheus-style metrics
 
+## 🎥 Video System Features
+
+### Webcam Integration
+- **Technology**: MediaRecorder API
+- **Format**: WebM with VP8 video + Opus audio
+- **Features**: Live preview, start/stop controls, playback review
+
+### Video Upload
+- **Accepted Formats**: MP4, WebM, QuickTime, AVI
+- **Size Limit**: 100MB
+- **Processing**: SHA256 checksums, metadata extraction
+- **Storage**: Local filesystem with S3 fallback
+
+### Storage Strategy
+- **Primary**: S3 bucket with public read access
+- **Fallback**: Local filesystem storage
+- **Organization**: UUID-based naming with metadata tracking
+
 ## 🧪 Testing
 
-Run the test suite:
-
+### Run Test Suite
 ```bash
 # Run all tests
 python -m pytest tests/ -v
@@ -280,20 +268,58 @@ python -m pytest tests/test_models.py -v
 
 # Run with coverage
 python -m pytest tests/ --cov=. --cov-report=html
+
+# Run tests in Docker
+make test
 ```
 
 ### Test Coverage
+- **Total Tests**: 9 test files
+- **Test Areas**: Models, permissions, API endpoints, media validation, security, accessibility, UI flows
 
-- **Total Tests**: 8 test files
-- **Test Areas**:
-  - Model validation and constraints
-  - Permission system
-  - API endpoints
-  - Media validation
-  - CRUD operations
-  - Icon accessibility
-  - UI non-reader flows
-  - Security and rate limiting
+## 🚀 Deployment
+
+### Heroku Deployment
+```bash
+# Deploy to Heroku
+./deploy-heroku.sh
+
+# Check deployment status
+heroku logs --tail --app your-app-name
+```
+
+### Environment Variables
+```bash
+# Required for production
+DJANGO_SECRET_KEY=your-production-secret-key
+DJANGO_ENVIRONMENT=production
+DJANGO_DEBUG=False
+
+# S3 Configuration (optional)
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
+AWS_STORAGE_BUCKET_NAME=your_bucket_name
+AWS_S3_REGION_NAME=us-east-1
+```
+
+## 🔒 Security Features
+
+### Authentication & Login Security
+- **Rate Limiting**: 5 login attempts per minute per IP address
+- **Account Lockout**: 5 minutes after 5 failed login attempts
+- **Password Security**: Minimum 8 characters with complexity requirements
+- **Session Security**: 1 hour timeout with secure cookies
+
+### File Upload Security
+- **Video File Validation**: MP4, WebM, QuickTime, AVI formats only
+- **File Size Limit**: 100MB maximum
+- **Malware Protection**: Executable and script detection
+- **Content Validation**: Magic bytes and header analysis
+
+### Security Monitoring
+- **Security Events Logged**: Failed logins, account lockouts, rate limit violations
+- **Audit Trail**: User actions, resource access, security violations
+- **Security Headers**: X-Frame-Options, X-Content-Type-Options, X-XSS-Protection
 
 ## 📱 Browser Compatibility
 
@@ -312,14 +338,12 @@ python -m pytest tests/ --cov=. --cov-report=html
 ## 🔧 Development
 
 ### Code Quality
-
 - **Testing**: pytest + pytest-django
 - **Code Style**: Follow Django coding standards
 - **Linting**: ruff for code quality
 - **Formatting**: black for consistent formatting
 
 ### Adding New Features
-
 1. Write tests first (TDD approach)
 2. Implement the feature
 3. Ensure all tests pass
@@ -333,9 +357,9 @@ python -m pytest tests/ --cov=. --cov-report=html
 2. **Video Upload Fails**: Check file size (max 100MB), verify file format
 3. **Page Not Loading**: Check Django server, verify database migrations
 4. **libmagic Issues**: Install with `brew install libmagic` on macOS
+5. **Docker Issues**: Use `make logs` to view container logs
 
 ### Debug Mode
-
 - **Console Logging**: Detailed error information
 - **Performance Metrics**: Recording and upload timing
 - **State Inspection**: Current recorder status
@@ -354,7 +378,9 @@ python -m pytest tests/ --cov=. --cov-report=html
 - redis (caching)
 - django-prometheus (metrics)
 - django-health-check (health monitoring)
-- django-debug-toolbar (development)
+- whitenoise (static files)
+- gunicorn (WSGI server)
+- boto3 (AWS S3)
 
 ### Development Dependencies
 - pytest
@@ -367,7 +393,7 @@ python -m pytest tests/ --cov=. --cov-report=html
 
 ### Planned Features
 - **Real-time Comments**: WebSocket integration
-- **Video Processing**: Thumbnail generation
+- **Video Processing**: Thumbnail generation, transcoding
 - **User Profiles**: Avatar and bio support
 - **Search & Filter**: Advanced exercise discovery
 - **Mobile App**: React Native companion
@@ -376,10 +402,10 @@ python -m pytest tests/ --cov=. --cov-report=html
 - **Social Features**: Community challenges and competitions
 
 ### Technical Improvements
-- **CDN Integration**: Cloud video storage
+- **CDN Integration**: CloudFront for video delivery
 - **Video Compression**: Automatic optimization
 - **Analytics**: User engagement tracking
-- **Caching**: Redis-based performance
+- **Caching**: Redis-based performance optimization
 - **WebSocket Integration**: Real-time updates
 - **Progressive Web App**: Offline functionality
 
@@ -395,6 +421,11 @@ python -m pytest tests/ --cov=. --cov-report=html
 - [Safety](https://pyup.io/safety/) - Dependency vulnerability checker
 - [Django Debug Toolbar](https://django-debug-toolbar.readthedocs.io/) - Security inspection
 
+### Docker Resources
+- [Docker Documentation](https://docs.docker.com/)
+- [Docker Compose Documentation](https://docs.docker.com/compose/)
+- [Django Deployment Checklist](https://docs.djangoproject.com/en/stable/howto/deployment/checklist/)
+
 ## 📝 License
 
 This project is for educational and development purposes.
@@ -406,4 +437,5 @@ This project is for educational and development purposes.
 **Built with Django, HTML5, and modern JavaScript**  
 **Video recording powered by MediaRecorder API**  
 **Responsive design for all devices**  
-**Icon-first UI for universal accessibility**
+**Icon-first UI for universal accessibility**  
+**Production-ready with Docker and Heroku deployment**
