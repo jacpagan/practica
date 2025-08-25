@@ -177,26 +177,6 @@
                             <span class="icon">✅</span>
                             <span style="color: green; font-weight: bold;">Video Ready!</span>
                         </div>
-                        <div class="info-item">
-                            <button type="button" id="debug-video-btn" class="btn btn-small" style="display: none;" onclick="debugVideoStatus()">
-                                🔍 Debug Video
-                            </button>
-                            <button type="button" id="force-data-btn" class="btn btn-small" style="display: none;" onclick="forceDataCollection()">
-                                📡 Force Data
-                            </button>
-                            <button type="button" id="test-recording-btn" class="btn btn-small" style="display: none;" onclick="testRecording()">
-                                🧪 Test Recording
-                            </button>
-                            <button type="button" id="recovery-btn" class="btn btn-small" style="display: none;" onclick="attemptRecovery()">
-                                🔄 Attempt Recovery
-                            </button>
-                            <button type="button" id="manual-capture-btn" class="btn btn-small" style="display: none;" onclick="manualCapture()">
-                                📸 Manual Capture
-                            </button>
-                            <button type="button" id="canvas-capture-btn" class="btn btn-small" style="display: none;" onclick="canvasCapture()">
-                                🎨 Canvas Capture
-                            </button>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -348,98 +328,17 @@
                     } 
                 });
                 
-                console.log('Stream obtained:', {
-                    active: this.stream.active,
-                    tracks: this.stream.getTracks().map(t => ({ kind: t.kind, enabled: t.enabled, readyState: t.readyState }))
-                });
-                
                 this.preview.srcObject = this.stream;
-                // Test MIME types and find one that actually works
-                const mimeTypes = [
-                    'video/webm;codecs=vp8,opus',  // Most compatible
-                    'video/webm;codecs=vp8',       // Basic webm
-                    'video/webm',                   // Generic webm
-                    'video/mp4',                    // MP4 fallback
-                    'video/webm;codecs=vp9,opus'   // VP9 last (can cause issues)
-                ];
                 
-                let selectedMimeType = null;
-                let testRecorder = null;
+                // Use a simple, reliable MIME type
+                const mimeType = 'video/webm';
                 
-                // Test each MIME type to find one that actually produces data
-                for (const mimeType of mimeTypes) {
-                    if (MediaRecorder.isTypeSupported(mimeType)) {
-                        try {
-                            console.log('Testing MIME type:', mimeType);
-                            testRecorder = new MediaRecorder(this.stream, { mimeType });
-                            
-                            // Test if this MIME type actually produces data
-                            let hasData = false;
-                            testRecorder.ondataavailable = (event) => {
-                                if (event.data.size > 0) {
-                                    hasData = true;
-                                    console.log('MIME type test successful:', mimeType, 'size:', event.data.size);
-                                }
-                            };
-                            
-                            testRecorder.start();
-                            setTimeout(() => {
-                                testRecorder.stop();
-                                if (hasData) {
-                                    selectedMimeType = mimeType;
-                                    console.log('Selected working MIME type:', selectedMimeType);
-                                }
-                            }, 100);
-                            
-                            if (selectedMimeType) break;
-                            
-                        } catch (error) {
-                            console.log('MIME type test failed:', mimeType, error.message);
-                        }
-                    }
-                }
-                
-                if (!selectedMimeType) {
-                    console.error('No working MIME type found, using default');
-                    selectedMimeType = 'video/webm'; // Fallback to default
-                }
-                
-                console.log('Creating MediaRecorder with MIME type:', selectedMimeType);
-                
-                try {
-                    this.mediaRecorder = new MediaRecorder(this.stream, {
-                        mimeType: selectedMimeType
-                    });
-                    console.log('MediaRecorder created successfully');
-                } catch (error) {
-                    console.error('Failed to create MediaRecorder:', error);
-                    // Try without MIME type as fallback
-                    try {
-                        this.mediaRecorder = new MediaRecorder(this.stream);
-                        console.log('MediaRecorder created without MIME type as fallback');
-                    } catch (fallbackError) {
-                        console.error('Failed to create MediaRecorder even without MIME type:', fallbackError);
-                        throw fallbackError;
-                    }
-                }
+                this.mediaRecorder = new MediaRecorder(this.stream, { mimeType });
                 
                 this.mediaRecorder.ondataavailable = (event) => {
-                    console.log('Data available event:', { size: event.data.size, type: event.data.type });
                     if (event.data.size > 0) {
                         this.recordedChunks.push(event.data);
                         console.log('Video chunk received:', { size: event.data.size, totalChunks: this.recordedChunks.length });
-                    } else {
-                        console.warn('Empty data chunk received - trying to force data collection');
-                        // Try to force data collection if we're getting empty chunks
-                        if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
-                            setTimeout(() => {
-                                try {
-                                    this.mediaRecorder.requestData();
-                                } catch (error) {
-                                    console.error('Error forcing data collection:', error);
-                                }
-                            }, 100);
-                        }
                     }
                 };
                 
@@ -455,21 +354,26 @@
                 };
                 
                 this.mediaRecorder.onstop = () => {
-                    console.log('MediaRecorder stopped, requesting final data');
-                    // Request any remaining data
-                    if (this.mediaRecorder.state === 'inactive') {
-                        this.mediaRecorder.requestData();
+                    console.log('MediaRecorder stopped');
+                    this.status.textContent = 'Video Ready!';
+                    this.status.className = 'recording-status ready';
+                    this.videoStatus.textContent = 'Video ready for upload';
+                    
+                    // Show video ready indicator
+                    document.getElementById('video-ready-indicator').style.display = 'block';
+                    
+                    // Stop the stream
+                    if (this.stream) {
+                        this.stream.getTracks().forEach(track => track.stop());
+                        this.stream = null;
                     }
+                    
+                    // Update UI to show upload button
+                    this.updateUI();
                 };
                 
-                // Start recording with more frequent data collection
-                try {
-                    this.mediaRecorder.start(50); // Every 50ms for more frequent data collection
-                    console.log('MediaRecorder.start() called successfully with 50ms intervals');
-                } catch (error) {
-                    console.error('Failed to start MediaRecorder:', error);
-                    throw error;
-                }
+                // Start recording with 1-second intervals for reliable data collection
+                this.mediaRecorder.start(1000);
                 this.isRecording = true;
                 this.recordingStartTime = Date.now();
                 this.startDurationTimer();
@@ -597,86 +501,11 @@
                 
                 this.isRecording = false;
                 
-                // IMPORTANT: Request data BEFORE stopping the MediaRecorder
-                console.log('Requesting final data before stopping...');
-                try {
-                    this.mediaRecorder.requestData();
-                    console.log('Final data requested successfully');
-                } catch (error) {
-                    console.error('Error requesting final data:', error);
-                }
-                
-                // Wait a moment for data to be collected, then stop
-                setTimeout(() => {
-                    try {
-                        console.log('Stopping MediaRecorder after data collection...');
-                        this.mediaRecorder.stop();
-                        console.log('MediaRecorder.stop() called');
-                    } catch (error) {
-                        console.error('Error stopping MediaRecorder:', error);
-                    }
-                }, 500); // Wait 500ms for data collection
-                
-                // DON'T stop the stream yet - wait for data collection
-                console.log('Keeping stream active for data collection...');
+                // Simply stop the MediaRecorder
+                this.mediaRecorder.stop();
                 
                 this.status.textContent = 'Processing...';
                 this.status.className = 'recording-status processing';
-                
-                // Wait for the final data to be available
-                this.mediaRecorder.onstop = () => {
-                    console.log('MediaRecorder onstop triggered');
-                    
-                    // Process the collected data
-                    setTimeout(() => {
-                        console.log('Processing final data, chunks:', this.recordedChunks.length);
-                        
-                        // If we still have no chunks, try recovery
-                        if (this.recordedChunks.length === 0) {
-                            console.warn('No chunks collected, attempting recovery...');
-                            this.attemptImmediateRecovery();
-                        }
-                        
-                        this.status.textContent = 'Video Ready!';
-                        this.status.className = 'recording-status ready';
-                        this.videoStatus.textContent = 'Video ready for upload';
-                        
-                        // Show video ready indicator
-                        document.getElementById('video-ready-indicator').style.display = 'block';
-                        
-                        // Show debug button
-                        document.getElementById('debug-video-btn').style.display = 'inline-block';
-                        
-                        // Show force data button
-                        document.getElementById('force-data-btn').style.display = 'inline-block';
-                        
-                        // Show test recording button
-                        document.getElementById('test-recording-btn').style.display = 'inline-block';
-                        
-                        // Show recovery button if no chunks
-                        if (this.recordedChunks.length === 0) {
-                            document.getElementById('recovery-btn').style.display = 'inline-block';
-                            document.getElementById('manual-capture-btn').style.display = 'inline-block';
-                            document.getElementById('canvas-capture-btn').style.display = 'inline-block';
-                        }
-                        
-                        console.log('Video recording completed and ready, chunks:', this.recordedChunks.length);
-                        
-                        // NOW stop the stream after we have data
-                        if (this.stream) {
-                            this.stream.getTracks().forEach(track => {
-                                track.stop();
-                                console.log('Track stopped after data collection:', track.kind);
-                            });
-                            this.stream = null;
-                        }
-                        
-                        // Update UI to show upload button
-                        this.updateUI();
-                        
-                        // Note: Submit button will be enabled when Upload Video is clicked
-                    }, 1000); // Increased timeout for better data collection
-                };
             }
         }
         
@@ -759,170 +588,6 @@
             }
             
             return { valid: true, blob };
-        }
-        
-        forceRefreshVideo() {
-            // Force a refresh of the video blob
-            if (this.recordedChunks.length > 0) {
-                const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
-                console.log('Force refreshed video blob:', { size: blob.size, chunks: this.recordedChunks.length });
-                return blob;
-            }
-            return null;
-        }
-        
-        requestData() {
-            // Manually request data from MediaRecorder if it's still active
-            if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
-                console.log('Manually requesting data from MediaRecorder');
-                this.mediaRecorder.requestData();
-            }
-        }
-        
-        forceDataCollection() {
-            console.log('=== FORCING DATA COLLECTION ===');
-            
-            // Try to request data if still recording
-            this.requestData();
-            
-            // Check current state
-            console.log('Current chunks:', this.recordedChunks ? this.recordedChunks.length : 0);
-            
-            // Try to create a blob anyway
-            const blob = this.forceRefreshVideo();
-            if (blob) {
-                console.log('Successfully created blob after force refresh:', { size: blob.size });
-                return blob;
-            } else {
-                console.log('Still no data available');
-                return null;
-            }
-        }
-        
-        testRecording() {
-            console.log('=== TESTING RECORDING ===');
-            console.log('Stream active:', this.stream ? this.stream.active : false);
-            console.log('MediaRecorder state:', this.mediaRecorder ? this.mediaRecorder.state : 'null');
-            console.log('Current chunks:', this.recordedChunks.length);
-            
-            if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
-                console.log('Requesting data from active MediaRecorder...');
-                this.mediaRecorder.requestData();
-            }
-            
-            // Try to recover if we have no chunks but stream is active
-            if (this.recordedChunks.length === 0 && this.stream && this.stream.active) {
-                console.log('Attempting to recover recording data...');
-                this.attemptDataRecovery();
-            }
-        }
-        
-        attemptDataRecovery() {
-            console.log('=== ATTEMPTING DATA RECOVERY ===');
-            
-            // Try to create a new MediaRecorder if the old one is inactive
-            if (this.stream && this.stream.active) {
-                try {
-                    console.log('Creating new MediaRecorder for recovery...');
-                    const newRecorder = new MediaRecorder(this.stream);
-                    
-                    newRecorder.ondataavailable = (event) => {
-                        if (event.data.size > 0) {
-                            this.recordedChunks.push(event.data);
-                            console.log('Recovery chunk received:', { size: event.data.size, totalChunks: this.recordedChunks.length });
-                        }
-                    };
-                    
-                    // Start recording for a short time to capture data
-                    newRecorder.start();
-                    setTimeout(() => {
-                        newRecorder.stop();
-                        console.log('Recovery recording stopped, chunks:', this.recordedChunks.length);
-                    }, 1000);
-                    
-                } catch (error) {
-                    console.error('Recovery failed:', error);
-                }
-            }
-        }
-        
-        attemptImmediateRecovery() {
-            console.log('=== ATTEMPTING IMMEDIATE RECOVERY ===');
-            
-            // If stream is still active, try to capture data immediately
-            if (this.stream && this.stream.active) {
-                try {
-                    console.log('Stream still active, attempting immediate capture...');
-                    
-                    // Try multiple MIME types for recovery
-                    const recoveryMimeTypes = ['video/webm', 'video/webm;codecs=vp8', 'video/mp4'];
-                    
-                    for (const mimeType of recoveryMimeTypes) {
-                        if (MediaRecorder.isTypeSupported(mimeType)) {
-                            try {
-                                console.log('Trying recovery with MIME type:', mimeType);
-                                const recoveryRecorder = new MediaRecorder(this.stream, { mimeType });
-                                
-                                recoveryRecorder.ondataavailable = (event) => {
-                                    if (event.data.size > 0) {
-                                        this.recordedChunks.push(event.data);
-                                        console.log('Recovery chunk received:', { size: event.data.size, totalChunks: this.recordedChunks.length, type: mimeType });
-                                    }
-                                };
-                                
-                                // Start recording for a short time
-                                recoveryRecorder.start();
-                                
-                                // Stop after 500ms to get data
-                                setTimeout(() => {
-                                    recoveryRecorder.stop();
-                                    console.log('Recovery completed with', mimeType, 'chunks:', this.recordedChunks.length);
-                                }, 500);
-                                
-                                break; // Use the first working MIME type
-                                
-                            } catch (error) {
-                                console.error('Recovery failed with', mimeType, ':', error);
-                            }
-                        }
-                    }
-                    
-                } catch (error) {
-                    console.error('Immediate recovery failed:', error);
-                }
-            } else {
-                console.log('Stream not active, cannot attempt immediate recovery');
-            }
-        }
-        
-        createVideoFromCanvas() {
-            console.log('=== CREATING VIDEO FROM CANVAS ===');
-            
-            try {
-                // Create a canvas element
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                
-                // Set canvas size to match video
-                canvas.width = this.preview.videoWidth || 640;
-                canvas.height = this.preview.videoHeight || 480;
-                
-                // Draw the current video frame to canvas
-                ctx.drawImage(this.preview, 0, 0, canvas.width, canvas.height);
-                
-                // Convert canvas to blob
-                canvas.toBlob((blob) => {
-                    if (blob && blob.size > 0) {
-                        // Create a video file from the canvas
-                        const videoBlob = new Blob([blob], { type: 'image/png' });
-                        this.recordedChunks.push(videoBlob);
-                        console.log('Canvas video created:', { size: videoBlob.size, totalChunks: this.recordedChunks.length });
-                    }
-                }, 'image/png');
-                
-            } catch (error) {
-                console.error('Canvas video creation failed:', error);
-            }
         }
         
         reset() {
@@ -1172,144 +837,5 @@
             submitBtn.textContent = 'Creating...';
         });
     });
-    
-    // Debug function to check video status
-    function debugVideoStatus() {
-        try {
-            const activeSource = document.querySelector('.toggle-btn.active').dataset.source;
-            console.log('=== VIDEO DEBUG INFO ===');
-            console.log('Active source:', activeSource);
-            
-            if (activeSource === 'webcam') {
-                if (typeof videoRecorder === 'undefined') {
-                    console.error('ERROR: videoRecorder is not defined!');
-                    console.log('Available global variables:', window && Object.keys(window) ? Object.keys(window).filter(key => key.includes('video') || key.includes('recorder')) : 'window not available');
-                    return;
-                }
-                
-                console.log('VideoRecorder state:', {
-                    isRecording: videoRecorder.isRecording,
-                    chunks: videoRecorder.recordedChunks ? videoRecorder.recordedChunks.length : 0,
-                    hasVideo: videoRecorder.hasVideo(),
-                    getVideoBlob: videoRecorder.getVideoBlob(),
-                    forceRefresh: videoRecorder.forceRefreshVideo()
-                });
-            } else {
-                const fileInput = document.getElementById('video-file');
-                console.log('File input state:', {
-                    files: fileInput.files,
-                    fileCount: fileInput.files.length,
-                    firstFile: fileInput.files[0] ? {
-                        name: fileInput.files[0].name,
-                        size: fileInput.files[0].size,
-                        type: fileInput.files[0].type
-                    } : null
-                });
-            }
-            
-            // Test form validation
-            const name = document.getElementById('name').value.trim();
-            console.log('Form validation test:', {
-                name: name,
-                nameValid: !!name
-            });
-            
-            alert('Check browser console for detailed video debug information');
-        } catch (error) {
-            console.error('Debug function error:', error);
-            alert('Error in debug function: ' + error.message);
-        }
-    }
-    
-    // Force data collection function
-    function forceDataCollection() {
-        try {
-            if (typeof videoRecorder === 'undefined') {
-                alert('VideoRecorder not available');
-                return;
-            }
-            
-            console.log('=== FORCING DATA COLLECTION ===');
-            
-            // Try to request data if still recording
-            videoRecorder.requestData();
-            
-            // Check current state
-            console.log('Current chunks:', videoRecorder.recordedChunks ? videoRecorder.recordedChunks.length : 0);
-            
-            // Try to create a blob anyway
-            const blob = videoRecorder.forceRefreshVideo();
-            if (blob) {
-                console.log('Successfully created blob after force refresh:', { size: blob.size });
-                alert('Data collected! Check console for details.');
-            } else {
-                console.log('Still no data available');
-                alert('No data available even after force collection.');
-            }
-        } catch (error) {
-            console.error('Force data collection error:', error);
-            alert('Error in force data collection: ' + error.message);
-        }
-    }
-    
-    // Test recording function
-    function testRecording() {
-        try {
-            if (typeof videoRecorder === 'undefined') {
-                alert('VideoRecorder not available');
-                return;
-            }
-            
-            videoRecorder.testRecording();
-        } catch (error) {
-            console.error('Test recording error:', error);
-            alert('Error in test recording: ' + error.message);
-        }
-    }
-    
-    // Attempt recovery function
-    function attemptRecovery() {
-        try {
-            if (typeof videoRecorder === 'undefined') {
-                alert('VideoRecorder not available');
-                return;
-            }
-            
-            videoRecorder.attemptDataRecovery();
-        } catch (error) {
-            console.error('Recovery error:', error);
-            alert('Error in recovery: ' + error.message);
-        }
-    }
-    
-    // Manual capture function
-    function manualCapture() {
-        try {
-            if (typeof videoRecorder === 'undefined') {
-                alert('VideoRecorder not available');
-                return;
-            }
-            
-            videoRecorder.attemptImmediateRecovery();
-        } catch (error) {
-            console.error('Manual capture error:', error);
-            alert('Error in manual capture: ' + error.message);
-        }
-    }
-    
-    // Canvas capture function
-    function canvasCapture() {
-        try {
-            if (typeof videoRecorder === 'undefined') {
-                alert('VideoRecorder not available');
-                return;
-            }
-            
-            videoRecorder.createVideoFromCanvas();
-        } catch (error) {
-            console.error('Canvas capture error:', error);
-            alert('Error in canvas capture: ' + error.message);
-        }
-    }
 </script>
 {% endblock %}
