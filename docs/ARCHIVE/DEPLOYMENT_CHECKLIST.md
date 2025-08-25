@@ -1,3 +1,9 @@
+# DEPRECATED — Consolidated into root README.md
+
+This file is archived. The canonical source is README.md.
+
+---
+
 # 🚀 Production Deployment Checklist
 
 ## ✅ Pre-Deployment Verification
