@@ -1,316 +1,214 @@
 <!DOCTYPE html>
-<html lang="en" class="icon-only">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Practika">
-    <meta name="msapplication-TileColor" content="#2c3e50">
-    <meta name="theme-color" content="#2c3e50">
-    
-    <!-- Enhanced mobile compatibility -->
-    <meta name="format-detection" content="telephone=no">
-    <meta name="msapplication-tap-highlight" content="no">
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Practika{% endblock %}</title>
     
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="/static/manifest.json">
-    
-    <!-- Apple Touch Icons -->
-    <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png">
-    <link rel="apple-touch-icon" sizes="152x152" href="/static/icons/icon-152x152.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/icon-180x180.png">
-    
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/static/icons/favicon-16x16.png">
-    
-    <link rel="stylesheet" href="/static/css/icon-ui.css">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+        }
+        
         body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-            line-height: 1.6; 
+            line-height: 1.5; 
             color: #333; 
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-            /* Enhanced mobile performance */
-            -webkit-text-size-adjust: 100%;
-            text-size-adjust: 100%;
-            -webkit-tap-highlight-color: transparent;
+            background: #fff;
+            font-size: 14px;
         }
         
-        /* Mobile-first responsive design */
         .container { 
-            max-width: 100%; 
+            max-width: 800px; 
             margin: 0 auto; 
-            padding: 10px; 
-        }
-        
-        @media (min-width: 768px) {
-            .container { 
-                max-width: 1200px; 
-                padding: 20px; 
-            }
+            padding: 20px; 
         }
         
         .header { 
-            background: #2c3e50; 
-            color: white; 
-            padding: 1rem 0; 
-            margin-bottom: 1rem; 
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            /* Fallback for older devices */
-            background: rgba(44, 62, 80, 0.95);
+            background: #f8f9fa; 
+            border-bottom: 1px solid #dee2e6;
+            padding: 15px 0; 
+            margin-bottom: 20px; 
         }
         
         .header h1 { 
             text-align: center; 
-            font-size: 1.5rem;
-        }
-        
-        @media (min-width: 768px) {
-            .header h1 { font-size: 2rem; }
+            font-size: 24px;
+            font-weight: normal;
         }
         
         .nav { 
-            background: #34495e; 
-            padding: 0.5rem 0; 
-            margin-bottom: 1rem; 
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            overflow-scrolling: touch;
+            background: #fff; 
+            border-bottom: 1px solid #dee2e6;
+            padding: 10px 0; 
+            margin-bottom: 20px; 
         }
         
         .nav a { 
-            color: white; 
+            color: #495057; 
             text-decoration: none; 
-            padding: 0.5rem 1rem; 
-            margin: 0 0.25rem; 
-            white-space: nowrap;
+            padding: 8px 16px; 
+            margin: 0 4px; 
             display: inline-block;
-            /* Enhanced touch support */
-            min-height: 44px;
-            display: flex;
-            align-items: center;
-            -webkit-tap-highlight-color: transparent;
-            touch-action: manipulation;
         }
         
-        .nav a:hover, .nav a:active { 
-            background: #2c3e50; 
+        .nav a:hover { 
+            background: #f8f9fa; 
         }
         
         .card { 
-            background: white; 
-            border: 1px solid #ddd; 
-            border-radius: 12px; 
-            padding: 1rem; 
-            margin-bottom: 1rem; 
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
-        }
-        
-        @media (min-width: 768px) {
-            .card { padding: 1.5rem; }
+            background: #fff; 
+            border: 1px solid #dee2e6; 
+            padding: 20px; 
+            margin-bottom: 20px; 
         }
         
         .btn { 
-            background: #3498db; 
-            color: white; 
+            background: #6c757d; 
+            color: #fff; 
             border: none; 
-            padding: 0.75rem 1.5rem; 
-            border-radius: 8px; 
+            padding: 8px 16px; 
             cursor: pointer; 
-            font-size: 1rem; 
-            font-weight: 500;
-            transition: all 0.2s ease;
-            -webkit-tap-highlight-color: transparent;
-            touch-action: manipulation;
-            /* Enhanced touch targets for older devices */
-            min-height: 44px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            -webkit-user-select: none;
-            user-select: none;
+            font-size: 14px; 
+            text-decoration: none;
+            display: inline-block;
         }
         
-        .btn:hover, .btn:active { 
-            background: #2980b9; 
-            transform: translateY(-1px);
+        .btn:hover { 
+            background: #5a6268; 
         }
         
-        .btn:disabled {
-            background: #bdc3c7;
-            cursor: not-allowed;
-            transform: none;
+        .btn-primary { background: #007bff; }
+        .btn-primary:hover { background: #0056b3; }
+        .btn-success { background: #28a745; }
+        .btn-success:hover { background: #1e7e34; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        .btn-warning:hover { background: #e0a800; }
+        
+        .form-group { 
+            margin-bottom: 15px; 
         }
         
-        .btn-danger { background: #e74c3c; }
-        .btn-danger:hover, .btn-danger:active { background: #c0392b; }
-        .btn-success { background: #27ae60; }
-        .btn-success:hover, .btn-success:active { background: #229954; }
-        
-        /* Mobile-optimized button sizes */
-        .btn-mobile {
-            min-height: 44px; /* iOS touch target minimum */
-            padding: 0.875rem 1.5rem;
-        }
-        
-        .form-group { margin-bottom: 1rem; }
         .form-group label { 
             display: block; 
-            margin-bottom: 0.5rem; 
-            font-weight: 600; 
+            margin-bottom: 5px; 
+            font-weight: 500; 
         }
         
-        .form-group input, .form-group textarea { 
+        .form-group input, 
+        .form-group textarea, 
+        .form-group select { 
             width: 100%; 
-            padding: 0.875rem; 
-            border: 1px solid #ddd; 
-            border-radius: 8px; 
-            font-size: 1rem; 
-            -webkit-appearance: none;
-            appearance: none;
-            /* Enhanced mobile input styling */
-            -webkit-tap-highlight-color: transparent;
-            touch-action: manipulation;
+            padding: 8px; 
+            border: 1px solid #ced4da; 
+            font-size: 14px; 
         }
         
-        .form-group input:focus, .form-group textarea:focus {
+        .form-control {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ced4da;
+            font-size: 14px;
+        }
+        
+        .form-group input:focus, 
+        .form-group textarea:focus, 
+        .form-group select:focus {
             outline: none;
-            border-color: #3498db;
-            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+            border-color: #007bff;
         }
         
-        .video-container { margin: 1rem 0; }
+        .video-container { 
+            margin: 15px 0; 
+        }
+        
         .video-player { 
             width: 100%; 
             max-width: 100%; 
-            border-radius: 12px; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
         
-        /* Mobile-optimized recorder */
         .recorder { 
             background: #f8f9fa; 
-            padding: 1rem; 
-            border-radius: 12px; 
-            margin: 1rem 0; 
-            border: 2px solid #e9ecef;
+            padding: 15px; 
+            border: 1px solid #dee2e6;
+            margin: 15px 0; 
         }
         
         .recorder video { 
             width: 100%; 
             max-width: 100%; 
-            border-radius: 12px; 
-            margin-bottom: 1rem; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 15px; 
         }
         
         .recorder .controls { 
             display: flex; 
-            gap: 0.5rem; 
-            margin-bottom: 1rem; 
+            gap: 10px; 
+            margin-bottom: 15px; 
             flex-wrap: wrap;
-            justify-content: center;
         }
         
-        .recorder .controls .btn {
-            flex: 1;
-            min-width: 120px;
-            max-width: 200px;
-        }
-        
-        /* Mobile camera controls */
         .camera-controls {
             display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
+            gap: 10px;
             align-items: center;
-        }
-        
-        @media (min-width: 768px) {
-            .camera-controls {
-                flex-direction: row;
-                justify-content: center;
-            }
+            justify-content: center;
+            margin: 15px 0;
         }
         
         .camera-btn {
-            width: 60px;
-            height: 60px;
+            width: 50px;
+            height: 50px;
             border-radius: 50%;
             border: none;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            font-size: 18px;
             cursor: pointer;
-            transition: all 0.2s ease;
-            -webkit-tap-highlight-color: transparent;
-            touch-action: manipulation;
         }
         
         .camera-btn.record {
-            background: #e74c3c;
+            background: #dc3545;
             color: white;
-        }
-        
-        .camera-btn.record:hover, .camera-btn.record:active {
-            background: #c0392b;
-            transform: scale(1.1);
-        }
-        
-        .camera-btn.record.recording {
-            animation: pulse 1.5s infinite;
         }
         
         .camera-btn.switch {
-            background: #34495e;
+            background: #6c757d;
             color: white;
         }
         
-        .camera-btn.switch:hover, .camera-btn.switch:active {
-            background: #2c3e50;
-        }
-        
         .alert { 
-            padding: 1rem; 
-            border-radius: 8px; 
-            margin-bottom: 1rem; 
-            border-left: 4px solid;
+            padding: 12px; 
+            border: 1px solid; 
+            margin-bottom: 15px; 
         }
         
         .alert-success { 
             background: #d4edda; 
             color: #155724; 
-            border-left-color: #28a745;
+            border-color: #c3e6cb;
         }
         
         .alert-error { 
             background: #f8d7da; 
             color: #721c24; 
-            border-left-color: #dc3545;
+            border-color: #f5c6cb;
         }
         
         .alert-info {
             background: #d1ecf1;
             color: #0c5460;
-            border-left-color: #17a2b8;
+            border-color: #bee5eb;
         }
         
         .exercise-grid { 
             display: grid; 
             grid-template-columns: 1fr; 
-            gap: 1rem; 
+            gap: 20px; 
         }
         
         @media (min-width: 768px) {
@@ -321,84 +219,28 @@
         
         .comment { 
             background: #f8f9fa; 
-            padding: 1rem; 
-            border-radius: 8px; 
-            margin: 1rem 0; 
-            border-left: 4px solid #3498db; 
+            padding: 15px; 
+            border: 1px solid #dee2e6;
+            margin: 15px 0; 
         }
         
         .comment .meta { 
-            font-size: 0.9rem; 
-            color: #666; 
-            margin-bottom: 0.5rem; 
+            font-size: 12px; 
+            color: #6c757d; 
+            margin-bottom: 8px; 
         }
         
         .hidden { display: none; }
+        
         .admin-badge { 
-            background: #e74c3c; 
+            background: #dc3545; 
             color: white; 
-            padding: 0.25rem 0.5rem; 
-            border-radius: 4px; 
-            font-size: 0.8rem; 
-            margin-left: 0.5rem; 
+            padding: 2px 6px; 
+            border-radius: 3px; 
+            font-size: 11px; 
+            margin-left: 8px; 
         }
         
-        .simple-loop { 
-            background: #e8f5e8; 
-            border: 2px solid #27ae60; 
-        }
-        
-        /* Mobile upload progress */
-        .upload-progress {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 1rem;
-            margin: 1rem 0;
-            border: 1px solid #e9ecef;
-        }
-        
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: #e9ecef;
-            border-radius: 4px;
-            overflow: hidden;
-            margin: 0.5rem 0;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #4caf50, #2196f3);
-            transition: width 0.3s ease;
-            border-radius: 4px;
-        }
-        
-        .upload-status {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 0.5rem;
-        }
-        
-        .status-indicator {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #6c757d;
-        }
-        
-        .status-indicator.uploading { background: #2196f3; animation: pulse 1s infinite; }
-        .status-indicator.processing { background: #ff9800; animation: pulse 1s infinite; }
-        .status-indicator.complete { background: #4caf50; }
-        .status-indicator.error { background: #f44336; }
-        
-        @keyframes pulse { 
-            0% { opacity: 1; } 
-            50% { opacity: 0.5; } 
-            100% { opacity: 1; } 
-        }
-        
-        /* Mobile file input styling */
         .file-input-wrapper {
             position: relative;
             display: inline-block;
@@ -414,197 +256,234 @@
         
         .file-input-label {
             display: block;
-            padding: 1rem;
-            border: 2px dashed #ddd;
-            border-radius: 8px;
+            padding: 15px;
+            border: 1px dashed #ced4da;
             text-align: center;
             background: #f8f9fa;
-            color: #666;
-            transition: all 0.2s ease;
+            color: #6c757d;
             cursor: pointer;
-            /* Enhanced touch support */
-            min-height: 44px;
+        }
+        
+        .file-input-label:hover {
+            border-color: #007bff;
+            background: #e3f2fd;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e9ecef;
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #007bff;
+            transition: width 0.3s ease;
+        }
+        
+        .status-dots {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin: 15px 0;
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #6c757d;
+        }
+        
+        .status-dot.processing { background: #007bff; }
+        .status-dot.uploading { background: #28a745; }
+        .status-dot.saving { background: #ffc107; }
+        
+        .minimal-status {
+            text-align: center;
+            margin: 10px 0;
+            font-size: 12px;
+            color: #6c757d;
+        }
+        
+        h1, h2, h3, h4, h5, h6 {
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+        
+        h1 { font-size: 24px; }
+        h2 { font-size: 20px; }
+        h3 { font-size: 18px; }
+        h4 { font-size: 16px; }
+        
+        p { margin-bottom: 10px; }
+        
+        .meta p { margin-bottom: 5px; }
+        
+        .exercise-actions {
+            margin: 15px 0;
+        }
+        
+        .comments-section {
+            margin-top: 30px;
+        }
+        
+        .video-section {
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .device-info {
+            background: #f8f9fa;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 3px;
+        }
+        
+        .video-preview {
+            text-align: center;
+            margin: 15px 0;
+        }
+        
+        .video-placeholder {
+            background: #f8f9fa;
+            padding: 40px;
+            border: 1px dashed #ced4da;
+            color: #6c757d;
+        }
+        
+        .recording-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        
+        .recording-status {
+            text-align: center;
+            margin: 15px 0;
+        }
+        
+        .recording-indicator {
+            color: #dc3545;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+        
+        .fallback-upload {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        .recorder-container {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            margin: 15px 0;
+            text-align: center;
+        }
+        
+        .recorder-container p {
+            color: #6c757d;
+            margin-bottom: 10px;
+        }
+        
+        .file-upload-label {
+            display: block;
+            padding: 10px;
+            background: #f8f9fa;
+            border: 1px solid #ced4da;
+            text-align: center;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        .file-upload-label:hover {
+            background: #e3f2fd;
+            border-color: #007bff;
+        }
+        
+        .password-container {
+            position: relative;
             display: flex;
             align-items: center;
-            justify-content: center;
-            -webkit-tap-highlight-color: transparent;
-            touch-action: manipulation;
         }
         
-        .file-input-label:hover, .file-input-label:active {
-            border-color: #3498db;
-            background: #e3f2fd;
-            color: #3498db;
-        }
-        
-        .file-input-label.dragover {
-            border-color: #3498db;
-            background: #e3f2fd;
-            transform: scale(1.02);
-        }
-        
-        /* Mobile navigation improvements */
-        .mobile-nav-toggle {
-            display: block;
+        .password-toggle {
+            position: absolute;
+            right: 10px;
             background: none;
             border: none;
-            color: white;
-            font-size: 1.5rem;
             cursor: pointer;
-            padding: 0.5rem;
-            /* Enhanced touch support */
-            min-width: 44px;
-            min-height: 44px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            -webkit-tap-highlight-color: transparent;
-            touch-action: manipulation;
+            font-size: 14px;
+            padding: 5px;
         }
         
-        @media (min-width: 768px) {
-            .mobile-nav-toggle { display: none; }
+        .login-links {
+            margin-top: 20px;
+            text-align: center;
         }
         
-        .nav-menu {
-            display: flex;
-            flex-direction: column;
+        .login-links a {
+            color: #007bff;
+            text-decoration: none;
+            margin: 0 10px;
         }
         
-        @media (min-width: 768px) {
-            .nav-menu {
-                flex-direction: row;
+        .login-links a:hover {
+            text-decoration: underline;
+        }
+        
+        .security-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 3px;
+            margin-bottom: 20px;
+            font-size: 12px;
+        }
+        
+        .security-info h4 {
+            margin: 0 0 10px 0;
+            color: #495057;
+        }
+        
+        .security-info ul {
+            margin: 0;
+            padding-left: 20px;
+            color: #6c757d;
+        }
+        
+        .security-info li {
+            margin-bottom: 3px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
             }
-        }
-        
-        .nav-menu.collapsed {
-            display: none;
-        }
-        
-        /* Loading states */
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #3498db;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        /* Enhanced mobile-specific improvements for older devices */
-        @media (max-width: 767px) {
-            .btn {
-                width: 100%;
-                margin-bottom: 0.5rem;
-                /* Ensure minimum touch targets on older devices */
-                min-height: 48px;
-                padding: 1rem 1.5rem;
+            
+            .nav a {
+                display: block;
+                margin: 2px 0;
+                text-align: center;
             }
             
             .recorder .controls {
                 flex-direction: column;
             }
             
-            .recorder .controls .btn {
-                min-width: auto;
-                max-width: none;
-                min-height: 48px;
+            .recording-controls {
+                flex-direction: column;
             }
             
-            .video-player {
-                max-height: 300px;
-                object-fit: cover;
-            }
-            
-            /* Enhanced touch targets for older devices */
-            .camera-btn {
-                width: 64px;
-                height: 64px;
-                font-size: 1.75rem;
-            }
-            
-            .file-input-label {
-                min-height: 48px;
-                padding: 1.25rem;
-            }
-        }
-        
-        /* iPhone SE and older device specific optimizations */
-        @media (max-width: 375px) {
-            .btn {
-                min-height: 52px;
-                padding: 1.25rem 1.5rem;
-                font-size: 1.1rem;
-            }
-            
-            .camera-btn {
-                width: 72px;
-                height: 72px;
-                font-size: 2rem;
-            }
-            
-            .header h1 {
-                font-size: 1.25rem;
-            }
-            
-            .container {
-                padding: 8px;
-            }
-            
-            .card {
-                padding: 0.75rem;
-            }
-        }
-        
-        /* Safe area for notched devices */
-        @supports (padding: max(0px)) {
-            .header, .nav {
-                padding-left: max(1rem, env(safe-area-inset-left));
-                padding-right: max(1rem, env(safe-area-inset-right));
-            }
-            
-            .container {
-                padding-left: max(10px, env(safe-area-inset-left));
-                padding-right: max(10px, env(safe-area-inset-right));
-            }
-        }
-        
-        /* Fallback for devices that don't support safe-area-inset */
-        @supports not (padding: max(0px)) {
-            .header, .nav {
-                padding-left: 1rem;
-                padding-right: 1rem;
-            }
-            
-            .container {
-                padding-left: 10px;
-                padding-right: 10px;
-            }
-        }
-        
-        /* Performance optimizations for older devices */
-        @media (max-width: 480px) {
-            .btn,
-            .camera-btn,
-            .file-input-label {
-                will-change: transform;
-                -webkit-transform: translateZ(0);
-                transform: translateZ(0);
-            }
-            
-            /* Reduce animations on older devices for better performance */
-            .btn:hover {
-                transform: none;
-            }
-            
-            .camera-btn:hover {
-                transform: none;
+            .camera-controls {
+                flex-direction: column;
             }
         }
     </style>
@@ -612,25 +491,22 @@
 <body>
     <header class="header">
         <div class="container">
-            <h1>🎯 Practika</h1>
-            <button class="mobile-nav-toggle" onclick="toggleMobileNav()" aria-label="Toggle navigation menu">☰</button>
+            <h1>Practika</h1>
         </div>
     </header>
     
     <nav class="nav">
         <div class="container">
-            <div class="nav-menu" id="navMenu">
-                <a href="/">🏠 Home</a>
-                <a href="/exercises/">📚 Exercises</a>
-                {% if user.is_staff %}
-                <a href="/create/">➕ Create Exercise</a>
-                {% endif %}
-                {% if user.is_authenticated %}
-                <a href="/logout/">🚪 Logout</a>
-                {% else %}
-                <a href="/login/">🔑 Login</a>
-                {% endif %}
-            </div>
+            <a href="/">Home</a>
+            <a href="/exercises/">Exercises</a>
+            {% if user.is_staff %}
+            <a href="/create/">Create Exercise</a>
+            {% endif %}
+            {% if user.is_authenticated %}
+            <a href="/logout/">Logout</a>
+            {% else %}
+            <a href="/login/">Login</a>
+            {% endif %}
         </div>
     </nav>
 
@@ -645,135 +521,6 @@
 
         {% block content %}{% endblock %}
     </main>
-
-    <!-- PWA Service Worker Registration -->
-    <script>
-        // Enhanced mobile compatibility detection
-        const isOldDevice = (() => {
-            const userAgent = navigator.userAgent.toLowerCase();
-            const isIOS = /iphone|ipad|ipod/.test(userAgent);
-            const isAndroid = /android/.test(userAgent);
-            
-            if (isIOS) {
-                const match = userAgent.match(/os (\d+)_/);
-                if (match && parseInt(match[1]) < 14) return true;
-            }
-            
-            if (isAndroid) {
-                const match = userAgent.match(/android (\d+)/);
-                if (match && parseInt(match[1]) < 10) return true;
-            }
-            
-            return false;
-        })();
-        
-        // Performance optimizations for older devices
-        if (isOldDevice) {
-            // Reduce animations and effects for better performance
-            document.documentElement.classList.add('old-device');
-            
-            // Disable hover effects on older devices
-            const style = document.createElement('style');
-            style.textContent = `
-                .old-device .btn:hover,
-                .old-device .camera-btn:hover,
-                .old-device .file-input-label:hover {
-                    transform: none !important;
-                }
-                
-                .old-device .btn:active,
-                .old-device .camera-btn:active,
-                .old-device .file-input-label:active {
-                    transform: scale(0.98) !important;
-                }
-            `;
-            document.head.appendChild(style);
-        }
-        
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/static/sw.js')
-                    .then((registration) => {
-                        console.log('SW registered: ', registration);
-                    })
-                    .catch((registrationError) => {
-                        console.log('SW registration failed: ', registrationError);
-                    });
-            });
-        }
-        
-        // Enhanced mobile navigation toggle
-        function toggleMobileNav() {
-            const navMenu = document.getElementById('navMenu');
-            navMenu.classList.toggle('collapsed');
-            
-            // Add haptic feedback for supported devices
-            if (navigator.vibrate) {
-                navigator.vibrate(50);
-            }
-        }
-        
-        // Close mobile nav when clicking outside
-        document.addEventListener('click', (e) => {
-            const navMenu = document.getElementById('navMenu');
-            const mobileToggle = document.querySelector('.mobile-nav-toggle');
-            
-            if (!navMenu.contains(e.target) && !mobileToggle.contains(e.target)) {
-                navMenu.classList.add('collapsed');
-            }
-        });
-        
-        // Enhanced mobile orientation and resize handling
-        let resizeTimeout;
-        window.addEventListener('resize', () => {
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(() => {
-                // Fix any layout issues after resize
-                window.dispatchEvent(new Event('resize'));
-            }, 100);
-        });
-        
-        window.addEventListener('orientationchange', () => {
-            setTimeout(() => {
-                // Trigger resize to fix any layout issues
-                window.dispatchEvent(new Event('resize'));
-            }, 100);
-        });
-        
-        // Enhanced touch handling for older devices
-        let lastTouchEnd = 0;
-        document.addEventListener('touchend', (event) => {
-            const now = (new Date()).getTime();
-            if (now - lastTouchEnd <= 300) {
-                event.preventDefault();
-            }
-            lastTouchEnd = now;
-        }, false);
-        
-        // Prevent zoom on double tap (iOS) - enhanced for older devices
-        let lastTouchStart = 0;
-        document.addEventListener('touchstart', (event) => {
-            const now = (new Date()).getTime();
-            if (now - lastTouchStart <= 300) {
-                event.preventDefault();
-            }
-            lastTouchStart = now;
-        }, false);
-        
-        // Enhanced performance monitoring for older devices
-        if (isOldDevice && 'performance' in window) {
-            window.addEventListener('load', () => {
-                setTimeout(() => {
-                    const loadTime = performance.timing.loadEventEnd - performance.timing.navigationStart;
-                    console.log(`Page load time on older device: ${loadTime}ms`);
-                    
-                    if (loadTime > 5000) {
-                        console.warn('Slow page load detected on older device');
-                    }
-                }, 100);
-            });
-        }
-    </script>
 
     {% block extra_js %}{% endblock %}
 </body>

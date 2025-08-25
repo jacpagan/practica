@@ -5,353 +5,351 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Video Upload Test - Practika</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.5;
+            color: #333;
+            background: #fff;
+            font-size: 14px;
+        }
+        
+        .container {
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
-            background-color: #f5f5f5;
         }
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
+        
         h1 {
             color: #333;
             text-align: center;
             margin-bottom: 30px;
+            font-size: 24px;
+            font-weight: normal;
         }
+        
         .upload-section {
-            border: 2px dashed #ddd;
-            border-radius: 10px;
+            border: 1px dashed #ced4da;
             padding: 40px;
             text-align: center;
             margin-bottom: 30px;
-            transition: border-color 0.3s;
+            background: #f8f9fa;
         }
+        
         .upload-section:hover {
             border-color: #007bff;
         }
+        
         .upload-section.dragover {
             border-color: #007bff;
-            background-color: #f8f9fa;
+            background: #e3f2fd;
         }
+        
         .file-input {
             display: none;
         }
+        
         .upload-btn {
             background: #007bff;
             color: white;
             border: none;
-            padding: 12px 24px;
-            border-radius: 5px;
+            padding: 8px 16px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 14px;
             margin: 10px;
         }
+        
         .upload-btn:hover {
             background: #0056b3;
         }
+        
         .upload-btn:disabled {
             background: #6c757d;
             cursor: not-allowed;
         }
+        
         .progress {
             width: 100%;
-            height: 20px;
-            background-color: #e9ecef;
-            border-radius: 10px;
+            height: 6px;
+            background: #e9ecef;
+            border-radius: 3px;
             overflow: hidden;
             margin: 20px 0;
             display: none;
         }
+        
         .progress-bar {
             height: 100%;
-            background-color: #007bff;
+            background: #007bff;
             width: 0%;
             transition: width 0.3s;
         }
+        
         .status {
             margin: 20px 0;
             padding: 15px;
-            border-radius: 5px;
+            border: 1px solid;
             display: none;
         }
+        
         .status.success {
-            background-color: #d4edda;
+            background: #d4edda;
             color: #155724;
-            border: 1px solid #c3e6cb;
+            border-color: #c3e6cb;
         }
+        
         .status.error {
-            background-color: #f8d7da;
+            background: #f8d7da;
             color: #721c24;
-            border: 1px solid #f5c6cb;
+            border-color: #f5c6cb;
         }
+        
         .video-list {
             margin-top: 30px;
         }
+        
         .video-item {
             background: #f8f9fa;
             padding: 15px;
             margin: 10px 0;
-            border-radius: 5px;
-            border-left: 4px solid #007bff;
+            border: 1px solid #dee2e6;
         }
-        .video-info {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        
+        .video-item h3 {
+            margin-bottom: 10px;
+            font-size: 16px;
         }
-        .video-details {
-            flex: 1;
+        
+        .video-item video {
+            width: 100%;
+            max-width: 100%;
+            margin: 10px 0;
         }
-        .video-actions {
-            display: flex;
-            gap: 10px;
-        }
-        .btn-small {
-            padding: 5px 10px;
-            font-size: 12px;
-            border: none;
-            border-radius: 3px;
-            cursor: pointer;
-        }
-        .btn-view {
-            background: #28a745;
-            color: white;
-        }
-        .btn-delete {
+        
+        .delete-btn {
             background: #dc3545;
             color: white;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 12px;
         }
-        .drag-text {
-            color: #666;
-            font-size: 18px;
+        
+        .delete-btn:hover {
+            background: #c82333;
+        }
+        
+        .drag-instructions {
+            color: #6c757d;
             margin-bottom: 20px;
         }
+        
         .file-info {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 5px;
-            display: none;
+            margin: 15px 0;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 3px;
+            font-size: 12px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎥 Video Upload Test</h1>
+        <h1>Video Upload Test</h1>
         
-        <!-- Upload Section -->
         <div class="upload-section" id="uploadSection">
-            <div class="drag-text">Drag & drop your video here or click to select</div>
-            <input type="file" id="videoFile" class="file-input" accept="video/*">
-            <button class="upload-btn" onclick="document.getElementById('videoFile').click()">
-                Choose Video File
-            </button>
-            <button class="upload-btn" id="uploadBtn" onclick="uploadVideo()" disabled>
-                Upload Video
-            </button>
-            
-            <!-- File Info -->
-            <div class="file-info" id="fileInfo"></div>
-            
-            <!-- Progress Bar -->
-            <div class="progress" id="progress">
-                <div class="progress-bar" id="progressBar"></div>
+            <div class="drag-instructions">
+                Drag and drop video files here, or click to select files
             </div>
             
-            <!-- Status Messages -->
-            <div class="status" id="status"></div>
+            <input type="file" id="fileInput" class="file-input" accept="video/*" multiple>
+            <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                Choose Files
+            </button>
+            
+            <div class="file-info" id="fileInfo" style="display: none;"></div>
         </div>
         
-        <!-- Video List -->
-        <div class="video-list">
-            <h3>📋 Uploaded Videos</h3>
-            <button class="upload-btn" onclick="loadVideos()">Refresh List</button>
-            <div id="videoList"></div>
+        <div class="progress" id="progress">
+            <div class="progress-bar" id="progressBar"></div>
         </div>
+        
+        <div class="status" id="status"></div>
+        
+        <div class="video-list" id="videoList"></div>
     </div>
 
     <script>
-        let selectedFile = null;
-        
-        // File selection handling
-        document.getElementById('videoFile').addEventListener('change', function(e) {
-            selectedFile = e.target.files[0];
-            if (selectedFile) {
-                showFileInfo(selectedFile);
-                document.getElementById('uploadBtn').disabled = false;
-            }
-        });
-        
-        // Drag and drop handling
         const uploadSection = document.getElementById('uploadSection');
+        const fileInput = document.getElementById('fileInput');
+        const progress = document.getElementById('progress');
+        const progressBar = document.getElementById('progressBar');
+        const status = document.getElementById('status');
+        const videoList = document.getElementById('videoList');
+        const fileInfo = document.getElementById('fileInfo');
         
-        uploadSection.addEventListener('dragover', function(e) {
+        // Drag and drop functionality
+        uploadSection.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadSection.classList.add('dragover');
         });
         
-        uploadSection.addEventListener('dragleave', function(e) {
-            e.preventDefault();
+        uploadSection.addEventListener('dragleave', () => {
             uploadSection.classList.remove('dragover');
         });
         
-        uploadSection.addEventListener('drop', function(e) {
+        uploadSection.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadSection.classList.remove('dragover');
-            
             const files = e.dataTransfer.files;
-            if (files.length > 0 && files[0].type.startsWith('video/')) {
-                selectedFile = files[0];
-                document.getElementById('videoFile').files = files;
-                showFileInfo(selectedFile);
-                document.getElementById('uploadBtn').disabled = false;
-            }
+            handleFiles(files);
         });
         
-        function showFileInfo(file) {
-            const fileInfo = document.getElementById('fileInfo');
-            const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        // File input change
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+        
+        // Handle selected files
+        function handleFiles(files) {
+            if (files.length === 0) return;
             
+            // Show file info
+            const file = files[0];
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
             fileInfo.innerHTML = `
-                <strong>Selected File:</strong> ${file.name}<br>
+                <strong>Selected file:</strong> ${file.name}<br>
                 <strong>Size:</strong> ${sizeMB} MB<br>
                 <strong>Type:</strong> ${file.type}
             `;
             fileInfo.style.display = 'block';
+            
+            // Upload file
+            uploadFile(file);
         }
         
-        async function uploadVideo() {
-            if (!selectedFile) {
-                showStatus('Please select a video file first.', 'error');
-                return;
-            }
-            
+        // Upload file function
+        function uploadFile(file) {
             const formData = new FormData();
-            formData.append('video', selectedFile);
+            formData.append('video', file);
             
             // Show progress
-            document.getElementById('progress').style.display = 'block';
-            document.getElementById('uploadBtn').disabled = true;
+            progress.style.display = 'block';
+            progressBar.style.width = '0%';
             
-            try {
-                const response = await fetch('/core/api/upload-video/', {
-                    method: 'POST',
-                    body: formData
-                });
+            // Simulate upload progress
+            let progressValue = 0;
+            const progressInterval = setInterval(() => {
+                progressValue += Math.random() * 10;
+                if (progressValue > 90) progressValue = 90;
+                progressBar.style.width = progressValue + '%';
+            }, 200);
+            
+            // Make upload request
+            fetch('/core/api/upload-video/', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                clearInterval(progressInterval);
+                progressBar.style.width = '100%';
                 
-                if (response.ok) {
-                    const result = await response.json();
-                    showStatus(`✅ Upload successful! Video ID: ${result.video_id}`, 'success');
-                    
-                    // Reset form
-                    document.getElementById('videoFile').value = '';
-                    selectedFile = null;
-                    document.getElementById('fileInfo').style.display = 'none';
-                    document.getElementById('uploadBtn').disabled = true;
-                    
-                    // Refresh video list
+                if (data.success) {
+                    showStatus('Video uploaded successfully!', 'success');
                     loadVideos();
                 } else {
-                    const error = await response.json();
-                    showStatus(`❌ Upload failed: ${error.error}`, 'error');
+                    showStatus('Upload failed: ' + data.error, 'error');
                 }
-            } catch (error) {
-                showStatus(`❌ Upload error: ${error.message}`, 'error');
-            } finally {
-                // Hide progress
-                document.getElementById('progress').style.display = 'none';
-                document.getElementById('uploadBtn').disabled = false;
-            }
+                
+                // Hide progress after delay
+                setTimeout(() => {
+                    progress.style.display = 'none';
+                }, 2000);
+            })
+            .catch(error => {
+                clearInterval(progressInterval);
+                console.error('Upload error:', error);
+                showStatus('Upload failed. Please try again.', 'error');
+                progress.style.display = 'none';
+            });
         }
         
+        // Show status message
         function showStatus(message, type) {
-            const status = document.getElementById('status');
             status.textContent = message;
             status.className = `status ${type}`;
             status.style.display = 'block';
             
-            // Auto-hide after 5 seconds
             setTimeout(() => {
                 status.style.display = 'none';
             }, 5000);
         }
         
-        async function loadVideos() {
-            try {
-                const response = await fetch('/core/api/videos/');
-                if (response.ok) {
-                    const result = await response.json();
-                    displayVideos(result.videos);
-                } else {
-                    console.error('Failed to load videos');
+        // Load existing videos
+        function loadVideos() {
+            fetch('/core/api/videos/')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayVideos(data.videos);
                 }
-            } catch (error) {
+            })
+            .catch(error => {
                 console.error('Error loading videos:', error);
-            }
+            });
         }
         
+        // Display videos
         function displayVideos(videos) {
-            const videoList = document.getElementById('videoList');
+            videoList.innerHTML = '';
             
-            if (videos.length === 0) {
-                videoList.innerHTML = '<p>No videos uploaded yet.</p>';
-                return;
-            }
-            
-            const videoHtml = videos.map(video => `
-                <div class="video-item">
-                    <div class="video-info">
-                        <div class="video-details">
-                            <strong>${video.filename}</strong><br>
-                            <small>Size: ${video.size_mb}MB | Type: ${video.mime_type}</small><br>
-                            <small>Uploaded: ${new Date(video.created_at).toLocaleString()}</small>
-                        </div>
-                        <div class="video-actions">
-                            <button class="btn-small btn-view" onclick="window.open('${video.url}', '_blank')">
-                                View
-                            </button>
-                            <button class="btn-small btn-delete" onclick="deleteVideo('${video.id}')">
-                                Delete
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-            
-            videoList.innerHTML = videoHtml;
+            videos.forEach(video => {
+                const videoItem = document.createElement('div');
+                videoItem.className = 'video-item';
+                videoItem.innerHTML = `
+                    <h3>${video.filename}</h3>
+                    <video controls>
+                        <source src="/media/${video.storage_path}" type="${video.mime_type}">
+                        Your browser does not support the video tag.
+                    </video>
+                    <p><strong>Size:</strong> ${(video.file_size / (1024 * 1024)).toFixed(2)} MB</p>
+                    <p><strong>Uploaded:</strong> ${new Date(video.uploaded_at).toLocaleString()}</p>
+                    <button class="delete-btn" onclick="deleteVideo(${video.id})">Delete</button>
+                `;
+                videoList.appendChild(videoItem);
+            });
         }
         
-        async function deleteVideo(videoId) {
-            if (!confirm('Are you sure you want to delete this video?')) {
-                return;
-            }
+        // Delete video
+        function deleteVideo(videoId) {
+            if (!confirm('Are you sure you want to delete this video?')) return;
             
-            try {
-                const response = await fetch(`/core/api/videos/${videoId}/delete/`, {
-                    method: 'DELETE'
-                });
-                
-                if (response.ok) {
-                    showStatus('✅ Video deleted successfully', 'success');
-                    loadVideos(); // Refresh list
+            fetch(`/core/api/videos/${videoId}/delete/`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showStatus('Video deleted successfully!', 'success');
+                    loadVideos();
                 } else {
-                    const error = await response.json();
-                    showStatus(`❌ Delete failed: ${error.error}`, 'error');
+                    showStatus('Delete failed: ' + data.error, 'error');
                 }
-            } catch (error) {
-                showStatus(`❌ Delete error: ${error.message}`, 'error');
-            }
+            })
+            .catch(error => {
+                console.error('Delete error:', error);
+                showStatus('Delete failed. Please try again.', 'error');
+            });
         }
         
         // Load videos on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            loadVideos();
-        });
+        document.addEventListener('DOMContentLoaded', loadVideos);
     </script>
 </body>
 </html>

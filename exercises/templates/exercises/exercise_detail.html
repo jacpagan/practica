@@ -51,15 +51,22 @@
         
         {% if user.is_authenticated %}
             <div class="card">
-                <h4>💬 Add Comment</h4>
+                <h4>Add Comment</h4>
                 {% csrf_token %}
                 <div class="form-group">
-                    <label for="comment-text">📝 Text (optional)</label>
+                    <label for="comment-text">Text (optional)</label>
                     <textarea id="comment-text" rows="2" placeholder="Add text..."></textarea>
                 </div>
-                <div id="recorder-container-main"></div>
+                <div id="recorder-container-main" class="recorder-container">
+                    <p>Video recording functionality is available on the create exercise page.</p>
+                    <p>To add a video comment, please use the file upload option below.</p>
+                </div>
                 
-                <!-- Minimal Comment Progress -->
+                <div class="form-group">
+                    <label for="video-file">Video File:</label>
+                    <input type="file" id="video-file" name="video" accept="video/*" required>
+                </div>
+                
                 <div id="comment-progress-main" style="display: none;">
                     <div class="minimal-progress">
                         <div class="status-dots">
@@ -73,9 +80,8 @@
                     </div>
                 </div>
                 
-                <button class="btn btn-success" onclick="submitComment()" aria-label="Submit video comment" title="Submit Comment">
-                    <svg class="icon"><use href="/static/icons/icons.svg#upload"/></svg>
-                    <span class="label-text">Submit</span>
+                <button class="btn btn-success" onclick="submitComment()">
+                    Submit
                 </button>
             </div>
         {% endif %}
@@ -86,6 +92,33 @@
     // Initialize main video recorder
     document.addEventListener('DOMContentLoaded', function() {
         if (document.getElementById('recorder-container-main')) {
+            // Define VideoRecorder class if not already defined
+            if (typeof VideoRecorder === 'undefined') {
+                class VideoRecorder {
+                    constructor(containerId) {
+                        this.container = document.getElementById(containerId);
+                        this.videoBlob = null;
+                        this.mediaRecorder = null;
+                        this.stream = null;
+                        this.recordedChunks = [];
+                    }
+                    
+                    startRecording() {
+                        // Basic implementation for comment recording
+                        alert('Video recording functionality not available on this page. Please use the create exercise page for full recording features.');
+                    }
+                    
+                    stopRecording() {
+                        // Basic implementation
+                    }
+                    
+                    reset() {
+                        // Basic implementation
+                    }
+                }
+            }
+            
+            window.videoRecorders = window.videoRecorders || {};
             window.videoRecorders['main'] = new VideoRecorder('recorder-container-main');
         }
     });
@@ -99,127 +132,45 @@
         }
     }
 
-    function updateCommentStatus(text) {
-        const statusText = document.getElementById('comment-status-text');
-        if (statusText) {
-            statusText.textContent = text;
-        }
-    }
-
-    async function submitComment() {
+    // Submit comment function
+    function submitComment() {
         const text = document.getElementById('comment-text').value;
-        const recorder = window.videoRecorders['main'];
-        const videoBlob = recorder.getVideoBlob();
-
-        if (!videoBlob) {
-            alert('Please record a video comment first.');
+        const videoFile = document.getElementById('video-file').files[0];
+        
+        if (!videoFile) {
+            alert('Please select a video file.');
             return;
         }
-
-        // Show progress section
+        
+        // Show progress
         document.getElementById('comment-progress-main').style.display = 'block';
-
-        // Step 1: Process video
-        updateCommentDot(1, 'active');
-        updateCommentStatus('Processing...');
         
-        // Simulate processing time
-        await new Promise(resolve => setTimeout(resolve, 800));
-        updateCommentDot(1, 'completed');
-        updateCommentStatus('Uploading...');
-
-        // Step 2: Upload
-        updateCommentDot(2, 'active');
-        
+        // Create form data
         const formData = new FormData();
-        formData.append('exercise_id', '{{ exercise.id }}');
         formData.append('text', text);
-        formData.append('video', videoBlob, 'comment.webm');
-
-        try {
-            // Simulate upload time based on file size
-            const fileSize = videoBlob.size;
-            const uploadTime = Math.min(1500, Math.max(300, fileSize / 1000)); // 0.3s to 1.5s
-            await new Promise(resolve => setTimeout(resolve, uploadTime));
-            
-            updateCommentDot(2, 'completed');
-            updateCommentStatus('Saving...');
-
-            // Step 3: Create comment
-            updateCommentDot(3, 'active');
-            
-            // Debug: Check if CSRF token is available
-            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
-            let csrfTokenValue = null;
-            
-            if (csrfToken) {
-                csrfTokenValue = csrfToken.value;
-                console.log('CSRF Token found in form:', csrfTokenValue);
+        formData.append('video', videoFile);
+        formData.append('exercise', '{{ exercise.id }}');
+        
+        // Submit comment
+        fetch('/comments/api/comments/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
             } else {
-                // Fallback: try to get from cookies
-                csrfTokenValue = getCookie('csrftoken');
-                if (csrfTokenValue) {
-                    console.log('CSRF Token found in cookies:', csrfTokenValue);
-                } else {
-                    console.error('CSRF token not found in form or cookies');
-                    updateCommentDot(3, 'error');
-                    updateCommentStatus('CSRF error');
-                    return;
-                }
+                alert('Error submitting comment: ' + data.error);
             }
-            
-            const response = await fetch('/api/video-comments/', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRFToken': csrfTokenValue
-                }
-            });
-
-            if (response.ok) {
-                updateCommentDot(3, 'completed');
-                updateCommentStatus('Success!');
-                
-                // Hide progress after success
-                setTimeout(() => {
-                    document.getElementById('comment-progress-main').style.display = 'none';
-                    // Reset form
-                    document.getElementById('comment-text').value = '';
-                    recorder.reset();
-                }, 1500);
-                
-                // Reload page to show new comment
-                setTimeout(() => {
-                    window.location.reload();
-                }, 2000);
-                
-            } else {
-                const errorData = await response.json();
-                console.error('Comment creation failed:', errorData);
-                updateCommentDot(3, 'error');
-                updateCommentStatus('Upload failed');
-            }
-            
-        } catch (error) {
-            console.error('Error creating comment:', error);
-            updateCommentDot(3, 'error');
-            updateCommentStatus('Network error');
-        }
-    }
-
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error submitting comment. Please try again.');
+        });
     }
 </script>
 {% endblock %}

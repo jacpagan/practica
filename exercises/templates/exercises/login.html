@@ -4,11 +4,11 @@
 
 {% block content %}
 <div class="card" style="max-width: 400px; margin: 0 auto;">
-    <h2>🔐 Secure Login</h2>
+    <h2>Secure Login</h2>
     
-    <div class="security-info" style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; font-size: 0.9em;">
-        <h4 style="margin: 0 0 10px 0; color: #495057;">Security Features</h4>
-        <ul style="margin: 0; padding-left: 20px; color: #6c757d;">
+    <div class="security-info">
+        <h4>Security Features</h4>
+        <ul>
             <li>Rate limiting: 5 attempts per minute</li>
             <li>Account lockout after 5 failed attempts</li>
             <li>Session timeout: 1 hour</li>
@@ -34,242 +34,40 @@
                        title="Password must be at least 8 characters long">
                 <button type="button" id="toggle-password" class="password-toggle" 
                         aria-label="Toggle password visibility">
-                    👁️
+                    Show
                 </button>
-            </div>
-            <div id="password-strength" class="password-strength" style="display: none;">
-                <div class="strength-bar">
-                    <div class="strength-fill" id="strength-fill"></div>
-                </div>
-                <div class="strength-text" id="strength-text"></div>
             </div>
         </div>
         
         <button type="submit" class="btn btn-success" style="width: 100%;">Login</button>
     </form>
     
-    <div class="login-links" style="margin-top: 20px; text-align: center;">
-        <a href="/admin/" style="color: #3498db;">Admin Login</a>
+    <div class="login-links">
+        <a href="/admin/">Admin Login</a>
         <span style="margin: 0 10px;">|</span>
-        <a href="#" id="forgot-password" style="color: #3498db;">Forgot Password?</a>
-    </div>
-    
-    <!-- Security Tips Modal -->
-    <div id="security-tips-modal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h3>🔒 Security Tips</h3>
-            <ul>
-                <li>Use a strong, unique password</li>
-                <li>Never share your credentials</li>
-                <li>Log out when using shared devices</li>
-                <li>Keep your browser updated</li>
-                <li>Be cautious of phishing attempts</li>
-            </ul>
-        </div>
+        <a href="#" id="forgot-password">Forgot Password?</a>
     </div>
 </div>
 
-<style>
-.password-container {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.password-toggle {
-    position: absolute;
-    right: 10px;
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 16px;
-    padding: 5px;
-}
-
-.password-strength {
-    margin-top: 10px;
-}
-
-.strength-bar {
-    width: 100%;
-    height: 8px;
-    background: #e9ecef;
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.strength-fill {
-    height: 100%;
-    transition: width 0.3s ease, background-color 0.3s ease;
-    width: 0%;
-}
-
-.strength-text {
-    font-size: 0.8em;
-    margin-top: 5px;
-    text-align: center;
-}
-
-.modal {
-    position: fixed;
-    z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0,0,0,0.5);
-}
-
-.modal-content {
-    background-color: white;
-    margin: 15% auto;
-    padding: 20px;
-    border-radius: 8px;
-    width: 80%;
-    max-width: 500px;
-}
-
-.close {
-    color: #aaa;
-    float: right;
-    font-size: 28px;
-    font-weight: bold;
-    cursor: pointer;
-}
-
-.close:hover {
-    color: #000;
-}
-
-.security-info {
-    border-left: 4px solid #28a745;
-}
-</style>
-
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const passwordInput = document.getElementById('password');
-    const togglePassword = document.getElementById('toggle-password');
-    const passwordStrength = document.getElementById('password-strength');
-    const strengthFill = document.getElementById('strength-fill');
-    const strengthText = document.getElementById('strength-text');
-    const forgotPassword = document.getElementById('forgot-password');
-    const securityTipsModal = document.getElementById('security-tips-modal');
-    const closeModal = document.querySelector('.close');
-    
-    // Password visibility toggle
-    togglePassword.addEventListener('click', function() {
-        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-        passwordInput.setAttribute('type', type);
-        togglePassword.textContent = type === 'password' ? '👁️' : '🙈';
-    });
-    
-    // Password strength checker
-    passwordInput.addEventListener('input', function() {
-        const password = this.value;
-        if (password.length === 0) {
-            passwordStrength.style.display = 'none';
-            return;
-        }
+    // Toggle password visibility
+    document.getElementById('toggle-password').addEventListener('click', function() {
+        const passwordInput = document.getElementById('password');
+        const button = this;
         
-        passwordStrength.style.display = 'block';
-        
-        let score = 0;
-        let feedback = [];
-        
-        // Length check
-        if (password.length >= 8) score += 1;
-        else feedback.push('At least 8 characters');
-        
-        // Character variety checks
-        if (/[a-z]/.test(password)) score += 1;
-        else feedback.push('Lowercase letter');
-        
-        if (/[A-Z]/.test(password)) score += 1;
-        else feedback.push('Uppercase letter');
-        
-        if (/\d/.test(password)) score += 1;
-        else feedback.push('Number');
-        
-        if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) score += 1;
-        else feedback.push('Special character');
-        
-        // Common password check
-        const commonPasswords = ['password', '123456', '12345678', 'qwerty', 'abc123'];
-        if (commonPasswords.includes(password.toLowerCase())) {
-            score -= 1;
-            feedback.push('Too common');
-        }
-        
-        // Update strength bar
-        const percentage = Math.max(0, Math.min(100, (score / 5) * 100));
-        strengthFill.style.width = percentage + '%';
-        
-        // Set colors and text
-        if (score <= 1) {
-            strengthFill.style.backgroundColor = '#dc3545';
-            strengthText.textContent = 'Very Weak';
-            strengthText.style.color = '#dc3545';
-        } else if (score <= 2) {
-            strengthFill.style.backgroundColor = '#fd7e14';
-            strengthText.textContent = 'Weak';
-            strengthText.style.color = '#fd7e14';
-        } else if (score <= 3) {
-            strengthFill.style.backgroundColor = '#ffc107';
-            strengthText.textContent = 'Fair';
-            strengthText.style.color = '#ffc107';
-        } else if (score <= 4) {
-            strengthFill.style.backgroundColor = '#28a745';
-            strengthText.textContent = 'Good';
-            strengthText.style.color = '#28a745';
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            button.textContent = 'Hide';
         } else {
-            strengthFill.style.backgroundColor = '#20c997';
-            strengthText.textContent = 'Strong';
-            strengthText.style.color = '#20c997';
+            passwordInput.type = 'password';
+            button.textContent = 'Show';
         }
     });
     
-    // Forgot password - show security tips
-    forgotPassword.addEventListener('click', function(e) {
+    // Forgot password functionality
+    document.getElementById('forgot-password').addEventListener('click', function(e) {
         e.preventDefault();
-        securityTipsModal.style.display = 'block';
+        alert('Please contact an administrator to reset your password.');
     });
-    
-    // Close modal
-    closeModal.addEventListener('click', function() {
-        securityTipsModal.style.display = 'none';
-    });
-    
-    // Close modal when clicking outside
-    window.addEventListener('click', function(e) {
-        if (e.target === securityTipsModal) {
-            securityTipsModal.style.display = 'none';
-        }
-    });
-    
-    // Form validation
-    document.getElementById('login-form').addEventListener('submit', function(e) {
-        const username = document.getElementById('username').value.trim();
-        const password = document.getElementById('password').value;
-        
-        if (!username || !password) {
-            e.preventDefault();
-            alert('Please fill in all fields');
-            return;
-        }
-        
-        if (password.length < 8) {
-            e.preventDefault();
-            alert('Password must be at least 8 characters long');
-            return;
-        }
-        
-        // Show loading state
-        const submitBtn = this.querySelector('button[type="submit"]');
-        submitBtn.textContent = 'Logging in...';
-        submitBtn.disabled = true;
-    });
-});
 </script>
 {% endblock %}

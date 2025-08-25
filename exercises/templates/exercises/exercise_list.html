@@ -5,9 +5,9 @@
 {% block content %}
 <div class="card">
     <h2>Available Exercises</h2>
-    {% if exercises %}
+    {% if exercise_list %}
         <div class="exercise-grid">
-            {% for exercise in exercises %}
+            {% for exercise in exercise_list %}
             <div class="card">
                 <h3>{{ exercise.name }}</h3>
                 {% if exercise.description %}
@@ -23,13 +23,9 @@
                     </video>
                 </div>
 
-                <!-- Exercise Actions -->
-                <div class="exercise-actions" style="margin: 1rem 0;">
-                    <a href="{% url 'exercise_detail' exercise.id %}" class="btn btn-secondary" 
-                       aria-label="View exercise details and {{ exercise.videocomment_set.count }} comments" 
-                       title="View Details & Comments">
-                        <svg class="icon"><use href="/static/icons/icons.svg#play"/></svg>
-                        <span class="label-text">View Details & Comments ({{ exercise.videocomment_set.count }})</span>
+                <div class="exercise-actions">
+                    <a href="{% url 'exercise_detail' exercise.id %}" class="btn btn-primary">
+                        View Details & Comments ({{ exercise.videocomment_set.count }})
                     </a>
                 </div>
             </div>
