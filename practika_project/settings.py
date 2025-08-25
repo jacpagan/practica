@@ -119,24 +119,18 @@ WSGI_APPLICATION = "practika_project.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
+# Parse DATABASE_URL from Heroku
+import dj_database_url
+
 DATABASES = {
-    "default": {
-        "ENGINE": os.getenv('DJANGO_DB_ENGINE', 'django.db.backends.sqlite3'),
-        "NAME": os.getenv('DJANGO_DB_NAME', BASE_DIR / "db.sqlite3"),
-        "USER": os.getenv('DJANGO_DB_USER', ''),
-        "PASSWORD": os.getenv('DJANGO_DB_PASSWORD', ''),
-        "HOST": os.getenv('DJANGO_DB_HOST', ''),
-        "PORT": os.getenv('DJANGO_DB_PORT', ''),
-        "OPTIONS": {
-            "timeout": 20,
-            "check_same_thread": False,
-        } if os.getenv('DJANGO_DB_ENGINE', '').endswith('sqlite3') else {},
-    }
+    "default": dj_database_url.config(
+        default=os.getenv('DATABASE_URL', 'sqlite:///' + str(BASE_DIR / "db.sqlite3")),
+        conn_max_age=600 if not IS_DEVELOPMENT else 0,
+        conn_health_checks=True,
+    )
 }
 
-# Database connection pooling and optimization
-if not IS_DEVELOPMENT:
-    DATABASES['default']['CONN_MAX_AGE'] = 600
+
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
