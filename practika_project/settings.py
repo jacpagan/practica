@@ -47,23 +47,32 @@ SECURE_HSTS_SECONDS = 31536000 if IS_PRODUCTION else 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = IS_PRODUCTION
 SECURE_HSTS_PRELOAD = IS_PRODUCTION
 
-# Enhanced security for development
+# Security settings for all environments
+# Session security
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_COOKIE_AGE = 3600  # 1 hour
+
+# CSRF security
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_USE_SESSIONS = True
+CSRF_TRUSTED_ORIGINS = os.getenv('DJANGO_CSRF_TRUSTED_ORIGINS', 'https://practika-d127ed6da5d2.herokuapp.com').split(',')
+CSRF_COOKIE_DOMAIN = None  # Let Django handle this automatically
+
+# Enhanced security for development vs production
 if IS_DEVELOPMENT:
-    # Session security
+    # Development-specific settings
     SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
-    SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = 'Lax'
-    SESSION_EXPIRE_AT_BROWSER_CLOSE = True
-    SESSION_COOKIE_AGE = 3600  # 1 hour
-    
-    # CSRF security
     CSRF_COOKIE_SECURE = False  # Set to True in production with HTTPS
-    CSRF_COOKIE_HTTPONLY = True
-    CSRF_COOKIE_SAMESITE = 'Lax'
-    CSRF_USE_SESSIONS = True
     
     # Additional security headers
     SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+else:
+    # Production-specific settings
+    SESSION_COOKIE_SECURE = True  # Require HTTPS in production
+    CSRF_COOKIE_SECURE = True  # Require HTTPS in production
 
 # Application definition
 
