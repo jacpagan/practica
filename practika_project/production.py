@@ -72,15 +72,25 @@ DATABASES = {
         'PASSWORD': os.environ.get('DJANGO_DB_PASSWORD', ''),
         'HOST': os.environ.get('DJANGO_DB_HOST', ''),
         'PORT': os.environ.get('DJANGO_DB_PORT', ''),
-        'OPTIONS': {
-            'timeout': 20,
-            'check_same_thread': False,
-        } if os.environ.get('DJANGO_DB_ENGINE', '').endswith('sqlite3') else {
-            'sslmode': 'require',
-            'connect_timeout': 20,
-        },
     }
 }
+
+# Add database-specific options
+if os.environ.get('DJANGO_DB_ENGINE', '').endswith('sqlite3'):
+    DATABASES['default']['OPTIONS'] = {
+        'timeout': 20,
+        'check_same_thread': False,
+    }
+elif os.environ.get('DJANGO_DB_ENGINE', '').endswith('postgresql'):
+    DATABASES['default']['OPTIONS'] = {
+        'sslmode': 'require',
+        'connect_timeout': 20,
+    }
+
+# Check for DATABASE_URL (Heroku style)
+if os.environ.get('DATABASE_URL'):
+    import dj_database_url
+    DATABASES['default'] = dj_database_url.parse(os.environ.get('DATABASE_URL'))
 
 # Redis configuration for production
 REDIS_URL = os.environ.get('DJANGO_REDIS_URL', 'redis://localhost:6379/1')
