@@ -205,6 +205,27 @@ class VideoAsset(models.Model):
         self.save(update_fields=['access_count', 'last_accessed'])
         logger.debug(f"VideoAsset {self.id} marked as accessed")
 
+    def get_public_url(self):
+        """Get public URL for the video asset"""
+        try:
+            # Try to use the storage service to get the URL
+            from core.services.storage import VideoStorageService
+            storage_service = VideoStorageService()
+            return storage_service.get_video_url(self)
+        except Exception as e:
+            logger.warning(f"Could not get public URL via storage service: {e}")
+            
+            # Fallback: check if storage_path is already a URL
+            if self.storage_path.startswith(('http://', 'https://')):
+                return self.storage_path
+            
+            # Fallback: construct local URL
+            from django.conf import settings
+            if hasattr(settings, 'MEDIA_URL'):
+                return f"{settings.MEDIA_URL}{self.storage_path}"
+            
+            return self.storage_path
+
     def get_file_info(self):
         """Get comprehensive file information"""
         file_info = {

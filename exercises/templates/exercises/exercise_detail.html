@@ -18,7 +18,7 @@
     <div class="video-container">
         <h3>Exercise Video</h3>
         <video class="video-player" controls>
-            <source src="/media/{{ exercise.video_asset.storage_path }}" type="{{ exercise.video_asset.mime_type }}">
+            <source src="{{ exercise.video_asset.get_public_url }}" type="{{ exercise.video_asset.mime_type }}">
             Your browser does not support the video tag.
         </video>
     </div>
@@ -40,7 +40,7 @@
             
             <div class="video-container">
                 <video class="video-player" controls>
-                    <source src="/media/{{ comment.video_asset.storage_path }}" type="{{ comment.video_asset.mime_type }}">
+                    <source src="{{ comment.video_asset.get_public_url }}" type="{{ comment.video_asset.mime_type }}">
                     Your browser does not support the video tag.
                 </video>
             </div>
