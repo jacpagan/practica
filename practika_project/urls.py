@@ -7,6 +7,7 @@ from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib import admin
 
 def home_landing(request):
     """Show exercises list as the main page"""
@@ -19,6 +20,7 @@ def home_redirect(request):
     return redirect('exercises:exercise_list')
 
 urlpatterns = [
+    path('admin/', admin.site.urls),
     path('', home_landing, name='home'),
     path('app/', home_redirect, name='app_home'),
     path('core/', include('core.urls')),
