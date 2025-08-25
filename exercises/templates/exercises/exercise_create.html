@@ -190,6 +190,9 @@
                             <button type="button" id="recovery-btn" class="btn btn-small" style="display: none;" onclick="attemptRecovery()">
                                 🔄 Attempt Recovery
                             </button>
+                            <button type="button" id="manual-capture-btn" class="btn btn-small" style="display: none;" onclick="manualCapture()">
+                                📸 Manual Capture
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -422,8 +425,8 @@
                 
                 // Start recording with more frequent data collection
                 try {
-                    this.mediaRecorder.start(100); // Every 100ms
-                    console.log('MediaRecorder.start() called successfully');
+                    this.mediaRecorder.start(50); // Every 50ms for more frequent data collection
+                    console.log('MediaRecorder.start() called successfully with 50ms intervals');
                 } catch (error) {
                     console.error('Failed to start MediaRecorder:', error);
                     throw error;
@@ -555,13 +558,25 @@
                 
                 this.isRecording = false;
                 
-                // Stop the media recorder first but DON'T stop the stream yet
+                // IMPORTANT: Request data BEFORE stopping the MediaRecorder
+                console.log('Requesting final data before stopping...');
                 try {
-                    this.mediaRecorder.stop();
-                    console.log('MediaRecorder.stop() called');
+                    this.mediaRecorder.requestData();
+                    console.log('Final data requested successfully');
                 } catch (error) {
-                    console.error('Error stopping MediaRecorder:', error);
+                    console.error('Error requesting final data:', error);
                 }
+                
+                // Wait a moment for data to be collected, then stop
+                setTimeout(() => {
+                    try {
+                        console.log('Stopping MediaRecorder after data collection...');
+                        this.mediaRecorder.stop();
+                        console.log('MediaRecorder.stop() called');
+                    } catch (error) {
+                        console.error('Error stopping MediaRecorder:', error);
+                    }
+                }, 500); // Wait 500ms for data collection
                 
                 // DON'T stop the stream yet - wait for data collection
                 console.log('Keeping stream active for data collection...');
@@ -573,22 +588,14 @@
                 this.mediaRecorder.onstop = () => {
                     console.log('MediaRecorder onstop triggered');
                     
-                    // Force collect any remaining data
+                    // Process the collected data
                     setTimeout(() => {
                         console.log('Processing final data, chunks:', this.recordedChunks.length);
                         
-                        // Force a final data collection if no chunks
+                        // If we still have no chunks, try recovery
                         if (this.recordedChunks.length === 0) {
-                            console.warn('No chunks collected, trying to force data collection...');
-                            this.forceDataCollection();
-                            
-                            // Add a timeout fallback to ensure we get data
-                            setTimeout(() => {
-                                if (this.recordedChunks.length === 0) {
-                                    console.warn('Still no chunks after timeout, forcing final collection...');
-                                    this.mediaRecorder.requestData();
-                                }
-                            }, 2000);
+                            console.warn('No chunks collected, attempting recovery...');
+                            this.attemptImmediateRecovery();
                         }
                         
                         this.status.textContent = 'Video Ready!';
@@ -610,6 +617,7 @@
                         // Show recovery button if no chunks
                         if (this.recordedChunks.length === 0) {
                             document.getElementById('recovery-btn').style.display = 'inline-block';
+                            document.getElementById('manual-capture-btn').style.display = 'inline-block';
                         }
                         
                         console.log('Video recording completed and ready, chunks:', this.recordedChunks.length);
@@ -795,6 +803,41 @@
                 } catch (error) {
                     console.error('Recovery failed:', error);
                 }
+            }
+        }
+        
+        attemptImmediateRecovery() {
+            console.log('=== ATTEMPTING IMMEDIATE RECOVERY ===');
+            
+            // If stream is still active, try to capture data immediately
+            if (this.stream && this.stream.active) {
+                try {
+                    console.log('Stream still active, attempting immediate capture...');
+                    
+                    // Create a new MediaRecorder with the same stream
+                    const recoveryRecorder = new MediaRecorder(this.stream);
+                    
+                    recoveryRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            this.recordedChunks.push(event.data);
+                            console.log('Immediate recovery chunk received:', { size: event.data.size, totalChunks: this.recordedChunks.length });
+                        }
+                    };
+                    
+                    // Start recording for a very short time
+                    recoveryRecorder.start();
+                    
+                    // Stop after 100ms to get whatever data we can
+                    setTimeout(() => {
+                        recoveryRecorder.stop();
+                        console.log('Immediate recovery completed, total chunks:', this.recordedChunks.length);
+                    }, 100);
+                    
+                } catch (error) {
+                    console.error('Immediate recovery failed:', error);
+                }
+            } else {
+                console.log('Stream not active, cannot attempt immediate recovery');
             }
         }
         
@@ -1152,6 +1195,21 @@
         } catch (error) {
             console.error('Recovery error:', error);
             alert('Error in recovery: ' + error.message);
+        }
+    }
+    
+    // Manual capture function
+    function manualCapture() {
+        try {
+            if (typeof videoRecorder === 'undefined') {
+                alert('VideoRecorder not available');
+                return;
+            }
+            
+            videoRecorder.attemptImmediateRecovery();
+        } catch (error) {
+            console.error('Manual capture error:', error);
+            alert('Error in manual capture: ' + error.message);
         }
     }
 </script>
