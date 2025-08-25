@@ -325,7 +325,9 @@ Use the automated deployment script:
 
 ### **Current Production Status**
 
-- **App**: practika-container-1e918c8ae02b.herokuapp.com
+- **App**: practika (Single consolidated app)
+- **URL**: https://practika-d127ed6da5d2.herokuapp.com/
 - **Stack**: Container
 - **Status**: ✅ Production Ready
 - **Last Deploy**: August 25, 2025
+- **Strategy**: Single app, single URL, no confusion
