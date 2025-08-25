@@ -82,6 +82,11 @@
                             <span class="icon">✅</span>
                             <span style="color: green; font-weight: bold;">Video Ready!</span>
                         </div>
+                        <div class="info-item">
+                            <button type="button" id="debug-video-btn" class="btn btn-small" style="display: none;" onclick="debugVideoStatus()">
+                                🔍 Debug Video
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -277,6 +282,9 @@
                         // Show video ready indicator
                         document.getElementById('video-ready-indicator').style.display = 'block';
                         
+                        // Show debug button
+                        document.getElementById('debug-video-btn').style.display = 'inline-block';
+                        
                         // Enable the submit button
                         document.getElementById('submit-btn').disabled = false;
                         
@@ -318,7 +326,19 @@
         
         hasVideo() {
             const blob = this.getVideoBlob();
-            return blob !== null && blob.size > 0;
+            const hasVideo = blob !== null && blob.size > 0;
+            console.log('hasVideo() called:', { hasVideo, blobExists: !!blob, blobSize: blob ? blob.size : 0 });
+            return hasVideo;
+        }
+        
+        forceRefreshVideo() {
+            // Force a refresh of the video blob
+            if (this.recordedChunks.length > 0) {
+                const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
+                console.log('Force refreshed video blob:', { size: blob.size, chunks: this.recordedChunks.length });
+                return blob;
+            }
+            return null;
         }
         
         reset() {
@@ -451,8 +471,28 @@
             let hasVideo = false;
             
             if (activeSource === 'webcam') {
-                hasVideo = videoRecorder.hasVideo();
-                console.log('Webcam video check:', { hasVideo, hasVideoMethod: videoRecorder.hasVideo() });
+                // More detailed webcam video check
+                const videoBlob = videoRecorder.getVideoBlob();
+                const hasVideoMethod = videoRecorder.hasVideo();
+                hasVideo = hasVideoMethod && videoBlob && videoBlob.size > 0;
+                
+                console.log('Webcam video check:', { 
+                    hasVideo, 
+                    hasVideoMethod, 
+                    blobExists: !!videoBlob, 
+                    blobSize: videoBlob ? videoBlob.size : 0,
+                    chunks: videoRecorder.recordedChunks ? videoRecorder.recordedChunks.length : 0
+                });
+                
+                // If we have chunks but no blob, try to create one
+                if (!hasVideo && videoRecorder.recordedChunks && videoRecorder.recordedChunks.length > 0) {
+                    console.log('Attempting to create blob from chunks...');
+                    const tempBlob = new Blob(videoRecorder.recordedChunks, { type: 'video/webm' });
+                    if (tempBlob.size > 0) {
+                        hasVideo = true;
+                        console.log('Successfully created blob from chunks:', { size: tempBlob.size });
+                    }
+                }
             } else {
                 const fileInput = document.getElementById('video-file');
                 hasVideo = fileInput.files.length > 0 && fileInput.files[0].size > 0;
@@ -496,5 +536,42 @@
             submitBtn.textContent = 'Creating...';
         });
     });
+    
+    // Debug function to check video status
+    function debugVideoStatus() {
+        const activeSource = document.querySelector('.toggle-btn.active').dataset.source;
+        console.log('=== VIDEO DEBUG INFO ===');
+        console.log('Active source:', activeSource);
+        
+        if (activeSource === 'webcam') {
+            console.log('VideoRecorder state:', {
+                isRecording: videoRecorder.isRecording,
+                chunks: videoRecorder.recordedChunks ? videoRecorder.recordedChunks.length : 0,
+                hasVideo: videoRecorder.hasVideo(),
+                getVideoBlob: videoRecorder.getVideoBlob(),
+                forceRefresh: videoRecorder.forceRefreshVideo()
+            });
+        } else {
+            const fileInput = document.getElementById('video-file');
+            console.log('File input state:', {
+                files: fileInput.files,
+                fileCount: fileInput.files.length,
+                firstFile: fileInput.files[0] ? {
+                    name: fileInput.files[0].name,
+                    size: fileInput.files[0].size,
+                    type: fileInput.files[0].type
+                } : null
+            });
+        }
+        
+        // Test form validation
+        const name = document.getElementById('name').value.trim();
+        console.log('Form validation test:', {
+            name: name,
+            nameValid: !!name
+        });
+        
+        alert('Check browser console for detailed video debug information');
+    }
 </script>
 {% endblock %}
