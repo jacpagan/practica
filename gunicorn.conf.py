@@ -12,7 +12,7 @@ backlog = 2048
 
 # Worker processes
 workers = int(os.environ.get('GUNICORN_WORKERS', multiprocessing.cpu_count() * 2 + 1))
-worker_class = os.environ.get('GUNICORN_WORKER_CLASS', 'gevent')
+worker_class = os.environ.get('GUNICORN_WORKER_CLASS', 'sync')  # Changed from 'gevent' to 'sync'
 worker_connections = int(os.environ.get('GUNICORN_WORKER_CONNECTIONS', 1000))
 max_requests = int(os.environ.get('GUNICORN_MAX_REQUESTS', 1000))
 max_requests_jitter = int(os.environ.get('GUNICORN_MAX_REQUESTS_JITTER', 100))
