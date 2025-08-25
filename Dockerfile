@@ -33,9 +33,6 @@ RUN mkdir -p /app/logs /app/media /app/staticfiles /app/media/videos && \
     chmod -R 755 /app/media && \
     chmod -R 755 /app/logs
 
-# Collect static files
-RUN python manage.py collectstatic --noinput
-
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash app && \
     chown -R app:app /app
