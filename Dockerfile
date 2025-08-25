@@ -5,7 +5,7 @@ FROM python:3.11-slim as base
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
-    DJANGO_SETTINGS_MODULE=practika_project.production \
+    DJANGO_SETTINGS_MODULE=practika_project.settings_production \
     DJANGO_ENVIRONMENT=production \
     DJANGO_DEBUG=False
 
@@ -46,7 +46,7 @@ EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health/ || exit 1
+    CMD curl -f http://localhost:8000/core/health/ || exit 1
 
 # Default command - use Gunicorn for production
 CMD ["gunicorn", "--config", "gunicorn.conf.py", "practika_project.wsgi:application"]
