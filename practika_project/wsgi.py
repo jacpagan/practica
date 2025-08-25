@@ -11,6 +11,10 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "practika_project.settings")
+# Use Heroku settings if available, otherwise fall back to base settings
+if os.environ.get('DYNO') or os.environ.get('HEROKU'):
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "practika_project.settings_heroku")
+else:
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "practika_project.settings")
 
 application = get_wsgi_application()
