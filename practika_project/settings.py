@@ -274,6 +274,10 @@ CACHES = {
         "LOCATION": os.getenv('DJANGO_REDIS_URL', '127.0.0.1:6379/1'),
         "OPTIONS": {
             "CLIENT_CLASS": "redis.client.DefaultClient",
+            "CONNECTION_POOL_KWARGS": {
+                "ssl_cert_reqs": None,  # Disable SSL certificate verification for Heroku Redis
+                "ssl": True,
+            } if not IS_DEVELOPMENT else {},
         } if not IS_DEVELOPMENT else {},
         "TIMEOUT": 300,
         "KEY_PREFIX": "practika",

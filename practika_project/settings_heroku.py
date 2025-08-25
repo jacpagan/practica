@@ -74,6 +74,13 @@ CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
         'LOCATION': os.environ.get('REDIS_URL', 'redis://localhost:6379/0'),
+        'OPTIONS': {
+            'CLIENT_CLASS': 'redis.client.DefaultClient',
+            'CONNECTION_POOL_KWARGS': {
+                'ssl_cert_reqs': None,  # Disable SSL certificate verification for Heroku Redis
+                'ssl': True,
+            },
+        },
     }
 }
 
@@ -87,8 +94,27 @@ CORS_ALLOWED_ORIGINS = [
     "https://yourdomain.com",
 ]
 
-# Remove development-specific middleware
+# Add WhiteNoise middleware for static files
 MIDDLEWARE = [
     middleware for middleware in MIDDLEWARE 
     if 'core.middleware.PerformanceMonitoringMiddleware' not in str(middleware)
 ]
+
+# Ensure WhiteNoise is present for static files
+if 'whitenoise.middleware.WhiteNoiseMiddleware' not in MIDDLEWARE:
+    # Insert WhiteNoise after SecurityMiddleware
+    security_index = None
+    for i, middleware in enumerate(MIDDLEWARE):
+        if 'SecurityMiddleware' in middleware:
+            security_index = i
+            break
+    
+    if security_index is not None:
+        MIDDLEWARE.insert(security_index + 1, 'whitenoise.middleware.WhiteNoiseMiddleware')
+    else:
+        MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
+
+# WhiteNoise configuration for static files
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+WHITENOISE_USE_FINDERS = True
+WHITENOISE_AUTOREFRESH = True
