@@ -1,24 +1,40 @@
-# Practika Exercise Platform
+# Practika
 
-A Django-based Learning Management System focused on video-based exercises and comments. This platform allows administrators to create exercises with video content and authenticated users to view exercises and create video comments.
+**Video-based learning platform for interactive exercises and video comments.**
 
-## 🚀 Quick Start
+## What Practika Is
 
-### Option 1: Docker (Recommended)
+Practika is a Django-based Learning Management System focused on video-based exercises and comments. This platform allows administrators to create exercises with video content and authenticated users to view exercises and create video comments. Built for mobile-first learning with session authentication, staff CRUD operations for exercises, and video reply capabilities.
 
-```bash
-# Development environment
-make dev-up
-# or
-./docker-helper.sh dev-up
+## Scope Contract (v1)
 
-# Production environment
-make prod-up
-# or
-./docker-helper.sh prod-up
-```
+### In-Scope
+- Three core models: Exercise, VideoAsset, VideoComment
+- Five UI surfaces: Home/Feed, Exercise Detail, Upload/Record, Login, Minimal Admin
+- Session authentication with staff-only exercise CRUD
+- Video replies only (no nested comments)
+- 100MB file cap with MP4/WebM/QuickTime/AVI support
+- Local development + S3 production storage
+- Basic validation, rate limits, security headers
+- Health endpoints (liveness only)
 
-### Option 2: Local Development
+### Out-of-Scope
+- User registration (admin-created accounts only)
+- Nested comment threading
+- Video processing/compression
+- Advanced analytics
+- Mobile apps (web-only)
+- Real-time features
+
+### Rules
+- No new features without scope approval
+- Maintain backward compatibility
+- Security-first approach
+- Mobile-responsive design required
+
+## Quick Start
+
+### Local Development
 
 ```bash
 # Create and activate virtual environment
@@ -41,143 +57,8 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-### Access the Application
+### Docker Development
 
-- **Main Frontend:** http://localhost:8000/
-- **Admin Interface:** http://localhost:8000/admin/
-- **Login Page:** http://localhost:8000/login/
-- **Health Check:** http://localhost:8000/health/
-
-## 👥 User Accounts
-
-### Admin User
-- **Username:** `admin`
-- **Password:** `admin123`
-- **Capabilities:** Create exercises, manage all content, CRUD any video comments
-
-### Regular User
-- **Username:** `user`
-- **Password:** `user123`
-- **Capabilities:** View exercises, create video comments, reply to comments
-
-## 📚 Core Features
-
-### Exercise Management
-- **Admin CRUD Operations**: Staff users can create, read, update, and delete exercises
-- **User Exercise Access**: Authenticated users can view all exercises
-- **Video Integration**: Exercises support video content with validation
-
-### Video Comments System
-- **Video Comments**: Users can create video comments on exercises using webcam recording or file upload
-- **Webcam Recording**: Real-time video recording via MediaRecorder API
-- **File Upload**: Support for video file uploads (MP4, WebM, QuickTime, AVI)
-- **Permission System**: Role-based access control for exercises and comments
-
-### Security & Validation
-- **File Validation**: MP4, WebM, QuickTime, AVI formats only, 100MB maximum
-- **Rate Limiting**: 5 login attempts per minute, 10 uploads per minute per IP
-- **Account Lockout**: 5 minutes after 5 failed login attempts
-- **Input Sanitization**: XSS, SQL injection, and command injection protection
-
-## 🎨 Icon-First UI System
-
-The application uses an SVG sprite system with consistent icon mappings across all templates. Icons are designed to be universally intuitive and accessible.
-
-### Icon System Overview
-- **File**: `/static/icons/icons.svg`
-- **CSS**: `/static/css/icon-ui.css`
-- **Default Mode**: Icon-only (`.icon-only` class on `<html>`)
-- **Text Mode**: Add `?text=1` query parameter to reveal labels
-
-### Core Icon Mappings
-| Action | Icon ID | Description |
-|--------|----------|-------------|
-| **Home/Main Page** | `#home` | House icon for main page |
-| **Exercise List** | `#list` | List icon for exercise overview |
-| **Create Exercise** | `#new-ex` | Plus icon for new exercise creation |
-| **Play Video** | `#play` | Play triangle for video playback |
-| **Start Recording** | `#record` | Red circle for recording start |
-| **Camera/Webcam** | `#camera` | Camera icon for webcam actions |
-| **Upload/Submit** | `#upload` | Up arrow for file uploads |
-
-### Accessibility Features
-- **ARIA Labels**: Every interactive element includes screen reader descriptions
-- **Keyboard Navigation**: Logical tab sequence with high-contrast focus rings
-- **Screen Reader Support**: Hidden labels and meaningful icon descriptions
-- **Icon Legend**: Modal overlay showing icon meanings (toggle with ⓘ button)
-
-## 🛠️ Technology Stack
-
-### Backend
-- **Framework**: Django 4.2 + Django REST Framework
-- **Database**: SQLite (development), PostgreSQL (production)
-- **Storage**: FileSystemStorage (local) + S3 (cloud)
-- **Authentication**: Session-based authentication
-- **Caching**: Redis
-
-### Frontend
-- **Templates**: Server-rendered HTML with Django templates
-- **JavaScript**: ES6+ with MediaRecorder API for video recording
-- **CSS**: Custom icon-first UI system
-- **Video Support**: MP4, WebM, QuickTime, AVI formats
-
-### Infrastructure
-- **Containerization**: Docker with multi-stage builds
-- **Deployment**: Heroku-ready with Procfile and buildpacks
-- **Monitoring**: Health checks, metrics, and logging
-- **Security**: Rate limiting, input validation, security headers
-
-## 📁 Project Structure
-
-```
-Practika/
-├── core/                    # Core functionality and VideoAsset model
-│   ├── models.py           # VideoAsset model with validation
-│   ├── services/           # Storage and cloud storage services
-│   ├── views.py            # Health check and video API endpoints
-│   ├── middleware.py       # Security and monitoring middleware
-│   ├── security.py         # Security validation and auditing
-│   └── admin.py            # Admin interface for VideoAsset
-├── exercises/               # Exercise management
-│   ├── models.py           # Exercise model
-│   ├── views.py            # API ViewSets and HTML views
-│   ├── serializers.py      # DRF serializers
-│   ├── permissions.py      # Custom permissions
-│   ├── admin.py            # Admin interface
-│   ├── templates/          # HTML templates
-│   └── html_views.py       # HTML views for web interface
-├── comments/                # Video comment management
-│   ├── models.py           # VideoComment model
-│   ├── views.py            # API ViewSets
-│   ├── serializers.py      # DRF serializers
-│   ├── permissions.py      # Custom permissions
-│   └── admin.py            # Admin interface
-├── tests/                   # Comprehensive test suite
-│   ├── test_models.py      # Model tests
-│   ├── test_permissions.py # Permission tests
-│   ├── test_api_exercises.py # Exercise API tests
-│   ├── test_api_comments.py # Comment API tests
-│   ├── test_media_validation.py # Media validation tests
-│   ├── test_security.py    # Security and rate limiting tests
-│   ├── test_a11y_icons.py # Icon accessibility tests
-│   └── test_ui_nonreader_flow.py # UI flow tests
-├── practika_project/        # Django project settings
-├── media/                   # Video file storage
-├── static/                  # Static files and icons
-├── templates/               # Base templates
-├── requirements.txt         # Production dependencies
-├── requirements-dev.txt     # Development dependencies
-├── pytest.ini              # Pytest configuration
-├── Dockerfile              # Development Docker image
-├── Dockerfile.prod         # Production Docker image
-├── docker-compose.yml      # Development environment
-├── docker-compose.prod.yml # Production environment
-└── README.md               # This file
-```
-
-## 🐳 Docker Setup
-
-### Development Environment
 ```bash
 # Start development environment
 make dev-up
@@ -192,71 +73,136 @@ make test
 make down
 ```
 
-### Production Environment
-```bash
-# Start production environment
-make prod-up
+### Access the Application
 
-# View production logs
-make logs-prod
+- **Main Frontend:** http://localhost:8000/
+- **Admin Interface:** http://localhost:8000/admin/
+- **Health Check:** http://localhost:8000/core/health/
 
-# Stop production services
-make prod-down
+## Configuration
+
+### Environment Variables
+
+| Variable | Dev Default | Production | Description |
+|----------|-------------|------------|-------------|
+| `DJANGO_ENVIRONMENT` | `development` | `production` | Environment mode |
+| `DJANGO_DEBUG` | `True` | `False` | Debug mode |
+| `DJANGO_SECRET_KEY` | Auto-generated | Required | Django secret key |
+| `DATABASE_URL` | SQLite | PostgreSQL | Database connection |
+| `AWS_ACCESS_KEY_ID` | - | Required | S3 access key |
+| `AWS_SECRET_ACCESS_KEY` | - | Required | S3 secret key |
+| `AWS_STORAGE_BUCKET_NAME` | - | Required | S3 bucket name |
+| `USE_S3` | `False` | `True` | Enable S3 storage |
+
+### Development vs Production
+
+- **Development**: SQLite, local file storage, debug enabled
+- **Production**: PostgreSQL, S3 storage, debug disabled, security headers
+
+## Core Features
+
+### Exercise Management
+- **Staff CRUD Operations**: Create, read, update, delete exercises
+- **User Access**: Authenticated users can view all exercises
+- **Video Integration**: Exercises support video content
+
+### Video Comments System
+- **Video Comments**: Users create video comments using webcam or file upload
+- **Webcam Recording**: Real-time video recording via MediaRecorder API
+- **File Upload**: MP4, WebM, QuickTime, AVI formats (100MB max)
+- **Permission System**: Role-based access control
+
+### Security & Validation
+- **File Validation**: Format and size restrictions enforced
+- **Rate Limiting**: Basic rate limiting for uploads and requests
+- **Input Sanitization**: XSS, SQL injection protection
+- **Security Headers**: Comprehensive security headers
+
+## UI Surfaces
+
+### 1. Home/Feed
+- Exercise list with video thumbnails
+- Search and filtering capabilities
+- Responsive grid layout
+
+### 2. Exercise Detail
+- Video player with exercise information
+- Comment section below video
+- Related exercises sidebar
+
+### 3. Upload/Record
+- Webcam recording interface
+- File upload with drag-and-drop
+- Preview and edit before submission
+
+### 4. Login
+- Session-based authentication
+- Staff and regular user roles
+- Secure password handling
+
+### 5. Minimal Admin
+- Exercise CRUD operations
+- User management
+- Content moderation tools
+
+## API Map
+
+### Core Endpoints
+- `GET /` - Home page
+- `GET /core/health/` - Health check
+- `POST /core/api/upload-video/` - Video upload
+- `GET /core/api/videos/` - List videos
+- `DELETE /core/api/videos/{id}/delete/` - Delete video
+
+### Exercise Endpoints
+- `GET /exercises/` - Exercise list
+- `GET /exercises/{id}/` - Exercise detail
+- `POST /exercises/` - Create exercise (staff)
+- `PATCH /exercises/{id}/` - Update exercise (staff)
+- `DELETE /exercises/{id}/` - Delete exercise (staff)
+
+### Comment Endpoints
+- `GET /comments/` - Comment list
+- `POST /comments/` - Create comment
+- `PATCH /comments/{id}/` - Update comment
+- `DELETE /comments/{id}/` - Delete comment
+
+## Project Structure
+
+```
+Practika/
+├── core/                    # Core functionality and VideoAsset model
+│   ├── models.py           # VideoAsset model
+│   ├── services/           # Storage services
+│   ├── views.py            # Health check and video API
+│   ├── middleware.py       # Security and monitoring
+│   └── admin.py            # Admin interface
+├── exercises/               # Exercise management
+│   ├── models.py           # Exercise model
+│   ├── views.py            # API and HTML views
+│   ├── serializers.py      # DRF serializers
+│   ├── permissions.py      # Custom permissions
+│   └── templates/          # HTML templates
+├── comments/                # Video comment management
+│   ├── models.py           # VideoComment model
+│   ├── views.py            # API views
+│   ├── serializers.py      # DRF serializers
+│   └── permissions.py      # Custom permissions
+├── practika_project/        # Django project settings
+│   ├── settings.py         # Base settings
+│   ├── settings_production.py # Production settings
+│   └── wsgi.py             # WSGI configuration
+├── tests/                   # Test suite
+├── media/                   # Video file storage
+├── static/                  # Static files and icons
+├── templates/               # Base templates
+├── requirements.txt         # Dependencies
+├── Dockerfile              # Container configuration
+├── docker-compose.yml      # Development environment
+└── gunicorn.conf.py        # Production server config
 ```
 
-### Available Commands
-```bash
-make help              # Show all available commands
-make status            # Check service status
-make shell             # Open Django shell
-make clean             # Clean up all containers
-```
-
-## 🔌 API Endpoints
-
-### Exercises
-- `GET /api/exercises/` - List all exercises (authenticated)
-- `POST /api/exercises/` - Create exercise (staff only)
-- `GET /api/exercises/{id}/` - Get exercise details (authenticated)
-- `PATCH /api/exercises/{id}/` - Update exercise (staff only)
-- `DELETE /api/exercises/{id}/` - Delete exercise (staff only)
-
-### Video Comments
-- `GET /api/video-comments/` - List all comments (authenticated)
-- `POST /api/video-comments/` - Create comment (authenticated)
-- `GET /api/video-comments/{id}/` - Get comment details (authenticated)
-- `PATCH /api/video-comments/{id}/` - Update comment (author or staff)
-- `DELETE /api/video-comments/{id}/` - Delete comment (author or staff)
-
-### Video Upload (Core)
-- `POST /core/api/upload-video/` - Upload video file (authenticated)
-- `GET /core/api/videos/` - List uploaded videos (authenticated)
-- `DELETE /core/api/videos/{id}/delete/` - Delete video (authenticated)
-
-### Health & Monitoring
-- `GET /health/` - System health check
-- `GET /api/health/` - Detailed health status
-- `GET /api/metrics/` - Prometheus-style metrics
-
-## 🎥 Video System Features
-
-### Webcam Integration
-- **Technology**: MediaRecorder API
-- **Format**: WebM with VP8 video + Opus audio
-- **Features**: Live preview, start/stop controls, playback review
-
-### Video Upload
-- **Accepted Formats**: MP4, WebM, QuickTime, AVI
-- **Size Limit**: 100MB
-- **Processing**: SHA256 checksums, metadata extraction
-- **Storage**: Local filesystem with S3 fallback
-
-### Storage Strategy
-- **Primary**: S3 bucket with public read access
-- **Fallback**: Local filesystem storage
-- **Organization**: UUID-based naming with metadata tracking
-
-## 🧪 Testing
+## Testing
 
 ### Run Test Suite
 ```bash
@@ -274,60 +220,156 @@ make test
 ```
 
 ### Test Coverage
-- **Total Tests**: 9 test files
-- **Test Areas**: Models, permissions, API endpoints, media validation, security, accessibility, UI flows
+- **Models**: Exercise, VideoAsset, VideoComment validation
+- **Permissions**: Role-based access control
+- **API Endpoints**: CRUD operations and validation
+- **Security**: Rate limiting and input validation
+- **UI Flows**: User interaction testing
 
-## 🚀 **Deployment**
+## Deployment
 
-### **Container Stack Deployment (Recommended)**
-
-The platform is now deployed using Heroku's container stack. For complete deployment instructions, see [docs/OPERATIONS.md](docs/OPERATIONS.md).
-
-#### **Quick Deploy Commands**
+### Heroku Container Deployment
 
 ```bash
-# 1. Create new container app
-heroku create your-app-name --stack container
-
-# 2. Set required environment variables
-heroku config:set DJANGO_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')"
+# 1. Set environment variables
 heroku config:set DJANGO_ENVIRONMENT=production
 heroku config:set DJANGO_DEBUG=False
-heroku config:set DJANGO_SETTINGS_MODULE=practika_project.production
+heroku config:set DJANGO_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')"
 
-# 3. Add PostgreSQL and Redis
-heroku addons:create heroku-postgresql:essential-0
-heroku addons:create heroku-redis:mini
-
-# 4. Deploy container
+# 2. Deploy container
 heroku container:push web
 heroku container:release web
 
-# 5. Run release phase commands
+# 3. Run migrations
 heroku run python manage.py migrate
+
+# 4. Collect static files
 heroku run python manage.py collectstatic --noinput
 ```
 
-#### **One-Liner Deployment**
-
-Use the automated deployment script:
-
+### Automated Deployment
 ```bash
-./deploy-heroku-container.sh
+chmod +x deploy-heroku-simple.sh
+./deploy-heroku-simple.sh
 ```
 
-### **Documentation**
+### Production Checklist
+- [ ] Environment variables set
+- [ ] Database migrations run
+- [ ] Static files collected
+- [ ] Health check passes
+- [ ] All endpoints responding
+- [ ] Logs showing no errors
 
-- **Complete Operations Guide**: [docs/OPERATIONS.md](docs/OPERATIONS.md)
-- **Release Audit Report**: [docs/RELEASE_AUDIT.md](docs/RELEASE_AUDIT.md)
-- **Smoke Test Checklist**: [HEROKU_SMOKE_TEST.md](HEROKU_SMOKE_TEST.md)
-- **Docker Guide**: [DOCKER.md](DOCKER.md)
+## Operations & Health
 
-### **Current Production Status**
+### Health Endpoints
+- **Liveness**: `GET /core/health/` - Basic system health
+- **Response**: JSON with status, timestamp, and component checks
 
-- **App**: practika (Single consolidated app)
-- **URL**: https://practika-d127ed6da5d2.herokuapp.com/
-- **Stack**: Container
-- **Status**: ✅ Production Ready
-- **Last Deploy**: August 25, 2025
-- **Strategy**: Single app, single URL, no confusion
+### Monitoring
+- **Logs**: `heroku logs --tail`
+- **Status**: `heroku ps`
+- **Metrics**: Request timing and error rates
+
+### Logging
+- Request/response logging with unique IDs
+- Performance monitoring for slow requests
+- Error tracking and alerting
+
+## Security Posture
+
+### Validation
+- File type and size validation
+- Input sanitization and escaping
+- SQL injection prevention
+
+### Rate Limits
+- Basic rate limiting on uploads
+- Request throttling for API endpoints
+- Account lockout after failed attempts
+
+### Security Headers
+- X-Content-Type-Options: nosniff
+- X-Frame-Options: DENY
+- X-XSS-Protection: 1; mode=block
+- Referrer-Policy: strict-origin-when-cross-origin
+
+## Troubleshooting
+
+### Common Issues
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| 500 errors on Heroku | Missing middleware or settings | Check logs, verify production settings |
+| Database connection failed | Missing DATABASE_URL | Set Heroku PostgreSQL addon |
+| Static files not loading | collectstatic not run | Run `heroku run python manage.py collectstatic` |
+| Video upload fails | File size/format invalid | Check file size (100MB max) and format |
+| App won't start | Environment variables missing | Verify DJANGO_SECRET_KEY and DJANGO_ENVIRONMENT |
+| Health check fails | Database or storage issues | Check database connection and file permissions |
+| CORS errors | Origin not allowed | Update CORS_ALLOWED_ORIGINS in settings |
+| Memory issues | Large video files | Optimize video size or increase dyno memory |
+| Slow performance | Single worker process | Scale with `heroku ps:scale web=2` |
+| Build fails | Dockerfile issues | Check Dockerfile syntax and dependencies |
+
+### Debug Commands
+```bash
+# Check app status
+heroku ps
+
+# View logs
+heroku logs --tail
+
+# Check environment
+heroku config
+
+# Test database
+heroku run python manage.py dbshell
+
+# Check static files
+heroku run python manage.py check --deploy
+```
+
+## Change Governance
+
+### RFC Process
+1. **Proposal**: Document feature request with scope impact
+2. **Review**: Team review for scope alignment
+3. **Approval**: Scope owner approval required
+4. **Implementation**: Development with scope constraints
+5. **Testing**: Comprehensive testing before deployment
+
+### Scope Guardrails
+- **No new models** without scope approval
+- **No new UI surfaces** without scope approval
+- **No new authentication methods** without scope approval
+- **Maintain backward compatibility** for existing features
+- **Security review required** for all changes
+
+## Changelog
+
+### Since Last README Update (August 25, 2025)
+- **Refactored production settings** - Eliminated 500 errors on Heroku
+- **Added missing middleware** - RequestLoggingMiddleware, SecurityMiddleware, etc.
+- **Simplified container deployment** - Fixed Dockerfile and heroku.yml
+- **Enhanced health monitoring** - Database and storage health checks
+- **Consolidated documentation** - Single README as source of truth
+- **Removed complex dependencies** - Redis, S3 made optional
+- **Improved error handling** - Better logging and debugging capabilities
+
+### Previous Major Changes
+- **Initial deployment** - Basic Django app with video support
+- **Container migration** - Moved from buildpack to container stack
+- **Security hardening** - Added rate limiting and validation
+- **Mobile optimization** - Responsive design and touch support
+
+## License & Contact
+
+- **License**: Proprietary - All rights reserved
+- **Contact**: jacpagan1@gmail.com
+- **Repository**: Private repository
+- **Status**: Production ready on Heroku
+
+---
+
+**Practika v1** - Video-based learning platform for interactive exercises and video comments.

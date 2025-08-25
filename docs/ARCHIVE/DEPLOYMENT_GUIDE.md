@@ -1,3 +1,9 @@
+# DEPRECATED — Consolidated into root README.md
+
+This file is archived. The canonical source is README.md.
+
+---
+
 # Practika Deployment Guide
 
 This guide will help you deploy the cleaned-up Practika application to Heroku.
