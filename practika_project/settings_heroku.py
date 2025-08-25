@@ -112,6 +112,8 @@ MIDDLEWARE = [
 CSRF_USE_SESSIONS = False  # Disable session-based CSRF to avoid middleware dependency issues
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access to CSRF token
 CSRF_TRUSTED_ORIGINS = ['https://practika-d127ed6da5d2.herokuapp.com']
+CSRF_COOKIE_SECURE = False  # Disable secure cookie requirement for now
+CSRF_COOKIE_SAMESITE = None  # Disable SameSite requirement for now
 
 # Basic logging
 LOGGING = {
