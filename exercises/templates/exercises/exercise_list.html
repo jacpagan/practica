@@ -44,8 +44,10 @@
         </div>
     {% else %}
         <p>No exercises available yet.</p>
-        {% if user.is_authenticated %}
+        {% if user.is_authenticated and user.is_staff %}
             <p><a href="{% url 'exercises:exercise_create' %}" class="btn btn-success" title="➕ Create Your First Exercise">➕ Create Your First Exercise</a></p>
+        {% elif user.is_authenticated %}
+            <p><em>Only staff users can create exercises. Contact an administrator if you need to create content.</em></p>
         {% endif %}
     {% endif %}
 </div>
