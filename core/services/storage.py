@@ -128,50 +128,53 @@ class VideoStorageService:
     def store_uploaded_video(self, video_file):
         """Store uploaded video and create VideoAsset record"""
         try:
-            import magic
             import os
+            try:
+                import magic  # type: ignore
+            except ImportError:
+                magic = None
             from core.models import VideoAsset
-            
+
             logger.info(f"Storing uploaded video: {video_file.name}, size: {video_file.size} bytes")
-            logger.info(f"Storage backend: {type(self.backend).__name__}")
-            logger.info(f"USE_S3 setting: {getattr(settings, 'USE_S3', False)}")
-            
+
             # Generate unique filename
             import uuid
             file_extension = os.path.splitext(video_file.name)[1]
             unique_filename = f"videos/{uuid.uuid4()}{file_extension}"
-            
+
             logger.info(f"Generated filename: {unique_filename}")
-            
+
+            # Detect MIME type before uploading
+            if magic:
+                try:
+                    content = video_file.read(1024)
+                    video_file.seek(0)
+                    if content:
+                        mime_type = magic.from_buffer(content, mime=True)
+                        logger.info(f"Detected MIME type: {mime_type}")
+                    else:
+                        mime_type = self._get_mime_type_from_extension(file_extension)
+                        logger.warning(f"Empty file, using extension-based MIME type: {mime_type}")
+                except Exception as e:
+                    mime_type = self._get_mime_type_from_extension(file_extension)
+                    logger.warning(f"MIME detection failed, using extension-based: {mime_type}, error: {e}")
+            else:
+                mime_type = getattr(video_file, 'content_type', None) or self._get_mime_type_from_extension(file_extension)
+
+            # Validate MIME type
+            allowed_types = getattr(settings, 'ALLOWED_VIDEO_MIME_TYPES', [])
+            if mime_type not in allowed_types:
+                raise ValueError(f"Unsupported MIME type: {mime_type}")
+
+            # Generate checksum for the file
+            import hashlib
+            checksum = hashlib.sha256(video_file.read()).hexdigest()
+            video_file.seek(0)
+
             # Upload file to storage
             storage_path = self.backend.upload(video_file, unique_filename)
             logger.info(f"File uploaded to storage path: {storage_path}")
-            
-            # Detect MIME type
-            try:
-                # Read file content for MIME detection
-                content = video_file.read(1024)
-                video_file.seek(0)  # Reset file pointer
-                
-                if content:
-                    mime_type = magic.from_buffer(content, mime=True)
-                    logger.info(f"Detected MIME type: {mime_type}")
-                else:
-                    # Empty file, use extension-based detection
-                    mime_type = self._get_mime_type_from_extension(file_extension)
-                    logger.warning(f"Empty file, using extension-based MIME type: {mime_type}")
-                    
-            except Exception as e:
-                # Fallback to extension-based detection
-                mime_type = self._get_mime_type_from_extension(file_extension)
-                logger.warning(f"MIME detection failed, using extension-based: {mime_type}, error: {e}")
-            
-            # Generate checksum for the file
-            import hashlib
-            video_file.seek(0)  # Reset file pointer
-            checksum = hashlib.sha256(video_file.read()).hexdigest()
-            video_file.seek(0)  # Reset file pointer again
-            
+
             # Create VideoAsset record
             video_asset = VideoAsset.objects.create(
                 orig_filename=video_file.name,
