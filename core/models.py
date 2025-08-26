@@ -82,10 +82,10 @@ class VideoAsset(models.Model):
     def get_public_url(self):
         """Get public URL for the video asset"""
         try:
-            # Use storage service to get URL
-            from core.services.storage import VideoStorageService
-            storage_service = VideoStorageService()
-            return storage_service.get_video_url(self)
+            # Use dependency injection container to get URL provider
+            from core.container import container
+            url_provider = container.get_url_provider()
+            return url_provider.get_video_url(self)
         except Exception as e:
             # Log the error for debugging
             import logging

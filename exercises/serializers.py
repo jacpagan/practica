@@ -26,9 +26,9 @@ class ExerciseSerializer(serializers.ModelSerializer):
         if not video_file:
             raise serializers.ValidationError("Video file is required")
         
-        # Create video asset first with user context
-        from core.services.storage import VideoStorageService
-        storage_service = VideoStorageService()
+        # Create video asset using dependency injection
+        from core.container import container
+        storage_service = container.get_video_storage_service()
         
         # Create video asset
         video_asset = storage_service.store_uploaded_video(video_file)
@@ -42,9 +42,9 @@ class ExerciseSerializer(serializers.ModelSerializer):
         video_file = validated_data.pop('video', None)
         
         if video_file:
-            # Replace video asset
-            from core.services.storage import VideoStorageService
-            storage_service = VideoStorageService()
+            # Replace video asset using dependency injection
+            from core.container import container
+            storage_service = container.get_video_storage_service()
             
             # Delete old video asset
             if instance.video_asset:

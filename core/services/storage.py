@@ -1,12 +1,13 @@
 """
-Simplified storage service for Practika v1
-Single interface for local and S3 storage backends
+Legacy storage service - maintained for backward compatibility
+New code should use the refactored services in core.services.video_storage_service
 """
 
 import os
 import logging
 from django.conf import settings
 from django.core.files.storage import default_storage
+from core.container import container
 
 logger = logging.getLogger(__name__)
 
@@ -84,139 +85,36 @@ class S3StorageBackend:
             return False
 
 class VideoStorageService:
-    """Main storage service interface"""
+    """Legacy storage service - delegates to new refactored service"""
     
     def __init__(self):
-        self.backend = self._get_backend()
+        # Delegate to the new refactored service
+        self._service = container.get_video_storage_service()
     
     def _get_backend(self):
-        """Get appropriate storage backend based on settings"""
-        try:
-            if getattr(settings, 'USE_S3', False):
-                return S3StorageBackend()
-            else:
-                return LocalStorageBackend()
-        except Exception as e:
-            logger.error(f"Failed to initialize storage backend: {e}")
-            # Fallback to local storage
-            return LocalStorageBackend()
+        """Legacy method - delegates to new service"""
+        return self._service.storage_backend
     
     def get_video_url(self, video_asset):
-        """Get public URL for video"""
-        try:
-            if getattr(settings, 'USE_S3', False):
-                # For S3, use the default storage URL
-                return default_storage.url(video_asset.storage_path)
-            else:
-                # For local storage, construct the URL
-                media_url = getattr(settings, 'MEDIA_URL', '/media/')
-                return f"{media_url}{video_asset.storage_path}"
-        except Exception as e:
-            logger.error(f"Failed to get video URL: {e}")
-            return video_asset.storage_path
+        """Get public URL for video - delegates to new service"""
+        return self._service.get_video_url(video_asset)
     
     def upload_video(self, file_obj, filename):
-        """Upload video file"""
-        return self.backend.upload(file_obj, filename)
-    
-
+        """Upload video file - delegates to new service"""
+        return self._service.upload_video(file_obj, filename)
     
     def delete_video(self, storage_path):
-        """Delete video file"""
-        return self.backend.delete(storage_path)
+        """Delete video file - delegates to new service"""
+        return self._service.delete_video(storage_path)
     
     def store_uploaded_video(self, video_file):
-        """Store uploaded video and create VideoAsset record"""
-        try:
-            import os
-            try:
-                import magic  # type: ignore
-            except ImportError:
-                magic = None
-            from core.models import VideoAsset
-
-            logger.info(f"Storing uploaded video: {video_file.name}, size: {video_file.size} bytes")
-
-            # Generate unique filename
-            import uuid
-            file_extension = os.path.splitext(video_file.name)[1]
-            unique_filename = f"videos/{uuid.uuid4()}{file_extension}"
-
-            logger.info(f"Generated filename: {unique_filename}")
-
-            # Detect MIME type before uploading
-            if magic:
-                try:
-                    content = video_file.read(1024)
-                    video_file.seek(0)
-                    if content:
-                        mime_type = magic.from_buffer(content, mime=True)
-                        logger.info(f"Detected MIME type: {mime_type}")
-                    else:
-                        mime_type = self._get_mime_type_from_extension(file_extension)
-                        logger.warning(f"Empty file, using extension-based MIME type: {mime_type}")
-                except Exception as e:
-                    mime_type = self._get_mime_type_from_extension(file_extension)
-                    logger.warning(f"MIME detection failed, using extension-based: {mime_type}, error: {e}")
-            else:
-                mime_type = getattr(video_file, 'content_type', None) or self._get_mime_type_from_extension(file_extension)
-
-            # Validate MIME type
-            allowed_types = getattr(settings, 'ALLOWED_VIDEO_MIME_TYPES', [])
-            if mime_type not in allowed_types:
-                raise ValueError(f"Unsupported MIME type: {mime_type}")
-
-            # Generate checksum for the file
-            import hashlib
-            checksum = hashlib.sha256(video_file.read()).hexdigest()
-            video_file.seek(0)
-
-            # Upload file to storage
-            storage_path = self.backend.upload(video_file, unique_filename)
-            logger.info(f"File uploaded to storage path: {storage_path}")
-
-            # Create VideoAsset record
-            video_asset = VideoAsset.objects.create(
-                orig_filename=video_file.name,
-                storage_path=storage_path,
-                mime_type=mime_type,
-                size_bytes=video_file.size,
-                checksum_sha256=checksum,
-                processing_status='completed'  # For now, assume completed
-            )
-            
-            logger.info(f"Video asset created: {video_asset.id} for file {video_file.name}")
-            return video_asset
-            
-        except Exception as e:
-            logger.error(f"Failed to store uploaded video: {e}")
-            raise
+        """Store uploaded video and create VideoAsset record - delegates to new service"""
+        return self._service.store_uploaded_video(video_file)
     
     def delete_video_asset(self, video_asset):
-        """Delete video asset and associated file"""
-        try:
-            # Delete the file
-            if self.backend.delete(video_asset.storage_path):
-                # Delete the database record
-                video_asset.delete()
-                logger.info(f"Video asset deleted: {video_asset.id}")
-                return True
-            return False
-        except Exception as e:
-            logger.error(f"Failed to delete video asset: {e}")
-            return False
+        """Delete video asset and associated file - delegates to new service"""
+        return self._service.delete_video_asset(video_asset)
     
     def _get_mime_type_from_extension(self, extension):
-        """Get MIME type from file extension"""
-        mime_types = {
-            '.mp4': 'video/mp4',
-            '.avi': 'video/avi',
-            '.mov': 'video/mov',
-            '.webm': 'video/webm',
-            '.ogg': 'video/ogg',
-            '.txt': 'text/plain',  # Allow text files for testing
-            '.mpg': 'video/mpeg',
-            '.mpeg': 'video/mpeg',
-            '.mkv': 'video/x-matroska',
-        }
-        return mime_types.get(extension.lower(), 'application/octet-stream')
+        """Legacy method - delegates to new service"""
+        return self._service.mime_detector._get_mime_type_from_extension(extension)
