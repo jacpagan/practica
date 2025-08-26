@@ -692,8 +692,10 @@
             <nav class="nav">
             <div class="container">
                 <a href="{% url 'exercises:exercise_list' %}">Exercises</a>
-                {% if user.is_staff %}
+                {% if user.is_authenticated %}
                 <a href="{% url 'exercises:exercise_create' %}" class="create-btn" title="Create Exercise">+</a>
+                {% endif %}
+                {% if user.is_staff %}
                 <a href="/admin/">Admin</a>
                 {% endif %}
                 {% if user.is_authenticated %}

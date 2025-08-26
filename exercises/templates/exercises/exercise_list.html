@@ -44,7 +44,7 @@
         </div>
     {% else %}
         <p>No exercises available yet.</p>
-        {% if user.is_staff %}
+        {% if user.is_authenticated %}
             <p><a href="{% url 'exercises:exercise_create' %}" class="btn btn-success">Create Your First Exercise</a></p>
         {% endif %}
     {% endif %}
