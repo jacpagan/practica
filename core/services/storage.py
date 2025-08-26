@@ -27,7 +27,9 @@ class LocalStorageBackend:
     def get_url(self, storage_path):
         """Get URL for local file"""
         try:
-            return default_storage.url(storage_path)
+            from django.conf import settings
+            media_url = getattr(settings, 'MEDIA_URL', '/media/')
+            return f"{media_url}{storage_path}"
         except Exception as e:
             logger.error(f"Failed to get local URL: {e}")
             return storage_path
