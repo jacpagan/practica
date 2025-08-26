@@ -16,19 +16,17 @@ class VideoCommentSerializer(serializers.ModelSerializer):
     
     def get_video_asset(self, obj):
         """Return nested video asset data"""
-        if obj.video_asset:
-            return {
-                'id': obj.video_asset.id,
-                'orig_filename': obj.video_asset.orig_filename,
-                'mime_type': obj.video_asset.mime_type,
-                'size_bytes': obj.video_asset.size_bytes,
-                'duration_sec': obj.video_asset.duration_sec,
-                'width': obj.video_asset.width,
-                'height': obj.video_asset.height,
-                'poster_path': obj.video_asset.poster_path,
-                'created_at': obj.video_asset.created_at,
-            }
-        return None
+        return {
+            'id': obj.video_asset.id,
+            'orig_filename': obj.video_asset.orig_filename,
+            'mime_type': obj.video_asset.mime_type,
+            'size_bytes': obj.video_asset.size_bytes,
+            'duration_sec': obj.video_asset.duration_sec,
+            'width': obj.video_asset.width,
+            'height': obj.video_asset.height,
+            'poster_path': obj.video_asset.poster_path,
+            'created_at': obj.video_asset.created_at,
+        }
     
     def create(self, validated_data):
         video_file = validated_data.pop('video', None)
@@ -40,12 +38,13 @@ class VideoCommentSerializer(serializers.ModelSerializer):
         except Exercise.DoesNotExist:
             raise serializers.ValidationError("Exercise not found")
         
-        # Create video asset if video file provided
-        video_asset = None
-        if video_file:
-            from core.container import container
-            storage_service = container.get_video_storage_service()
-            video_asset = storage_service.store_uploaded_video(video_file)
+        # Create video asset (required)
+        if not video_file:
+            raise serializers.ValidationError("Video file is required for comments")
+        
+        from core.container import container
+        storage_service = container.get_video_storage_service()
+        video_asset = storage_service.store_uploaded_video(video_file)
         
         # Create comment
         validated_data['exercise'] = exercise
