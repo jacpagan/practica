@@ -53,11 +53,42 @@
         {% if user.is_authenticated %}
             <div class="card">
                 <h4>Add Comment</h4>
-                <form method="post" action="{% url 'comments:add_comment' exercise.id %}">
+                <form method="post" action="{% url 'comments:add_comment' exercise.id %}" enctype="multipart/form-data">
                     <!-- CSRF token temporarily disabled for testing -->
                     <div class="form-group">
                         <label for="comment-text">Comment Text:</label>
                         <textarea id="comment-text" name="text" rows="3" placeholder="Write your comment here..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Video Comment (Optional):</label>
+                        <div class="video-input-options">
+                            <div class="option-tabs">
+                                <button type="button" class="tab-btn active" data-tab="upload">Upload Video File</button>
+                                <button type="button" class="tab-btn" data-tab="record">Record with Webcam</button>
+                            </div>
+                            
+                            <div class="tab-content active" id="upload-tab">
+                                <input type="file" name="video" accept="video/*">
+                                <p class="form-help">Upload a video file (MP4, AVI, MOV, WebM, or OGG)</p>
+                            </div>
+                            
+                            <div class="tab-content" id="record-tab">
+                                <div class="webcam-container">
+                                    <video id="webcam-preview" autoplay muted></video>
+                                    <canvas id="webcam-canvas" style="display: none;"></canvas>
+                                    <div class="webcam-controls">
+                                        <button type="button" id="start-camera" class="btn btn-primary">Start Camera</button>
+                                        <button type="button" id="record-video" class="btn btn-danger" style="display: none;">Record</button>
+                                        <button type="button" id="stop-recording" class="btn btn-warning" style="display: none;">Stop Recording</button>
+                                    </div>
+                                    <div id="recording-status" style="display: none;">
+                                        <p>Recording... <span id="recording-time">00:00</span></p>
+                                    </div>
+                                </div>
+                                <input type="hidden" id="recorded-video" name="recorded_video">
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="form-actions">
@@ -72,88 +103,128 @@
 </div>
 
 <script>
-    // Initialize main video recorder
-    document.addEventListener('DOMContentLoaded', function() {
-        if (document.getElementById('recorder-container-main')) {
-            // Define VideoRecorder class if not already defined
-            if (typeof VideoRecorder === 'undefined') {
-                class VideoRecorder {
-                    constructor(containerId) {
-                        this.container = document.getElementById(containerId);
-                        this.videoBlob = null;
-                        this.mediaRecorder = null;
-                        this.stream = null;
-                        this.recordedChunks = [];
-                    }
-                    
-                    startRecording() {
-                        // Basic implementation for comment recording
-                        alert('Video recording functionality not available on this page. Please use the create exercise page for full recording features.');
-                    }
-                    
-                    stopRecording() {
-                        // Basic implementation
-                    }
-                    
-                    reset() {
-                        // Basic implementation
-                    }
-                }
-            }
+// Webcam recording functionality for comments
+document.addEventListener('DOMContentLoaded', function() {
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    const startCameraBtn = document.getElementById('start-camera');
+    const recordBtn = document.getElementById('record-video');
+    const stopBtn = document.getElementById('stop-recording');
+    const webcamPreview = document.getElementById('webcam-preview');
+    const canvas = document.getElementById('webcam-canvas');
+    const recordingStatus = document.getElementById('recording-status');
+    const recordingTime = document.getElementById('recording-time');
+    const recordedVideoInput = document.getElementById('recorded-video');
+    
+    if (!startCameraBtn) return; // Exit if not on comment form
+    
+    let mediaRecorder;
+    let recordedChunks = [];
+    let recordingStartTime;
+    let recordingInterval;
+    
+    // Tab switching
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tabName = this.dataset.tab;
             
-            window.videoRecorders = window.videoRecorders || {};
-            window.videoRecorders['main'] = new VideoRecorder('recorder-container-main');
+            // Update active tab button
+            tabBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Update active tab content
+            tabBtns.forEach(content => {
+                content.classList.remove('active');
+                if (content.id === tabName + '-tab') {
+                    content.classList.add('active');
+                }
+            });
+        });
+    });
+    
+    // Start camera
+    startCameraBtn.addEventListener('click', async function() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: true, 
+                audio: true 
+            });
+            webcamPreview.srcObject = stream;
+            startCameraBtn.style.display = 'none';
+            recordBtn.style.display = 'inline-block';
+        } catch (err) {
+            alert('Error accessing camera: ' + err.message);
         }
     });
-
-    // Update comment progress dots
-    function updateCommentDot(dotNumber, state) {
-        const dot = document.getElementById(`comment-dot-${dotNumber}`);
-        if (dot) {
-            dot.className = `status-dot ${state}`;
-            dot.setAttribute('data-state', state);
-        }
-    }
-
-    // Submit comment function
-    function submitComment() {
-        const text = document.getElementById('comment-text').value;
-        const videoFile = document.getElementById('video-file').files[0];
+    
+    // Start recording
+    recordBtn.addEventListener('click', function() {
+        recordedChunks = [];
+        const stream = webcamPreview.srcObject;
         
-        if (!videoFile) {
-            alert('Please select a video file.');
-            return;
-        }
+        mediaRecorder = new MediaRecorder(stream);
         
-        // Show progress
-        document.getElementById('comment-progress-main').style.display = 'block';
-        
-        // Create form data
-        const formData = new FormData();
-        formData.append('text', text);
-        formData.append('video', videoFile);
-        formData.append('exercise', '{{ exercise.id }}');
-        
-        // Submit comment
-        fetch('/comments/api/comments/', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        mediaRecorder.ondataavailable = function(event) {
+            if (event.data.size > 0) {
+                recordedChunks.push(event.data);
             }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Error submitting comment: ' + data.error);
+        };
+        
+        mediaRecorder.onstop = function() {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            
+            // Create a file input for the recorded video
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.name = 'video';
+            fileInput.style.display = 'none';
+            fileInput.files = new DataTransfer().files;
+            
+            // Replace the file input
+            const originalFileInput = document.querySelector('input[name="video"]');
+            if (originalFileInput) {
+                originalFileInput.parentNode.replaceChild(fileInput, originalFileInput);
             }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error submitting comment. Please try again.');
-        });
+            
+            // Set the recorded video data
+            recordedVideoInput.value = url;
+            
+            // Show success message
+            alert('Video recorded successfully! You can now submit your comment.');
+        };
+        
+        mediaRecorder.start();
+        recordBtn.style.display = 'none';
+        stopBtn.style.display = 'inline-block';
+        recordingStatus.style.display = 'block';
+        
+        // Start recording timer
+        recordingStartTime = Date.now();
+        recordingInterval = setInterval(updateRecordingTime, 1000);
+    });
+    
+    // Stop recording
+    stopBtn.addEventListener('click', function() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+        }
+        
+        stopBtn.style.display = 'none';
+        recordBtn.style.display = 'inline-block';
+        recordingStatus.style.display = 'none';
+        
+        // Stop timer
+        clearInterval(recordingInterval);
+    });
+    
+    // Update recording time
+    function updateRecordingTime() {
+        const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        recordingTime.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     }
+});
 </script>
 {% endblock %}

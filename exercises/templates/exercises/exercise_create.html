@@ -20,9 +20,34 @@
         </div>
         
         <div class="form-group">
-            <label for="video">Video File:</label>
-            <input type="file" id="video" name="video" accept="video/*" required>
-            <p class="form-help">Upload a video file (MP4, AVI, MOV, WebM, or OGG)</p>
+            <label for="video">Video:</label>
+            <div class="video-input-options">
+                <div class="option-tabs">
+                    <button type="button" class="tab-btn active" data-tab="upload">Upload Video File</button>
+                    <button type="button" class="tab-btn" data-tab="record">Record with Webcam</button>
+                </div>
+                
+                <div class="tab-content active" id="upload-tab">
+                    <input type="file" id="video" name="video" accept="video/*">
+                    <p class="form-help">Upload a video file (MP4, AVI, MOV, WebM, or OGG)</p>
+                </div>
+                
+                <div class="tab-content" id="record-tab">
+                    <div class="webcam-container">
+                        <video id="webcam-preview" autoplay muted></video>
+                        <canvas id="webcam-canvas" style="display: none;"></canvas>
+                        <div class="webcam-controls">
+                            <button type="button" id="start-camera" class="btn btn-primary">Start Camera</button>
+                            <button type="button" id="record-video" class="btn btn-danger" style="display: none;">Record</button>
+                            <button type="button" id="stop-recording" class="btn btn-warning" style="display: none;">Stop Recording</button>
+                        </div>
+                        <div id="recording-status" style="display: none;">
+                            <p>Recording... <span id="recording-time">00:00</span></p>
+                        </div>
+                    </div>
+                    <input type="hidden" id="recorded-video" name="recorded_video">
+                </div>
+            </div>
         </div>
         
         <div class="form-actions">
@@ -31,4 +56,126 @@
         </div>
     </form>
 </div>
+
+<script>
+// Webcam recording functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    const startCameraBtn = document.getElementById('start-camera');
+    const recordBtn = document.getElementById('record-video');
+    const stopBtn = document.getElementById('stop-recording');
+    const webcamPreview = document.getElementById('webcam-preview');
+    const canvas = document.getElementById('webcam-canvas');
+    const recordingStatus = document.getElementById('recording-status');
+    const recordingTime = document.getElementById('recording-time');
+    const recordedVideoInput = document.getElementById('recorded-video');
+    
+    let mediaRecorder;
+    let recordedChunks = [];
+    let recordingStartTime;
+    let recordingInterval;
+    
+    // Tab switching
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tabName = this.dataset.tab;
+            
+            // Update active tab button
+            tabBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Update active tab content
+            tabContents.forEach(content => {
+                content.classList.remove('active');
+                if (content.id === tabName + '-tab') {
+                    content.classList.add('active');
+                }
+            });
+        });
+    });
+    
+    // Start camera
+    startCameraBtn.addEventListener('click', async function() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: true, 
+                audio: true 
+            });
+            webcamPreview.srcObject = stream;
+            startCameraBtn.style.display = 'none';
+            recordBtn.style.display = 'inline-block';
+        } catch (err) {
+            alert('Error accessing camera: ' + err.message);
+        }
+    });
+    
+    // Start recording
+    recordBtn.addEventListener('click', function() {
+        recordedChunks = [];
+        const stream = webcamPreview.srcObject;
+        
+        mediaRecorder = new MediaRecorder(stream);
+        
+        mediaRecorder.ondataavailable = function(event) {
+            if (event.data.size > 0) {
+                recordedChunks.push(event.data);
+            }
+        };
+        
+        mediaRecorder.onstop = function() {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            
+            // Create a file input for the recorded video
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.name = 'video';
+            fileInput.style.display = 'none';
+            fileInput.files = new DataTransfer().files;
+            
+            // Replace the file input
+            const originalFileInput = document.getElementById('video');
+            originalFileInput.parentNode.replaceChild(fileInput, originalFileInput);
+            
+            // Set the recorded video data
+            recordedVideoInput.value = url;
+            
+            // Show success message
+            alert('Video recorded successfully! You can now create the exercise.');
+        };
+        
+        mediaRecorder.start();
+        recordBtn.style.display = 'none';
+        stopBtn.style.display = 'inline-block';
+        recordingStatus.style.display = 'block';
+        
+        // Start recording timer
+        recordingStartTime = Date.now();
+        recordingInterval = setInterval(updateRecordingTime, 1000);
+    });
+    
+    // Stop recording
+    stopBtn.addEventListener('click', function() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+        }
+        
+        stopBtn.style.display = 'none';
+        recordBtn.style.display = 'inline-block';
+        recordingStatus.style.display = 'none';
+        
+        // Stop timer
+        clearInterval(recordingInterval);
+    });
+    
+    // Update recording time
+    function updateRecordingTime() {
+        const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        recordingTime.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+});
+</script>
 {% endblock %}
