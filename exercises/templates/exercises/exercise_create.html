@@ -51,7 +51,7 @@
         </div>
         
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Create Exercise</button>
+            <button type="submit" class="btn btn-primary" onclick="return validateForm()">Create Exercise</button>
             <a href="{% url 'exercises:exercise_list' %}" class="btn btn-secondary">Cancel</a>
         </div>
     </form>
@@ -99,14 +99,18 @@ document.addEventListener('DOMContentLoaded', function() {
     startCameraBtn.addEventListener('click', async function() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: true, 
+                video: { width: 640, height: 480 },
                 audio: true 
             });
             webcamPreview.srcObject = stream;
             startCameraBtn.style.display = 'none';
             recordBtn.style.display = 'inline-block';
+            
+            // Show success message
+            console.log('Camera started successfully');
         } catch (err) {
-            alert('Error accessing camera: ' + err.message);
+            console.error('Camera access error:', err);
+            alert('Error accessing camera: ' + err.message + '\n\nPlease ensure your camera is connected and you have granted permission.');
         }
     });
     
@@ -125,24 +129,28 @@ document.addEventListener('DOMContentLoaded', function() {
         
         mediaRecorder.onstop = function() {
             const blob = new Blob(recordedChunks, { type: 'video/webm' });
-            const url = URL.createObjectURL(blob);
             
-            // Create a file input for the recorded video
-            const fileInput = document.createElement('input');
-            fileInput.type = 'file';
-            fileInput.name = 'video';
-            fileInput.style.display = 'none';
-            fileInput.files = new DataTransfer().files;
+            // Create a File object from the blob
+            const file = new File([blob], 'webcam-recording.webm', { type: 'video/webm' });
             
-            // Replace the file input
+            // Create a new file input and set the file
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            
+            // Replace the original file input
             const originalFileInput = document.getElementById('video');
-            originalFileInput.parentNode.replaceChild(fileInput, originalFileInput);
+            const newFileInput = document.createElement('input');
+            newFileInput.type = 'file';
+            newFileInput.name = 'video';
+            newFileInput.accept = 'video/*';
+            newFileInput.files = dataTransfer.files;
+            newFileInput.style.display = 'none';
             
-            // Set the recorded video data
-            recordedVideoInput.value = url;
+            originalFileInput.parentNode.replaceChild(newFileInput, originalFileInput);
             
             // Show success message
-            alert('Video recorded successfully! You can now create the exercise.');
+            console.log('Video recorded successfully, file size:', file.size, 'bytes');
+            alert('Video recorded successfully! (' + Math.round(file.size / 1024) + ' KB)\n\nYou can now create the exercise.');
         };
         
         mediaRecorder.start();
@@ -175,6 +183,31 @@ document.addEventListener('DOMContentLoaded', function() {
         const minutes = Math.floor(elapsed / 60);
         const seconds = elapsed % 60;
         recordingTime.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+    
+    // Form validation
+    function validateForm() {
+        const name = document.getElementById('name').value.trim();
+        const videoInput = document.querySelector('input[name="video"]');
+        
+        if (!name) {
+            alert('Please enter an exercise name.');
+            return false;
+        }
+        
+        if (!videoInput || !videoInput.files || videoInput.files.length === 0) {
+            alert('Please upload a video file or record a video with your webcam.');
+            return false;
+        }
+        
+        const file = videoInput.files[0];
+        if (file.size === 0) {
+            alert('The video file appears to be empty. Please try recording again.');
+            return false;
+        }
+        
+        console.log('Form validation passed, submitting exercise with video:', file.name, file.size, 'bytes');
+        return true;
     }
 });
 </script>
