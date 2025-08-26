@@ -2,6 +2,8 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from comments.views import VideoCommentViewSet, add_comment, edit_comment, delete_comment
 
+app_name = 'comments'
+
 router = DefaultRouter()
 router.register(r'video-comments', VideoCommentViewSet)
 

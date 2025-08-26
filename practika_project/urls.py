@@ -25,7 +25,7 @@ urlpatterns = [
     path('app/', home_redirect, name='app_home'),
     path('core/', include('core.urls')),
     path('exercises/', include('exercises.urls', namespace='exercises')),
-    path('comments/', include('comments.urls')),
+    path('comments/', include('comments.urls', namespace='comments')),
 ]
 
 # Serve media files in development
