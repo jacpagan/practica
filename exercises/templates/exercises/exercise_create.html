@@ -45,7 +45,7 @@
         </div>
         
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary" onclick="return validateForm()">Create Exercise</button>
+            <button type="submit" class="btn btn-primary" id="submit-btn">Create Exercise</button>
             <a href="{% url 'exercises:exercise_list' %}" class="btn btn-secondary">Cancel</a>
         </div>
     </form>
@@ -272,6 +272,23 @@ document.addEventListener('DOMContentLoaded', function() {
         const seconds = elapsed % 60;
         recordingTime.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     }
+    
+    // Form submission handler
+    const form = document.querySelector('form');
+    const submitBtn = document.getElementById('submit-btn');
+    
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        if (validateForm()) {
+            // Show loading state
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating Exercise...';
+            
+            // Submit the form
+            form.submit();
+        }
+    });
     
     // Form validation
     function validateForm() {

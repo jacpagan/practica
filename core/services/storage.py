@@ -133,6 +133,8 @@ class VideoStorageService:
             from core.models import VideoAsset
             
             logger.info(f"Storing uploaded video: {video_file.name}, size: {video_file.size} bytes")
+            logger.info(f"Storage backend: {type(self.backend).__name__}")
+            logger.info(f"USE_S3 setting: {getattr(settings, 'USE_S3', False)}")
             
             # Generate unique filename
             import uuid
