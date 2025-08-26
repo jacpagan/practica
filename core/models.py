@@ -5,7 +5,7 @@ from django.utils import timezone
 
 class VideoAsset(models.Model):
     """
-    Simplified VideoAsset model for v1 - core video storage and management
+    VideoAsset model for video storage and management
     """
     
     # Core fields
@@ -14,11 +14,13 @@ class VideoAsset(models.Model):
     storage_path = models.CharField(max_length=500, help_text="Full path to stored video file")
     mime_type = models.CharField(max_length=100, help_text="MIME type of the video")
     size_bytes = models.PositiveIntegerField(help_text="File size in bytes")
+    checksum_sha256 = models.CharField(max_length=64, help_text="SHA256 checksum for integrity verification")
+    poster_path = models.CharField(max_length=500, blank=True, null=True, help_text="Path to video poster image")
     
     # Video metadata
-    duration_sec = models.PositiveIntegerField(null=True, blank=True, help_text="Video duration in seconds")
-    width = models.PositiveIntegerField(null=True, blank=True, help_text="Video width in pixels")
-    height = models.PositiveIntegerField(null=True, blank=True, help_text="Video height in pixels")
+    duration_sec = models.PositiveIntegerField(blank=True, null=True, help_text="Video duration in seconds")
+    width = models.PositiveIntegerField(blank=True, null=True, help_text="Video width in pixels")
+    height = models.PositiveIntegerField(blank=True, null=True, help_text="Video height in pixels")
     
     # Processing status
     processing_status = models.CharField(
@@ -33,6 +35,14 @@ class VideoAsset(models.Model):
         help_text="Current processing status of the video"
     )
     processing_error = models.TextField(blank=True, null=True, help_text="Error message if processing failed")
+    processed_at = models.DateTimeField(blank=True, null=True, help_text="When processing was completed")
+    
+    # Validation and access tracking
+    is_valid = models.BooleanField(default=True, help_text="Whether the asset passed integrity checks")
+    last_validated = models.DateTimeField(blank=True, null=True, help_text="When the asset was last validated")
+    validation_errors = models.JSONField(blank=True, default=list, help_text="List of validation errors found")
+    access_count = models.PositiveIntegerField(default=0, help_text="Number of times this asset was accessed")
+    last_accessed = models.DateTimeField(blank=True, null=True, help_text="Last time this asset was accessed")
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True, help_text="When the asset was created")
