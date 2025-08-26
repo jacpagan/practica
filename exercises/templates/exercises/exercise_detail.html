@@ -35,9 +35,9 @@
                 
                 {% if user == comment.author or user.is_staff %}
                 <div class="comment-actions">
-                    <a href="{% url 'comments:edit_comment' comment.id %}" class="btn btn-sm btn-warning">Edit</a>
+                    <a href="{% url 'comments:edit_comment' comment.id %}" class="btn btn-sm btn-warning" title="✏️ Edit Comment">✏️</a>
                     <a href="{% url 'comments:delete_comment' comment.id %}" class="btn btn-sm btn-danger" 
-                       onclick="return confirm('Are you sure you want to delete this comment?')">Delete</a>
+                       onclick="return confirm('Are you sure you want to delete this comment?')" title="🗑️ Delete Comment">🗑️</a>
                 </div>
                 {% endif %}
             </div>
@@ -65,16 +65,16 @@
                 <form method="post" action="{% url 'comments:add_comment' exercise.id %}" enctype="multipart/form-data">
                     {% csrf_token %}
                     <div class="form-group">
-                        <label for="comment-text">Comment Text:</label>
+                        <label for="comment-text">💬 Comment Text:</label>
                         <textarea id="comment-text" name="text" rows="3" placeholder="Write your comment here..."></textarea>
                     </div>
                     
                                     <div class="form-group">
-                    <label>Video Comment (Optional):</label>
+                    <label>🎥 Video Comment (Optional):</label>
                     <input type="file" name="video" accept="video/*" style="display: none;">
                     <div class="video-options">
-                        <button type="button" id="upload-btn" class="btn btn-sm btn-secondary">📁 Upload Video</button>
-                        <button type="button" id="record-btn" class="btn btn-sm btn-primary">🎥 Record Video</button>
+                        <button type="button" id="upload-btn" class="btn btn-sm btn-secondary" title="📁 Upload Video">📁 Upload</button>
+                        <button type="button" id="record-btn" class="btn btn-sm btn-primary" title="🎥 Record Video">🎥 Record</button>
                     </div>
                     <div id="video-preview" style="display: none;">
                         <p>✅ Video ready: <span id="video-name"></span></p>
@@ -84,10 +84,10 @@
                     <div id="webcam-container" style="display: none;">
                         <video id="webcam-preview" autoplay muted playsinline></video>
                         <div class="webcam-controls">
-                            <button type="button" id="start-camera" class="btn btn-sm btn-primary">📷 Start Camera</button>
-                            <button type="button" id="flip-camera" class="btn btn-sm btn-secondary" style="display: none;">🔄 Flip Camera</button>
-                            <button type="button" id="record-video" class="btn btn-sm btn-danger" style="display: none;">🔴 Record</button>
-                            <button type="button" id="stop-recording" class="btn btn-sm btn-warning" style="display: none;">⏹️ Stop</button>
+                            <button type="button" id="start-camera" class="btn btn-sm btn-primary" title="📷 Start Camera">📷</button>
+                            <button type="button" id="flip-camera" class="btn btn-sm btn-secondary" style="display: none;" title="🔄 Flip Camera">🔄</button>
+                            <button type="button" id="record-video" class="btn btn-sm btn-danger" style="display: none;" title="🔴 Record">🔴</button>
+                            <button type="button" id="stop-recording" class="btn btn-sm btn-warning" style="display: none;" title="⏹️ Stop">⏹️</button>
                         </div>
                         <div id="recording-status" style="display: none;">
                             <p>🔴 Recording... <span id="recording-time">00:00</span></p>
@@ -96,12 +96,12 @@
                 </div>
                     
                                     <div class="form-actions">
-                    <button type="submit" class="btn btn-success" onclick="return validateCommentForm()">Add Comment</button>
+                    <button type="submit" class="btn btn-success" onclick="return validateCommentForm()" title="💬 Add Comment">💬 Add Comment</button>
                 </div>
                 </form>
             </div>
         {% else %}
-            <p><a href="{% url 'exercises:login' %}">Login to add comments</a></p>
+            <p><a href="{% url 'exercises:login' %}" title="🔑 Login to add comments">🔑 Login to add comments</a></p>
         {% endif %}
     </div>
 </div>

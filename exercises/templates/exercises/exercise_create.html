@@ -10,21 +10,21 @@
         {% csrf_token %}
         
         <div class="form-group">
-            <label for="name">Exercise Name:</label>
-            <input type="text" id="name" name="name" required>
+            <label for="name">📝 Exercise Name:</label>
+            <input type="text" id="name" name="name" required placeholder="Enter exercise name...">
         </div>
         
         <div class="form-group">
-            <label for="description">Description:</label>
-            <textarea id="description" name="description" rows="3"></textarea>
+            <label for="description">📄 Description:</label>
+            <textarea id="description" name="description" rows="3" placeholder="Describe your exercise..."></textarea>
         </div>
         
         <div class="form-group">
-            <label for="video">Video:</label>
+            <label for="video">🎥 Video:</label>
             <input type="file" id="video" name="video" accept="video/*" style="display: none;">
             <div class="video-options">
-                <button type="button" id="upload-btn" class="btn btn-secondary">📁 Upload Video</button>
-                <button type="button" id="record-btn" class="btn btn-primary">🎥 Record Video</button>
+                <button type="button" id="upload-btn" class="btn btn-secondary" title="📁 Upload Video">📁 Upload</button>
+                <button type="button" id="record-btn" class="btn btn-primary" title="🎥 Record Video">🎥 Record</button>
             </div>
             <div id="video-preview" style="display: none;">
                 <p>✅ Video ready: <span id="video-name"></span></p>
@@ -34,10 +34,10 @@
             <div id="webcam-container" style="display: none;">
                 <video id="webcam-preview" autoplay muted playsinline style="width: 100%; max-width: 400px; border-radius: 8px;"></video>
                 <div class="webcam-controls" style="margin-top: 10px;">
-                    <button type="button" id="flip-camera" class="btn btn-sm btn-secondary" style="display: none;">🔄 Flip</button>
-                    <button type="button" id="record-video" class="btn btn-danger" style="display: none;">🔴 Start Recording</button>
-                    <button type="button" id="stop-recording" class="btn btn-warning" style="display: none;">⏹️ Stop Recording</button>
-                    <button type="button" id="cancel-recording" class="btn btn-sm btn-outline">Cancel</button>
+                    <button type="button" id="flip-camera" class="btn btn-sm btn-secondary" style="display: none;" title="🔄 Flip Camera">🔄</button>
+                    <button type="button" id="record-video" class="btn btn-danger" style="display: none;" title="🔴 Start Recording">🔴</button>
+                    <button type="button" id="stop-recording" class="btn btn-warning" style="display: none;" title="⏹️ Stop Recording">⏹️</button>
+                    <button type="button" id="cancel-recording" class="btn btn-sm btn-outline" title="❌ Cancel">❌</button>
                 </div>
                 <div id="recording-status" style="display: none;">
                     <p>🔴 Recording... <span id="recording-time">00:00</span></p>
@@ -46,7 +46,7 @@
         </div>
         
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary" id="submit-btn">Create Exercise</button>
+            <button type="submit" class="btn btn-primary" id="submit-btn" title="✅ Create Exercise">✅ Create Exercise</button>
         </div>
     </form>
 </div>
