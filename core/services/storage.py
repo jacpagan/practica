@@ -135,12 +135,19 @@ class VideoStorageService:
                 # Fallback to extension-based detection
                 mime_type = self._get_mime_type_from_extension(file_extension)
             
+            # Generate checksum for the file
+            import hashlib
+            video_file.seek(0)  # Reset file pointer
+            checksum = hashlib.sha256(video_file.read()).hexdigest()
+            video_file.seek(0)  # Reset file pointer again
+            
             # Create VideoAsset record
             video_asset = VideoAsset.objects.create(
                 orig_filename=video_file.name,
                 storage_path=storage_path,
                 mime_type=mime_type,
                 size_bytes=video_file.size,
+                checksum_sha256=checksum,
                 processing_status='completed'  # For now, assume completed
             )
             
