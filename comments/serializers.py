@@ -43,8 +43,8 @@ class VideoCommentSerializer(serializers.ModelSerializer):
         # Create video asset if video file provided
         video_asset = None
         if video_file:
-            from core.services.storage import VideoStorageService
-            storage_service = VideoStorageService()
+            from core.container import container
+            storage_service = container.get_video_storage_service()
             video_asset = storage_service.store_uploaded_video(video_file)
         
         # Create comment
@@ -57,9 +57,9 @@ class VideoCommentSerializer(serializers.ModelSerializer):
         video_file = validated_data.pop('video', None)
         
         if video_file:
-            # Replace video asset
-            from core.services.storage import VideoStorageService
-            storage_service = VideoStorageService()
+            # Replace video asset using dependency injection
+            from core.container import container
+            storage_service = container.get_video_storage_service()
             
             # Store the old video asset reference
             old_video_asset = instance.video_asset
