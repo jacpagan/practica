@@ -28,6 +28,12 @@ urlpatterns = [
     path('comments/', include('comments.urls', namespace='comments')),
 ]
 
-# Serve media files in development
+# Serve media files in development and production
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+else:
+    # In production, serve media files directly
+    from django.views.static import serve
+    urlpatterns += [
+        path('media/<path:path>', serve, {'document_root': settings.MEDIA_ROOT}),
+    ]
