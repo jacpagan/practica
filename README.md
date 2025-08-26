@@ -73,6 +73,22 @@ make test
 make down
 ```
 
+### Docker Production
+
+```bash
+# Copy environment template
+cp docker.env.template .env
+
+# Start production-like environment
+make prod-up
+
+# View production logs
+make logs-prod
+
+# Stop production services
+make prod-down
+```
+
 ### Access the Application
 
 - **Main Frontend:** http://localhost:8000/
