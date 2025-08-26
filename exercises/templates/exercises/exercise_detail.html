@@ -150,17 +150,30 @@ document.addEventListener('DOMContentLoaded', function() {
     // Start camera
     startCameraBtn.addEventListener('click', async function() {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { width: 240, height: 180 },
+            // Mobile-friendly camera constraints
+            const constraints = {
+                video: { 
+                    width: { ideal: 480, max: 720 },
+                    height: { ideal: 360, max: 480 },
+                    facingMode: 'user' // Front camera on mobile
+                },
                 audio: true 
-            });
+            };
+            
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
             webcamPreview.srcObject = stream;
             startCameraBtn.style.display = 'none';
             recordVideoBtn.style.display = 'inline-block';
             console.log('Camera started successfully for comment');
         } catch (err) {
             console.error('Camera access error:', err);
-            alert('Error accessing camera: ' + err.message + '\n\nPlease ensure your camera is connected and you have granted permission.');
+            let errorMsg = 'Error accessing camera: ' + err.message;
+            if (err.name === 'NotAllowedError') {
+                errorMsg += '\n\nPlease allow camera access in your browser settings.';
+            } else if (err.name === 'NotFoundError') {
+                errorMsg += '\n\nNo camera found. Please check your device.';
+            }
+            alert(errorMsg);
         }
     });
     
