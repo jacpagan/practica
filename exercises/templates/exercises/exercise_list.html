@@ -16,9 +16,9 @@
                 </div>
     </div>
     
-    {% if exercise_list %}
+    {% if exercises %}
         <div class="exercise-grid">
-            {% for exercise in exercise_list %}
+            {% for exercise in exercises %}
             <div class="card">
                 <h3>{{ exercise.name }}</h3>
                 {% if exercise.description %}
