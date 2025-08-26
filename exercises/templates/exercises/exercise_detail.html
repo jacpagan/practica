@@ -78,6 +78,8 @@
                     </div>
                     <div id="video-preview" style="display: none;">
                         <p>✅ Video ready: <span id="video-name"></span></p>
+                        <video id="comment-video-playback" controls style="display: none; width: 100%; max-width: 300px; border-radius: 8px; margin-top: 10px;"></video>
+                        <button type="button" id="comment-change-video" class="btn btn-sm btn-outline">Record Again</button>
                     </div>
                     <div id="webcam-container" style="display: none;">
                         <video id="webcam-preview" autoplay muted playsinline></video>
@@ -109,7 +111,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     const uploadBtn = document.getElementById('upload-btn');
     const recordBtn = document.getElementById('record-btn');
-    const videoInput = document.querySelector('input[name="video"]');
+    let videoInput = document.querySelector('input[name="video"]');
     const videoPreview = document.getElementById('video-preview');
     const videoName = document.getElementById('video-name');
     const webcamContainer = document.getElementById('webcam-container');
@@ -119,6 +121,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const webcamPreview = document.getElementById('webcam-preview');
     const recordingStatus = document.getElementById('recording-status');
     const recordingTime = document.getElementById('recording-time');
+    const commentVideoPlayback = document.getElementById('comment-video-playback');
+    const commentChangeVideoBtn = document.getElementById('comment-change-video');
     
     if (!startCameraBtn) return; // Exit if not on comment form
     
@@ -133,7 +137,18 @@ document.addEventListener('DOMContentLoaded', function() {
     uploadBtn.addEventListener('click', function() {
         videoInput.click();
     });
-    
+
+    // Change recorded/uploaded video
+    commentChangeVideoBtn.addEventListener('click', function() {
+        videoPreview.style.display = 'none';
+        videoInput.value = '';
+        if (commentVideoPlayback) {
+            commentVideoPlayback.pause();
+            commentVideoPlayback.removeAttribute('src');
+            commentVideoPlayback.style.display = 'none';
+        }
+    });
+
     // File input change
     videoInput.addEventListener('change', function() {
         if (this.files && this.files[0]) {
@@ -141,6 +156,11 @@ document.addEventListener('DOMContentLoaded', function() {
             videoName.textContent = file.name;
             videoPreview.style.display = 'block';
             webcamContainer.style.display = 'none';
+            if (commentVideoPlayback) {
+                commentVideoPlayback.src = URL.createObjectURL(file);
+                commentVideoPlayback.style.display = 'block';
+                commentVideoPlayback.play().catch(() => {});
+            }
         }
     });
     
@@ -270,6 +290,11 @@ document.addEventListener('DOMContentLoaded', function() {
             // Show success
             videoName.textContent = 'Webcam Recording (' + Math.round(file.size / 1024) + ' KB)';
             videoPreview.style.display = 'block';
+            if (commentVideoPlayback) {
+                commentVideoPlayback.src = URL.createObjectURL(blob);
+                commentVideoPlayback.style.display = 'block';
+                commentVideoPlayback.play().catch(() => {});
+            }
             webcamContainer.style.display = 'none';
             
             console.log('Comment video recorded successfully, file size:', file.size, 'bytes');
