@@ -94,6 +94,8 @@ document.addEventListener('DOMContentLoaded', function() {
             videoName.textContent = file.name;
             videoPreview.style.display = 'block';
             webcamContainer.style.display = 'none';
+            // Clear any globally stored recorded file
+            window.recordedVideoFile = null;
         }
     });
     
@@ -219,35 +221,35 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             console.log('Setting file to input:', file.name, file.size, 'bytes');
             
+            // Store the file globally for form submission
+            window.recordedVideoFile = file;
+            
             // Try modern DataTransfer API first
             if (window.DataTransfer && window.DataTransfer.prototype.items) {
-                const dataTransfer = new DataTransfer();
-                dataTransfer.items.add(file);
-                videoInput.files = dataTransfer.files;
-                console.log('File set using DataTransfer API');
+                try {
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(file);
+                    videoInput.files = dataTransfer.files;
+                    console.log('File set using DataTransfer API');
+                } catch (e) {
+                    console.warn('DataTransfer API failed, trying fallback:', e);
+                    throw e; // This will trigger the fallback
+                }
             } else {
-                // Fallback: create a new input with the file
-                const newInput = document.createElement('input');
-                newInput.type = 'file';
-                newInput.name = 'video';
-                newInput.accept = 'video/*';
-                newInput.style.display = 'none';
-                newInput.files = [file];
-                videoInput.parentNode.replaceChild(newInput, videoInput);
-                videoInput = newInput;
-                console.log('File set using fallback method');
+                throw new Error('DataTransfer not supported');
             }
             
             // Verify the file was set
             if (videoInput.files && videoInput.files.length > 0) {
                 console.log('File successfully set to input:', videoInput.files[0].name, videoInput.files[0].size);
             } else {
-                console.error('Failed to set file to input');
-                alert('Error setting video file. Please try again.');
+                throw new Error('File not set in input');
             }
         } catch (e) {
-            console.error('Error setting file:', e);
-            alert('Error setting video file. Please try again.');
+            console.warn('Primary method failed, using global file storage:', e);
+            // Fallback: store file globally and modify form submission
+            window.recordedVideoFile = file;
+            console.log('File stored globally for form submission');
         }
     }
     
@@ -298,19 +300,37 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Name:', name);
         console.log('Video input files:', videoInput.files);
         console.log('Video input files length:', videoInput.files ? videoInput.files.length : 'null');
+        console.log('Global recorded file:', window.recordedVideoFile);
         
         if (!name) {
             alert('Please enter an exercise name.');
             return false;
         }
         
-        if (!videoInput.files || videoInput.files.length === 0) {
-            console.error('No video file found in input');
+        // Check for video file in input or global storage
+        let file = null;
+        if (videoInput.files && videoInput.files.length > 0) {
+            file = videoInput.files[0];
+            console.log('Using file from input:', file.name, file.size, 'bytes');
+        } else if (window.recordedVideoFile) {
+            file = window.recordedVideoFile;
+            console.log('Using globally stored file:', file.name, file.size, 'bytes');
+            // Set the file to the input for form submission
+            try {
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                videoInput.files = dataTransfer.files;
+            } catch (e) {
+                console.warn('Could not set file to input, but will proceed with global file');
+            }
+        }
+        
+        if (!file) {
+            console.error('No video file found in input or global storage');
             alert('Please upload a video file or record a video.');
             return false;
         }
         
-        const file = videoInput.files[0];
         console.log('Video file details:', file.name, file.size, 'bytes', file.type);
         
         if (file.size === 0) {
