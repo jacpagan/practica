@@ -32,18 +32,19 @@
                 <strong>{{ comment.author.username }}</strong>
                 {% if comment.author.is_staff %}<span class="admin-badge">Admin</span>{% endif %}
                 <span>{{ comment.created_at|date:"M d, Y H:i" }}</span>
+                
+                {% if user == comment.author or user.is_staff %}
+                <div class="comment-actions">
+                    <a href="{% url 'comments:edit_comment' comment.id %}" class="btn btn-sm btn-warning">Edit</a>
+                    <a href="{% url 'comments:delete_comment' comment.id %}" class="btn btn-sm btn-danger" 
+                       onclick="return confirm('Are you sure you want to delete this comment?')">Delete</a>
+                </div>
+                {% endif %}
             </div>
             
             {% if comment.text %}
                 <p>{{ comment.text }}</p>
             {% endif %}
-            
-            <div class="video-container">
-                <video class="video-player" controls>
-                    <source src="{{ comment.video_asset.get_public_url }}" type="{{ comment.video_asset.mime_type }}">
-                    Your browser does not support the video tag.
-                </video>
-            </div>
         </div>
         {% empty %}
             <p>No comments yet. Be the first to comment!</p>
@@ -52,38 +53,20 @@
         {% if user.is_authenticated %}
             <div class="card">
                 <h4>Add Comment</h4>
-                {% csrf_token %}
-                <div class="form-group">
-                    <label for="comment-text">Text (optional)</label>
-                    <textarea id="comment-text" rows="2" placeholder="Add text..."></textarea>
-                </div>
-                <div id="recorder-container-main" class="recorder-container">
-                    <p>Video recording functionality is available on the create exercise page.</p>
-                    <p>To add a video comment, please use the file upload option below.</p>
-                </div>
-                
-                <div class="form-group">
-                    <label for="video-file">Video File:</label>
-                    <input type="file" id="video-file" name="video" accept="video/*" required>
-                </div>
-                
-                <div id="comment-progress-main" style="display: none;">
-                    <div class="minimal-progress">
-                        <div class="status-dots">
-                            <div class="status-dot" id="comment-dot-1" data-state="processing"></div>
-                            <div class="status-dot" id="comment-dot-2" data-state="uploading"></div>
-                            <div class="status-dot" id="comment-dot-3" data-state="saving"></div>
-                        </div>
-                        <div class="minimal-status">
-                            <div class="status-text" id="comment-status-text">Processing...</div>
-                        </div>
+                <form method="post" action="{% url 'comments:add_comment' exercise.id %}">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label for="comment-text">Comment Text:</label>
+                        <textarea id="comment-text" name="text" rows="3" placeholder="Write your comment here..."></textarea>
                     </div>
-                </div>
-                
-                <button class="btn btn-success" onclick="submitComment()">
-                    Submit
-                </button>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-success">Add Comment</button>
+                    </div>
+                </form>
             </div>
+        {% else %}
+            <p><a href="{% url 'exercises:login' %}">Login to add comments</a></p>
         {% endif %}
     </div>
 </div>
