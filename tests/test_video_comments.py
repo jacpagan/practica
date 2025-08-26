@@ -48,8 +48,8 @@ class VideoCommentsTests(TestCase):
             video_asset=self.exercise_video
         )
     
-    def test_text_only_comment_creation(self):
-        """Test creating a text-only comment."""
+    def test_text_only_comment_rejection(self):
+        """Test that text-only comments are rejected (video is now required)."""
         self.client.login(username='testuser', password='testpass123')
         
         response = self.client.post(
@@ -59,11 +59,8 @@ class VideoCommentsTests(TestCase):
         
         self.assertEqual(response.status_code, 302)
         
-        # Check that comment was created
-        comment = VideoComment.objects.get(exercise=self.exercise)
-        self.assertEqual(comment.text, 'This is a text comment')
-        self.assertIsNone(comment.video_asset)
-        self.assertEqual(comment.author, self.user)
+        # Check that no comment was created
+        self.assertEqual(VideoComment.objects.filter(exercise=self.exercise).count(), 0)
     
     def test_video_only_comment_creation(self):
         """Test creating a video-only comment."""
@@ -103,7 +100,7 @@ class VideoCommentsTests(TestCase):
         self.assertEqual(comment.author, self.user)
     
     def test_empty_comment_rejection(self):
-        """Test that empty comments are rejected."""
+        """Test that empty comments are rejected (video is required)."""
         self.client.login(username='testuser', password='testpass123')
         
         response = self.client.post(
@@ -121,15 +118,25 @@ class VideoCommentsTests(TestCase):
         self.client.login(username='testuser', password='testpass123')
         
         # Create first comment
+        test_video1 = SimpleUploadedFile(
+            "test_video1.mp4",
+            b"\x00\x00\x00\x20ftypmp42\x00\x00\x00\x00mp41mp42isom",
+            content_type="video/mp4"
+        )
         self.client.post(
             reverse('comments:add_comment', args=[self.exercise.id]),
-            {'text': 'First comment'}
+            {'text': 'First comment', 'video': test_video1}
         )
         
         # Create second comment
+        test_video2 = SimpleUploadedFile(
+            "test_video2.mp4",
+            b"\x00\x00\x00\x20ftypmp42\x00\x00\x00\x00mp41mp42isom",
+            content_type="video/mp4"
+        )
         self.client.post(
             reverse('comments:add_comment', args=[self.exercise.id]),
-            {'text': 'Second comment'}
+            {'text': 'Second comment', 'video': test_video2}
         )
         
         # Check that both comments were created
@@ -140,11 +147,12 @@ class VideoCommentsTests(TestCase):
     
     def test_comment_display_in_exercise_detail(self):
         """Test that comments are displayed in exercise detail view."""
-        # Create a comment
+        # Create a comment with video
         VideoComment.objects.create(
             exercise=self.exercise,
             author=self.user,
-            text='Test comment text'
+            text='Test comment text',
+            video_asset=self.exercise_video
         )
         
         response = self.client.get(

@@ -10,7 +10,7 @@ class VideoComment(models.Model):
     exercise = models.ForeignKey(Exercise, on_delete=models.CASCADE)
     author = models.ForeignKey(User, on_delete=models.CASCADE)
     text = models.TextField(blank=True, null=True)
-    video_asset = models.ForeignKey(VideoAsset, on_delete=models.CASCADE, null=True, blank=True)
+    video_asset = models.ForeignKey(VideoAsset, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

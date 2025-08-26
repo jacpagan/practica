@@ -22,29 +22,23 @@ def add_comment(request, exercise_id):
         text = request.POST.get('text', '').strip()
         video_file = request.FILES.get('video')
         
-        if not text and not video_file:
-            messages.error(request, 'Please provide either text or a video comment.')
+        if not video_file:
+            messages.error(request, 'Video file is required for comments.')
             return redirect('exercises:exercise_detail', exercise_id=exercise_id)
         
         try:
-            # Handle video upload if provided
-            video_asset = None
-            if video_file:
-                from core.container import container
-                storage_service = container.get_video_storage_service()
-                video_asset = storage_service.store_uploaded_video(video_file)
+            # Handle video upload (required)
+            from core.container import container
+            storage_service = container.get_video_storage_service()
+            video_asset = storage_service.store_uploaded_video(video_file)
             
-            # Create comment - only create if we have either text or video
-            if text or video_asset:
-                comment = VideoComment.objects.create(
-                    exercise=exercise,
-                    author=request.user,
-                    text=text if text else None,
-                    video_asset=video_asset
-                )
-            else:
-                messages.error(request, 'Please provide either text or a video comment.')
-                return redirect('exercises:exercise_detail', exercise_id=exercise_id)
+            # Create comment with video (text is optional)
+            comment = VideoComment.objects.create(
+                exercise=exercise,
+                author=request.user,
+                text=text if text else None,
+                video_asset=video_asset
+            )
             
             messages.success(request, 'Comment added successfully!')
             return redirect('exercises:exercise_detail', exercise_id=exercise_id)
