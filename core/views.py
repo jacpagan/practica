@@ -5,7 +5,6 @@ Essential video upload and management functionality only
 
 import os
 import logging
-import magic
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -94,45 +93,17 @@ def upload_video(request):
                 'error': f'File too large ({video_file.size / 1024 / 1024:.1f}MB). Maximum is 100MB.'
             }, status=400)
         
-        # Detect MIME type
-        try:
-            mime_type = magic.from_buffer(video_file.read(1024), mime=True)
-            video_file.seek(0)
-        except Exception:
-            # Fallback to extension-based detection
-            mime_type = _get_mime_type_from_extension(video_file.name)
-        
-        # Validate MIME type
-        allowed_types = ['video/mp4', 'video/avi', 'video/mov', 'video/webm', 'video/ogg']
-        if mime_type not in allowed_types:
-            return JsonResponse({'error': f'Invalid file type: {mime_type}'}, status=400)
-        
-        # Generate filename
-        import uuid
-        file_extension = os.path.splitext(video_file.name)[1]
-        filename = f"videos/{uuid.uuid4()}{file_extension}"
-        
-        # Upload file
         storage_service = VideoStorageService()
-        storage_path = storage_service.upload_video(video_file, filename)
-        
-        # Create VideoAsset
-        video_asset = VideoAsset.objects.create(
-            orig_filename=video_file.name,
-            storage_path=storage_path,
-            mime_type=mime_type,
-            size_bytes=video_file.size,
-            processing_status='completed'  # Simple processing for v1
-        )
-        
+        video_asset = storage_service.store_uploaded_video(video_file)
+
         logger.info(f"Video uploaded successfully: {video_asset.id}")
-        
+
         return JsonResponse({
             'success': True,
             'video_id': str(video_asset.id),
             'filename': video_file.name,
             'size': video_file.size,
-            'mime_type': mime_type
+            'mime_type': video_asset.mime_type
         })
         
     except Exception as e:
