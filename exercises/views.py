@@ -40,6 +40,13 @@ def exercise_create(request):
             description = request.POST.get('description', '')
             video_file = request.FILES.get('video')
             
+            # Debug logging
+            logger.info(f"Form data - name: {name}, description: {description}")
+            logger.info(f"Files in request: {list(request.FILES.keys())}")
+            logger.info(f"Video file: {video_file}")
+            if video_file:
+                logger.info(f"Video file details - name: {video_file.name}, size: {video_file.size}")
+            
             if not name:
                 messages.error(request, 'Exercise name is required.')
                 return render(request, 'exercises/exercise_create.html')
@@ -64,9 +71,18 @@ def exercise_create(request):
                 messages.success(request, f'Exercise "{exercise.name}" created successfully!')
                 return redirect('exercises:exercise_detail', exercise_id=exercise.id)
             else:
-                messages.error(request, f'Error creating exercise: {serializer.errors}')
                 # Log the validation errors for debugging
                 logger.error(f"Exercise creation validation failed: {serializer.errors}")
+                
+                # Show more specific error messages
+                error_messages = []
+                for field, errors in serializer.errors.items():
+                    if isinstance(errors, list):
+                        error_messages.extend([f"{field}: {error}" for error in errors])
+                    else:
+                        error_messages.append(f"{field}: {errors}")
+                
+                messages.error(request, f'Error creating exercise: {"; ".join(error_messages)}')
                 
         except Exception as e:
             logger.error(f"Error creating exercise: {e}")

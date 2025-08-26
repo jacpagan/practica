@@ -63,7 +63,7 @@
             <div class="card">
                 <h4>Add Comment</h4>
                 <form method="post" action="{% url 'comments:add_comment' exercise.id %}" enctype="multipart/form-data">
-                    <!-- CSRF token temporarily disabled for testing -->
+                    {% csrf_token %}
                     <div class="form-group">
                         <label for="comment-text">Comment Text:</label>
                         <textarea id="comment-text" name="text" rows="3" placeholder="Write your comment here..."></textarea>

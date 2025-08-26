@@ -119,9 +119,7 @@ class VideoStorageService:
         """Upload video file"""
         return self.backend.upload(file_obj, filename)
     
-    def get_video_url(self, video_asset):
-        """Get public URL for video"""
-        return self.backend.get_url(video_asset.storage_path)
+
     
     def delete_video(self, storage_path):
         """Delete video file"""
@@ -134,13 +132,18 @@ class VideoStorageService:
             import os
             from core.models import VideoAsset
             
+            logger.info(f"Storing uploaded video: {video_file.name}, size: {video_file.size} bytes")
+            
             # Generate unique filename
             import uuid
             file_extension = os.path.splitext(video_file.name)[1]
             unique_filename = f"videos/{uuid.uuid4()}{file_extension}"
             
+            logger.info(f"Generated filename: {unique_filename}")
+            
             # Upload file to storage
             storage_path = self.backend.upload(video_file, unique_filename)
+            logger.info(f"File uploaded to storage path: {storage_path}")
             
             # Detect MIME type
             try:
@@ -150,13 +153,16 @@ class VideoStorageService:
                 
                 if content:
                     mime_type = magic.from_buffer(content, mime=True)
+                    logger.info(f"Detected MIME type: {mime_type}")
                 else:
                     # Empty file, use extension-based detection
                     mime_type = self._get_mime_type_from_extension(file_extension)
+                    logger.warning(f"Empty file, using extension-based MIME type: {mime_type}")
                     
-            except Exception:
+            except Exception as e:
                 # Fallback to extension-based detection
                 mime_type = self._get_mime_type_from_extension(file_extension)
+                logger.warning(f"MIME detection failed, using extension-based: {mime_type}, error: {e}")
             
             # Generate checksum for the file
             import hashlib

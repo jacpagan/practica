@@ -14,7 +14,7 @@ class VideoAssetSerializer(serializers.ModelSerializer):
 
 class ExerciseSerializer(serializers.ModelSerializer):
     video_asset = VideoAssetSerializer(read_only=True)
-    video = serializers.FileField(write_only=True, required=False)
+    video = serializers.FileField(write_only=True, required=True)
     
     class Meta:
         model = Exercise
