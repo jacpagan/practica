@@ -86,7 +86,7 @@ else:
 
 # Static files configuration
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'  # Handled in STORAGES
 
 # WhiteNoise configuration
 WHITENOISE_USE_FINDERS = True

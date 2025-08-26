@@ -7,7 +7,7 @@
     <h1>Create New Exercise</h1>
     
     <form method="post" enctype="multipart/form-data">
-        <!-- CSRF token temporarily disabled for testing -->
+        {% csrf_token %}
         
         <div class="form-group">
             <label for="name">Exercise Name:</label>
@@ -28,14 +28,15 @@
             </div>
             <div id="video-preview" style="display: none;">
                 <p>✅ Video ready: <span id="video-name"></span></p>
+                <button type="button" id="change-video" class="btn btn-sm btn-outline">Change Video</button>
             </div>
             <div id="webcam-container" style="display: none;">
-                <video id="webcam-preview" autoplay muted playsinline></video>
-                <div class="webcam-controls">
-                    <button type="button" id="start-camera" class="btn btn-primary">📷 Start Camera</button>
-                    <button type="button" id="flip-camera" class="btn btn-secondary" style="display: none;">🔄 Flip Camera</button>
-                    <button type="button" id="record-video" class="btn btn-danger" style="display: none;">🔴 Record</button>
-                    <button type="button" id="stop-recording" class="btn btn-warning" style="display: none;">⏹️ Stop</button>
+                <video id="webcam-preview" autoplay muted playsinline style="width: 100%; max-width: 400px; border-radius: 8px;"></video>
+                <div class="webcam-controls" style="margin-top: 10px;">
+                    <button type="button" id="flip-camera" class="btn btn-sm btn-secondary" style="display: none;">🔄 Flip</button>
+                    <button type="button" id="record-video" class="btn btn-danger" style="display: none;">🔴 Start Recording</button>
+                    <button type="button" id="stop-recording" class="btn btn-warning" style="display: none;">⏹️ Stop Recording</button>
+                    <button type="button" id="cancel-recording" class="btn btn-sm btn-outline">Cancel</button>
                 </div>
                 <div id="recording-status" style="display: none;">
                     <p>🔴 Recording... <span id="recording-time">00:00</span></p>
@@ -59,10 +60,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const videoPreview = document.getElementById('video-preview');
     const videoName = document.getElementById('video-name');
     const webcamContainer = document.getElementById('webcam-container');
-    const startCameraBtn = document.getElementById('start-camera');
     const flipCameraBtn = document.getElementById('flip-camera');
     const recordVideoBtn = document.getElementById('record-video');
     const stopBtn = document.getElementById('stop-recording');
+    const cancelBtn = document.getElementById('cancel-recording');
+    const changeVideoBtn = document.getElementById('change-video');
     const webcamPreview = document.getElementById('webcam-preview');
     const recordingStatus = document.getElementById('recording-status');
     const recordingTime = document.getElementById('recording-time');
@@ -79,6 +81,12 @@ document.addEventListener('DOMContentLoaded', function() {
         videoInput.click();
     });
     
+    // Change video button click
+    changeVideoBtn.addEventListener('click', function() {
+        videoPreview.style.display = 'none';
+        videoInput.value = '';
+    });
+    
     // File input change
     videoInput.addEventListener('change', function() {
         if (this.files && this.files[0]) {
@@ -89,28 +97,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Record button click - start camera and recording in one step
+    // Record button click - start camera immediately
     recordBtn.addEventListener('click', async function() {
         webcamContainer.style.display = 'block';
         videoPreview.style.display = 'none';
         
-        // Auto-start camera and recording for one-click experience
         try {
             await startCamera();
-            // Small delay to ensure camera is ready
-            setTimeout(() => {
-                if (currentStream) {
-                    recordVideoBtn.click();
-                }
-            }, 500);
         } catch (err) {
-            console.error('Auto-start failed:', err);
+            console.error('Camera start failed:', err);
+            webcamContainer.style.display = 'none';
         }
     });
     
-    // Start camera
-    startCameraBtn.addEventListener('click', async function() {
-        await startCamera();
+    // Cancel recording
+    cancelBtn.addEventListener('click', function() {
+        stopCamera();
+        webcamContainer.style.display = 'none';
     });
     
     // Flip camera
@@ -139,7 +142,6 @@ document.addEventListener('DOMContentLoaded', function() {
             
             currentStream = await navigator.mediaDevices.getUserMedia(constraints);
             webcamPreview.srcObject = currentStream;
-            startCameraBtn.style.display = 'none';
             flipCameraBtn.style.display = 'inline-block';
             recordVideoBtn.style.display = 'inline-block';
             console.log('Camera started successfully with facing mode:', currentFacingMode);
@@ -152,15 +154,35 @@ document.addEventListener('DOMContentLoaded', function() {
                 errorMsg += '\n\nNo camera found. Please check your device.';
             }
             alert(errorMsg);
+            throw err;
+        }
+    }
+    
+    // Stop camera function
+    function stopCamera() {
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+            currentStream = null;
+        }
+        webcamPreview.srcObject = null;
+        flipCameraBtn.style.display = 'none';
+        recordVideoBtn.style.display = 'none';
+        stopBtn.style.display = 'none';
+        recordingStatus.style.display = 'none';
+        if (recordingInterval) {
+            clearInterval(recordingInterval);
         }
     }
     
     // Start recording
     recordVideoBtn.addEventListener('click', function() {
-        recordedChunks = [];
-        const stream = webcamPreview.srcObject;
+        if (!currentStream) {
+            alert('Camera not available. Please try again.');
+            return;
+        }
         
-        mediaRecorder = new MediaRecorder(stream);
+        recordedChunks = [];
+        mediaRecorder = new MediaRecorder(currentStream);
         
         mediaRecorder.ondataavailable = function(event) {
             if (event.data.size > 0) {
@@ -172,47 +194,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const blob = new Blob(recordedChunks, { type: 'video/webm' });
             const file = new File([blob], 'webcam-recording.webm', { type: 'video/webm' });
             
-            // Mobile-compatible file handling
-            try {
-                // Try modern DataTransfer API first
-                if (window.DataTransfer && window.DataTransfer.prototype.items) {
-                    const dataTransfer = new DataTransfer();
-                    dataTransfer.items.add(file);
-                    videoInput.files = dataTransfer.files;
-                } else {
-                    // Fallback for older browsers/mobile
-                    const fileInput = document.createElement('input');
-                    fileInput.type = 'file';
-                    fileInput.name = 'video';
-                    fileInput.accept = 'video/*';
-                    fileInput.style.display = 'none';
-                    
-                    // Create a new file list
-                    const fileList = new DataTransfer();
-                    fileList.items.add(file);
-                    fileInput.files = fileList.files;
-                    
-                    // Replace the original input
-                    videoInput.parentNode.replaceChild(fileInput, videoInput);
-                    videoInput = fileInput;
-                }
-            } catch (e) {
-                console.error('Error setting file:', e);
-                // Last resort: create a new input with the file
-                const newInput = document.createElement('input');
-                newInput.type = 'file';
-                newInput.name = 'video';
-                newInput.accept = 'video/*';
-                newInput.style.display = 'none';
-                newInput.files = [file];
-                videoInput.parentNode.replaceChild(newInput, videoInput);
-                videoInput = newInput;
-            }
+            // Set the file to the input
+            setFileToInput(file);
             
-            // Show success
+            // Show success and stop camera
             videoName.textContent = 'Webcam Recording (' + Math.round(file.size / 1024) + ' KB)';
             videoPreview.style.display = 'block';
-            webcamContainer.style.display = 'none';
+            stopCamera();
             
             console.log('Video recorded successfully, file size:', file.size, 'bytes');
         };
@@ -226,6 +214,43 @@ document.addEventListener('DOMContentLoaded', function() {
         recordingInterval = setInterval(updateRecordingTime, 1000);
     });
     
+    // Helper function to set file to input
+    function setFileToInput(file) {
+        try {
+            console.log('Setting file to input:', file.name, file.size, 'bytes');
+            
+            // Try modern DataTransfer API first
+            if (window.DataTransfer && window.DataTransfer.prototype.items) {
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                videoInput.files = dataTransfer.files;
+                console.log('File set using DataTransfer API');
+            } else {
+                // Fallback: create a new input with the file
+                const newInput = document.createElement('input');
+                newInput.type = 'file';
+                newInput.name = 'video';
+                newInput.accept = 'video/*';
+                newInput.style.display = 'none';
+                newInput.files = [file];
+                videoInput.parentNode.replaceChild(newInput, videoInput);
+                videoInput = newInput;
+                console.log('File set using fallback method');
+            }
+            
+            // Verify the file was set
+            if (videoInput.files && videoInput.files.length > 0) {
+                console.log('File successfully set to input:', videoInput.files[0].name, videoInput.files[0].size);
+            } else {
+                console.error('Failed to set file to input');
+                alert('Error setting video file. Please try again.');
+            }
+        } catch (e) {
+            console.error('Error setting file:', e);
+            alert('Error setting video file. Please try again.');
+        }
+    }
+    
     // Stop recording
     stopBtn.addEventListener('click', function() {
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
@@ -235,7 +260,9 @@ document.addEventListener('DOMContentLoaded', function() {
         stopBtn.style.display = 'none';
         recordVideoBtn.style.display = 'inline-block';
         recordingStatus.style.display = 'none';
-        clearInterval(recordingInterval);
+        if (recordingInterval) {
+            clearInterval(recordingInterval);
+        }
     });
     
     // Update recording time
@@ -250,17 +277,25 @@ document.addEventListener('DOMContentLoaded', function() {
     function validateForm() {
         const name = document.getElementById('name').value.trim();
         
+        console.log('Validating form...');
+        console.log('Name:', name);
+        console.log('Video input files:', videoInput.files);
+        console.log('Video input files length:', videoInput.files ? videoInput.files.length : 'null');
+        
         if (!name) {
             alert('Please enter an exercise name.');
             return false;
         }
         
         if (!videoInput.files || videoInput.files.length === 0) {
+            console.error('No video file found in input');
             alert('Please upload a video file or record a video.');
             return false;
         }
         
         const file = videoInput.files[0];
+        console.log('Video file details:', file.name, file.size, 'bytes', file.type);
+        
         if (file.size === 0) {
             alert('The video file appears to be empty. Please try again.');
             return false;

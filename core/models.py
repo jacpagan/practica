@@ -93,6 +93,10 @@ class VideoAsset(models.Model):
             from core.services.storage import VideoStorageService
             storage_service = VideoStorageService()
             return storage_service.get_video_url(self)
-        except Exception:
+        except Exception as e:
+            # Log the error for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to get public URL for video asset {self.id}: {e}")
             # Fallback: return storage path
             return self.storage_path
