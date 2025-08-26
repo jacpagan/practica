@@ -27,12 +27,19 @@ def add_comment(request, exercise_id):
             return redirect('exercises:exercise_detail', exercise_id=exercise_id)
         
         try:
-            # Create comment with text
+            # Handle video upload if provided
+            video_asset = None
+            if video_file:
+                from core.services.storage import VideoStorageService
+                storage_service = VideoStorageService()
+                video_asset = storage_service.store_uploaded_video(video_file)
+            
+            # Create comment
             comment = VideoComment.objects.create(
                 exercise=exercise,
                 author=request.user,
                 text=text if text else None,
-                video_asset=exercise.video_asset  # Use exercise's video asset for now
+                video_asset=video_asset if video_asset else exercise.video_asset
             )
             
             messages.success(request, 'Comment added successfully!')
