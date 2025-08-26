@@ -53,6 +53,7 @@ SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SESSION_COOKIE_AGE = 3600  # 1 hour
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 
 # CSRF security
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access for testing
@@ -99,7 +100,7 @@ MIDDLEWARE = [
     "whitenoise.middleware.WhiteNoiseMiddleware",  # Add WhiteNoise for static files
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
-    # "django.middleware.csrf.CsrfViewMiddleware",  # Temporarily disabled for testing
+    "django.middleware.csrf.CsrfViewMiddleware",  # Re-enabled CSRF protection
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",

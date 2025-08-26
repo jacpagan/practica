@@ -57,11 +57,14 @@ class S3StorageBackend:
             raise
     
     def get_url(self, storage_path):
-        """Get S3 URL for file"""
+        """Get local storage URL for file"""
         try:
-            return default_storage.url(storage_path)
+            # For local storage, return a proper media URL
+            from django.conf import settings
+            media_url = getattr(settings, 'MEDIA_URL', '/media/')
+            return f"{media_url}{storage_path}"
         except Exception as e:
-            logger.error(f"Failed to get S3 URL: {e}")
+            logger.error(f"Failed to get local storage URL: {e}")
             return storage_path
     
     def delete(self, storage_path):
