@@ -42,11 +42,6 @@
         <button type="submit" class="btn btn-success" style="width: 100%;">Login</button>
     </form>
     
-    <div class="login-links">
-        <a href="/admin/">Admin Login</a>
-        <span style="margin: 0 10px;">|</span>
-        <a href="#" id="forgot-password">Forgot Password?</a>
-    </div>
 </div>
 
 <script>
@@ -62,12 +57,6 @@
             passwordInput.type = 'password';
             button.textContent = 'Show';
         }
-    });
-    
-    // Forgot password functionality
-    document.getElementById('forgot-password').addEventListener('click', function(e) {
-        e.preventDefault();
-        alert('Please contact an administrator to reset your password.');
     });
 </script>
 {% endblock %}
