@@ -780,7 +780,6 @@
             <div class="nav-container">
                 <div class="nav-links">
                     <a href="{% url 'exercises:exercise_list' %}" title="🏠 Home">🏠</a>
-                    <a href="{% url 'exercises:exercise_list' %}" title="📚 Exercises">📚</a>
                     {% if user.is_authenticated and user.is_staff %}
                     <a href="{% url 'exercises:exercise_create' %}" title="➕ Create Exercise">➕</a>
                     {% endif %}
