@@ -19,15 +19,15 @@
     <form method="post" id="login-form">
         <!-- CSRF token temporarily disabled for testing -->
         <div class="form-group">
-            <label for="username">Username</label>
+            <label for="username">👤 Username</label>
             <input type="text" id="username" name="username" required 
                    pattern="[a-zA-Z0-9_@.+-]+" 
                    title="Username can only contain letters, numbers, and @.+-_ characters"
-                   maxlength="150">
+                   maxlength="150" placeholder="Enter your username...">
         </div>
         
         <div class="form-group">
-            <label for="password">Password</label>
+            <label for="password">🔒 Password</label>
             <div class="password-container">
                 <input type="password" id="password" name="password" required 
                        minlength="8" 
@@ -39,7 +39,7 @@
             </div>
         </div>
         
-        <button type="submit" class="btn btn-success" style="width: 100%;">Login</button>
+        <button type="submit" class="btn btn-success" style="width: 100%;" title="🔑 Login">🔑 Login</button>
     </form>
     
 </div>
