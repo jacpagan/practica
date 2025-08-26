@@ -34,13 +34,17 @@ def add_comment(request, exercise_id):
                 storage_service = VideoStorageService()
                 video_asset = storage_service.store_uploaded_video(video_file)
             
-            # Create comment
-            comment = VideoComment.objects.create(
-                exercise=exercise,
-                author=request.user,
-                text=text if text else None,
-                video_asset=video_asset if video_asset else exercise.video_asset
-            )
+            # Create comment - only create if we have either text or video
+            if text or video_asset:
+                comment = VideoComment.objects.create(
+                    exercise=exercise,
+                    author=request.user,
+                    text=text if text else None,
+                    video_asset=video_asset
+                )
+            else:
+                messages.error(request, 'Please provide either text or a video comment.')
+                return redirect('exercises:exercise_detail', exercise_id=exercise_id)
             
             messages.success(request, 'Comment added successfully!')
             return redirect('exercises:exercise_detail', exercise_id=exercise_id)
