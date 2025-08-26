@@ -28,7 +28,8 @@
             </div>
             <div id="video-preview" style="display: none;">
                 <p>✅ Video ready: <span id="video-name"></span></p>
-                <button type="button" id="change-video" class="btn btn-sm btn-outline">Change Video</button>
+                <video id="video-playback" controls style="display: none; width: 100%; max-width: 400px; border-radius: 8px; margin-top: 10px;"></video>
+                <button type="button" id="change-video" class="btn btn-sm btn-outline">Record Again</button>
             </div>
             <div id="webcam-container" style="display: none;">
                 <video id="webcam-preview" autoplay muted playsinline style="width: 100%; max-width: 400px; border-radius: 8px;"></video>
@@ -68,6 +69,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const webcamPreview = document.getElementById('webcam-preview');
     const recordingStatus = document.getElementById('recording-status');
     const recordingTime = document.getElementById('recording-time');
+    const videoPlayback = document.getElementById('video-playback');
     
     let mediaRecorder;
     let recordedChunks = [];
@@ -85,6 +87,11 @@ document.addEventListener('DOMContentLoaded', function() {
     changeVideoBtn.addEventListener('click', function() {
         videoPreview.style.display = 'none';
         videoInput.value = '';
+        if (videoPlayback) {
+            videoPlayback.pause();
+            videoPlayback.removeAttribute('src');
+            videoPlayback.style.display = 'none';
+        }
     });
     
     // File input change
@@ -94,6 +101,11 @@ document.addEventListener('DOMContentLoaded', function() {
             videoName.textContent = file.name;
             videoPreview.style.display = 'block';
             webcamContainer.style.display = 'none';
+            if (videoPlayback) {
+                videoPlayback.src = URL.createObjectURL(file);
+                videoPlayback.style.display = 'block';
+                videoPlayback.play().catch(() => {});
+            }
             // Clear any globally stored recorded file
             window.recordedVideoFile = null;
         }
@@ -202,6 +214,11 @@ document.addEventListener('DOMContentLoaded', function() {
             // Show success and stop camera
             videoName.textContent = 'Webcam Recording (' + Math.round(file.size / 1024) + ' KB)';
             videoPreview.style.display = 'block';
+            if (videoPlayback) {
+                videoPlayback.src = URL.createObjectURL(blob);
+                videoPlayback.style.display = 'block';
+                videoPlayback.play().catch(() => {});
+            }
             stopCamera();
             
             console.log('Video recorded successfully, file size:', file.size, 'bytes');
