@@ -140,6 +140,8 @@ document.addEventListener('DOMContentLoaded', function() {
     commentChangeVideoBtn.addEventListener('click', function() {
         videoPreview.style.display = 'none';
         videoInput.value = '';
+        // Clear recorded video reference
+        window.recordedVideoFile = null;
         if (commentVideoPlayback) {
             commentVideoPlayback.pause();
             commentVideoPlayback.removeAttribute('src');
@@ -154,6 +156,8 @@ document.addEventListener('DOMContentLoaded', function() {
             videoName.textContent = file.name;
             videoPreview.style.display = 'block';
             webcamContainer.style.display = 'none';
+            // Clear recorded video reference when uploading new file
+            window.recordedVideoFile = null;
             if (commentVideoPlayback) {
                 commentVideoPlayback.src = URL.createObjectURL(file);
                 commentVideoPlayback.style.display = 'block';
@@ -248,54 +252,63 @@ document.addEventListener('DOMContentLoaded', function() {
             const blob = new Blob(recordedChunks, { type: 'video/webm' });
             const file = new File([blob], 'webcam-comment.webm', { type: 'video/webm' });
             
-            // Mobile-compatible file handling
+            console.log('Recording stopped, blob size:', blob.size, 'bytes');
+            
+            // Store the recorded file globally for form submission
+            window.recordedVideoFile = file;
+            
+            // Create a more reliable file attachment method
             try {
-                // Try modern DataTransfer API first
-                if (window.DataTransfer && window.DataTransfer.prototype.items) {
+                // Method 1: Try to create a new FileList using DataTransfer
+                if (window.DataTransfer) {
                     const dataTransfer = new DataTransfer();
                     dataTransfer.items.add(file);
                     videoInput.files = dataTransfer.files;
+                    console.log('File attached using DataTransfer API');
                 } else {
-                    // Fallback for older browsers/mobile
-                    const fileInput = document.createElement('input');
-                    fileInput.type = 'file';
-                    fileInput.name = 'video';
-                    fileInput.accept = 'video/*';
-                    fileInput.style.display = 'none';
-                    
-                    // Create a new file list
-                    const fileList = new DataTransfer();
-                    fileList.items.add(file);
-                    fileInput.files = fileList.files;
-                    
-                    // Replace the original input
-                    videoInput.parentNode.replaceChild(fileInput, videoInput);
-                    videoInput = fileInput;
+                    throw new Error('DataTransfer not available');
                 }
             } catch (e) {
-                console.error('Error setting file:', e);
-                // Last resort: create a new input with the file
+                console.warn('DataTransfer failed, using fallback method:', e);
+                // Fallback: Create a new input element with the file
                 const newInput = document.createElement('input');
                 newInput.type = 'file';
                 newInput.name = 'video';
                 newInput.accept = 'video/*';
                 newInput.style.display = 'none';
-                newInput.files = [file];
+                
+                // Try to set the file directly
+                try {
+                    newInput.files = [file];
+                } catch (e2) {
+                    console.warn('Direct file assignment failed:', e2);
+                    // Last resort: store file reference for manual handling
+                    newInput.recordedFile = file;
+                }
+                
+                // Replace the original input
                 videoInput.parentNode.replaceChild(newInput, videoInput);
                 videoInput = newInput;
+                console.log('File attached using fallback method');
             }
             
-            // Show success
+            // Show success and preview
             videoName.textContent = 'Webcam Recording (' + Math.round(file.size / 1024) + ' KB)';
             videoPreview.style.display = 'block';
+            
             if (commentVideoPlayback) {
                 commentVideoPlayback.src = URL.createObjectURL(blob);
                 commentVideoPlayback.style.display = 'block';
-                commentVideoPlayback.play().catch(() => {});
+                commentVideoPlayback.load(); // Force reload
+                commentVideoPlayback.play().catch((err) => {
+                    console.log('Auto-play prevented:', err);
+                });
             }
+            
             webcamContainer.style.display = 'none';
             
             console.log('Comment video recorded successfully, file size:', file.size, 'bytes');
+            console.log('Video input files:', videoInput.files);
         };
         
         mediaRecorder.start();
@@ -331,9 +344,27 @@ document.addEventListener('DOMContentLoaded', function() {
     function validateCommentForm() {
         const text = document.getElementById('comment-text').value.trim();
         
-        if (!text && (!videoInput.files || videoInput.files.length === 0)) {
-            alert('Please provide either text or a video comment.');
+        // Check for video file in input or recorded video
+        const hasVideoFile = (videoInput.files && videoInput.files.length > 0) || window.recordedVideoFile;
+        
+        if (!hasVideoFile) {
+            alert('Video file is required for comments.');
             return false;
+        }
+        
+        // Ensure recorded video is properly attached to form
+        if (window.recordedVideoFile && (!videoInput.files || videoInput.files.length === 0)) {
+            console.log('Attaching recorded video to form...');
+            try {
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(window.recordedVideoFile);
+                videoInput.files = dataTransfer.files;
+                console.log('Recorded video attached to form');
+            } catch (e) {
+                console.error('Failed to attach recorded video:', e);
+                alert('Error attaching recorded video. Please try recording again.');
+                return false;
+            }
         }
         
         if (videoInput.files && videoInput.files.length > 0) {
@@ -343,11 +374,40 @@ document.addEventListener('DOMContentLoaded', function() {
                 return false;
             }
             console.log('Comment form validation passed, submitting comment with video:', file.name, file.size, 'bytes');
-        } else {
-            console.log('Comment form validation passed, submitting text-only comment');
         }
         
         return true;
+    }
+    
+    // Add form submission handler to ensure recorded video is included
+    const commentForm = document.querySelector('form[action*="add_comment"]');
+    if (commentForm) {
+        commentForm.addEventListener('submit', function(e) {
+            // Ensure recorded video is attached before submission
+            if (window.recordedVideoFile && (!videoInput.files || videoInput.files.length === 0)) {
+                console.log('Form submission: attaching recorded video...');
+                try {
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(window.recordedVideoFile);
+                    videoInput.files = dataTransfer.files;
+                    console.log('Recorded video attached during form submission');
+                } catch (error) {
+                    console.error('Failed to attach recorded video during submission:', error);
+                    e.preventDefault();
+                    alert('Error attaching recorded video. Please try recording again.');
+                    return false;
+                }
+            }
+            
+            // Verify video is present before allowing submission
+            if (!videoInput.files || videoInput.files.length === 0) {
+                e.preventDefault();
+                alert('Video file is required for comments.');
+                return false;
+            }
+            
+            console.log('Form submitting with video file:', videoInput.files[0].name, videoInput.files[0].size, 'bytes');
+        });
     }
 });
 </script>
