@@ -30,8 +30,11 @@ def exercise_detail(request, exercise_id):
 
 @login_required
 def exercise_create(request):
-    """Create new exercise (authenticated users)"""
-    # Allow all authenticated users to create exercises
+    """Create new exercise (staff users only)"""
+    # Only staff users can create exercises
+    if not request.user.is_staff:
+        messages.error(request, 'Only staff users can create exercises.')
+        return redirect('exercises:exercise_list')
     
     if request.method == 'POST':
         try:
