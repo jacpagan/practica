@@ -101,6 +101,20 @@ class VideoStorageService:
             # Fallback to local storage
             return LocalStorageBackend()
     
+    def get_video_url(self, video_asset):
+        """Get public URL for video"""
+        try:
+            if getattr(settings, 'USE_S3', False):
+                # For S3, use the default storage URL
+                return default_storage.url(video_asset.storage_path)
+            else:
+                # For local storage, construct the URL
+                media_url = getattr(settings, 'MEDIA_URL', '/media/')
+                return f"{media_url}{video_asset.storage_path}"
+        except Exception as e:
+            logger.error(f"Failed to get video URL: {e}")
+            return video_asset.storage_path
+    
     def upload_video(self, file_obj, filename):
         """Upload video file"""
         return self.backend.upload(file_obj, filename)
