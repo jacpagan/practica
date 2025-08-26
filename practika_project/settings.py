@@ -241,6 +241,13 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv('DJANGO_FILE_UPLOAD_MAX_MEMORY_SIZE'
 DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv('DJANGO_DATA_UPLOAD_MAX_MEMORY_SIZE', 100 * 1024 * 1024))  # 100MB
 FILE_UPLOAD_TEMP_DIR = os.getenv('DJANGO_FILE_UPLOAD_TEMP_DIR', None)
 
+# Allowed video MIME types
+ALLOWED_VIDEO_MIME_TYPES = [
+    'video/mp4',
+    'video/webm',
+    'video/quicktime',
+]
+
 # CORS settings
 CORS_ALLOWED_ORIGINS = os.getenv('DJANGO_CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',')
 CORS_ALLOW_CREDENTIALS = True
