@@ -14,26 +14,27 @@ class AccountsTests(TestCase):
 
     def test_signup_page_loads(self):
         """Test that signup page loads correctly."""
-        response = self.client.get(reverse('accounts:signup'))
+        response = self.client.get(reverse('exercises:login'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Sign Up')
 
     def test_login_page_loads(self):
         """Test that login page loads correctly."""
-        response = self.client.get(reverse('accounts:login'))
+        response = self.client.get(reverse('exercises:login'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Login')
 
     def test_user_signup(self):
         """Test that user can sign up successfully."""
         data = {
+            'action': 'signup',
             'username': 'testuser',
             'email': 'test@example.com',
             'role': self.student_role.id,
             'password1': 'testpass123',
             'password2': 'testpass123'
         }
-        response = self.client.post(reverse('accounts:signup'), data)
+        response = self.client.post(reverse('exercises:login'), data)
         self.assertEqual(response.status_code, 302)  # Redirect after successful signup
         
         # Check that user was created
@@ -56,10 +57,11 @@ class AccountsTests(TestCase):
         
         # Test login
         data = {
+            'action': 'login',
             'username': 'testuser',
             'password': 'testpass123'
         }
-        response = self.client.post(reverse('accounts:login'), data)
+        response = self.client.post(reverse('exercises:login'), data)
         self.assertEqual(response.status_code, 302)  # Redirect after successful login
         
         # Check that user is logged in
