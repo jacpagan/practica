@@ -28,10 +28,14 @@
                 <p><strong>Created:</strong> {{ exercise.created_at|date:"M d, Y" }}</p>
                 
                 <div class="video-container">
+                    {% if exercise.video_asset.processing_status == 'completed' %}
                     <video class="video-player" controls>
                         <source src="{{ exercise.video_asset.get_public_url }}" type="{{ exercise.video_asset.mime_type }}">
                         Your browser does not support the video tag.
                     </video>
+                    {% else %}
+                    <p>Video processing: {{ exercise.video_asset.processing_status }}</p>
+                    {% endif %}
                 </div>
 
                 <div class="exercise-actions">

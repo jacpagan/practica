@@ -16,7 +16,8 @@ class VideoAsset(models.Model):
     size_bytes = models.PositiveIntegerField(help_text="File size in bytes")
     checksum_sha256 = models.CharField(max_length=64, help_text="SHA256 checksum for integrity verification")
     poster_path = models.CharField(max_length=500, blank=True, null=True, help_text="Path to video poster image")
-    
+    renditions = models.JSONField(default=dict, blank=True, help_text="Mapping of quality labels to rendition URLs")
+
     # Video metadata
     duration_sec = models.PositiveIntegerField(blank=True, null=True, help_text="Video duration in seconds")
     width = models.PositiveIntegerField(blank=True, null=True, help_text="Video width in pixels")
@@ -82,14 +83,14 @@ class VideoAsset(models.Model):
     def get_public_url(self):
         """Get public URL for the video asset"""
         try:
-            # Use dependency injection container to get URL provider
+            if self.renditions:
+                return self.renditions.get('720p') or next(iter(self.renditions.values()))
+
             from core.container import container
             url_provider = container.get_url_provider()
             return url_provider.get_video_url(self)
         except Exception as e:
-            # Log the error for debugging
             import logging
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to get public URL for video asset {self.id}: {e}")
-            # Fallback: return storage path
             return self.storage_path

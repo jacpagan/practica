@@ -17,10 +17,14 @@
     
     <div class="video-container">
         <h3>Exercise Video</h3>
+        {% if exercise.video_asset.processing_status == 'completed' %}
         <video class="video-player" controls>
             <source src="{{ exercise.video_asset.get_public_url }}" type="{{ exercise.video_asset.mime_type }}">
             Your browser does not support the video tag.
         </video>
+        {% else %}
+        <p>Video processing: {{ exercise.video_asset.processing_status }}</p>
+        {% endif %}
     </div>
 
     <div class="comments-section">
@@ -47,10 +51,14 @@
             {% endif %}
             
             <div class="comment-video">
+                {% if comment.video_asset.processing_status == 'completed' %}
                 <video controls width="300" height="200">
                     <source src="{{ comment.video_asset.get_public_url }}" type="{{ comment.video_asset.mime_type }}">
                     Your browser does not support the video tag.
                 </video>
+                {% else %}
+                <p>Video processing: {{ comment.video_asset.processing_status }}</p>
+                {% endif %}
             </div>
         </div>
         {% empty %}

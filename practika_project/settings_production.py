@@ -150,6 +150,11 @@ else:
     }
     logger.info("Local storage configured for production")
 
+# Celery configuration
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'memory://')
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'memory://')
+CELERY_TASK_ALWAYS_EAGER = os.getenv('CELERY_TASK_ALWAYS_EAGER', 'True').lower() == 'true'
+
 # Simplified middleware - only essential components
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
