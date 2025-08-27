@@ -60,7 +60,10 @@ if settings.DEBUG:
 else:
     # In production, serve media and static files directly
     from django.views.static import serve
+    from django.contrib.staticfiles.views import serve as static_serve
+    
     urlpatterns += [
         path('media/<path:path>', serve, {'document_root': settings.MEDIA_ROOT}),
-        path('static/<path:path>', serve, {'document_root': settings.STATIC_ROOT}),
+        # Use Django's built-in static file serving for better compatibility
+        path('static/<path:path>', static_serve, {'insecure': True}),
     ]
