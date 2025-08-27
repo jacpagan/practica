@@ -24,6 +24,7 @@ urlpatterns = [
     path('exercises/', include('exercises.urls', namespace='exercises')),
     path('comments/', include('comments.urls', namespace='comments')),
     path('accounts/', accounts_redirect, name='accounts_redirect'),
+    path('accounts/<path:path>', accounts_redirect, name='accounts_redirect_path'),
 ]
 
 # Serve media files in development and production
