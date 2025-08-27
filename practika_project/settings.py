@@ -217,6 +217,13 @@ STATICFILES_FINDERS = [
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
 ]
 
+# Ensure admin app is properly configured for static files
+ADMIN_MEDIA_PREFIX = '/static/admin/'
+
+# Force Django to find admin static files
+import django.contrib.admin
+ADMIN_STATIC_DIR = os.path.join(os.path.dirname(django.contrib.admin.__file__), 'static', 'admin')
+
 # WhiteNoise configuration for static files (handled in STORAGES)
 # STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
