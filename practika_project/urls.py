@@ -26,6 +26,7 @@ urlpatterns = [
     path('core/', include('core.urls')),
     path('exercises/', include('exercises.urls', namespace='exercises')),
     path('comments/', include('comments.urls', namespace='comments')),
+    path('analytics/', include('analytics.urls')),
 ]
 
 # Serve media files in development and production

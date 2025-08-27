@@ -8,6 +8,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from comments.models import VideoComment
 from comments.serializers import VideoCommentSerializer
 from comments.permissions import IsAuthorOrAdmin
+from analytics.utils import track_comment_activity
 from exercises.models import Exercise
 from core.models import VideoAsset
 
@@ -39,6 +40,7 @@ def add_comment(request, exercise_id):
                 text=text if text else None,
                 video_asset=video_asset
             )
+            track_comment_activity(request.user, comment, "create")
             
             messages.success(request, 'Comment added successfully!')
             return redirect('exercises:exercise_detail', exercise_id=exercise_id)
@@ -65,6 +67,7 @@ def edit_comment(request, comment_id):
         if text:
             comment.text = text
             comment.save()
+            track_comment_activity(request.user, comment, "edit")
             messages.success(request, 'Comment updated successfully!')
         else:
             messages.error(request, 'Comment text cannot be empty.')
@@ -85,6 +88,7 @@ def delete_comment(request, comment_id):
         return redirect('exercises:exercise_detail', exercise_id=comment.exercise.id)
     
     exercise_id = comment.exercise.id
+    track_comment_activity(request.user, comment, "delete")
     comment.delete()
     messages.success(request, 'Comment deleted successfully!')
     
@@ -104,3 +108,11 @@ class VideoCommentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
+        track_comment_activity(self.request.user, serializer.instance, "create")
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        track_comment_activity(self.request.user, instance, "edit")
+
+    def perform_destroy(self, instance):
+        track_comment_activity(self.request.user, instance, "delete")
+        instance.delete()

@@ -15,6 +15,7 @@ from django.conf import settings
 from django.db import connection
 from .models import VideoAsset
 from .services.storage import VideoStorageService
+from analytics.utils import track_video_view
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +120,7 @@ def list_videos(request):
         
         video_list = []
         for video in videos:
+            track_video_view(request.user, video)
             video_list.append({
                 'id': str(video.id),
                 'filename': video.orig_filename,

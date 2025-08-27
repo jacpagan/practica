@@ -8,6 +8,7 @@ from django.core.cache import cache
 from rest_framework import viewsets, filters
 from rest_framework.parsers import MultiPartParser, FormParser
 from exercises.models import Exercise
+from analytics.utils import track_video_view, track_session
 from exercises.serializers import ExerciseSerializer
 from exercises.permissions import IsAdminForExercise
 import re
@@ -25,6 +26,7 @@ def exercise_list(request):
 def exercise_detail(request, exercise_id):
     """Display single exercise with comments ordered by newest first"""
     exercise = get_object_or_404(Exercise, id=exercise_id)
+    track_video_view(request.user, exercise.video_asset)
     return render(request, 'exercises/exercise_detail.html', {'exercise': exercise})
 
 
@@ -169,6 +171,9 @@ def user_logout(request):
     if request.user.is_authenticated:
         username = request.user.username
         logger.info(f"User logout: {username} from IP {_get_client_ip(request)}")
+        login_time = request.session.get("login_time")
+        if login_time:
+            track_session(request.user, login_time, timezone.now())
         
         # Clear session data
         request.session.flush()

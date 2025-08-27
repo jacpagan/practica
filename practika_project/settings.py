@@ -92,6 +92,7 @@ INSTALLED_APPS = [
     "core",
     "exercises",
     "comments",
+    "analytics",
 ]
 
 MIDDLEWARE = [
