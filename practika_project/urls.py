@@ -10,9 +10,8 @@ from django.conf.urls.static import static
 from django.contrib import admin
 
 def home_landing(request):
-    """Show exercises list as the main page"""
-    from exercises.views import exercise_list
-    return exercise_list(request)
+    """Render the landing page with login and signup links."""
+    return render(request, "home.html")
 
 @login_required
 def home_redirect(request):
@@ -26,6 +25,7 @@ urlpatterns = [
     path('core/', include('core.urls')),
     path('exercises/', include('exercises.urls', namespace='exercises')),
     path('comments/', include('comments.urls', namespace='comments')),
+    path('accounts/', include('accounts.urls', namespace='accounts')),
 ]
 
 # Serve media files in development and production
