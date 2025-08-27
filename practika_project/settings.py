@@ -211,6 +211,12 @@ STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
 
+# Ensure admin static files are included
+STATICFILES_FINDERS = [
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
+]
+
 # WhiteNoise configuration for static files (handled in STORAGES)
 # STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
