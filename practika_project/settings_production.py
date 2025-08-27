@@ -88,6 +88,12 @@ else:
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
+# Ensure admin static files are included
+STATICFILES_FINDERS = [
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
+]
+
 # WhiteNoise configuration - disabled for now to fix admin panel
 # WHITENOISE_USE_FINDERS = True
 # WHITENOISE_AUTOREFRESH = False
