@@ -94,6 +94,9 @@ STATICFILES_FINDERS = [
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
 ]
 
+# Static files serving in production
+STATIC_URL = '/static/'
+
 # WhiteNoise configuration - disabled for now to fix admin panel
 # WHITENOISE_USE_FINDERS = True
 # WHITENOISE_AUTOREFRESH = False
