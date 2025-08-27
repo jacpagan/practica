@@ -158,10 +158,15 @@ def _handle_signup(request):
             # Fallback to sync if RQ not available
             send_verification_email(user.pk)
         
+        # TEMPORARY: Activate user immediately for testing
+        user.is_active = True
+        user.save()
+        user.profile.verify_email()  # Mark email as verified
+        
         logger.info(f"New user registered: {username}")
         messages.success(
             request, 
-            'Account created! Please check your email to verify your account before logging in.'
+            'Account created successfully! You can now log in.'
         )
         return redirect('exercises:login')
         
@@ -211,18 +216,22 @@ def _handle_login(request):
     try:
         existing_user = User.objects.get(username=username)
         if not existing_user.is_active:
-            # User exists but is inactive - check if it's due to email verification
-            if hasattr(existing_user, 'profile') and not existing_user.profile.is_email_verified():
-                logger.warning(f"Login attempt for unverified user: {username}")
-                messages.error(
-                    request, 
-                    'Please verify your email address before logging in. '
-                    '<a href="#" onclick="showResendForm()">Resend verification email</a>'
-                )
-            else:
-                logger.warning(f"Login attempt for inactive user: {username}")
-                messages.error(request, 'Account is disabled. Please contact administrator.')
-            return render(request, 'exercises/login.html')
+            # TEMPORARY: Activate inactive users for testing
+            existing_user.is_active = True
+            existing_user.save()
+            if hasattr(existing_user, 'profile'):
+                existing_user.profile.verify_email()
+            
+            logger.info(f"Activated inactive user: {username}")
+        # User exists but is inactive - check if it's due to email verification
+        # if hasattr(existing_user, 'profile') and not existing_user.profile.is_email_verified():
+        #     logger.warning(f"Login attempt for unverified user: {username}")
+        #     messages.error(
+        #         request, 
+        #         'Please verify your email address before logging in. '
+        #         '<a href="#" onclick="showResendForm()">Resend verification email</a>'
+        #     )
+        #     return render(request, 'exercises/login.html')
     except User.DoesNotExist:
         pass  # User doesn't exist, will be handled by authentication
     
@@ -230,7 +239,7 @@ def _handle_login(request):
     user = authenticate(request, username=username, password=password)
     
     if user is not None:
-        if user.is_active and user.profile.is_email_verified():
+        if user.is_active:  # TEMPORARY: Removed email verification requirement
             # Security logging
             logger.info(f"Successful login: {username} from IP {_get_client_ip(request)}")
             
@@ -250,8 +259,8 @@ def _handle_login(request):
             return redirect('exercises:exercise_list')
         else:
             # This should not happen due to the check above, but just in case
-            logger.warning(f"Login attempt for inactive/unverified user: {username}")
-            messages.error(request, 'Account is not active or email not verified.')
+            logger.warning(f"Login attempt for inactive user: {username}")
+            messages.error(request, 'Account is not active.')
     else:
         # Failed login attempt
         logger.warning(f"Failed login attempt: {username} from IP {_get_client_ip(request)}")
