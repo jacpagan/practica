@@ -1,6 +1,14 @@
 {% extends 'base_generic.html' %}
 
 {% block content %}
+{% if request.GET.m == 'verified' %}
+  <p>Email verified successfully! You can now log in.</p>
+{% elif request.GET.m == 'invalid_or_expired' %}
+  <p>Invalid or expired verification link.</p>
+{% elif request.GET.m == 'resent' %}
+  <p>Verification email sent.</p>
+{% endif %}
+
 <h2>Login</h2>
 <form method="post">
   {% csrf_token %}

@@ -9,9 +9,9 @@
                         <div class="user-controls">
                     {% if user.is_authenticated %}
                         <span class="user-info">👋 {{ user.username }}</span>
-                        <a href="{% url 'exercises:logout' %}" class="btn btn-secondary" title="🚪 Logout">🚪</a>
+                        <a href="{% url 'accounts:logout' %}" class="btn btn-secondary" title="🚪 Logout">🚪</a>
                     {% else %}
-                        <a href="{% url 'exercises:login' %}" class="btn btn-primary" title="🔑 Login">🔑</a>
+                        <a href="{% url 'accounts:login' %}" class="btn btn-primary" title="🔑 Login">🔑</a>
                     {% endif %}
                 </div>
     </div>

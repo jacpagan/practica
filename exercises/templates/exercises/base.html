@@ -789,9 +789,9 @@
                 </div>
                 <div class="nav-links">
                     {% if user.is_authenticated %}
-                    <a href="{% url 'exercises:logout' %}" title="🚪 Logout">🚪</a>
+                    <a href="{% url 'accounts:logout' %}" title="🚪 Logout">🚪</a>
                     {% else %}
-                    <a href="{% url 'exercises:login' %}" title="🔑 Login">🔑</a>
+                    <a href="{% url 'accounts:login' %}" title="🔑 Login">🔑</a>
                     {% endif %}
                 </div>
             </div>

@@ -1,8 +1,8 @@
 from django import forms
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 
-from .models import Role
 
 
 class SignUpForm(UserCreationForm):
@@ -22,4 +22,28 @@ class SignUpForm(UserCreationForm):
         if commit:
             user.save()
         return user
+
+    def clean_email(self):
+        email = self.cleaned_data["email"].lower()
+        if User.objects.filter(email__iexact=email).exists():
+            raise ValidationError("Email already exists", code="duplicate_email")
+        return email
+
+
+class VerifiedAuthenticationForm(AuthenticationForm):
+    """Authentication form that ensures the user's email is verified."""
+    def clean(self):
+        username = self.data.get("username")
+        if username:
+            try:
+                user = User.objects.get(username=username)
+                profile = getattr(user, "profile", None)
+                if not profile or not profile.is_email_verified():
+                    raise ValidationError(
+                        "Please verify your email address before logging in.",
+                        code="email_not_verified",
+                    )
+            except User.DoesNotExist:
+                pass
+        return super().clean()
 

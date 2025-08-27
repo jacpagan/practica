@@ -3,13 +3,10 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.contrib import messages
 from django.core.cache import cache
-from django.utils import timezone
 from django.http import JsonResponse
-from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.views import View
-from django.core.exceptions import ValidationError
 import logging
 
 from django.contrib.auth.models import User
@@ -27,8 +24,8 @@ def signup(request):
         form = SignUpForm(request.POST)
         if form.is_valid():
             user = form.save()
-            role = form.cleaned_data["role"]
-            Profile.objects.create(user=user, role=role)
+            student_role = Role.objects.get(name='student')
+            Profile.objects.create(user=user, role=student_role)
             
             # Send verification email
             try:
@@ -41,7 +38,7 @@ def signup(request):
                 request, 
                 'Account created! Please check your email to verify your account before logging in.'
             )
-            return redirect('exercises:login')
+            return redirect('accounts:login')
     else:
         form = SignUpForm()
 
@@ -58,7 +55,7 @@ class EmailVerificationView(View):
         
         if not uid or not token:
             messages.error(request, 'Invalid verification link.')
-            return redirect('exercises:login?m=invalid_or_expired')
+            return redirect('accounts:login?m=invalid_or_expired')
         
         try:
             # Decode user ID
@@ -71,14 +68,14 @@ class EmailVerificationView(View):
                 profile.verify_email()
                 logger.info(f"Email verified for user: {user.username}")
                 messages.success(request, 'Email verified successfully! You can now log in.')
-                return redirect(reverse('exercises:login') + '?m=verified')
+                return redirect(reverse('accounts:login') + '?m=verified')
             else:
                 messages.error(request, 'Invalid or expired verification link.')
-                return redirect(reverse('exercises:login') + '?m=invalid_or_expired')
+                return redirect(reverse('accounts:login') + '?m=invalid_or_expired')
                 
         except (ValueError, TypeError):
             messages.error(request, 'Invalid verification link.')
-            return redirect(reverse('exercises:login') + '?m=invalid_or_expired')
+            return redirect(reverse('accounts:login') + '?m=invalid_or_expired')
 
 
 @method_decorator(csrf_exempt, name='dispatch')

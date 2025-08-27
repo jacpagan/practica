@@ -1,18 +1,11 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.core.exceptions import ValidationError
-from django.utils import timezone
-from django.core.cache import cache
 from rest_framework import viewsets, filters
 from rest_framework.parsers import MultiPartParser, FormParser
 from exercises.models import Exercise
 from exercises.serializers import ExerciseSerializer
 from exercises.permissions import IsAdminForExercise
-from accounts.models import Role, Profile
-import re
 import logging
 
 
@@ -66,7 +59,6 @@ def exercise_create(request):
             }
             
             # Create serializer with request context for user access
-            from exercises.serializers import ExerciseSerializer
             serializer = ExerciseSerializer(data=exercise_data, context={'request': request})
             
             if serializer.is_valid():
@@ -93,198 +85,6 @@ def exercise_create(request):
     
     return render(request, 'exercises/exercise_create.html')
 
-
-def user_login(request):
-    """Enhanced user login/signup view with security features"""
-    if request.method == 'POST':
-        action = request.POST.get('action', 'login')
-        
-        if action == 'signup':
-            return _handle_signup(request)
-        else:
-            return _handle_login(request)
-    
-    return render(request, 'exercises/login.html')
-
-
-def _handle_signup(request):
-    """Handle user signup"""
-    username = request.POST.get('username')
-    email = request.POST.get('email')
-    password1 = request.POST.get('password1')
-    password2 = request.POST.get('password2')
-    
-    # Validation
-    if not all([username, email, password1, password2]):
-        messages.error(request, 'All fields are required.')
-        return render(request, 'exercises/login.html')
-    
-    if password1 != password2:
-        messages.error(request, 'Passwords do not match.')
-        return render(request, 'exercises/login.html')
-    
-    if len(password1) < 8:
-        messages.error(request, 'Password must be at least 8 characters long.')
-        return render(request, 'exercises/login.html')
-    
-    # Check if username already exists
-    if User.objects.filter(username=username).exists():
-        messages.error(request, 'Username already exists.')
-        return render(request, 'exercises/login.html')
-    
-    # Check if email already exists
-    if User.objects.filter(email=email).exists():
-        messages.error(request, 'Email already exists.')
-        return render(request, 'exercises/login.html')
-    
-    try:
-        # Create user (inactive until email verified)
-        user = User.objects.create_user(
-            username=username,
-            email=email,
-            password=password1,
-            is_active=False  # Inactive until email verified
-        )
-        
-        # Create profile (everyone is a student by default)
-        student_role = Role.objects.get(name='student')
-        Profile.objects.create(user=user, role=student_role)
-        
-        # Send verification email
-        from accounts.tasks import send_verification_email
-        try:
-            send_verification_email.delay(user.pk)
-        except:
-            # Fallback to sync if RQ not available
-            send_verification_email(user.pk)
-        
-        logger.info(f"New user registered: {username}")
-        messages.success(
-            request, 
-            'Account created! Please check your email to verify your account before logging in.'
-        )
-        return redirect('exercises:login')
-        
-    except Exception as e:
-        logger.error(f"Signup error: {e}")
-        messages.error(request, 'An error occurred during registration. Please try again.')
-        return render(request, 'exercises/login.html')
-
-
-def _handle_login(request):
-    """Handle user login"""
-    username = request.POST.get('username')
-    password = request.POST.get('password')
-    
-    # Input validation and sanitization
-    if not username or not password:
-        messages.error(request, 'Username and password are required.')
-        return render(request, 'exercises/login.html')
-    
-    # Sanitize inputs
-    username = username.strip()
-    if len(username) > 150:  # Django username max length
-        messages.error(request, 'Username is too long.')
-        return render(request, 'exercises/login.html')
-    
-    # Check for suspicious patterns
-    suspicious_patterns = [
-        r'<script', r'javascript:', r'vbscript:', r'onload=',
-        r'union\s+select', r'drop\s+table', r'insert\s+into',
-        r'delete\s+from', r'exec\s*\(', r'eval\s*\('
-    ]
-    
-    for pattern in suspicious_patterns:
-        if re.search(pattern, username, re.IGNORECASE):
-            logger.warning(f"Suspicious login attempt detected: {username}")
-            messages.error(request, 'Invalid username format.')
-            return render(request, 'exercises/login.html')
-    
-    # Check if account is locked
-    lockout_key = f"account_lockout:{username}"
-    if cache.get(lockout_key):
-        remaining_time = cache.ttl(lockout_key)
-        messages.error(request, f'Account is temporarily locked. Please try again in {remaining_time} seconds.')
-        return render(request, 'exercises/login.html')
-    
-    # Check if user exists and get their status before authentication
-    try:
-        existing_user = User.objects.get(username=username)
-        if not existing_user.is_active:
-            # User exists but is inactive - check if it's due to email verification
-            if hasattr(existing_user, 'profile') and not existing_user.profile.is_email_verified():
-                logger.warning(f"Login attempt for unverified user: {username}")
-                messages.error(
-                    request, 
-                    'Please verify your email address before logging in. '
-                    '<a href="#" onclick="showResendForm()">Resend verification email</a>'
-                )
-            else:
-                logger.warning(f"Login attempt for inactive user: {username}")
-                messages.error(request, 'Account is disabled. Please contact administrator.')
-            return render(request, 'exercises/login.html')
-    except User.DoesNotExist:
-        pass  # User doesn't exist, will be handled by authentication
-    
-    # Attempt authentication
-    user = authenticate(request, username=username, password=password)
-    
-    if user is not None:
-        if user.is_active and user.profile.is_email_verified():
-            # Security logging
-            logger.info(f"Successful login: {username} from IP {_get_client_ip(request)}")
-            
-            # Update last login
-            user.last_login = timezone.now()
-            user.save(update_fields=['last_login'])
-            
-            # Login user
-            login(request, user)
-            
-            # Set session security
-            request.session.set_expiry(3600)  # 1 hour
-            request.session['login_time'] = timezone.now().isoformat()
-            request.session['user_agent'] = request.META.get('HTTP_USER_AGENT', '')
-            
-            messages.success(request, f'Welcome back, {username}!')
-            return redirect('exercises:exercise_list')
-        else:
-            # This should not happen due to the check above, but just in case
-            logger.warning(f"Login attempt for inactive/unverified user: {username}")
-            messages.error(request, 'Account is not active or email not verified.')
-    else:
-        # Failed login attempt
-        logger.warning(f"Failed login attempt: {username} from IP {_get_client_ip(request)}")
-        messages.error(request, 'Invalid username or password.')
-    
-    return render(request, 'exercises/login.html')
-
-
-def user_logout(request):
-    """Enhanced user logout view with security logging"""
-    if request.user.is_authenticated:
-        username = request.user.username
-        logger.info(f"User logout: {username} from IP {_get_client_ip(request)}")
-        
-        # Clear session data
-        request.session.flush()
-        
-        logout(request)
-        messages.success(request, 'You have been logged out successfully.')
-    else:
-        messages.info(request, 'You were not logged in.')
-    
-    return redirect('exercises:exercise_list')
-
-
-def _get_client_ip(request):
-    """Extract client IP address from request"""
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        ip = x_forwarded_for.split(',')[0].strip()
-    else:
-        ip = request.META.get('REMOTE_ADDR')
-    return ip
 
 # API viewsets
 class ExerciseViewSet(viewsets.ModelViewSet):

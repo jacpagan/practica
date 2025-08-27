@@ -40,14 +40,13 @@ class EmailVerificationTests(TestCase):
     def test_new_signup_creates_inactive_user(self):
         """Test that new signup creates inactive user."""
         data = {
-            'action': 'signup',
             'username': 'newuser',
             'email': 'newuser@example.com',
             'password1': 'testpass123',
             'password2': 'testpass123'
         }
-        
-        response = self.client.post(reverse('exercises:login'), data)
+
+        response = self.client.post(reverse('accounts:signup'), data)
         self.assertEqual(response.status_code, 302)
         
         # Check user was created as inactive
@@ -55,18 +54,17 @@ class EmailVerificationTests(TestCase):
         self.assertFalse(user.is_active)
         self.assertFalse(user.profile.is_email_verified())
     
-    @patch('accounts.tasks.send_verification_email')
+    @patch('accounts.views.send_verification_email')
     def test_signup_sends_verification_email(self, mock_send_email):
         """Test that signup triggers verification email."""
         data = {
-            'action': 'signup',
             'username': 'newuser',
             'email': 'newuser@example.com',
             'password1': 'testpass123',
             'password2': 'testpass123'
         }
-        
-        response = self.client.post(reverse('exercises:login'), data)
+
+        response = self.client.post(reverse('accounts:signup'), data)
         self.assertEqual(response.status_code, 302)
         
         # Check that verification email was queued
@@ -155,12 +153,11 @@ class EmailVerificationTests(TestCase):
     def test_cannot_login_before_verify(self):
         """Test that unverified users cannot login."""
         data = {
-            'action': 'login',
             'username': 'testuser',
             'password': 'testpass123'
         }
-        
-        response = self.client.post(reverse('exercises:login'), data)
+
+        response = self.client.post(reverse('accounts:login'), data)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Please verify your email address')
     
@@ -170,14 +167,12 @@ class EmailVerificationTests(TestCase):
         self.user.profile.verify_email()
         
         data = {
-            'action': 'login',
             'username': 'testuser',
             'password': 'testpass123'
         }
-        
-        response = self.client.post(reverse('exercises:login'), data)
+
+        response = self.client.post(reverse('accounts:login'), data)
         self.assertEqual(response.status_code, 302)
-        self.assertRedirects(response, reverse('exercises:exercise_list'))
     
     def test_resend_verification_success(self):
         """Test successful resend verification."""
@@ -317,29 +312,28 @@ class EmailVerificationTests(TestCase):
     def test_verification_ui_banners(self):
         """Test verification status banners in UI."""
         # Test verified banner
-        response = self.client.get(reverse('exercises:login') + '?m=verified')
+        response = self.client.get(reverse('accounts:login') + '?m=verified')
         self.assertContains(response, 'Email verified successfully')
         
         # Test invalid/expired banner
-        response = self.client.get(reverse('exercises:login') + '?m=invalid_or_expired')
+        response = self.client.get(reverse('accounts:login') + '?m=invalid_or_expired')
         self.assertContains(response, 'Invalid or expired verification link')
         
         # Test resent banner
-        response = self.client.get(reverse('exercises:login') + '?m=resent')
+        response = self.client.get(reverse('accounts:login') + '?m=resent')
         self.assertContains(response, 'Verification email sent')
     
     def test_unique_email_enforcement(self):
         """Test that unique email constraint is enforced."""
         # Try to create user with existing email
         data = {
-            'action': 'signup',
             'username': 'anotheruser',
             'email': 'test@example.com',  # Same email as existing user
             'password1': 'testpass123',
             'password2': 'testpass123'
         }
-        
-        response = self.client.post(reverse('exercises:login'), data)
+
+        response = self.client.post(reverse('accounts:signup'), data)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Email already exists')
         

@@ -22,13 +22,14 @@ class Profile(models.Model):
     def is_email_verified(self):
         """Check if user's email is verified."""
         return self.email_verified_at is not None
-    
+
     def verify_email(self):
         """Mark email as verified."""
         self.email_verified_at = timezone.now()
         self.user.is_active = True
-        self.user.save(update_fields=['is_active'])
-        self.save(update_fields=['email_verified_at'])
+        self.user.save(update_fields=["is_active"])
+        self.save(update_fields=["email_verified_at"])
 
     def __str__(self) -> str:  # pragma: no cover - simple string representation
         return self.user.username
+
