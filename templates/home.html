@@ -170,7 +170,12 @@
         
         <div class="cta">
             <a href="/exercises/" class="btn" title="📚 View Exercises">📚 View Exercises</a>
-            <a href="/login/" class="btn btn-secondary" title="🔑 Login">🔑 Login</a>
+            {% if user.is_authenticated %}
+            <a href="{% url 'accounts:logout' %}" class="btn btn-secondary" title="🔒 Logout">🔒 Logout</a>
+            {% else %}
+            <a href="{% url 'accounts:login' %}" class="btn btn-secondary" title="🔑 Login">🔑 Login</a>
+            <a href="{% url 'accounts:signup' %}" class="btn btn-secondary" title="📝 Sign Up">📝 Sign Up</a>
+            {% endif %}
         </div>
     </div>
 </body>

@@ -92,6 +92,7 @@ INSTALLED_APPS = [
     "core",
     "exercises",
     "comments",
+    "accounts",
 ]
 
 MIDDLEWARE = [
@@ -235,6 +236,9 @@ REST_FRAMEWORK = {
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/"
 
 # File upload settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv('DJANGO_FILE_UPLOAD_MAX_MEMORY_SIZE', 100 * 1024 * 1024))  # 100MB
