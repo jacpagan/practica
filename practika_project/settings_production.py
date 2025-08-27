@@ -88,10 +88,10 @@ else:
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 # STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'  # Handled in STORAGES
 
-# WhiteNoise configuration
-WHITENOISE_USE_FINDERS = True
-WHITENOISE_AUTOREFRESH = False
-WHITENOISE_INDEX_FILE = True
+# WhiteNoise configuration - disabled for now to fix admin panel
+# WHITENOISE_USE_FINDERS = True
+# WHITENOISE_AUTOREFRESH = False
+# WHITENOISE_INDEX_FILE = True
 
 # Ensure staticfiles directory exists
 os.makedirs(STATIC_ROOT, exist_ok=True)
