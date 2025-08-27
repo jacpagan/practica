@@ -1,0 +1,39 @@
+#!/usr/bin/env python
+import os
+import django
+
+# Set Django settings
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'practika_project.settings_production')
+django.setup()
+
+from django.conf import settings
+
+print("=== Django Static Files Debug ===")
+print(f"Django version: {django.get_version()}")
+print(f"Static root: {settings.STATIC_ROOT}")
+print(f"Static files dirs: {settings.STATICFILES_DIRS}")
+print(f"Static files finders: {settings.STATICFILES_FINDERS}")
+print(f"Static URL: {settings.STATIC_URL}")
+
+# Check if staticfiles directory exists
+if os.path.exists('/app/staticfiles'):
+    print(f"Staticfiles directory exists: {os.path.exists('/app/staticfiles')}")
+    print(f"Staticfiles contents: {os.listdir('/app/staticfiles')}")
+    
+    # Check for admin directory
+    admin_dir = '/app/staticfiles/admin'
+    if os.path.exists(admin_dir):
+        print(f"Admin directory exists: {os.path.exists(admin_dir)}")
+        print(f"Admin directory contents: {os.listdir(admin_dir)}")
+    else:
+        print("Admin directory does not exist")
+else:
+    print("Staticfiles directory does not exist")
+
+# Check Django admin app location
+import django.contrib.admin
+admin_static_path = os.path.join(os.path.dirname(django.contrib.admin.__file__), 'static', 'admin')
+print(f"Django admin static path: {admin_static_path}")
+print(f"Django admin static exists: {os.path.exists(admin_static_path)}")
+if os.path.exists(admin_static_path):
+    print(f"Django admin static contents: {os.listdir(admin_static_path)}")
