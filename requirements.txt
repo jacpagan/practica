@@ -10,6 +10,7 @@ django-cors-headers
 Pillow
 python-magic
 django-storages
+celery
 
 # Cloud Services
 boto3

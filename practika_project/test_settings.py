@@ -25,6 +25,11 @@ STORAGES = {
     'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
 }
 
+# Celery - run tasks eagerly during tests
+CELERY_BROKER_URL = 'memory://'
+CELERY_RESULT_BACKEND = 'memory://'
+CELERY_TASK_ALWAYS_EAGER = True
+
 # Separate media directory for tests
 MEDIA_ROOT = BASE_DIR / 'test_media'
 os.makedirs(MEDIA_ROOT, exist_ok=True)
