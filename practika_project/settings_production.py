@@ -86,7 +86,7 @@ else:
 
 # Static files configuration
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-# STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'  # Handled in STORAGES
+STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
 # WhiteNoise configuration - disabled for now to fix admin panel
 # WHITENOISE_USE_FINDERS = True
