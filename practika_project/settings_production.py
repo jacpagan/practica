@@ -137,7 +137,7 @@ if USE_S3:
     AWS_S3_FILE_OVERWRITE = False
     AWS_S3_MAX_AGE_SECONDS = 31536000
     
-    logger.info("S3 storage configured for production")
+    print("S3 storage configured for production")
 else:
     # Local file system storage (modern Django format)
     STORAGES = {
@@ -148,7 +148,7 @@ else:
             'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
         },
     }
-    logger.info("Local storage configured for production")
+    print("Local storage configured for production")
 
 # Celery configuration
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'memory://')
