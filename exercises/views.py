@@ -32,11 +32,7 @@ def exercise_detail(request, exercise_id):
 
 @login_required
 def exercise_create(request):
-    """Create new exercise (staff users only)"""
-    # Only staff users can create exercises
-    if not request.user.is_staff:
-        messages.error(request, 'Only staff users can create exercises.')
-        return redirect('exercises:exercise_list')
+    """Create new exercise (all authenticated users)"""
     
     if request.method == 'POST':
         try:
@@ -106,9 +102,7 @@ def user_login(request):
         else:
             return _handle_login(request)
     
-    # Get available roles for signup
-    roles = Role.objects.all()
-    return render(request, 'exercises/login.html', {'roles': roles})
+    return render(request, 'exercises/login.html')
 
 
 def _handle_signup(request):
@@ -117,30 +111,29 @@ def _handle_signup(request):
     email = request.POST.get('email')
     password1 = request.POST.get('password1')
     password2 = request.POST.get('password2')
-    role_id = request.POST.get('role')
     
     # Validation
-    if not all([username, email, password1, password2, role_id]):
+    if not all([username, email, password1, password2]):
         messages.error(request, 'All fields are required.')
-        return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
+        return render(request, 'exercises/login.html')
     
     if password1 != password2:
         messages.error(request, 'Passwords do not match.')
-        return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
+        return render(request, 'exercises/login.html')
     
     if len(password1) < 8:
         messages.error(request, 'Password must be at least 8 characters long.')
-        return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
+        return render(request, 'exercises/login.html')
     
     # Check if username already exists
     if User.objects.filter(username=username).exists():
         messages.error(request, 'Username already exists.')
-        return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
+        return render(request, 'exercises/login.html')
     
     # Check if email already exists
     if User.objects.filter(email=email).exists():
         messages.error(request, 'Email already exists.')
-        return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
+        return render(request, 'exercises/login.html')
     
     try:
         # Create user
@@ -150,9 +143,9 @@ def _handle_signup(request):
             password=password1
         )
         
-        # Create profile with role
-        role = Role.objects.get(id=role_id)
-        Profile.objects.create(user=user, role=role)
+        # Create profile (everyone is a student by default)
+        student_role = Role.objects.get(name='student')
+        Profile.objects.create(user=user, role=student_role)
         
         # Log user in
         login(request, user)
@@ -162,14 +155,14 @@ def _handle_signup(request):
         request.session['login_time'] = timezone.now().isoformat()
         request.session['user_agent'] = request.META.get('HTTP_USER_AGENT', '')
         
-        logger.info(f"New user registered: {username} with role {role.name}")
+        logger.info(f"New user registered: {username}")
         messages.success(request, f'Welcome to Practika, {username}!')
         return redirect('exercises:exercise_list')
         
     except Exception as e:
         logger.error(f"Signup error: {e}")
         messages.error(request, 'An error occurred during registration. Please try again.')
-        return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
+        return render(request, 'exercises/login.html')
 
 
 def _handle_login(request):
@@ -180,13 +173,13 @@ def _handle_login(request):
     # Input validation and sanitization
     if not username or not password:
         messages.error(request, 'Username and password are required.')
-        return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
+        return render(request, 'exercises/login.html')
     
     # Sanitize inputs
     username = username.strip()
     if len(username) > 150:  # Django username max length
         messages.error(request, 'Username is too long.')
-        return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
+        return render(request, 'exercises/login.html')
     
     # Check for suspicious patterns
     suspicious_patterns = [
@@ -199,14 +192,14 @@ def _handle_login(request):
         if re.search(pattern, username, re.IGNORECASE):
             logger.warning(f"Suspicious login attempt detected: {username}")
             messages.error(request, 'Invalid username format.')
-            return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
+            return render(request, 'exercises/login.html')
     
     # Check if account is locked
     lockout_key = f"account_lockout:{username}"
     if cache.get(lockout_key):
         remaining_time = cache.ttl(lockout_key)
         messages.error(request, f'Account is temporarily locked. Please try again in {remaining_time} seconds.')
-        return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
+        return render(request, 'exercises/login.html')
     
     # Attempt authentication
     user = authenticate(request, username=username, password=password)
@@ -238,7 +231,7 @@ def _handle_login(request):
         logger.warning(f"Failed login attempt: {username} from IP {_get_client_ip(request)}")
         messages.error(request, 'Invalid username or password.')
     
-    return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
+    return render(request, 'exercises/login.html')
 
 
 def user_logout(request):

@@ -30,7 +30,6 @@ class AccountsTests(TestCase):
             'action': 'signup',
             'username': 'testuser',
             'email': 'test@example.com',
-            'role': self.student_role.id,
             'password1': 'testpass123',
             'password2': 'testpass123'
         }
@@ -41,7 +40,7 @@ class AccountsTests(TestCase):
         user = User.objects.get(username='testuser')
         self.assertEqual(user.email, 'test@example.com')
         
-        # Check that profile was created with correct role
+        # Check that profile was created with student role (default)
         profile = Profile.objects.get(user=user)
         self.assertEqual(profile.role, self.student_role)
 
