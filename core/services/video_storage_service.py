@@ -91,17 +91,26 @@ class VideoStorageService:
             storage_path = self.storage_backend.upload(video_file, unique_filename)
             logger.info(f"File uploaded to storage path: {storage_path}")
             
-            # Create VideoAsset record
+            # Create VideoAsset record with pending status
             video_asset = VideoAsset.objects.create(
                 orig_filename=video_file.name,
                 storage_path=storage_path,
                 mime_type=mime_type,
                 size_bytes=video_file.size,
                 checksum_sha256=checksum,
-                processing_status='completed'  # For now, assume completed
+                processing_status='pending'
             )
-            
+
             logger.info(f"Video asset created: {video_asset.id} for file {video_file.name}")
+
+            # Kick off background transcoding
+            try:
+                from core.services.transcoder import transcode_video
+                transcode_video.delay(str(video_asset.id))
+            except Exception as exc:
+                logger.warning(f"Celery not available, running sync transcode: {exc}")
+                transcode_video(str(video_asset.id))
+
             return video_asset
             
         except Exception as e:

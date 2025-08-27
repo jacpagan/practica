@@ -55,6 +55,7 @@ class TestDataFactory:
             'processing_status': 'completed',
             'is_valid': True,
             'validation_errors': [],
+            'renditions': {},
         }
         defaults.update(kwargs)
         

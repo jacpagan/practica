@@ -80,6 +80,11 @@ class DeviceOptimizationMiddleware(MiddlewareMixin):
         
         return response
 
+
+# Backwards compatibility alias for tests expecting MobileOptimizationMiddleware
+class MobileOptimizationMiddleware(DeviceOptimizationMiddleware):
+    pass
+
 class RequestIDFilter(logging.Filter):
     """Add request ID to log records"""
     

@@ -8,7 +8,7 @@ class VideoAssetSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = VideoAsset
-        fields = ['id', 'orig_filename', 'mime_type', 'size_bytes', 'duration_sec', 'width', 'height', 'poster_path', 'created_at']
+        fields = ['id', 'orig_filename', 'mime_type', 'size_bytes', 'duration_sec', 'width', 'height', 'poster_path', 'renditions', 'processing_status', 'created_at']
         read_only_fields = fields
 
 
