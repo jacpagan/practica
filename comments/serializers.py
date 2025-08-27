@@ -25,6 +25,8 @@ class VideoCommentSerializer(serializers.ModelSerializer):
             'width': obj.video_asset.width,
             'height': obj.video_asset.height,
             'poster_path': obj.video_asset.poster_path,
+            'renditions': obj.video_asset.renditions,
+            'processing_status': obj.video_asset.processing_status,
             'created_at': obj.video_asset.created_at,
         }
     
