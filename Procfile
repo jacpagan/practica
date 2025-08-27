@@ -1,1 +1,2 @@
-web: gunicorn practika_project.wsgi --config gunicorn.conf.py
+web: gunicorn practika_project.wsgi:application
+worker: python manage.py rqworker default

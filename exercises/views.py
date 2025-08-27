@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -14,6 +14,8 @@ from exercises.permissions import IsAdminForExercise
 from accounts.models import Role, Profile
 import re
 import logging
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -136,28 +138,32 @@ def _handle_signup(request):
         return render(request, 'exercises/login.html')
     
     try:
-        # Create user
+        # Create user (inactive until email verified)
         user = User.objects.create_user(
             username=username,
             email=email,
-            password=password1
+            password=password1,
+            is_active=False  # Inactive until email verified
         )
         
         # Create profile (everyone is a student by default)
         student_role = Role.objects.get(name='student')
         Profile.objects.create(user=user, role=student_role)
         
-        # Log user in
-        login(request, user)
-        
-        # Set session security
-        request.session.set_expiry(3600)  # 1 hour
-        request.session['login_time'] = timezone.now().isoformat()
-        request.session['user_agent'] = request.META.get('HTTP_USER_AGENT', '')
+        # Send verification email
+        from accounts.tasks import send_verification_email
+        try:
+            send_verification_email.delay(user.pk)
+        except:
+            # Fallback to sync if RQ not available
+            send_verification_email(user.pk)
         
         logger.info(f"New user registered: {username}")
-        messages.success(request, f'Welcome to Practika, {username}!')
-        return redirect('exercises:exercise_list')
+        messages.success(
+            request, 
+            'Account created! Please check your email to verify your account before logging in.'
+        )
+        return redirect('exercises:login')
         
     except Exception as e:
         logger.error(f"Signup error: {e}")
@@ -201,11 +207,30 @@ def _handle_login(request):
         messages.error(request, f'Account is temporarily locked. Please try again in {remaining_time} seconds.')
         return render(request, 'exercises/login.html')
     
+    # Check if user exists and get their status before authentication
+    try:
+        existing_user = User.objects.get(username=username)
+        if not existing_user.is_active:
+            # User exists but is inactive - check if it's due to email verification
+            if hasattr(existing_user, 'profile') and not existing_user.profile.is_email_verified():
+                logger.warning(f"Login attempt for unverified user: {username}")
+                messages.error(
+                    request, 
+                    'Please verify your email address before logging in. '
+                    '<a href="#" onclick="showResendForm()">Resend verification email</a>'
+                )
+            else:
+                logger.warning(f"Login attempt for inactive user: {username}")
+                messages.error(request, 'Account is disabled. Please contact administrator.')
+            return render(request, 'exercises/login.html')
+    except User.DoesNotExist:
+        pass  # User doesn't exist, will be handled by authentication
+    
     # Attempt authentication
     user = authenticate(request, username=username, password=password)
     
     if user is not None:
-        if user.is_active:
+        if user.is_active and user.profile.is_email_verified():
             # Security logging
             logger.info(f"Successful login: {username} from IP {_get_client_ip(request)}")
             
@@ -224,8 +249,9 @@ def _handle_login(request):
             messages.success(request, f'Welcome back, {username}!')
             return redirect('exercises:exercise_list')
         else:
-            logger.warning(f"Login attempt for inactive user: {username}")
-            messages.error(request, 'Account is disabled. Please contact administrator.')
+            # This should not happen due to the check above, but just in case
+            logger.warning(f"Login attempt for inactive/unverified user: {username}")
+            messages.error(request, 'Account is not active or email not verified.')
     else:
         # Failed login attempt
         logger.warning(f"Failed login attempt: {username} from IP {_get_client_ip(request)}")

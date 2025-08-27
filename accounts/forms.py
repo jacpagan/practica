@@ -6,12 +6,20 @@ from .models import Role
 
 
 class SignUpForm(UserCreationForm):
-    """Form for registering a new user along with a role."""
+    """Form for registering a new user."""
 
     email = forms.EmailField(required=True)
-    role = forms.ModelChoiceField(queryset=Role.objects.all(), required=True)
 
     class Meta:
         model = User
-        fields = ("username", "email", "role", "password1", "password2")
+        fields = ("username", "email", "password1", "password2")
+    
+    def save(self, commit=True):
+        """Save user as inactive until email is verified."""
+        user = super().save(commit=False)
+        user.email = self.cleaned_data["email"]
+        user.is_active = False  # Inactive until email verified
+        if commit:
+            user.save()
+        return user
 

@@ -13,9 +13,7 @@ def home_redirect(request):
     """Redirect to exercises list - extremely minimal app"""
     return redirect('exercises:exercise_list')
 
-def accounts_redirect(request, path=''):
-    """Redirect all accounts URLs to exercises login for minimal app"""
-    return redirect('exercises:login')
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -23,8 +21,7 @@ urlpatterns = [
     path('core/', include('core.urls')),
     path('exercises/', include('exercises.urls', namespace='exercises')),
     path('comments/', include('comments.urls', namespace='comments')),
-    path('accounts/', accounts_redirect, name='accounts_redirect'),
-    path('accounts/<path:path>', accounts_redirect, name='accounts_redirect_path'),
+    path('accounts/', include('accounts.urls', namespace='accounts')),
 ]
 
 # Serve media files in development and production
