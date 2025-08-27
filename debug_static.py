@@ -57,5 +57,11 @@ try:
     if os.path.exists(target_admin_dir):
         print(f"Admin directory contents after copy: {os.listdir(target_admin_dir)}")
         
+        # Check specific file permissions
+        css_file = '/app/staticfiles/admin/css/base.css'
+        print(f"CSS file exists: {os.path.exists(css_file)}")
+        print(f"CSS file readable: {os.access(css_file, os.R_OK)}")
+        print(f"CSS file size: {os.path.getsize(css_file) if os.path.exists(css_file) else 'N/A'}")
+        
 except Exception as e:
     print(f"Manual copy failed: {e}")
