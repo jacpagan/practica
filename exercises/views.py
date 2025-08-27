@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -10,6 +11,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from exercises.models import Exercise
 from exercises.serializers import ExerciseSerializer
 from exercises.permissions import IsAdminForExercise
+from accounts.models import Role, Profile
 import re
 import logging
 
@@ -95,73 +97,148 @@ def exercise_create(request):
 
 
 def user_login(request):
-    """Enhanced user login view with security features"""
+    """Enhanced user login/signup view with security features"""
     if request.method == 'POST':
-        username = request.POST.get('username')
-        password = request.POST.get('password')
+        action = request.POST.get('action', 'login')
         
-        # Input validation and sanitization
-        if not username or not password:
-            messages.error(request, 'Username and password are required.')
-            return render(request, 'exercises/login.html')
-        
-        # Sanitize inputs
-        username = username.strip()
-        if len(username) > 150:  # Django username max length
-            messages.error(request, 'Username is too long.')
-            return render(request, 'exercises/login.html')
-        
-        # Check for suspicious patterns
-        suspicious_patterns = [
-            r'<script', r'javascript:', r'vbscript:', r'onload=',
-            r'union\s+select', r'drop\s+table', r'insert\s+into',
-            r'delete\s+from', r'exec\s*\(', r'eval\s*\('
-        ]
-        
-        for pattern in suspicious_patterns:
-            if re.search(pattern, username, re.IGNORECASE):
-                logger.warning(f"Suspicious login attempt detected: {username}")
-                messages.error(request, 'Invalid username format.')
-                return render(request, 'exercises/login.html')
-        
-        # Check if account is locked
-        lockout_key = f"account_lockout:{username}"
-        if cache.get(lockout_key):
-            remaining_time = cache.ttl(lockout_key)
-            messages.error(request, f'Account is temporarily locked. Please try again in {remaining_time} seconds.')
-            return render(request, 'exercises/login.html')
-        
-        # Attempt authentication
-        user = authenticate(request, username=username, password=password)
-        
-        if user is not None:
-            if user.is_active:
-                # Security logging
-                logger.info(f"Successful login: {username} from IP {_get_client_ip(request)}")
-                
-                # Update last login
-                user.last_login = timezone.now()
-                user.save(update_fields=['last_login'])
-                
-                # Login user
-                login(request, user)
-                
-                # Set session security
-                request.session.set_expiry(3600)  # 1 hour
-                request.session['login_time'] = timezone.now().isoformat()
-                request.session['user_agent'] = request.META.get('HTTP_USER_AGENT', '')
-                
-                messages.success(request, f'Welcome back, {username}!')
-                return redirect('exercises:exercise_list')
-            else:
-                logger.warning(f"Login attempt for inactive user: {username}")
-                messages.error(request, 'Account is disabled. Please contact administrator.')
+        if action == 'signup':
+            return _handle_signup(request)
         else:
-            # Failed login attempt
-            logger.warning(f"Failed login attempt: {username} from IP {_get_client_ip(request)}")
-            messages.error(request, 'Invalid username or password.')
+            return _handle_login(request)
     
-    return render(request, 'exercises/login.html')
+    # Get available roles for signup
+    roles = Role.objects.all()
+    return render(request, 'exercises/login.html', {'roles': roles})
+
+
+def _handle_signup(request):
+    """Handle user signup"""
+    username = request.POST.get('username')
+    email = request.POST.get('email')
+    password1 = request.POST.get('password1')
+    password2 = request.POST.get('password2')
+    role_id = request.POST.get('role')
+    
+    # Validation
+    if not all([username, email, password1, password2, role_id]):
+        messages.error(request, 'All fields are required.')
+        return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
+    
+    if password1 != password2:
+        messages.error(request, 'Passwords do not match.')
+        return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
+    
+    if len(password1) < 8:
+        messages.error(request, 'Password must be at least 8 characters long.')
+        return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
+    
+    # Check if username already exists
+    if User.objects.filter(username=username).exists():
+        messages.error(request, 'Username already exists.')
+        return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
+    
+    # Check if email already exists
+    if User.objects.filter(email=email).exists():
+        messages.error(request, 'Email already exists.')
+        return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
+    
+    try:
+        # Create user
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password1
+        )
+        
+        # Create profile with role
+        role = Role.objects.get(id=role_id)
+        Profile.objects.create(user=user, role=role)
+        
+        # Log user in
+        login(request, user)
+        
+        # Set session security
+        request.session.set_expiry(3600)  # 1 hour
+        request.session['login_time'] = timezone.now().isoformat()
+        request.session['user_agent'] = request.META.get('HTTP_USER_AGENT', '')
+        
+        logger.info(f"New user registered: {username} with role {role.name}")
+        messages.success(request, f'Welcome to Practika, {username}!')
+        return redirect('exercises:exercise_list')
+        
+    except Exception as e:
+        logger.error(f"Signup error: {e}")
+        messages.error(request, 'An error occurred during registration. Please try again.')
+        return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
+
+
+def _handle_login(request):
+    """Handle user login"""
+    username = request.POST.get('username')
+    password = request.POST.get('password')
+    
+    # Input validation and sanitization
+    if not username or not password:
+        messages.error(request, 'Username and password are required.')
+        return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
+    
+    # Sanitize inputs
+    username = username.strip()
+    if len(username) > 150:  # Django username max length
+        messages.error(request, 'Username is too long.')
+        return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
+    
+    # Check for suspicious patterns
+    suspicious_patterns = [
+        r'<script', r'javascript:', r'vbscript:', r'onload=',
+        r'union\s+select', r'drop\s+table', r'insert\s+into',
+        r'delete\s+from', r'exec\s*\(', r'eval\s*\('
+    ]
+    
+    for pattern in suspicious_patterns:
+        if re.search(pattern, username, re.IGNORECASE):
+            logger.warning(f"Suspicious login attempt detected: {username}")
+            messages.error(request, 'Invalid username format.')
+            return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
+    
+    # Check if account is locked
+    lockout_key = f"account_lockout:{username}"
+    if cache.get(lockout_key):
+        remaining_time = cache.ttl(lockout_key)
+        messages.error(request, f'Account is temporarily locked. Please try again in {remaining_time} seconds.')
+        return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
+    
+    # Attempt authentication
+    user = authenticate(request, username=username, password=password)
+    
+    if user is not None:
+        if user.is_active:
+            # Security logging
+            logger.info(f"Successful login: {username} from IP {_get_client_ip(request)}")
+            
+            # Update last login
+            user.last_login = timezone.now()
+            user.save(update_fields=['last_login'])
+            
+            # Login user
+            login(request, user)
+            
+            # Set session security
+            request.session.set_expiry(3600)  # 1 hour
+            request.session['login_time'] = timezone.now().isoformat()
+            request.session['user_agent'] = request.META.get('HTTP_USER_AGENT', '')
+            
+            messages.success(request, f'Welcome back, {username}!')
+            return redirect('exercises:exercise_list')
+        else:
+            logger.warning(f"Login attempt for inactive user: {username}")
+            messages.error(request, 'Account is disabled. Please contact administrator.')
+    else:
+        # Failed login attempt
+        logger.warning(f"Failed login attempt: {username} from IP {_get_client_ip(request)}")
+        messages.error(request, 'Invalid username or password.')
+    
+    return render(request, 'exercises/login.html', {'roles': Role.objects.all()})
 
 
 def user_logout(request):
