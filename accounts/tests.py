@@ -52,7 +52,10 @@ class AccountsTests(TestCase):
             email='test@example.com',
             password='testpass123'
         )
-        Profile.objects.create(user=user, role=self.student_role)
+        profile = Profile.objects.create(user=user, role=self.student_role)
+        
+        # Verify the user's email so they can login
+        profile.verify_email()
         
         # Test login
         data = {

@@ -95,6 +95,30 @@ INSTALLED_APPS = [
     "accounts",
 ]
 
+# Using default User model with Profile extension for email verification
+
+# Email settings
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'localhost')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() == 'true'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@practika.com')
+SITE_URL = os.getenv('SITE_URL', 'http://localhost:8000')
+
+# Redis Queue (RQ) settings for async email sending
+RQ_QUEUES = {
+    'default': {
+        'HOST': os.getenv('REDIS_HOST', 'localhost'),
+        'PORT': int(os.getenv('REDIS_PORT', '6379')),
+        'DB': int(os.getenv('REDIS_DB', '0')),
+        'PASSWORD': os.getenv('REDIS_PASSWORD', ''),
+        'DEFAULT_TIMEOUT': 360,
+    }
+}
+
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",

@@ -12,6 +12,10 @@ python-magic
 django-storages
 celery
 
+# Email and Queue
+django-rq
+redis
+
 # Cloud Services
 boto3
 psycopg2-binary
