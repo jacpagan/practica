@@ -9,19 +9,13 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 
-def home_landing(request):
-    """Render the landing page with login and signup links."""
-    return render(request, "home.html")
-
-@login_required
 def home_redirect(request):
-    """Redirect authenticated users to exercises list"""
+    """Redirect to exercises list - extremely minimal app"""
     return redirect('exercises:exercise_list')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', home_landing, name='home'),
-    path('app/', home_redirect, name='app_home'),
+    path('', home_redirect, name='home'),
     path('core/', include('core.urls')),
     path('exercises/', include('exercises.urls', namespace='exercises')),
     path('comments/', include('comments.urls', namespace='comments')),
