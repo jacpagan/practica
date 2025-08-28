@@ -82,12 +82,12 @@
 .welcome-header h1 {
     font-size: 2.5rem;
     margin-bottom: 0.5rem;
-    color: #2c3e50;
+    color: var(--concrete-darker);
 }
 
 .welcome-subtitle {
     font-size: 1.2rem;
-    color: #7f8c8d;
+    color: var(--concrete-dark);
     margin-bottom: 2rem;
 }
 
@@ -99,11 +99,13 @@
 }
 
 .stat-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--concrete-dark) 0%, var(--concrete-darker) 100%);
     color: white;
     padding: 1.5rem;
     border-radius: 12px;
     min-width: 120px;
+    border: 2px solid var(--concrete-medium);
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
 }
 
 .stat-number {
@@ -129,10 +131,18 @@
 }
 
 .feature-item {
-    background: #f8f9fa;
+    background: linear-gradient(135deg, #ffffff 0%, var(--concrete-light) 100%);
     padding: 1.5rem;
     border-radius: 8px;
-    border: 1px solid #e9ecef;
+    border: 2px solid var(--concrete-medium);
+    box-shadow: 0 4px 8px rgba(108, 117, 125, 0.15);
+    transition: all 0.3s ease;
+}
+
+.feature-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(108, 117, 125, 0.25);
+    border-color: var(--concrete-dark);
 }
 
 .feature-icon {
@@ -141,7 +151,7 @@
 }
 
 .feature-item h3 {
-    color: #2c3e50;
+    color: var(--concrete-darker);
     margin-bottom: 0.5rem;
 }
 
@@ -169,18 +179,21 @@
 }
 
 .btn-primary {
-    background: #007bff;
+    background: linear-gradient(135deg, var(--concrete-dark) 0%, var(--concrete-darker) 100%);
     color: white;
+    border: 2px solid var(--concrete-darker);
 }
 
 .btn-secondary {
-    background: #6c757d;
+    background: linear-gradient(135deg, var(--concrete-medium) 0%, var(--concrete-dark) 100%);
     color: white;
+    border: 2px solid var(--concrete-dark);
 }
 
 .btn-success {
-    background: #28a745;
+    background: linear-gradient(135deg, var(--success-color) 0%, #1e7e34 100%);
     color: white;
+    border: 2px solid var(--success-color);
 }
 
 .btn-large {
@@ -190,7 +203,7 @@
 
 .btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
 }
 
 .welcome-tips {
@@ -205,7 +218,8 @@
 
 .tips-list li {
     padding: 0.5rem 0;
-    border-bottom: 1px solid #e9ecef;
+    border-bottom: 1px solid var(--concrete-medium);
+    color: var(--concrete-darker);
 }
 
 .welcome-form {

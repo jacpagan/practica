@@ -11,35 +11,67 @@
     <!-- Custom CSS -->
     <style>
         :root {
-            --primary-color: #667eea;
-            --secondary-color: #764ba2;
+            --primary-color: #6c757d;
+            --secondary-color: #495057;
             --success-color: #28a745;
             --warning-color: #ffc107;
             --danger-color: #dc3545;
             --light-color: #f8f9fa;
-            --dark-color: #343a40;
+            --dark-color: #212529;
+            --concrete-light: #e9ecef;
+            --concrete-medium: #adb5bd;
+            --concrete-dark: #6c757d;
+            --concrete-darker: #495057;
         }
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             line-height: 1.6;
             color: var(--dark-color);
+            background: linear-gradient(135deg, var(--concrete-light) 0%, var(--concrete-medium) 100%);
+            min-height: 100vh;
         }
         
         .navbar-brand {
             font-weight: bold;
             font-size: 1.5rem;
+            color: var(--concrete-darker) !important;
+        }
+        
+        .navbar {
+            background: linear-gradient(135deg, var(--concrete-light) 0%, var(--concrete-medium) 100%) !important;
+            border-bottom: 3px solid var(--concrete-dark);
+            box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+        }
+        
+        .navbar-nav .nav-link {
+            color: var(--concrete-darker) !important;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .navbar-nav .nav-link:hover {
+            color: var(--dark-color) !important;
+            background-color: var(--concrete-light);
+            border-radius: 6px;
         }
         
         .main-content {
             min-height: calc(100vh - 200px);
             padding: 2rem 0;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 12px;
+            margin: 1rem;
+            box-shadow: 0 8px 32px rgba(108, 117, 125, 0.2);
+            backdrop-filter: blur(10px);
         }
         
         .footer {
-            background: var(--light-color);
+            background: linear-gradient(135deg, var(--concrete-medium) 0%, var(--concrete-dark) 100%);
             padding: 2rem 0;
             margin-top: 3rem;
+            border-top: 3px solid var(--concrete-darker);
+            color: white;
         }
         
         .alert {
@@ -52,23 +84,43 @@
             border-radius: 6px;
             font-weight: 500;
             transition: all 0.3s ease;
+            border: 2px solid var(--concrete-dark);
+            background: linear-gradient(135deg, var(--concrete-light) 0%, var(--concrete-medium) 100%);
+            color: var(--concrete-darker);
         }
         
         .btn:hover {
             transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+            background: linear-gradient(135deg, var(--concrete-medium) 0%, var(--concrete-dark) 100%);
+            border-color: var(--concrete-darker);
+            color: white;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--concrete-dark) 0%, var(--concrete-darker) 100%) !important;
+            border-color: var(--concrete-darker) !important;
+            color: white !important;
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(135deg, var(--concrete-darker) 0%, var(--dark-color) 100%) !important;
+            border-color: var(--dark-color) !important;
         }
         
         .card {
             border-radius: 12px;
             border: none;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 6px rgba(108, 117, 125, 0.15);
             transition: transform 0.3s ease;
+            background: linear-gradient(135deg, #ffffff 0%, var(--concrete-light) 100%);
+            border: 1px solid var(--concrete-medium);
         }
         
         .card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+            box-shadow: 0 8px 15px rgba(108, 117, 125, 0.25);
+            border-color: var(--concrete-dark);
         }
         
         /* Loading states */
