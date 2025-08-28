@@ -199,6 +199,8 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "core.middleware.RequestLoggingMiddleware",
     "core.middleware.SecurityMiddleware",
+    "core.middleware.error_handling.EnhancedErrorHandlingMiddleware",
+    "core.middleware.rate_limiting.RateLimitingMiddleware",
 ]
 
 # REST Framework settings - simplified for production
