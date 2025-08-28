@@ -1,8 +1,10 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+import secrets
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+
 
 
 class Role(models.Model):
@@ -41,6 +43,23 @@ class Profile(models.Model):
     def __str__(self) -> str:  # pragma: no cover - simple string representation
         return self.user.username
 
+def _generate_token():
+    return secrets.token_urlsafe(16)
+
+
+class BetaInvitation(models.Model):
+    """Invitation for beta access."""
+
+    email = models.EmailField(unique=True)
+    token = models.CharField(max_length=64, unique=True, default=_generate_token)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+
+    def mark_accepted(self):
+        self.accepted_at = timezone.now()
+        self.save(update_fields=["accepted_at"])
+
+    def __str__(self):  # pragma: no cover - simple string representation
+        return self.email
 
 class UserMetrics(models.Model):
     """Stores engagement metrics for a user."""
@@ -61,3 +80,4 @@ def create_user_metrics(sender, instance, created, **kwargs):
     """Automatically create UserMetrics when a Profile is created."""
     if created:
         UserMetrics.objects.create(profile=instance)
+

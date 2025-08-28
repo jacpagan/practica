@@ -9,6 +9,8 @@ from django.urls import reverse
 from django.utils import timezone
 import logging
 
+from .models import BetaInvitation
+
 try:
     from rq import get_current_job
     RQ_AVAILABLE = True
@@ -72,3 +74,31 @@ def send_verification_email(user_id):
     except Exception as e:
         logger.error(f"Failed to send verification email to user {user_id}: {e}")
         raise
+
+
+def send_beta_invitation(email):
+    """Create a beta invitation and email the token."""
+    invitation, created = BetaInvitation.objects.get_or_create(email=email)
+    if not created:
+        invitation.token = BetaInvitation._meta.get_field("token").default()
+        invitation.accepted_at = None
+        invitation.save(update_fields=["token", "accepted_at"])
+
+    invitation_url = f"{settings.SITE_URL}{reverse('exercises:login')}?token={invitation.token}"
+    subject = "You're invited to Practika beta"
+    context = {"invitation_url": invitation_url}
+    html_message = render_to_string("accounts/beta_invitation_email.html", context)
+    plain_message = (
+        "You're invited to Practika beta.\n"
+        f"Use the following link to get started:\n{invitation_url}\n"
+    )
+    send_mail(
+        subject=subject,
+        message=plain_message,
+        html_message=html_message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[email],
+        fail_silently=False,
+    )
+    logger.info(f"Beta invitation sent to {email}")
+    return invitation
