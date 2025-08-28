@@ -308,3 +308,28 @@ class ExerciseViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+
+@login_required
+def welcome_flow(request):
+    """Welcome flow for new users"""
+    user = request.user
+    
+    # Check if user has completed onboarding
+    if hasattr(user, 'profile') and user.profile.onboarding_completed:
+        return redirect('exercises:exercise_list')
+    
+    if request.method == 'POST':
+        # Mark onboarding as completed
+        if hasattr(user, 'profile'):
+            user.profile.onboarding_completed = True
+            user.profile.save()
+        
+        messages.success(request, 'Welcome to Practika! Let\'s get started.')
+        return redirect('exercises:exercise_list')
+    
+    return render(request, 'exercises/welcome.html', {
+        'user': user,
+        'total_exercises': Exercise.objects.count(),
+        'total_users': User.objects.count(),
+    })
