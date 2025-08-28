@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+import secrets
 
 
 class Role(models.Model):
@@ -43,3 +44,22 @@ class Profile(models.Model):
 
     def __str__(self) -> str:  # pragma: no cover - simple string representation
         return self.user.username
+
+
+def _generate_token():
+    return secrets.token_urlsafe(16)
+
+
+class BetaInvitation(models.Model):
+    """Invitation for beta access."""
+
+    email = models.EmailField(unique=True)
+    token = models.CharField(max_length=64, unique=True, default=_generate_token)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+
+    def mark_accepted(self):
+        self.accepted_at = timezone.now()
+        self.save(update_fields=["accepted_at"])
+
+    def __str__(self):  # pragma: no cover - simple string representation
+        return self.email
