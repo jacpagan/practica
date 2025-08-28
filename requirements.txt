@@ -15,7 +15,7 @@ celery
 # Email and Queue
 django-rq
 redis
-sendgrid
+boto3
 
 # Cloud Services
 boto3

@@ -1,34 +1,49 @@
 """
-SendGrid email backend for Django
+Amazon SES email backend for Django
 """
 import logging
+import boto3
+from botocore.exceptions import ClientError, NoCredentialsError
 from django.core.mail.backends.base import BaseEmailBackend
 from django.conf import settings
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email, To, Content, HtmlContent, TextContent
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 
 logger = logging.getLogger(__name__)
 
 
-class SendGridEmailBackend(BaseEmailBackend):
+class AmazonSESEmailBackend(BaseEmailBackend):
     """
-    SendGrid email backend for Django
+    Amazon SES email backend for Django
     """
     
     def __init__(self, fail_silently=False, **kwargs):
         super().__init__(fail_silently=fail_silently, **kwargs)
-        self.api_key = getattr(settings, 'SENDGRID_API_KEY', '')
-        self.from_email = getattr(settings, 'SENDGRID_FROM_EMAIL', 'noreply@practika.com')
-        self.from_name = getattr(settings, 'SENDGRID_FROM_NAME', 'Practika')
         
-        if not self.api_key:
-            logger.warning("SendGrid API key not configured. Emails will not be sent.")
+        # Get AWS credentials from settings
+        self.aws_access_key_id = getattr(settings, 'AWS_ACCESS_KEY_ID', '')
+        self.aws_secret_access_key = getattr(settings, 'AWS_SECRET_ACCESS_KEY', '')
+        self.aws_region = getattr(settings, 'AWS_S3_REGION_NAME', 'us-east-1')
+        self.from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@practika.com')
+        self.from_name = getattr(settings, 'SES_FROM_NAME', 'Practika')
+        
+        if not self.aws_access_key_id or not self.aws_secret_access_key:
+            logger.warning("AWS credentials not configured. Emails will not be sent.")
             return
             
         try:
-            self.sg = SendGridAPIClient(api_key=self.api_key)
+            # Initialize SES client
+            self.ses_client = boto3.client(
+                'ses',
+                aws_access_key_id=self.aws_access_key_id,
+                aws_secret_access_key=self.aws_secret_access_key,
+                region_name=self.aws_region
+            )
+            logger.info("Amazon SES client initialized successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize SendGrid client: {e}")
+            logger.error(f"Failed to initialize Amazon SES client: {e}")
             if not fail_silently:
                 raise
     
@@ -36,44 +51,71 @@ class SendGridEmailBackend(BaseEmailBackend):
         """
         Send one or more EmailMessage objects and return the number of email messages sent.
         """
-        if not self.api_key:
-            logger.warning("SendGrid API key not configured. Skipping email send.")
+        if not hasattr(self, 'ses_client'):
+            logger.warning("Amazon SES client not initialized. Skipping email send.")
             return 0
             
         num_sent = 0
         
         for message in email_messages:
             try:
-                # Create SendGrid Mail object
-                mail = Mail(
-                    from_email=Email(self.from_email, self.from_name),
-                    to_emails=[To(email) for email in message.to],
-                    subject=message.subject,
-                    html_content=HtmlContent(message.body) if message.content_subtype == 'html' else None,
-                    plain_text_content=TextContent(message.body) if message.content_subtype == 'plain' else None
-                )
+                # Create MIME message
+                msg = MIMEMultipart('alternative')
+                msg['Subject'] = message.subject
+                msg['From'] = f"{self.from_name} <{self.from_email}>"
+                msg['To'] = ', '.join(message.to)
                 
                 # Add CC recipients if any
                 if message.cc:
-                    for cc_email in message.cc:
-                        mail.add_cc(Email(cc_email))
+                    msg['Cc'] = ', '.join(message.cc)
                 
                 # Add BCC recipients if any
                 if message.bcc:
-                    for bcc_email in message.bcc:
-                        mail.add_bcc(Email(bcc_email))
+                    msg['Bcc'] = ', '.join(message.bcc)
                 
-                # Send the email
-                response = self.sg.send(mail)
-                
-                if response.status_code in [200, 201, 202]:
-                    logger.info(f"Email sent successfully to {message.to}. Status: {response.status_code}")
-                    num_sent += 1
+                # Add message body
+                if message.content_subtype == 'html':
+                    html_part = MIMEText(message.body, 'html')
+                    msg.attach(html_part)
                 else:
-                    logger.error(f"Failed to send email. Status: {response.status_code}, Body: {response.body}")
-                    if not self.fail_silently:
-                        raise Exception(f"SendGrid API error: {response.status_code}")
-                        
+                    text_part = MIMEText(message.body, 'plain')
+                    msg.attach(text_part)
+                
+                # Add attachments if any
+                for attachment in message.attachments:
+                    if isinstance(attachment, tuple):
+                        filename, content, mimetype = attachment
+                        part = MIMEBase('application', 'octet-stream')
+                        part.set_payload(content)
+                        encoders.encode_base64(part)
+                        part.add_header('Content-Disposition', f'attachment; filename= {filename}')
+                        msg.attach(part)
+                
+                # Send email via SES
+                response = self.ses_client.send_raw_email(
+                    Source=self.from_email,
+                    Destinations=message.to + (message.cc or []) + (message.bcc or []),
+                    RawMessage={'Data': msg.as_string()}
+                )
+                
+                logger.info(f"Email sent successfully to {message.to}. Message ID: {response['MessageId']}")
+                num_sent += 1
+                
+            except ClientError as e:
+                error_code = e.response['Error']['Code']
+                error_message = e.response['Error']['Message']
+                logger.error(f"SES ClientError sending email to {message.to}: {error_code} - {error_message}")
+                
+                if error_code == 'MessageRejected':
+                    logger.error("Email rejected by SES. Check sender verification.")
+                elif error_code == 'MailFromDomainNotVerified':
+                    logger.error("Sender domain not verified in SES.")
+                elif error_code == 'ConfigurationSetDoesNotExist':
+                    logger.error("SES configuration set does not exist.")
+                    
+                if not self.fail_silently:
+                    raise
+                    
             except Exception as e:
                 logger.error(f"Error sending email to {message.to}: {e}")
                 if not self.fail_silently:
