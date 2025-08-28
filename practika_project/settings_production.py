@@ -159,6 +159,29 @@ else:
     }
     print("Local storage configured for production")
 
+# Email settings - Use SendGrid if configured, otherwise fallback to console
+if os.getenv('SENDGRID_API_KEY'):
+    EMAIL_BACKEND = 'core.email_backends.SendGridEmailBackend'
+    print("SendGrid email backend configured")
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    print("Console email backend configured (no SendGrid API key)")
+
+# Email configuration
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'localhost')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_USE_SSL = os.getenv('EMAIL_SSL', 'False').lower() == 'true'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('SENDGRID_FROM_EMAIL', 'noreply@practika.com')
+SITE_URL = os.getenv('SITE_URL', 'https://practika-d127ed6da5d2.herokuapp.com')
+
+# SendGrid settings
+SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY', '')
+SENDGRID_FROM_EMAIL = os.getenv('SENDGRID_FROM_EMAIL', 'noreply@practika.com')
+SENDGRID_FROM_NAME = os.getenv('SENDGRID_FROM_NAME', 'Practika')
+
 # Celery configuration
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'memory://')
 CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'memory://')
