@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 from django.core import mail
 import re
-from .models import Role, Profile
+from .models import Role, Profile, BetaInvitation
 
 
 class AccountsTests(TestCase):
@@ -12,6 +12,8 @@ class AccountsTests(TestCase):
         # Roles should be seeded by migration
         self.student_role = Role.objects.get(name='student')
         self.instructor_role = Role.objects.get(name='instructor')
+        invitation = BetaInvitation.objects.create(email='invite@example.com')
+        self.client.get(reverse('exercises:login') + f'?token={invitation.token}')
 
     def test_signup_page_loads(self):
         response = self.client.get(reverse('exercises:login'))

@@ -12,6 +12,7 @@ from exercises.models import Exercise
 from exercises.serializers import ExerciseSerializer
 from exercises.permissions import IsAdminForExercise
 from accounts.models import Role, Profile
+from accounts.decorators import beta_invitation_required
 import re
 import logging
 
@@ -94,6 +95,7 @@ def exercise_create(request):
     return render(request, 'exercises/exercise_create.html')
 
 
+@beta_invitation_required
 def user_login(request):
     """Enhanced user login/signup view with security features"""
     if request.method == 'POST':

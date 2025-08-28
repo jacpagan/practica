@@ -39,8 +39,16 @@
                 </div>
 
                 <div class="exercise-actions">
-                    <a href="{% url 'exercises:exercise_detail' exercise.id %}" class="btn btn-primary" title="👁️ View Details & Comments">
-                        👁️ {{ exercise.videocomment_set.count }} 💬
+                    <a
+                        href="{% url 'exercises:exercise_detail' exercise.id %}"
+                        class="btn btn-primary"
+                        title="View Details & Comments"
+                        aria-label="View exercise details and comments"
+                    >
+                        <svg class="icon" aria-hidden="true">
+                            <use href="/static/icons/icons.svg#play"></use>
+                        </svg>
+                        <span class="label-text">View Details & Comments</span>
                     </a>
                 </div>
             </div>
