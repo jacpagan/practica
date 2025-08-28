@@ -166,9 +166,11 @@ def _handle_signup(request):
         logger.info(f"New user registered: {username}")
         messages.success(
             request, 
-            'Account created successfully! You can now log in.'
+            'Account created successfully! Welcome to Practika!'
         )
-        return redirect('exercises:login')
+        # Log the user in and redirect to welcome flow
+        login(request, user)
+        return redirect('exercises:welcome')
         
     except Exception as e:
         logger.error(f"Signup error: {e}")
@@ -315,8 +317,15 @@ def welcome_flow(request):
     """Welcome flow for new users"""
     user = request.user
     
+    # Debug logging
+    logger.info(f"Welcome flow accessed by user: {user.username}")
+    logger.info(f"User has profile: {hasattr(user, 'profile')}")
+    if hasattr(user, 'profile'):
+        logger.info(f"Onboarding completed: {getattr(user.profile, 'onboarding_completed', False)}")
+    
     # Check if user has completed onboarding
-    if hasattr(user, 'profile') and user.profile.onboarding_completed:
+    if hasattr(user, 'profile') and getattr(user.profile, 'onboarding_completed', False):
+        logger.info(f"User {user.username} has completed onboarding, redirecting to exercise list")
         return redirect('exercises:exercise_list')
     
     if request.method == 'POST':
@@ -324,10 +333,12 @@ def welcome_flow(request):
         if hasattr(user, 'profile'):
             user.profile.onboarding_completed = True
             user.profile.save()
+            logger.info(f"User {user.username} onboarding marked as completed")
         
         messages.success(request, 'Welcome to Practika! Let\'s get started.')
         return redirect('exercises:exercise_list')
     
+    logger.info(f"Rendering welcome template for user: {user.username}")
     return render(request, 'exercises/welcome.html', {
         'user': user,
         'total_exercises': Exercise.objects.count(),
