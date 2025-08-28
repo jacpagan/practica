@@ -159,13 +159,13 @@ else:
     }
     print("Local storage configured for production")
 
-# Email settings - Use SendGrid if configured, otherwise fallback to console
-if os.getenv('SENDGRID_API_KEY'):
-    EMAIL_BACKEND = 'core.email_backends.SendGridEmailBackend'
-    print("SendGrid email backend configured")
+# Email settings - Use Amazon SES if configured, otherwise fallback to console
+if os.getenv('AWS_ACCESS_KEY_ID') and os.getenv('AWS_SECRET_ACCESS_KEY'):
+    EMAIL_BACKEND = 'core.email_backends.AmazonSESEmailBackend'
+    print("Amazon SES email backend configured")
 else:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-    print("Console email backend configured (no SendGrid API key)")
+    print("Console email backend configured (no AWS credentials)")
 
 # Email configuration
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'localhost')
@@ -177,10 +177,8 @@ EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.getenv('SENDGRID_FROM_EMAIL', 'noreply@practika.com')
 SITE_URL = os.getenv('SITE_URL', 'https://practika-d127ed6da5d2.herokuapp.com')
 
-# SendGrid settings
-SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY', '')
-SENDGRID_FROM_EMAIL = os.getenv('SENDGRID_FROM_EMAIL', 'noreply@practika.com')
-SENDGRID_FROM_NAME = os.getenv('SENDGRID_FROM_NAME', 'Practika')
+# Amazon SES settings
+SES_FROM_NAME = os.getenv('SES_FROM_NAME', 'Practika')
 
 # Celery configuration
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'memory://')

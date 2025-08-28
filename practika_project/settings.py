@@ -108,10 +108,8 @@ EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@practika.com')
 SITE_URL = os.getenv('SITE_URL', 'http://localhost:8000')
 
-# SendGrid settings
-SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY', '')
-SENDGRID_FROM_EMAIL = os.getenv('SENDGRID_FROM_EMAIL', 'noreply@practika.com')
-SENDGRID_FROM_NAME = os.getenv('SENDGRID_FROM_NAME', 'Practika')
+# Amazon SES settings
+SES_FROM_NAME = os.getenv('SES_FROM_NAME', 'Practika')
 
 # Redis Queue (RQ) settings for async email sending
 RQ_QUEUES = {
