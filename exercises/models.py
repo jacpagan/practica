@@ -18,6 +18,10 @@ class Exercise(models.Model):
     class Meta:
         db_table = "exercises_exercise"
         unique_together = ["name", "created_by"]
+        indexes = [
+            models.Index(fields=['created_by']),
+            models.Index(fields=['created_at']),
+        ]
 
     def __str__(self):
         return f"{self.name} by {self.created_by.username}"

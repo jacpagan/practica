@@ -19,6 +19,11 @@ class VideoComment(models.Model):
     class Meta:
         db_table = "comments_videocomment"
         ordering = ['-created_at']  # Most recent first
+        indexes = [
+            models.Index(fields=['exercise']),
+            models.Index(fields=['author']),
+            models.Index(fields=['created_at']),
+        ]
 
     def __str__(self):
         return f"Comment by {self.author.username} on {self.exercise.name}"
