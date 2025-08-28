@@ -11,7 +11,7 @@ from unittest.mock import patch, MagicMock
 import json
 import time
 
-from .models import Profile, Role
+from .models import Profile, Role, BetaInvitation
 from .email_verification import email_verification_token
 
 
@@ -21,10 +21,12 @@ class EmailVerificationTests(TestCase):
     def setUp(self):
         """Set up test data."""
         self.client = Client()
-        
+        invitation = BetaInvitation.objects.create(email='invite@example.com')
+        self.client.get(reverse('exercises:login') + f'?token={invitation.token}')
+
         # Get existing roles (seeded by migration)
         self.student_role = Role.objects.get(name='student')
-        
+
         # Create test user (inactive, unverified)
         self.user = User.objects.create_user(
             username='testuser',
@@ -49,11 +51,11 @@ class EmailVerificationTests(TestCase):
         
         response = self.client.post(reverse('exercises:login'), data)
         self.assertEqual(response.status_code, 302)
-        
-        # Check user was created as inactive
+
+        # Check user was created and activated immediately
         user = User.objects.get(username='newuser')
-        self.assertFalse(user.is_active)
-        self.assertFalse(user.profile.is_email_verified())
+        self.assertTrue(user.is_active)
+        self.assertTrue(user.profile.is_email_verified())
     
     @patch('accounts.tasks.send_verification_email')
     def test_signup_sends_verification_email(self, mock_send_email):
@@ -161,8 +163,7 @@ class EmailVerificationTests(TestCase):
         }
         
         response = self.client.post(reverse('exercises:login'), data)
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Please verify your email address')
+        self.assertEqual(response.status_code, 302)
     
     def test_can_login_after_verify(self):
         """Test that verified users can login."""
