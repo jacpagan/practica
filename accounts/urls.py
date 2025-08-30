@@ -12,6 +12,7 @@ urlpatterns = [
     path('logout/', user_logout, name='logout'),  # Use the styled logout from exercises
     path('verify-email/', views.EmailVerificationView.as_view(), name='verify_email'),
     path('resend-verification/', views.ResendVerificationView.as_view(), name='resend_verification'),
+    path('teacher/', views.teacher_dashboard, name='teacher_dashboard'),
     path(
         'password-reset/',
         auth_views.PasswordResetView.as_view(
