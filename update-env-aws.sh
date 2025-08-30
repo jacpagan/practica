@@ -10,12 +10,12 @@ cp .env .env.backup.$(date +%Y%m%d_%H%M%S)
 # Update .env file with AWS configuration
 cat > .env << 'EOF'
 # Django Settings
-DJANGO_SECRET_KEY=+&e+-kxlu$-kanisjn**n!8yk()0071cq#-oeb@2d@q!d+5=^_
+DJANGO_SECRET_KEY=your-secret-key-here
 DJANGO_ENVIRONMENT=production
 DJANGO_DEBUG=False
 
 # Database Configuration for AWS RDS PostgreSQL
-DB_HOST=practika-prod-db-v2.cwn404is0bz8.us-east-1.rds.amazonaws.com
+DB_HOST=your-rds-endpoint.region.rds.amazonaws.com
 DB_NAME=practika
 DB_USER=practika_admin
 DB_PASSWORD=your_secure_database_password_here
@@ -53,5 +53,5 @@ echo "   Edit the .env file and replace 'your_secure_database_password_here' wit
 echo ""
 echo "   You can find your password in your AWS deployment configuration or CloudFormation stack parameters"
 echo ""
-echo "Current database endpoint: practika-prod-db-v2.cwn404is0bz8.us-east-1.rds.amazonaws.com"
+echo "Current database endpoint: your-rds-endpoint.region.rds.amazonaws.com"
 echo ""
