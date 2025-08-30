@@ -42,7 +42,9 @@
                 <button type="button" id="change-video" class="btn btn-sm btn-outline">Record Again</button>
             </div>
             <div id="webcam-container" style="display: none;">
-                <video id="webcam-preview" autoplay muted playsinline style="width: 100%; max-width: 400px; border-radius: 8px;"></video>
+                <video id="webcam-preview" autoplay muted playsinline 
+                       style="width: 100%; max-width: 400px; border-radius: 8px;"
+                       preload="none" disablePictureInPicture></video>
                 <div class="webcam-controls" style="margin-top: 10px;">
                     <button type="button" id="flip-camera" class="btn btn-sm btn-secondary" style="display: none;" title="🔄 Flip Camera">🔄</button>
                     <button type="button" id="record-video" class="btn btn-danger" style="display: none;" title="🔴 Start Recording">🔴</button>
@@ -171,21 +173,41 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error('Camera access not supported in this browser. Please use a modern browser or upload a video file instead.');
             }
             
-            // Mobile-friendly camera constraints
+            // Performance-optimized camera constraints
             const constraints = {
                 video: { 
                     width: { ideal: 640, max: 1280 },
                     height: { ideal: 480, max: 720 },
-                    facingMode: currentFacingMode
+                    facingMode: currentFacingMode,
+                    // Performance optimizations
+                    frameRate: { ideal: 30, max: 30 },
+                    aspectRatio: { ideal: 16/9 },
+                    // Reduce processing overhead
+                    resizeMode: 'crop-and-scale'
                 },
-                audio: true 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    sampleRate: 44100,
+                    channelCount: 1
+                }
             };
             
+            const startTime = performance.now();
             currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+            const endTime = performance.now();
+            
+            console.log(`Camera started in ${(endTime - startTime).toFixed(2)}ms with facing mode:`, currentFacingMode);
+            
+            // Set video properties for better performance
             webcamPreview.srcObject = currentStream;
+            webcamPreview.onloadedmetadata = function() {
+                console.log('Video metadata loaded, dimensions:', webcamPreview.videoWidth, 'x', webcamPreview.videoHeight);
+            };
+            
             flipCameraBtn.style.display = 'inline-block';
             recordVideoBtn.style.display = 'inline-block';
-            console.log('Camera started successfully with facing mode:', currentFacingMode);
         } catch (err) {
             console.error('Camera access error:', err);
             let errorMsg = 'Error accessing camera: ' + err.message;
@@ -233,8 +255,22 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         recordedChunks = [];
-        mediaRecorder = new MediaRecorder(currentStream);
         
+        // Performance-optimized MediaRecorder settings
+        const options = {
+            mimeType: 'video/webm;codecs=vp8,opus',
+            videoBitsPerSecond: 2500000, // 2.5 Mbps for good quality/size balance
+            audioBitsPerSecond: 128000   // 128 kbps audio
+        };
+        
+        // Fallback to default if codec not supported
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            options.mimeType = 'video/webm';
+        }
+        
+        mediaRecorder = new MediaRecorder(currentStream, options);
+        
+        // Optimize data collection frequency
         mediaRecorder.ondataavailable = function(event) {
             if (event.data.size > 0) {
                 recordedChunks.push(event.data);
@@ -261,7 +297,8 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('Video recorded successfully, file size:', file.size, 'bytes');
         };
         
-        mediaRecorder.start();
+        // Start recording with optimized timeslice for better performance
+        mediaRecorder.start(1000); // 1-second chunks for smoother processing
         recordVideoBtn.style.display = 'none';
         stopBtn.style.display = 'inline-block';
         recordingStatus.style.display = 'block';
@@ -321,12 +358,26 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Update recording time
+    // Update recording time with performance monitoring
     function updateRecordingTime() {
         const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
         const minutes = Math.floor(elapsed / 60);
         const seconds = elapsed % 60;
         recordingTime.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        
+        // Monitor recording performance every 5 seconds
+        if (elapsed % 5 === 0 && elapsed > 0) {
+            const videoTrack = currentStream?.getVideoTracks()[0];
+            if (videoTrack) {
+                const settings = videoTrack.getSettings();
+                console.log('Recording performance check:', {
+                    frameRate: settings.frameRate,
+                    width: settings.width,
+                    height: settings.height,
+                    elapsed: elapsed
+                });
+            }
+        }
     }
     
     // Form submission handler

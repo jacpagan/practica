@@ -455,6 +455,10 @@
             background: #000;
             border-radius: 8px;
             margin-bottom: 15px;
+            /* Performance optimizations */
+            transform: translateZ(0); /* Hardware acceleration */
+            will-change: transform; /* Optimize for animations */
+            object-fit: cover; /* Maintain aspect ratio */
         }
         .webcam-controls {
             display: flex;
@@ -627,6 +631,11 @@
                 height: 240px;
                 width: 100%;
                 max-width: 100%;
+                /* Mobile performance optimizations */
+                transform: translateZ(0);
+                -webkit-transform: translateZ(0);
+                backface-visibility: hidden;
+                -webkit-backface-visibility: hidden;
             }
             
             .comment-video video {
