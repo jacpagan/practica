@@ -136,6 +136,11 @@ ALLOWED_HOSTS = [
     os.getenv('DOMAIN_NAME', ''),
 ]
 
+# Authentication Settings
+LOGIN_URL = '/exercises/login/'
+LOGIN_REDIRECT_URL = '/exercises/'
+LOGOUT_REDIRECT_URL = '/exercises/'
+
 # CORS Settings for AWS
 CORS_ALLOWED_ORIGINS = [
     f"https://{os.getenv('DOMAIN_NAME', 'localhost')}",

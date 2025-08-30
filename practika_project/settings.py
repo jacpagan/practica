@@ -270,8 +270,9 @@ REST_FRAMEWORK = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-LOGIN_REDIRECT_URL = "/"
-LOGOUT_REDIRECT_URL = "/"
+LOGIN_URL = "/exercises/login/"
+LOGIN_REDIRECT_URL = "/exercises/"
+LOGOUT_REDIRECT_URL = "/exercises/"
 
 # File upload settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv('DJANGO_FILE_UPLOAD_MAX_MEMORY_SIZE', 100 * 1024 * 1024))  # 100MB
