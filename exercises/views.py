@@ -28,6 +28,13 @@ def exercise_list(request):
 def exercise_detail(request, exercise_id):
     """Display single exercise with comments ordered by newest first"""
     exercise = get_object_or_404(Exercise, id=exercise_id)
+    
+    # Debug logging
+    logger.info(f"Exercise detail view - exercise_id: {exercise_id}")
+    logger.info(f"Exercise has video_asset: {hasattr(exercise, 'video_asset')}")
+    if hasattr(exercise, 'video_asset') and exercise.video_asset:
+        logger.info(f"Video asset fields: youtube_url={getattr(exercise.video_asset, 'youtube_url', 'N/A')}, video_type={getattr(exercise.video_asset, 'video_type', 'N/A')}")
+    
     return render(request, 'exercises/exercise_detail.html', {'exercise': exercise})
 
 
