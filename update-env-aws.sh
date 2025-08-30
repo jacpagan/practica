@@ -26,8 +26,8 @@ REDIS_URL=redis://redis:6379/1
 
 # AWS S3 Storage Configuration (Required for video uploads)
 # Prefer IAM role when running in AWS; keys optional for local only
-AWS_ACCESS_KEY_ID=AKIASMXOUPM264T2QBNF
-AWS_SECRET_ACCESS_KEY=HeP3FlTQj0Y5JrwQBWog8/rFGeZkpbbEWQ9Pv0eS
+AWS_ACCESS_KEY_ID=your_aws_access_key_id_here
+AWS_SECRET_ACCESS_KEY=your_aws_secret_access_key_here
 AWS_STORAGE_BUCKET_NAME=practika-videos
 AWS_S3_REGION_NAME=us-east-1
 

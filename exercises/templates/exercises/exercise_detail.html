@@ -69,7 +69,7 @@
                         <button type="button" id="comment-change-video" class="btn btn-sm btn-outline">Record Again</button>
                     </div>
                     <div id="webcam-container" style="display: none;">
-                        <video id="webcam-preview" autoplay muted playsinline></video>
+                        <video id="webcam-preview" autoplay muted playsinline style="width: 100%; max-width: 400px; border-radius: 8px; margin-bottom: 15px;"></video>
                         <div class="webcam-controls">
                             <button type="button" id="start-camera" class="btn btn-sm btn-primary" title="📷 Start Camera">📷</button>
                             <button type="button" id="flip-camera" class="btn btn-sm btn-secondary" style="display: none;" title="🔄 Flip Camera">🔄</button>
@@ -79,6 +79,7 @@
                         <div id="recording-status" style="display: none;">
                             <p>🔴 Recording... <span id="recording-time">00:00</span></p>
                         </div>
+                        <div id="camera-error" style="display: none; color: #dc3545; margin-top: 10px; padding: 10px; background: #f8d7da; border-radius: 5px;"></div>
                     </div>
                     
                     <div id="youtube-container" style="display: none;">
@@ -139,26 +140,16 @@
     {% endif %}
 
     <div class="comments-section">
-        <h3>Video Comments ({{ exercise.videocomment_set.count }})</h3>
-        
-        {% for comment in exercise.videocomment_set.all %}
+        <h3>💬 Video Comments</h3>
+        {% for comment in comments %}
         <div class="comment">
             <div class="meta">
-                <strong>{{ comment.author.username }}</strong>
-                {% if comment.author.is_staff %}<span class="admin-badge">Admin</span>{% endif %}
-                <span>{{ comment.created_at|date:"M d, Y H:i" }}</span>
-                
-                {% if user == comment.author or user.is_staff %}
-                <div class="comment-actions">
-                    <a href="{% url 'comments:edit_comment' comment.id %}" class="btn btn-sm btn-warning" title="✏️ Edit Comment">✏️</a>
-                    <a href="{% url 'comments:delete_comment' comment.id %}" class="btn btn-sm btn-danger" 
-                       onclick="return confirm('Are you sure you want to delete this comment?')" title="🗑️ Delete Comment">🗑️</a>
-                </div>
-                {% endif %}
+                <strong>{{ comment.author.username }}</strong> 
+                {{ comment.created_at|date:"M d, Y H:i" }}
             </div>
             
             {% if comment.text %}
-                <p>{{ comment.text }}</p>
+            <p>{{ comment.text }}</p>
             {% endif %}
             
             <div class="comment-video">
@@ -192,76 +183,15 @@
             <p>No comments yet. Be the first to comment!</p>
         {% endfor %}
         
-        {% if not user.is_authenticated %}
-            <div class="card">
-                <h4>Add Comment</h4>
-                <form method="post" action="{% url 'comments:add_comment' exercise.id %}" enctype="multipart/form-data">
-                    {% csrf_token %}
-                    <div class="form-group">
-                        <label for="comment-text">💬 Comment Text:</label>
-                        <textarea id="comment-text" name="text" rows="3" placeholder="Write your comment here..."></textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>🎥 Video Comment (Required):</label>
-                        <input type="file" name="video" accept="video/*" style="display: none;">
-                        <div class="video-options">
-                            <button type="button" id="upload-btn" class="btn btn-sm btn-secondary" title="📁 Upload Video">📁 Upload</button>
-                            <button type="button" id="record-btn" class="btn btn-sm btn-primary" title="🎥 Record Video">🎥 Record</button>
-                            <button type="button" id="youtube-btn" class="btn btn-sm btn-success" title="📺 Add YouTube Video">📺 YouTube</button>
-                        </div>
-                        <div id="video-preview" style="display: none;">
-                            <p>✅ Video ready: <span id="video-name"></span></p>
-                            <video id="comment-video-playback" controls style="display: none; width: 100%; max-width: 300px; border-radius: 8px; margin-top: 10px;"></video>
-                            <button type="button" id="comment-change-video" class="btn btn-sm btn-outline">Record Again</button>
-                        </div>
-                        <div id="webcam-container" style="display: none;">
-                            <video id="webcam-preview" autoplay muted playsinline></video>
-                            <div class="webcam-controls">
-                                <button type="button" id="start-camera" class="btn btn-sm btn-primary" title="📷 Start Camera">📷</button>
-                                <button type="button" id="flip-camera" class="btn btn-sm btn-secondary" style="display: none;" title="🔄 Flip Camera">🔄</button>
-                                <button type="button" id="record-video" class="btn btn-sm btn-danger" style="display: none;" title="🔴 Record">🔴</button>
-                                <button type="button" id="stop-recording" class="btn btn-sm btn-warning" style="display: none;" title="⏹️ Stop">⏹️</button>
-                            </div>
-                            <div id="recording-status" style="display: none;">
-                                <p>🔴 Recording... <span id="recording-time">00:00</span></p>
-                            </div>
-                        </div>
-                        
-                        <div id="youtube-container" style="display: none;">
-                            <div class="form-group">
-                                <label for="youtube-url">📺 YouTube Video URL:</label>
-                                <input type="url" id="youtube-url" name="youtube_url" 
-                                       placeholder="https://www.youtube.com/watch?v=..." 
-                                       pattern="https?://(?:www\.)?(?:youtube\.com|youtu\.be)/.*"
-                                       title="Please enter a valid YouTube URL">
-                                <div class="form-help">Paste a YouTube video URL for your comment</div>
-                            </div>
-                            <div id="youtube-preview" style="display: none;">
-                                <div class="youtube-video-container">
-                                    <iframe id="youtube-embed" width="300" height="200" 
-                                            frameborder="0" allowfullscreen 
-                                            style="border-radius: 8px; margin-top: 10px;"></iframe>
-                                </div>
-                                <button type="button" id="change-youtube" class="btn btn-sm btn-outline" style="margin-top: 10px;">Change YouTube URL</button>
-                            </div>
-                        </div>
-                    </div>
-                        
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-success" onclick="return validateCommentForm()" title="💬 Add Comment">💬 Add Comment</button>
-                    </div>
-                </form>
-            </div>
-        {% else %}
-            <p><a href="{% url 'exercises:login' %}" title="🔑 Login to add comments">🔑 Login to add comments</a></p>
-        {% endif %}
+
     </div>
 </div>
 
 <script>
-// Simplified video recording functionality for comments
+// Enhanced video recording functionality with better error handling
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('Initializing enhanced video recording functionality...');
+    
     const uploadBtn = document.getElementById('upload-btn');
     const recordBtn = document.getElementById('record-btn');
     const youtubeBtn = document.getElementById('youtube-btn');
@@ -282,14 +212,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const recordingTime = document.getElementById('recording-time');
     const commentVideoPlayback = document.getElementById('comment-video-playback');
     const commentChangeVideoBtn = document.getElementById('comment-change-video');
+    const cameraError = document.getElementById('camera-error');
     
     // Check if we're on a page with camera functionality
     if (!startCameraBtn || !recordBtn) {
         console.log('Camera elements not found, skipping camera initialization');
         return;
     }
-    
-    console.log('Initializing camera recording functionality...');
     
     let mediaRecorder;
     let recordedChunks = [];
@@ -298,58 +227,41 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentStream = null;
     let currentFacingMode = 'user'; // Start with front camera
     
+    // Check HTTPS requirement for camera access
+    function checkHTTPSRequirement() {
+        if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+            const errorMsg = 'Camera access requires HTTPS. Please contact support to enable HTTPS for camera recording.';
+            console.warn(errorMsg);
+            if (cameraError) {
+                cameraError.textContent = errorMsg;
+                cameraError.style.display = 'block';
+            }
+            return false;
+        }
+        return true;
+    }
+    
     // Upload button click
     uploadBtn.addEventListener('click', function() {
         videoInput.click();
         youtubeContainer.style.display = 'none';
         webcamContainer.style.display = 'none';
-    });
-    
-    // YouTube button click
-    youtubeBtn.addEventListener('click', function() {
-        youtubeContainer.style.display = 'block';
-        videoPreview.style.display = 'none';
-        webcamContainer.style.display = 'none';
-        youtubePreview.style.display = 'none';
-        youtubeUrlInput.value = '';
-    });
-
-    // Change recorded/uploaded video
-    commentChangeVideoBtn.addEventListener('click', function() {
-        videoPreview.style.display = 'none';
-        videoInput.value = '';
-        // Clear recorded video reference
-        window.recordedVideoFile = null;
-        if (commentVideoPlayback) {
-            commentVideoPlayback.pause();
-            commentVideoPlayback.removeAttribute('src');
-            commentVideoPlayback.style.display = 'none';
-        }
-    });
-
-    // File input change
-    videoInput.addEventListener('change', function() {
-        if (this.files && this.files[0]) {
-            const file = this.files[0];
-            videoName.textContent = file.name;
-            videoPreview.style.display = 'block';
-            webcamContainer.style.display = 'none';
-            // Clear recorded video reference when uploading new file
-            window.recordedVideoFile = null;
-            if (commentVideoPlayback) {
-                commentVideoPlayback.src = URL.createObjectURL(file);
-                commentVideoPlayback.style.display = 'block';
-                commentVideoPlayback.play().catch(() => {});
-            }
-        }
+        if (cameraError) cameraError.style.display = 'none';
     });
     
     // Record button click - start camera and recording in one step
     recordBtn.addEventListener('click', async function() {
         console.log('Record button clicked, starting camera...');
+        
+        if (!checkHTTPSRequirement()) {
+            alert('Camera access requires HTTPS. Please use the upload option instead.');
+            return;
+        }
+        
         webcamContainer.style.display = 'block';
         videoPreview.style.display = 'none';
         youtubeContainer.style.display = 'none';
+        if (cameraError) cameraError.style.display = 'none';
         
         // Auto-start camera and recording for one-click experience
         try {
@@ -375,6 +287,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (isValidYouTubeUrl(url)) {
             const videoId = extractYouTubeVideoId(url);
             if (videoId) {
+                // Use a simpler embed URL without problematic parameters
                 youtubeEmbed.src = `https://www.youtube.com/embed/${videoId}`;
                 youtubePreview.style.display = 'block';
                 // Store YouTube URL globally for form submission
@@ -419,26 +332,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         return null;
     }
-        webcamContainer.style.display = 'block';
-        videoPreview.style.display = 'none';
-        
-        // Auto-start camera and recording for one-click experience
-        try {
-            await startCamera();
-            // Small delay to ensure camera is ready
-            setTimeout(() => {
-                if (currentStream) {
-                    recordVideoBtn.click();
-                }
-            }, 500);
-        } catch (err) {
-            console.error('Auto-start failed:', err);
-        }
-    });
     
     // Start camera
     startCameraBtn.addEventListener('click', async function() {
         console.log('Manual camera start button clicked');
+        if (!checkHTTPSRequirement()) {
+            alert('Camera access requires HTTPS. Please use the upload option instead.');
+            return;
+        }
         try {
             await startCamera();
         } catch (err) {
@@ -497,6 +398,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const flipCameraBtn = document.getElementById('flip-camera');
                 if (flipCameraBtn) flipCameraBtn.style.display = 'inline-block';
                 recordVideoBtn.style.display = 'inline-block';
+                if (cameraError) cameraError.style.display = 'none';
             };
             
             console.log('Camera started successfully for comment with facing mode:', currentFacingMode);
@@ -511,8 +413,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 errorMsg = 'Camera not supported in this browser. Please try a different browser.';
             } else if (err.name === 'NotReadableError') {
                 errorMsg = 'Camera is in use by another application. Please close other camera apps and try again.';
+            } else if (err.name === 'SecurityError') {
+                errorMsg = 'Camera access blocked due to security restrictions. Please check your browser settings.';
             }
-            alert(errorMsg);
+            
+            if (cameraError) {
+                cameraError.textContent = errorMsg;
+                cameraError.style.display = 'block';
+            } else {
+                alert(errorMsg);
+            }
             
             // Reset UI state
             startCameraBtn.style.display = 'inline-block';
@@ -561,80 +471,49 @@ document.addEventListener('DOMContentLoaded', function() {
             };
             
             mediaRecorder.onstop = function() {
-                if (recordedChunks.length === 0) {
-                    alert('No video data recorded. Please try again.');
-                    return;
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                const file = new File([blob], 'webcam-recording.webm', { type: 'video/webm' });
+                
+                // Set the file to the input
+                setFileToInput(file);
+                
+                // Show success and stop camera
+                videoName.textContent = 'Webcam Recording (' + Math.round(file.size / 1024) + ' KB)';
+                videoPreview.style.display = 'block';
+                if (commentVideoPlayback) {
+                    commentVideoPlayback.src = URL.createObjectURL(blob);
+                    commentVideoPlayback.style.display = 'block';
+                    commentVideoPlayback.load(); // Force reload
+                    commentVideoPlayback.play().catch((err) => {
+                        console.log('Auto-play prevented:', err);
+                    });
                 }
                 
-                const blob = new Blob(recordedChunks, { type: mimeType });
-                const file = new File([blob], 'webcam-comment.webm', { type: mimeType });
+                webcamContainer.style.display = 'none';
                 
-                console.log('Recording stopped, blob size:', blob.size, 'bytes');
-                
-                // Store the recorded file globally for form submission
-                window.recordedVideoFile = file;
+                console.log('Comment video recorded successfully, file size:', file.size, 'bytes');
+                console.log('Video input files:', videoInput.files);
+            };
             
-            // Create a more reliable file attachment method
-            try {
-                // Method 1: Try to create a new FileList using DataTransfer
-                if (window.DataTransfer) {
-                    const dataTransfer = new DataTransfer();
-                    dataTransfer.items.add(file);
-                    videoInput.files = dataTransfer.files;
-                    console.log('File attached using DataTransfer API');
-                } else {
-                    throw new Error('DataTransfer not available');
-                }
-            } catch (e) {
-                console.warn('DataTransfer failed, using fallback method:', e);
-                // Fallback: Create a new input element with the file
-                const newInput = document.createElement('input');
-                newInput.type = 'file';
-                newInput.name = 'video';
-                newInput.accept = 'video/*';
-                newInput.style.display = 'none';
-                
-                // Try to set the file directly
-                try {
-                    newInput.files = [file];
-                } catch (e2) {
-                    console.warn('Direct file assignment failed:', e2);
-                    // Last resort: store file reference for manual handling
-                    newInput.recordedFile = file;
-                }
-                
-                // Replace the original input
-                videoInput.parentNode.replaceChild(newInput, videoInput);
-                videoInput = newInput;
-                console.log('File attached using fallback method');
-            }
+            mediaRecorder.start();
+            recordVideoBtn.style.display = 'none';
+            stopBtn.style.display = 'inline-block';
+            recordingStatus.style.display = 'block';
             
-            // Show success and preview
-            videoName.textContent = 'Webcam Recording (' + Math.round(file.size / 1024) + ' KB)';
-            videoPreview.style.display = 'block';
+            // Start recording timer
+            recordingStartTime = Date.now();
+            recordingInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                recordingTime.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }, 1000);
             
-            if (commentVideoPlayback) {
-                commentVideoPlayback.src = URL.createObjectURL(blob);
-                commentVideoPlayback.style.display = 'block';
-                commentVideoPlayback.load(); // Force reload
-                commentVideoPlayback.play().catch((err) => {
-                    console.log('Auto-play prevented:', err);
-                });
-            }
-            
-            webcamContainer.style.display = 'none';
-            
-            console.log('Comment video recorded successfully, file size:', file.size, 'bytes');
-            console.log('Video input files:', videoInput.files);
-        };
-        
-        mediaRecorder.start();
-        recordVideoBtn.style.display = 'none';
-        stopBtn.style.display = 'inline-block';
-        recordingStatus.style.display = 'block';
-        
-        recordingStartTime = Date.now();
-        recordingInterval = setInterval(updateRecordingTime, 1000);
+            console.log('Recording started');
+        } catch (err) {
+            console.error('Failed to start recording:', err);
+            alert('Failed to start recording: ' + err.message);
+        }
     });
     
     // Stop recording
@@ -642,105 +521,98 @@ document.addEventListener('DOMContentLoaded', function() {
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
             mediaRecorder.stop();
         }
-        
-        stopBtn.style.display = 'none';
-        recordVideoBtn.style.display = 'inline-block';
+        if (recordingInterval) {
+            clearInterval(recordingInterval);
+        }
         recordingStatus.style.display = 'none';
-        clearInterval(recordingInterval);
+        stopBtn.style.display = 'none';
     });
     
-    // Update recording time
-    function updateRecordingTime() {
-        const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
-        const minutes = Math.floor(elapsed / 60);
-        const seconds = elapsed % 60;
-        recordingTime.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    // Change video button
+    if (commentChangeVideoBtn) {
+        commentChangeVideoBtn.addEventListener('click', function() {
+            videoPreview.style.display = 'none';
+            videoInput.value = '';
+            if (commentVideoPlayback) {
+                commentVideoPlayback.pause();
+                commentVideoPlayback.removeAttribute('src');
+                commentVideoPlayback.style.display = 'none';
+            }
+        });
     }
     
-    // Form validation for comments
+    // File input change
+    videoInput.addEventListener('change', function() {
+        if (this.files && this.files[0]) {
+            const file = this.files[0];
+            videoName.textContent = file.name;
+            videoPreview.style.display = 'block';
+            webcamContainer.style.display = 'none';
+            if (commentVideoPlayback) {
+                commentVideoPlayback.src = URL.createObjectURL(file);
+                commentVideoPlayback.style.display = 'block';
+                commentVideoPlayback.play().catch(() => {});
+            }
+        }
+    });
+    
+    // YouTube button click
+    youtubeBtn.addEventListener('click', function() {
+        youtubeContainer.style.display = 'block';
+        videoPreview.style.display = 'none';
+        webcamContainer.style.display = 'none';
+        youtubePreview.style.display = 'none';
+        youtubeUrlInput.value = '';
+    });
+    
+    // Helper function to set file to input
+    function setFileToInput(file) {
+        try {
+            // Modern browsers support DataTransfer
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            videoInput.files = dataTransfer.files;
+        } catch (e) {
+            console.warn('DataTransfer failed, using fallback method:', e);
+            // Fallback: Create a new input element with the file
+            const newInput = document.createElement('input');
+            newInput.type = 'file';
+            newInput.name = 'video';
+            newInput.accept = 'video/*';
+            newInput.style.display = 'none';
+            
+            // Try to set the file directly
+            try {
+                newInput.files = [file];
+            } catch (e2) {
+                console.warn('Direct file assignment failed:', e2);
+                // Last resort: store file reference for manual handling
+                newInput.recordedFile = file;
+            }
+            
+            // Replace the original input
+            videoInput.parentNode.replaceChild(newInput, videoInput);
+            videoInput = newInput;
+            console.log('File attached using fallback method');
+        }
+    }
+    
+    // Form validation
     function validateCommentForm() {
-        const text = document.getElementById('comment-text').value.trim();
-        
-        // Check for video file in input, recorded video, or YouTube URL
-        const hasVideoFile = (videoInput.files && videoInput.files.length > 0) || window.recordedVideoFile;
+        const commentText = document.getElementById('comment-text').value.trim();
+        const hasVideo = videoInput.files && videoInput.files.length > 0;
         const hasYouTubeUrl = window.youtubeVideoUrl;
         
-        if (!hasVideoFile && !hasYouTubeUrl) {
-            alert('Either a video file or YouTube URL is required for comments.');
+        if (!hasVideo && !hasYouTubeUrl) {
+            alert('Please add a video comment (upload, record, or YouTube URL).');
             return false;
-        }
-        
-        if (hasVideoFile && hasYouTubeUrl) {
-            alert('Please provide either a video file or YouTube URL, not both.');
-            return false;
-        }
-        
-        // Ensure recorded video is properly attached to form
-        if (window.recordedVideoFile && (!videoInput.files || videoInput.files.length === 0)) {
-            console.log('Attaching recorded video to form...');
-            try {
-                const dataTransfer = new DataTransfer();
-                dataTransfer.items.add(window.recordedVideoFile);
-                videoInput.files = dataTransfer.files;
-                console.log('Recorded video attached to form');
-            } catch (e) {
-                console.error('Failed to attach recorded video:', e);
-                alert('Error attaching recorded video. Please try recording again.');
-                return false;
-            }
-        }
-        
-        if (videoInput.files && videoInput.files.length > 0) {
-            const file = videoInput.files[0];
-            if (file.size === 0) {
-                alert('The video file appears to be empty. Please try recording again.');
-                return false;
-            }
-            console.log('Comment form validation passed, submitting comment with video:', file.name, file.size, 'bytes');
         }
         
         return true;
     }
     
-    // Add form submission handler to ensure recorded video is included
-    const commentForm = document.querySelector('form[action*="add_comment"]');
-    if (commentForm) {
-        commentForm.addEventListener('submit', function(e) {
-            // Ensure recorded video is attached before submission
-            if (window.recordedVideoFile && (!videoInput.files || videoInput.files.length === 0)) {
-                console.log('Form submission: attaching recorded video...');
-                try {
-                    const dataTransfer = new DataTransfer();
-                    dataTransfer.items.add(window.recordedVideoFile);
-                    videoInput.files = dataTransfer.files;
-                    console.log('Recorded video attached during form submission');
-                } catch (error) {
-                    console.error('Failed to attach recorded video during submission:', error);
-                    e.preventDefault();
-                    alert('Error attaching recorded video. Please try recording again.');
-                    return false;
-                }
-            }
-            
-            // Verify video is present before allowing submission
-            const hasVideoFile = (videoInput.files && videoInput.files.length > 0) || window.recordedVideoFile;
-            const hasYouTubeUrl = window.youtubeVideoUrl;
-            
-            if (!hasVideoFile && !hasYouTubeUrl) {
-                e.preventDefault();
-                alert('Either a video file or YouTube URL is required for comments.');
-                return false;
-            }
-            
-            if (hasVideoFile && hasYouTubeUrl) {
-                e.preventDefault();
-                alert('Please provide either a video file or YouTube URL, not both.');
-                return false;
-            }
-            
-            console.log('Form submitting with video file:', videoInput.files[0].name, videoInput.files[0].size, 'bytes');
-        });
-    }
+    // Make validateCommentForm globally available
+    window.validateCommentForm = validateCommentForm;
 });
 </script>
 {% endblock %}
