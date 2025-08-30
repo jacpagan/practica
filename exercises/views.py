@@ -41,11 +41,13 @@ def exercise_create(request):
             name = request.POST.get('name')
             description = request.POST.get('description', '')
             video_file = request.FILES.get('video')
+            youtube_url = request.POST.get('youtube_url', '').strip()
             
             # Debug logging
             logger.info(f"Form data - name: {name}, description: {description}")
             logger.info(f"Files in request: {list(request.FILES.keys())}")
             logger.info(f"Video file: {video_file}")
+            logger.info(f"YouTube URL: {youtube_url}")
             if video_file:
                 logger.info(f"Video file details - name: {video_file.name}, size: {video_file.size}")
             
@@ -53,16 +55,24 @@ def exercise_create(request):
                 messages.error(request, 'Exercise name is required.')
                 return render(request, 'exercises/exercise_create.html')
             
-            if not video_file:
-                messages.error(request, 'Video file is required.')
+            if not video_file and not youtube_url:
+                messages.error(request, 'Either a video file or YouTube URL is required.')
+                return render(request, 'exercises/exercise_create.html')
+            
+            if video_file and youtube_url:
+                messages.error(request, 'Please provide either a video file or YouTube URL, not both.')
                 return render(request, 'exercises/exercise_create.html')
             
             # Create exercise data - let the serializer handle video processing
             exercise_data = {
                 'name': name,
                 'description': description,
-                'video': video_file,  # Pass the video file directly
             }
+            
+            if video_file:
+                exercise_data['video'] = video_file
+            elif youtube_url:
+                exercise_data['youtube_url'] = youtube_url
             
             # Create serializer with request context for user access
             from exercises.serializers import ExerciseSerializer
