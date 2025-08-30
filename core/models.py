@@ -135,7 +135,8 @@ class VideoAsset(models.Model):
                 match = re.search(pattern, self.youtube_url)
                 if match:
                     video_id = match.group(1)
-                    return f"https://www.youtube.com/embed/{video_id}"
+                    # Add parameters for better compatibility and autoplay
+                    return f"https://www.youtube.com/embed/{video_id}?rel=0&showinfo=0&autoplay=0&modestbranding=1"
             
             return self.youtube_url
         return None
