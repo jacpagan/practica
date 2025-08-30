@@ -21,16 +21,25 @@ def add_comment(request, exercise_id):
     if request.method == 'POST':
         text = request.POST.get('text', '').strip()
         video_file = request.FILES.get('video')
+        youtube_url = request.POST.get('youtube_url', '').strip()
         
-        if not video_file:
-            messages.error(request, 'Video file is required for comments.')
+        if not video_file and not youtube_url:
+            messages.error(request, 'Either a video file or YouTube URL is required for comments.')
+            return redirect('exercises:exercise_detail', exercise_id=exercise_id)
+        
+        if video_file and youtube_url:
+            messages.error(request, 'Please provide either a video file or YouTube URL, not both.')
             return redirect('exercises:exercise_detail', exercise_id=exercise_id)
         
         try:
-            # Handle video upload (required)
+            # Handle video upload or YouTube URL
             from core.container import container
             storage_service = container.get_video_storage_service()
-            video_asset = storage_service.store_uploaded_video(video_file)
+            
+            if video_file:
+                video_asset = storage_service.store_uploaded_video(video_file)
+            else:
+                video_asset = storage_service.create_youtube_video_asset(youtube_url)
             
             # Create comment with video (text is optional)
             comment = VideoComment.objects.create(
