@@ -3,7 +3,7 @@
 {% block title %}Create Exercise - Practika{% endblock %}
 
 {% block content %}
-<div class="card">
+<div id="create-exercise-container" class="card">
     <h1>Create New Exercise</h1>
     
     <!-- Camera Access Notice -->
@@ -16,7 +16,7 @@
         {% endif %}
     </div>
     
-    <form method="post" enctype="multipart/form-data">
+    <form method="post" enctype="multipart/form-data" class="form-section">
         {% csrf_token %}
         
         <div class="form-group">

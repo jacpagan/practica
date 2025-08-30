@@ -5,6 +5,7 @@ URL configuration for practika_project project.
 from django.urls import path, include
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
+from exercises import views as exercise_views
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -20,7 +21,11 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', home_redirect, name='home'),
     path('core/', include('core.urls')),
+    path('exercises/', exercise_views.exercise_list, name='exercise_list'),
+    path('exercises/create/', exercise_views.exercise_create, name='exercise_create'),
+    path('exercises/<uuid:exercise_id>/', exercise_views.exercise_detail, name='exercise_detail'),
     path('exercises/', include('exercises.urls', namespace='exercises')),
+    path('login/', exercise_views.user_login, name='login'),
     path('comments/', include('comments.urls', namespace='comments')),
     
     # Top-level URL patterns for tests (aliases to namespaced URLs)
