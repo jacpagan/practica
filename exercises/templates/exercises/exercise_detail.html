@@ -20,7 +20,7 @@
         <div class="exercise-video-section">
             <div class="video-container">
                 <h3>Exercise Video (Watch while recording)</h3>
-                {% if exercise.video_asset.video_type == 'youtube' %}
+                {% if exercise.video_asset.youtube_url and exercise.video_asset.get_youtube_embed_url %}
                     <div class="youtube-video-container">
                         <iframe 
                             src="{{ exercise.video_asset.get_youtube_embed_url }}" 
@@ -130,7 +130,7 @@
             {% endif %}
             
             <div class="comment-video">
-                {% if comment.video_asset.video_type == 'youtube' %}
+                {% if comment.video_asset.youtube_url and comment.video_asset.get_youtube_embed_url %}
                     <div class="youtube-video-container">
                         <iframe 
                             src="{{ comment.video_asset.get_youtube_embed_url }}" 
