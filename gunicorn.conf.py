@@ -1,6 +1,6 @@
 """
 Gunicorn configuration for Practika production deployment
-Simplified configuration for Heroku stability
+Simplified configuration for AWS ECS stability
 """
 
 import os
@@ -10,7 +10,7 @@ import os
 bind = f"0.0.0.0:{os.environ.get('PORT', '8000')}"
 backlog = 2048
 
-# Worker processes - keep it simple for Heroku
+# Worker processes - keep it simple for ECS
 workers = int(os.environ.get('GUNICORN_WORKERS', 1))
 worker_class = 'sync'
 worker_connections = 1000
@@ -22,7 +22,7 @@ timeout = 30
 keepalive = 2
 graceful_timeout = 30
 
-# Logging - ensure all logs go to stdout/stderr for Heroku
+# Logging - ensure all logs go to stdout/stderr for ECS
 accesslog = '-'
 errorlog = '-'
 loglevel = 'info'
@@ -38,7 +38,7 @@ user = None
 group = None
 tmp_upload_dir = None
 
-# SSL (not needed for Heroku)
+# SSL (handled by ALB)
 keyfile = None
 certfile = None
 

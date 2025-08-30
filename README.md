@@ -244,29 +244,24 @@ make test
 
 ## Deployment
 
-### Heroku Container Deployment
+### AWS Native Deployment
 
 ```bash
-# 1. Set environment variables
-heroku config:set DJANGO_ENVIRONMENT=production
-heroku config:set DJANGO_DEBUG=False
-heroku config:set DJANGO_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')"
+# 1. Deploy to AWS using CloudFormation
+./deploy-aws.sh
 
-# 2. Deploy container
-heroku container:push web
-heroku container:release web
-
-# 3. Run migrations
-heroku run python manage.py migrate
-
-# 4. Collect static files
-heroku run python manage.py collectstatic --noinput
+# 2. The script will:
+#    - Build and push Docker image to ECR
+#    - Create AWS infrastructure (VPC, RDS, S3, ECS, ALB)
+#    - Run database migrations
+#    - Collect static files
+#    - Deploy the application
 ```
 
 ### Automated Deployment
 ```bash
-chmod +x deploy-heroku-simple.sh
-./deploy-heroku-simple.sh
+chmod +x deploy-aws.sh
+./deploy-aws.sh
 ```
 
 ### Production Checklist
@@ -284,8 +279,8 @@ chmod +x deploy-heroku-simple.sh
 - **Response**: JSON with status, timestamp, and component checks
 
 ### Monitoring
-- **Logs**: `heroku logs --tail`
-- **Status**: `heroku ps`
+- **Logs**: AWS CloudWatch logs
+- **Status**: ECS service status
 - **Metrics**: Request timing and error rates
 
 ### Logging
@@ -317,33 +312,33 @@ chmod +x deploy-heroku-simple.sh
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| 500 errors on Heroku | Missing middleware or settings | Check logs, verify production settings |
-| Database connection failed | Missing DATABASE_URL | Set Heroku PostgreSQL addon |
-| Static files not loading | collectstatic not run | Run `heroku run python manage.py collectstatic` |
+| 500 errors on AWS | Missing middleware or settings | Check CloudWatch logs, verify production settings |
+| Database connection failed | Missing DATABASE_URL | Check RDS connection and security groups |
+| Static files not loading | collectstatic not run | Run migrations in ECS task |
 | Video upload fails | File size/format invalid | Check file size (100MB max) and format |
 | App won't start | Environment variables missing | Verify DJANGO_SECRET_KEY and DJANGO_ENVIRONMENT |
 | Health check fails | Database or storage issues | Check database connection and file permissions |
 | CORS errors | Origin not allowed | Update CORS_ALLOWED_ORIGINS in settings |
-| Memory issues | Large video files | Optimize video size or increase dyno memory |
-| Slow performance | Single worker process | Scale with `heroku ps:scale web=2` |
+| Memory issues | Large video files | Optimize video size or increase ECS task memory |
+| Slow performance | Single task | Scale ECS service to multiple tasks |
 | Build fails | Dockerfile issues | Check Dockerfile syntax and dependencies |
 
 ### Debug Commands
 ```bash
 # Check app status
-heroku ps
+aws ecs describe-services --cluster prod-cluster --services prod-service
 
 # View logs
-heroku logs --tail
+aws logs tail /ecs/practika-prod --follow
 
 # Check environment
-heroku config
+aws ecs describe-task-definition --task-definition prod-task
 
 # Test database
-heroku run python manage.py dbshell
+aws rds describe-db-instances --db-instance-identifier practika-prod-db
 
 # Check static files
-heroku run python manage.py check --deploy
+aws s3 ls s3://practika-prod-media-164782963509/
 ```
 
 ## Change Governance
@@ -365,9 +360,9 @@ heroku run python manage.py check --deploy
 ## Changelog
 
 ### Since Last README Update (August 25, 2025)
-- **Refactored production settings** - Eliminated 500 errors on Heroku
+- **Refactored production settings** - Eliminated 500 errors on AWS
 - **Added missing middleware** - RequestLoggingMiddleware, SecurityMiddleware, etc.
-- **Simplified container deployment** - Fixed Dockerfile and heroku.yml
+- **Simplified container deployment** - Fixed Dockerfile for AWS ECS
 - **Enhanced health monitoring** - Database and storage health checks
 - **Consolidated documentation** - Single README as source of truth
 - **Removed complex dependencies** - Redis, S3 made optional
@@ -384,7 +379,7 @@ heroku run python manage.py check --deploy
 - **License**: Proprietary - All rights reserved
 - **Contact**: jacpagan1@gmail.com
 - **Repository**: Private repository
-- **Status**: Production ready on Heroku
+- **Status**: Production ready on AWS
 
 ---
 

@@ -22,6 +22,13 @@ urlpatterns = [
     path('core/', include('core.urls')),
     path('exercises/', include('exercises.urls', namespace='exercises')),
     path('comments/', include('comments.urls', namespace='comments')),
+    
+    # Top-level URL patterns for tests (aliases to namespaced URLs)
+    path('login/', auth_views.LoginView.as_view(template_name='accounts/login.html'), name='login'),
+    path('exercise/create/', lambda request: redirect('exercises:exercise_create'), name='exercise_create'),
+    path('exercise/<uuid:exercise_id>/', lambda request, exercise_id: redirect('exercises:exercise_detail', exercise_id=exercise_id), name='exercise_detail'),
+    path('exercise/list/', lambda request: redirect('exercises:exercise_list'), name='exercise_list'),
+    
     path(
         'accounts/password-reset/',
         auth_views.PasswordResetView.as_view(

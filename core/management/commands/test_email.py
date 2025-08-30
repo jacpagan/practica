@@ -48,4 +48,4 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.ERROR(f'❌ Failed to send test email: {e}')
             )
-            self.stdout.write('This might be due to missing SendGrid configuration.')
+            self.stdout.write('This might be due to missing AWS SES configuration.')

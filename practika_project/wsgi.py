@@ -11,8 +11,8 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-# Use production settings for Heroku deployment
-if os.environ.get('DYNO') or os.environ.get('HEROKU') or os.environ.get('PORT'):
+# Use production settings for AWS ECS deployment
+if os.environ.get('DJANGO_ENVIRONMENT') == 'production' or os.environ.get('PORT'):
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "practika_project.settings_production")
 else:
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "practika_project.settings")

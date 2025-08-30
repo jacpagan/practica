@@ -6,6 +6,16 @@
 <div class="card">
     <h1>Create New Exercise</h1>
     
+    <!-- Camera Access Notice -->
+    <div class="alert alert-info" style="background-color: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; padding: 12px; margin-bottom: 20px;">
+        <strong>📹 Camera Recording:</strong> 
+        {% if request.is_secure %}
+            ✅ Available - You can record videos directly
+        {% else %}
+            ⚠️ Upload Only - Camera recording requires HTTPS. Please use the upload option below.
+        {% endif %}
+    </div>
+    
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         
@@ -52,9 +62,21 @@
 </div>
 
 <script>
-// Simplified video recording functionality - Version 2.0 (Fixed)
+// Simplified video recording functionality - Version 2.1 (Enhanced Error Handling)
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Practika video recording v2.0 loaded - Fixed version');
+    console.log('Practika video recording v2.1 loaded - Enhanced error handling');
+    
+    // Check browser compatibility
+    if (!navigator.mediaDevices) {
+        console.warn('MediaDevices API not supported - camera recording disabled');
+        // Disable record button and show message
+        const recordBtn = document.getElementById('record-btn');
+        if (recordBtn) {
+            recordBtn.disabled = true;
+            recordBtn.title = 'Camera recording not supported in this browser';
+            recordBtn.textContent = '📷 Not Supported';
+        }
+    }
     const uploadBtn = document.getElementById('upload-btn');
     const recordBtn = document.getElementById('record-btn');
     const videoInput = document.getElementById('video');
@@ -144,6 +166,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 currentStream.getTracks().forEach(track => track.stop());
             }
             
+            // Check if MediaDevices API is available
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('Camera access not supported in this browser. Please use a modern browser or upload a video file instead.');
+            }
+            
             // Mobile-friendly camera constraints
             const constraints = {
                 video: { 
@@ -162,12 +189,22 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (err) {
             console.error('Camera access error:', err);
             let errorMsg = 'Error accessing camera: ' + err.message;
-            if (err.name === 'NotAllowedError') {
-                errorMsg += '\n\nPlease allow camera access in your browser settings.';
+            
+            if (err.message.includes('not supported')) {
+                errorMsg = 'Camera recording is not supported in this browser. Please use the upload option instead.';
+            } else if (err.name === 'NotAllowedError') {
+                errorMsg = 'Camera access denied. Please allow camera access in your browser settings or use the upload option.';
             } else if (err.name === 'NotFoundError') {
-                errorMsg += '\n\nNo camera found. Please check your device.';
+                errorMsg = 'No camera found. Please check your device or use the upload option.';
+            } else if (err.name === 'NotSupportedError') {
+                errorMsg = 'Camera access not supported. Please use the upload option instead.';
+            } else if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+                errorMsg = 'Camera access requires HTTPS. For now, please use the upload option. Contact support to enable HTTPS for camera recording.';
             }
+            
             alert(errorMsg);
+            // Hide camera container and show upload option
+            webcamContainer.style.display = 'none';
             throw err;
         }
     }

@@ -1,6 +1,6 @@
 """
 Clean production settings for Practika platform
-Optimized for Heroku deployment and stability
+Optimized for AWS ECS deployment and stability
 """
 
 import os
@@ -27,10 +27,10 @@ if not SECRET_KEY:
     raise ValueError("DJANGO_SECRET_KEY environment variable is required in production")
 
 # Allowed hosts for production
-ALLOWED_HOSTS = ['*', 'practika-d127ed6da5d2.herokuapp.com']
+ALLOWED_HOSTS = ['*', 'jpagan.com', 'practika.jpagan.com', 'jacpagan.com', 'practika.jacpagan.com']
 
 # Security headers and HTTPS
-SECURE_SSL_REDIRECT = False  # Disable for Heroku (they handle HTTPS)
+SECURE_SSL_REDIRECT = True  # Enable for AWS ALB
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
@@ -40,14 +40,14 @@ X_FRAME_OPTIONS = 'DENY'
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 
 # Session security
-SESSION_COOKIE_SECURE = False  # Disable for Heroku (they handle HTTPS)
+SESSION_COOKIE_SECURE = True  # Enable for AWS ALB
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SESSION_COOKIE_AGE = 3600
 
 # CSRF security
-CSRF_COOKIE_SECURE = False  # Disable for Heroku (they handle HTTPS)
+CSRF_COOKIE_SECURE = True  # Enable for AWS ALB
 CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_USE_SESSIONS = False
@@ -56,13 +56,16 @@ CSRF_USE_SESSIONS = False
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:8000',
     'http://127.0.0.1:8000',
-    'https://practika-d127ed6da5d2.herokuapp.com'
+    'https://jpagan.com',
+    'https://practika.jpagan.com',
+    'https://jacpagan.com',
+    'https://practika.jacpagan.com'
 ]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
 CORS_ALLOW_HEADERS = ['*']
 
-# Database configuration - use DATABASE_URL from Heroku
+# Database configuration - use DATABASE_URL from environment
 if os.environ.get('DATABASE_URL'):
     DATABASES = {
         'default': dj_database_url.parse(os.environ.get('DATABASE_URL'))
@@ -174,8 +177,8 @@ EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
 EMAIL_USE_SSL = os.getenv('EMAIL_SSL', 'False').lower() == 'true'
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.getenv('SENDGRID_FROM_EMAIL', 'noreply@practika.com')
-SITE_URL = os.getenv('SITE_URL', 'https://practika-d127ed6da5d2.herokuapp.com')
+DEFAULT_FROM_EMAIL = os.getenv('SES_FROM_EMAIL', 'noreply@practika.com')
+SITE_URL = os.getenv('SITE_URL', 'https://jpagan.com')
 
 # Amazon SES settings
 SES_FROM_NAME = os.getenv('SES_FROM_NAME', 'Practika')
