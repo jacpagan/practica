@@ -10,6 +10,7 @@ urlpatterns = [
     path('signup/', views.signup, name='signup'),
     path('login/', user_login, name='login'),  # Use the styled login from exercises
     path('logout/', user_logout, name='logout'),  # Use the styled logout from exercises
+    path('dashboard/', views.student_dashboard, name='student_dashboard'),
     path('verify-email/', views.EmailVerificationView.as_view(), name='verify_email'),
     path('resend-verification/', views.ResendVerificationView.as_view(), name='resend_verification'),
     path(
