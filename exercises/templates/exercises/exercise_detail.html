@@ -283,7 +283,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const commentVideoPlayback = document.getElementById('comment-video-playback');
     const commentChangeVideoBtn = document.getElementById('comment-change-video');
     
-    if (!startCameraBtn) return; // Exit if not on comment form
+    // Check if we're on a page with camera functionality
+    if (!startCameraBtn || !recordBtn) {
+        console.log('Camera elements not found, skipping camera initialization');
+        return;
+    }
+    
+    console.log('Initializing camera recording functionality...');
     
     let mediaRecorder;
     let recordedChunks = [];
@@ -340,6 +346,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Record button click - start camera and recording in one step
     recordBtn.addEventListener('click', async function() {
+        console.log('Record button clicked, starting camera...');
         webcamContainer.style.display = 'block';
         videoPreview.style.display = 'none';
         youtubeContainer.style.display = 'none';
@@ -350,11 +357,15 @@ document.addEventListener('DOMContentLoaded', function() {
             // Small delay to ensure camera is ready
             setTimeout(() => {
                 if (currentStream) {
+                    console.log('Starting recording automatically...');
                     recordVideoBtn.click();
+                } else {
+                    console.log('No camera stream available for recording');
                 }
-            }, 500);
+            }, 1000); // Increased delay for better reliability
         } catch (err) {
             console.error('Auto-start failed:', err);
+            alert('Failed to start camera: ' + err.message);
         }
     });
     
@@ -427,7 +438,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Start camera
     startCameraBtn.addEventListener('click', async function() {
-        await startCamera();
+        console.log('Manual camera start button clicked');
+        try {
+            await startCamera();
+        } catch (err) {
+            console.error('Manual camera start failed:', err);
+        }
     });
     
     // Flip camera
