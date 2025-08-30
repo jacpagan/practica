@@ -123,7 +123,7 @@ class VideoAsset(models.Model):
     
     def get_youtube_embed_url(self):
         """Get YouTube embed URL for the video"""
-        if self.video_type == 'youtube' and self.youtube_url:
+        if self.youtube_url:
             # Extract video ID from various YouTube URL formats
             import re
             patterns = [
