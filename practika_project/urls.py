@@ -26,6 +26,7 @@ urlpatterns = [
     path('exercises/', include('exercises.urls', namespace='exercises')),
     path('login/', exercise_views.user_login, name='login'),
     path('comments/', include('comments.urls', namespace='comments')),
+    path('accounts/', include('accounts.urls', namespace='accounts')),
     
     # Top-level URL patterns for tests (aliases to namespaced URLs)
     path('exercise/create/', lambda request: redirect('exercises:exercise_create'), name='exercise_create'),

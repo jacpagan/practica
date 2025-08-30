@@ -96,6 +96,7 @@ INSTALLED_APPS = [
     "core",
     "exercises",
     "comments",
+    "accounts",
 ]
 
 # Using default User model for MVP
