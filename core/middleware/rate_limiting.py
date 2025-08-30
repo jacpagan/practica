@@ -19,14 +19,10 @@ class RateLimitingMiddleware:
         self.get_response = get_response
         
     def __call__(self, request):
-        # Skip rate limiting for admin and static files
-        if request.path.startswith('/admin/') or request.path.startswith('/static/'):
-            return self.get_response(request)
-            
         # Get client identifier
         client_id = self._get_client_id(request)
         
-        # Check rate limits
+        # Check rate limits (including admin routes)
         if not self._check_rate_limit(request, client_id):
             return self._rate_limit_response(request)
             
@@ -54,6 +50,8 @@ class RateLimitingMiddleware:
         
         # Different limits for different endpoints
         limits = {
+            '/admin/login/': {'POST': 3, 'GET': 10},  # Admin login - very strict
+            '/admin/': {'POST': 5, 'GET': 15},  # Admin pages - strict
             '/exercises/login/': {'POST': 5, 'GET': 20},  # Login attempts
             '/accounts/signup/': {'POST': 3, 'GET': 10},  # Signup attempts
             '/accounts/resend-verification/': {'POST': 3, 'GET': 5},  # Resend verification

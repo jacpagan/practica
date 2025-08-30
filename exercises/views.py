@@ -11,8 +11,6 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from exercises.models import Exercise
 from exercises.serializers import ExerciseSerializer
 from exercises.permissions import IsAdminForExercise
-from accounts.models import Role, Profile
-from accounts.decorators import beta_invitation_required
 import re
 import logging
 
@@ -95,7 +93,6 @@ def exercise_create(request):
     return render(request, 'exercises/exercise_create.html')
 
 
-@beta_invitation_required
 def user_login(request):
     """Enhanced user login/signup view with security features"""
     if request.method == 'POST':
@@ -140,37 +137,20 @@ def _handle_signup(request):
         return render(request, 'exercises/login.html')
     
     try:
-        # Create user (inactive until email verified)
+        # Create user (active immediately for MVP)
         user = User.objects.create_user(
             username=username,
             email=email,
             password=password1,
-            is_active=False  # Inactive until email verified
+            is_active=True  # Active immediately for MVP
         )
-        
-        # Create profile (everyone is a student by default)
-        student_role = Role.objects.get(name='student')
-        Profile.objects.create(user=user, role=student_role)
-        
-        # Send verification email
-        from accounts.tasks import send_verification_email
-        try:
-            send_verification_email.delay(user.pk)
-        except:
-            # Fallback to sync if RQ not available
-            send_verification_email(user.pk)
-        
-        # TEMPORARY: Activate user immediately for testing
-        user.is_active = True
-        user.save()
-        user.profile.verify_email()  # Mark email as verified
         
         logger.info(f"New user registered: {username}")
         messages.success(
             request, 
             'Account created successfully! Welcome to Practika!'
         )
-        # Log the user in and redirect to welcome flow
+        # Log the user in and redirect to exercise list
         login(request, user)
         
         # Handle redirect after signup
@@ -178,7 +158,7 @@ def _handle_signup(request):
         if next_url:
             return redirect(next_url)
         else:
-            return redirect('exercises:welcome')
+            return redirect('exercises:exercise_list')
         
     except Exception as e:
         logger.error(f"Signup error: {e}")
@@ -222,34 +202,11 @@ def _handle_login(request):
         messages.error(request, f'Account is temporarily locked. Please try again in {remaining_time} seconds.')
         return render(request, 'exercises/login.html')
     
-    # Check if user exists and get their status before authentication
-    try:
-        existing_user = User.objects.get(username=username)
-        if not existing_user.is_active:
-            # TEMPORARY: Activate inactive users for testing
-            existing_user.is_active = True
-            existing_user.save()
-            if hasattr(existing_user, 'profile'):
-                existing_user.profile.verify_email()
-            
-            logger.info(f"Activated inactive user: {username}")
-        # User exists but is inactive - check if it's due to email verification
-        # if hasattr(existing_user, 'profile') and not existing_user.profile.is_email_verified():
-        #     logger.warning(f"Login attempt for unverified user: {username}")
-        #     messages.error(
-        #         request, 
-        #         'Please verify your email address before logging in. '
-        #         '<a href="#" onclick="showResendForm()">Resend verification email</a>'
-        #     )
-        #     return render(request, 'exercises/login.html')
-    except User.DoesNotExist:
-        pass  # User doesn't exist, will be handled by authentication
-    
     # Attempt authentication
     user = authenticate(request, username=username, password=password)
     
     if user is not None:
-        if user.is_active:  # TEMPORARY: Removed email verification requirement
+        if user.is_active:
             # Security logging
             logger.info(f"Successful login: {username} from IP {_get_client_ip(request)}")
             
@@ -274,7 +231,6 @@ def _handle_login(request):
             else:
                 return redirect('exercises:exercise_list')
         else:
-            # This should not happen due to the check above, but just in case
             logger.warning(f"Login attempt for inactive user: {username}")
             messages.error(request, 'Account is not active.')
     else:
@@ -333,22 +289,9 @@ def welcome_flow(request):
     
     # Debug logging
     logger.info(f"Welcome flow accessed by user: {user.username}")
-    logger.info(f"User has profile: {hasattr(user, 'profile')}")
-    if hasattr(user, 'profile'):
-        logger.info(f"Onboarding completed: {getattr(user.profile, 'onboarding_completed', False)}")
-    
-    # Check if user has completed onboarding
-    if hasattr(user, 'profile') and getattr(user.profile, 'onboarding_completed', False):
-        logger.info(f"User {user.username} has completed onboarding, redirecting to exercise list")
-        return redirect('exercises:exercise_list')
     
     if request.method == 'POST':
-        # Mark onboarding as completed
-        if hasattr(user, 'profile'):
-            user.profile.onboarding_completed = True
-            user.profile.save()
-            logger.info(f"User {user.username} onboarding marked as completed")
-        
+        # Mark onboarding as completed (for MVP, just redirect)
         messages.success(request, 'Welcome to Practika! Let\'s get started.')
         return redirect('exercises:exercise_list')
     

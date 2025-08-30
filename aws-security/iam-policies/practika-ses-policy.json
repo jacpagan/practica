@@ -1,0 +1,34 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "PractikaSESEmail",
+            "Effect": "Allow",
+            "Action": [
+                "ses:SendEmail",
+                "ses:SendRawEmail",
+                "ses:SendBulkTemplatedEmail",
+                "ses:SendTemplatedEmail"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "StringEquals": {
+                    "ses:FromAddress": [
+                        "noreply@practika.com",
+                        "support@practika.com"
+                    ]
+                }
+            }
+        },
+        {
+            "Sid": "PractikaSESIdentity",
+            "Effect": "Allow",
+            "Action": [
+                "ses:GetIdentityVerificationAttributes",
+                "ses:GetSendQuota",
+                "ses:GetSendStatistics"
+            ],
+            "Resource": "*"
+        }
+    ]
+}

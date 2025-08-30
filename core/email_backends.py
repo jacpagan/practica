@@ -22,25 +22,15 @@ class AmazonSESEmailBackend(BaseEmailBackend):
     def __init__(self, fail_silently=False, **kwargs):
         super().__init__(fail_silently=fail_silently, **kwargs)
         
-        # Get AWS credentials from settings
-        self.aws_access_key_id = getattr(settings, 'AWS_ACCESS_KEY_ID', '')
-        self.aws_secret_access_key = getattr(settings, 'AWS_SECRET_ACCESS_KEY', '')
-        self.aws_region = getattr(settings, 'AWS_S3_REGION_NAME', 'us-east-1')
+        # Use region from settings; rely on IAM role or default credential chain
+        self.aws_region = getattr(settings, 'AWS_SES_REGION_NAME', getattr(settings, 'AWS_S3_REGION_NAME', 'us-east-1'))
         self.from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@practika.com')
         self.from_name = getattr(settings, 'SES_FROM_NAME', 'Practika')
         
-        if not self.aws_access_key_id or not self.aws_secret_access_key:
-            logger.warning("AWS credentials not configured. Emails will not be sent.")
-            return
-            
         try:
             # Initialize SES client
-            self.ses_client = boto3.client(
-                'ses',
-                aws_access_key_id=self.aws_access_key_id,
-                aws_secret_access_key=self.aws_secret_access_key,
-                region_name=self.aws_region
-            )
+            # Do not pass explicit credentials; boto3 will use the default chain (IAM role preferred)
+            self.ses_client = boto3.client('ses', region_name=self.aws_region)
             logger.info("Amazon SES client initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Amazon SES client: {e}")
