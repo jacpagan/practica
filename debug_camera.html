@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Debug Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .debug-info {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .camera-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        #webcam-preview {
+            width: 100%;
+            max-width: 400px;
+            height: 300px;
+            background: #000;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .controls {
+            margin: 15px 0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .error {
+            color: #dc3545;
+            background: #f8d7da;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #155724;
+            background: #d4edda;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Camera Debug Test</h1>
+    
+    <div class="debug-info">
+        <h3>Browser Information:</h3>
+        <p><strong>User Agent:</strong> <span id="user-agent"></span></p>
+        <p><strong>Protocol:</strong> <span id="protocol"></span></p>
+        <p><strong>Hostname:</strong> <span id="hostname"></span></p>
+        <p><strong>MediaDevices Supported:</strong> <span id="media-devices"></span></p>
+        <p><strong>getUserMedia Supported:</strong> <span id="get-user-media"></span></p>
+        <p><strong>MediaRecorder Supported:</strong> <span id="media-recorder"></span></p>
+    </div>
+
+    <div class="camera-container">
+        <h3>🎥 Camera Test</h3>
+        <video id="webcam-preview" autoplay muted playsinline></video>
+        <div class="controls">
+            <button id="start-camera">📷 Start Camera</button>
+            <button id="stop-camera">⏹️ Stop Camera</button>
+            <button id="record-video">🔴 Record Video</button>
+            <button id="stop-recording">⏹️ Stop Recording</button>
+        </div>
+        <div id="status"></div>
+    </div>
+
+    <div class="debug-info">
+        <h3>📋 Test Results:</h3>
+        <div id="test-results"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Display browser information
+            document.getElementById('user-agent').textContent = navigator.userAgent;
+            document.getElementById('protocol').textContent = location.protocol;
+            document.getElementById('hostname').textContent = location.hostname;
+            document.getElementById('media-devices').textContent = !!navigator.mediaDevices;
+            document.getElementById('get-user-media').textContent = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+            document.getElementById('media-recorder').textContent = !!window.MediaRecorder;
+
+            let currentStream = null;
+            let mediaRecorder = null;
+            let recordedChunks = [];
+
+            const webcamPreview = document.getElementById('webcam-preview');
+            const status = document.getElementById('status');
+            const testResults = document.getElementById('test-results');
+
+            function log(message, type = 'info') {
+                const div = document.createElement('div');
+                div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                div.className = type;
+                testResults.appendChild(div);
+                console.log(message);
+            }
+
+            function updateStatus(message, type = 'info') {
+                status.innerHTML = `<div class="${type}">${message}</div>`;
+            }
+
+            // Test HTTPS requirement
+            if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+                log('❌ HTTPS Required: Camera access requires HTTPS for production sites', 'error');
+                updateStatus('❌ HTTPS Required: Camera access requires HTTPS for production sites', 'error');
+            } else {
+                log('✅ HTTPS Check: Protocol is secure or localhost', 'success');
+            }
+
+            // Start camera
+            document.getElementById('start-camera').addEventListener('click', async function() {
+                try {
+                    log('🔍 Attempting to start camera...');
+                    updateStatus('🔍 Starting camera...');
+
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        throw new Error('MediaDevices API not supported');
+                    }
+
+                    const constraints = {
+                        video: { 
+                            width: { ideal: 480, max: 720 },
+                            height: { ideal: 360, max: 480 },
+                            facingMode: 'user'
+                        },
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true
+                        }
+                    };
+
+                    currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    webcamPreview.srcObject = currentStream;
+                    
+                    log('✅ Camera started successfully', 'success');
+                    updateStatus('✅ Camera started successfully', 'success');
+                    
+                    webcamPreview.onloadedmetadata = function() {
+                        log(`📐 Video dimensions: ${webcamPreview.videoWidth}x${webcamPreview.videoHeight}`);
+                    };
+
+                } catch (err) {
+                    log(`❌ Camera error: ${err.name} - ${err.message}`, 'error');
+                    updateStatus(`❌ Camera error: ${err.name} - ${err.message}`, 'error');
+                }
+            });
+
+            // Stop camera
+            document.getElementById('stop-camera').addEventListener('click', function() {
+                if (currentStream) {
+                    currentStream.getTracks().forEach(track => track.stop());
+                    currentStream = null;
+                    webcamPreview.srcObject = null;
+                    log('⏹️ Camera stopped');
+                    updateStatus('⏹️ Camera stopped');
+                }
+            });
+
+            // Record video
+            document.getElementById('record-video').addEventListener('click', function() {
+                if (!currentStream) {
+                    log('❌ No camera stream available for recording', 'error');
+                    updateStatus('❌ No camera stream available for recording', 'error');
+                    return;
+                }
+
+                if (!window.MediaRecorder) {
+                    log('❌ MediaRecorder not supported in this browser', 'error');
+                    updateStatus('❌ MediaRecorder not supported in this browser', 'error');
+                    return;
+                }
+
+                try {
+                    recordedChunks = [];
+                    
+                    // Try different MIME types
+                    const mimeTypes = [
+                        'video/webm;codecs=vp9',
+                        'video/webm;codecs=vp8',
+                        'video/webm',
+                        'video/mp4'
+                    ];
+
+                    let selectedMimeType = null;
+                    for (const mimeType of mimeTypes) {
+                        if (MediaRecorder.isTypeSupported(mimeType)) {
+                            selectedMimeType = mimeType;
+                            break;
+                        }
+                    }
+
+                    if (!selectedMimeType) {
+                        throw new Error('No supported video MIME type found');
+                    }
+
+                    log(`🎬 Starting recording with MIME type: ${selectedMimeType}`);
+                    updateStatus('🔴 Recording...');
+
+                    mediaRecorder = new MediaRecorder(currentStream, { mimeType: selectedMimeType });
+                    
+                    mediaRecorder.ondataavailable = function(event) {
+                        if (event.data.size > 0) {
+                            recordedChunks.push(event.data);
+                            log(`📦 Data chunk received: ${event.data.size} bytes`);
+                        }
+                    };
+
+                    mediaRecorder.onstop = function() {
+                        const blob = new Blob(recordedChunks, { type: selectedMimeType });
+                        log(`✅ Recording completed: ${blob.size} bytes (${Math.round(blob.size / 1024)} KB)`, 'success');
+                        updateStatus(`✅ Recording completed: ${Math.round(blob.size / 1024)} KB`, 'success');
+                        
+                        // Create download link
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'test-recording.webm';
+                        a.textContent = '📥 Download Recording';
+                        a.style.display = 'block';
+                        a.style.marginTop = '10px';
+                        a.style.padding = '10px';
+                        a.style.backgroundColor = '#28a745';
+                        a.style.color = 'white';
+                        a.style.textDecoration = 'none';
+                        a.style.borderRadius = '5px';
+                        status.appendChild(a);
+                    };
+
+                    mediaRecorder.onerror = function(event) {
+                        log(`❌ Recording error: ${event.error}`, 'error');
+                        updateStatus(`❌ Recording error: ${event.error}`, 'error');
+                    };
+
+                    mediaRecorder.start();
+                    log('🔴 Recording started');
+
+                } catch (err) {
+                    log(`❌ Recording setup error: ${err.message}`, 'error');
+                    updateStatus(`❌ Recording setup error: ${err.message}`, 'error');
+                }
+            });
+
+            // Stop recording
+            document.getElementById('stop-recording').addEventListener('click', function() {
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                    log('⏹️ Recording stopped');
+                }
+            });
+
+            // Initial test summary
+            log('🚀 Camera debug test initialized');
+            log(`🌐 Running on: ${location.protocol}//${location.hostname}`);
+            log(`🔧 Browser: ${navigator.userAgent.split(' ').slice(-2).join(' ')}`);
+        });
+    </script>
+</body>
+</html>

@@ -135,10 +135,9 @@ class VideoAsset(models.Model):
                 match = re.search(pattern, self.youtube_url)
                 if match:
                     video_id = match.group(1)
-                    # Add parameters for better compatibility and autoplay
-                    # Use mark_safe to prevent HTML encoding of & characters
+                    # Use simple embed URL without problematic parameters
                     from django.utils.safestring import mark_safe
-                    return mark_safe(f"https://www.youtube.com/embed/{video_id}?rel=0&showinfo=0&autoplay=0&modestbranding=1")
+                    return mark_safe(f"https://www.youtube.com/embed/{video_id}")
             
             return self.youtube_url
         return None
