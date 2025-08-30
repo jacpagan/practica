@@ -61,15 +61,34 @@ class DeviceOptimizationMiddleware(MiddlewareMixin):
         # Detect device type
         user_agent = request.META.get('HTTP_USER_AGENT', '').lower()
         
-        if any(device in user_agent for device in ['mobile', 'android', 'iphone', 'ipad']):
+        # Initialize mobile settings
+        request.mobile_settings = {}
+        
+        # Detect specific device types
+        if 'android' in user_agent:
+            request.device_type = 'android'
+            request.is_mobile = True
+            request.mobile_settings['platform'] = 'android'
+            request.mobile_settings['version'] = self.extract_android_version(user_agent)
+        elif 'iphone' in user_agent:
+            request.device_type = 'iphone'
+            request.is_mobile = True
+            request.mobile_settings['platform'] = 'ios'
+            request.mobile_settings['version'] = self.extract_ios_version(user_agent)
+        elif 'ipad' in user_agent:
+            request.device_type = 'ipad'
+            request.is_mobile = True
+            request.mobile_settings['platform'] = 'ios'
+            request.mobile_settings['version'] = self.extract_ios_version(user_agent)
+        elif any(device in user_agent for device in ['mobile', 'tablet']):
             request.device_type = 'mobile'
             request.is_mobile = True
-        elif 'tablet' in user_agent:
-            request.device_type = 'tablet'
-            request.is_mobile = False
         else:
             request.device_type = 'desktop'
             request.is_mobile = False
+        
+        # Detect small screen devices
+        request.is_small_screen = request.is_mobile
         
         return None
     
@@ -77,8 +96,37 @@ class DeviceOptimizationMiddleware(MiddlewareMixin):
         if hasattr(request, 'is_mobile') and request.is_mobile:
             # Add mobile-specific headers
             response['Vary'] = 'User-Agent'
+            response['X-Mobile-Optimized'] = 'true'
+            response['X-Device-Type'] = getattr(request, 'device_type', 'mobile')
+            
+            # Add legacy iOS header for old devices
+            if hasattr(request, 'mobile_settings') and request.mobile_settings.get('platform') == 'ios':
+                version = request.mobile_settings.get('version', '0')
+                if version and float(version.split('.')[0]) < 12:
+                    response['X-Legacy-iOS'] = 'true'
         
         return response
+    
+    def extract_android_version(self, user_agent):
+        """Extract Android version from user agent"""
+        import re
+        match = re.search(r'android\s+(\d+(?:\.\d+)*)', user_agent, re.IGNORECASE)
+        return match.group(1) if match else None
+    
+    def extract_ios_version(self, user_agent):
+        """Extract iOS version from user agent"""
+        import re
+        match = re.search(r'os\s+(\d+(?:_\d+)*)', user_agent, re.IGNORECASE)
+        if match:
+            return match.group(1).replace('_', '.')
+        return None
+    
+    def process_exception(self, request, exception):
+        """Handle exceptions for mobile devices"""
+        if hasattr(request, 'is_mobile') and request.is_mobile:
+            # Log mobile-specific errors
+            logger.error(f"Mobile error: {exception} for device {getattr(request, 'device_type', 'unknown')}")
+        return None
 
 
 # Backwards compatibility alias for tests expecting MobileOptimizationMiddleware

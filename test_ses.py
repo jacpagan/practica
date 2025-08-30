@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Simple script to test Amazon SES integration
-Run this locally or on Heroku to verify SES is working
+Run this locally to verify SES is working
 """
 
 import os

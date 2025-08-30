@@ -1,5 +1,6 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
+from exercises.views import user_login, user_logout
 
 from . import views
 
@@ -7,8 +8,8 @@ app_name = 'accounts'
 
 urlpatterns = [
     path('signup/', views.signup, name='signup'),
-    path('login/', auth_views.LoginView.as_view(template_name='accounts/login.html'), name='login'),
-    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+    path('login/', user_login, name='login'),  # Use the styled login from exercises
+    path('logout/', user_logout, name='logout'),  # Use the styled logout from exercises
     path('verify-email/', views.EmailVerificationView.as_view(), name='verify_email'),
     path('resend-verification/', views.ResendVerificationView.as_view(), name='resend_verification'),
     path(

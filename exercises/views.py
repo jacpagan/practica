@@ -170,7 +170,13 @@ def _handle_signup(request):
         )
         # Log the user in and redirect to welcome flow
         login(request, user)
-        return redirect('exercises:welcome')
+        
+        # Handle redirect after signup
+        next_url = request.GET.get('next')
+        if next_url:
+            return redirect(next_url)
+        else:
+            return redirect('exercises:welcome')
         
     except Exception as e:
         logger.error(f"Signup error: {e}")
@@ -258,7 +264,13 @@ def _handle_login(request):
             request.session['user_agent'] = request.META.get('HTTP_USER_AGENT', '')
             
             messages.success(request, f'Welcome back, {username}!')
-            return redirect('exercises:exercise_list')
+            
+            # Handle redirect after login
+            next_url = request.GET.get('next')
+            if next_url:
+                return redirect(next_url)
+            else:
+                return redirect('exercises:exercise_list')
         else:
             # This should not happen due to the check above, but just in case
             logger.warning(f"Login attempt for inactive user: {username}")

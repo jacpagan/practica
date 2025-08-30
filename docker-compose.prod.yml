@@ -10,11 +10,11 @@ services:
     environment:
       - DJANGO_ENVIRONMENT=production
       - DJANGO_DEBUG=False
-      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0,*.herokuapp.com
+      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
       - DJANGO_DB_ENGINE=django.db.backends.sqlite3
       - DJANGO_DB_NAME=/app/db.sqlite3
       - DJANGO_REDIS_URL=redis:6379/1
-      - DJANGO_CORS_ALLOWED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000,https://*.herokuapp.com
+      - DJANGO_CORS_ALLOWED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000
       - DJANGO_CORS_ALLOW_CREDENTIALS=True
       - DJANGO_CORS_ALLOW_METHODS=GET,POST,PUT,PATCH,DELETE,OPTIONS
       - DJANGO_CORS_ALLOW_HEADERS=*

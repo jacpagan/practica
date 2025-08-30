@@ -37,7 +37,7 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', "django-insecure-^mso&+&9%q-5cj+)jed
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DJANGO_DEBUG', 'True').lower() == 'true' and not IS_PRODUCTION
 
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,testserver').split(',')
 
 # Security settings
 SECURE_BROWSER_XSS_FILTER = True
@@ -59,9 +59,9 @@ SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access for testing
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_USE_SESSIONS = False  # Use cookies instead of sessions
-CSRF_TRUSTED_ORIGINS = os.getenv('DJANGO_CSRF_TRUSTED_ORIGINS', 'https://practika-d127ed6da5d2.herokuapp.com').split(',')
+CSRF_TRUSTED_ORIGINS = os.getenv('DJANGO_CSRF_TRUSTED_ORIGINS', 'https://jpagan.com,https://practika.jpagan.com').split(',')
 CSRF_COOKIE_DOMAIN = None  # Let Django handle this automatically
-CSRF_COOKIE_SECURE = False  # Allow HTTP for testing
+CSRF_COOKIE_SECURE = os.getenv('DJANGO_CSRF_COOKIE_SECURE', 'False').lower() == 'true'  # Use environment variable
 
 # Enhanced security for development vs production
 if IS_DEVELOPMENT:
@@ -73,8 +73,8 @@ if IS_DEVELOPMENT:
     SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 else:
     # Production-specific settings
-    SESSION_COOKIE_SECURE = True  # Require HTTPS in production
-    CSRF_COOKIE_SECURE = True  # Require HTTPS in production
+    SESSION_COOKIE_SECURE = os.getenv('DJANGO_SESSION_COOKIE_SECURE', 'True').lower() == 'true'  # Use environment variable
+    CSRF_COOKIE_SECURE = os.getenv('DJANGO_CSRF_COOKIE_SECURE', 'True').lower() == 'true'  # Use environment variable
 
 # Application definition
 
@@ -124,14 +124,17 @@ RQ_QUEUES = {
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
+    "core.middleware.RequestLoggingMiddleware",  # Request ID tracking
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",  # Add WhiteNoise for static files
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
-    # "django.middleware.csrf.CsrfViewMiddleware",  # Temporarily disabled for testing
+    "django.middleware.csrf.CsrfViewMiddleware",  # CSRF protection
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "core.middleware.ErrorHandlingMiddleware",  # Error handling
+    "core.middleware.RateLimitingMiddleware",  # Rate limiting
 ]
 
 ROOT_URLCONF = "practika_project.urls"
@@ -158,7 +161,7 @@ WSGI_APPLICATION = "practika_project.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-# Parse DATABASE_URL from Heroku
+# Parse DATABASE_URL from environment
 import dj_database_url
 
 DATABASES = {
