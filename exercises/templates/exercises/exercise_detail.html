@@ -15,100 +15,33 @@
         <p><strong>Last updated:</strong> {{ exercise.updated_at|date:"M d, Y H:i" }}</p>
     </div>
     
-    {% if user.is_authenticated %}
-    <div class="exercise-detail-layout">
-        <div class="exercise-video-section">
-            <div class="video-container">
-                <h3>Exercise Video (Watch while recording)</h3>
-                {% if exercise.video_asset %}
-                    {% if exercise.video_asset.youtube_url and exercise.video_asset.get_youtube_embed_url %}
-                        <div class="youtube-video-container">
-                            <iframe 
-                                src="{{ exercise.video_asset.get_youtube_embed_url }}" 
-                                width="100%" 
-                                height="400" 
-                                frameborder="0" 
-                                allowfullscreen
-                                style="border-radius: 8px;"
-                                title="YouTube video player">
-                            </iframe>
-                        </div>
-                    {% elif exercise.video_asset.processing_status == 'completed' %}
-                        <video class="video-player" controls>
-                            <source src="{{ exercise.video_asset.get_public_url }}" type="{{ exercise.video_asset.mime_type }}">
-                            Your browser does not support the video tag.
-                        </video>
-                    {% else %}
-                        <p>Video processing: {{ exercise.video_asset.processing_status }}</p>
-                    {% endif %}
-                {% else %}
-                    <p>No video available for this exercise.</p>
-                {% endif %}
-            </div>
-        </div>
-        
-        <div class="comment-form-section">
-            <h3>Add Your Video Comment</h3>
-            <form method="post" action="{% url 'comments:add_comment' exercise.id %}" enctype="multipart/form-data">
-                {% csrf_token %}
-                <div class="form-group">
-                    <label for="comment-text">💬 Comment Text:</label>
-                    <textarea id="comment-text" name="text" rows="3" placeholder="Write your comment here..."></textarea>
+    <div class="video-container">
+        <h3>Exercise Video</h3>
+        {% if exercise.video_asset %}
+            {% if exercise.video_asset.youtube_url and exercise.video_asset.get_youtube_embed_url %}
+                <div class="youtube-video-container">
+                    <iframe 
+                        src="{{ exercise.video_asset.get_youtube_embed_url }}" 
+                        width="100%" 
+                        height="400" 
+                        frameborder="0" 
+                        allowfullscreen
+                        style="border-radius: 8px;"
+                        title="YouTube video player">
+                    </iframe>
                 </div>
-                
-                <div class="form-group">
-                    <label>🎥 Video Comment (Required):</label>
-                    <input type="file" name="video" accept="video/*" style="display: none;">
-                    <div class="video-options">
-                        <button type="button" id="upload-btn" class="btn btn-sm btn-secondary" title="📁 Upload Video">📁 Upload</button>
-                        <button type="button" id="record-btn" class="btn btn-sm btn-primary" title="🎥 Record Video">🎥 Record</button>
-                        <button type="button" id="youtube-btn" class="btn btn-sm btn-success" title="📺 Add YouTube Video">📺 YouTube</button>
-                    </div>
-                    <div id="video-preview" style="display: none;">
-                        <p>✅ Video ready: <span id="video-name"></span></p>
-                        <video id="comment-video-playback" controls style="display: none; width: 100%; max-width: 300px; border-radius: 8px; margin-top: 10px;"></video>
-                        <button type="button" id="comment-change-video" class="btn btn-sm btn-outline">Record Again</button>
-                    </div>
-                    <div id="webcam-container" style="display: none;">
-                        <video id="webcam-preview" autoplay muted playsinline></video>
-                        <div class="webcam-controls">
-                            <button type="button" id="start-camera" class="btn btn-sm btn-primary" title="📷 Start Camera">📷</button>
-                            <button type="button" id="flip-camera" class="btn btn-sm btn-secondary" style="display: none;" title="🔄 Flip Camera">🔄</button>
-                            <button type="button" id="record-video" class="btn btn-sm btn-danger" style="display: none;" title="🔴 Record">🔴</button>
-                            <button type="button" id="stop-recording" class="btn btn-sm btn-warning" style="display: none;" title="⏹️ Stop">⏹️</button>
-                        </div>
-                        <div id="recording-status" style="display: none;">
-                            <p>🔴 Recording... <span id="recording-time">00:00</span></p>
-                        </div>
-                    </div>
-                    
-                    <div id="youtube-container" style="display: none;">
-                        <div class="form-group">
-                            <label for="youtube-url">📺 YouTube Video URL:</label>
-                            <input type="url" id="youtube-url" name="youtube_url" 
-                                   placeholder="https://www.youtube.com/watch?v=..." 
-                                   pattern="https?://(?:www\.)?(?:youtube\.com|youtu\.be)/.*"
-                                   title="Please enter a valid YouTube URL">
-                            <div class="form-help">Paste a YouTube video URL for your comment</div>
-                        </div>
-                        <div id="youtube-preview" style="display: none;">
-                            <div class="youtube-video-container">
-                                <iframe id="youtube-embed" width="300" height="200" 
-                                        frameborder="0" allowfullscreen 
-                                        style="border-radius: 8px; margin-top: 10px;"></iframe>
-                            </div>
-                            <button type="button" id="change-youtube" class="btn btn-sm btn-outline" style="margin-top: 10px;">Change YouTube URL</button>
-                        </div>
-                    </div>
-                </div>
-                    
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-success" onclick="return validateCommentForm()" title="💬 Add Comment">💬 Add Comment</button>
-                </div>
-            </form>
-        </div>
+            {% elif exercise.video_asset.processing_status == 'completed' %}
+                <video class="video-player" controls>
+                    <source src="{{ exercise.video_asset.get_public_url }}" type="{{ exercise.video_asset.mime_type }}">
+                    Your browser does not support the video tag.
+                </video>
+            {% else %}
+                <p>Video processing: {{ exercise.video_asset.processing_status }}</p>
+            {% endif %}
+        {% else %}
+            <p>No video available for this exercise.</p>
+        {% endif %}
     </div>
-    {% endif %}
 
     <div class="comments-section">
         <h3>Video Comments ({{ exercise.videocomment_set.count }})</h3>
@@ -164,7 +97,68 @@
             <p>No comments yet. Be the first to comment!</p>
         {% endfor %}
         
-        {% if not user.is_authenticated %}
+        {% if user.is_authenticated %}
+            <div class="card">
+                <h4>Add Comment</h4>
+                <form method="post" action="{% url 'comments:add_comment' exercise.id %}" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label for="comment-text">💬 Comment Text:</label>
+                        <textarea id="comment-text" name="text" rows="3" placeholder="Write your comment here..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>🎥 Video Comment (Required):</label>
+                        <input type="file" name="video" accept="video/*" style="display: none;">
+                        <div class="video-options">
+                            <button type="button" id="upload-btn" class="btn btn-sm btn-secondary" title="📁 Upload Video">📁 Upload</button>
+                            <button type="button" id="record-btn" class="btn btn-sm btn-primary" title="🎥 Record Video">🎥 Record</button>
+                            <button type="button" id="youtube-btn" class="btn btn-sm btn-success" title="📺 Add YouTube Video">📺 YouTube</button>
+                        </div>
+                        <div id="video-preview" style="display: none;">
+                            <p>✅ Video ready: <span id="video-name"></span></p>
+                            <video id="comment-video-playback" controls style="display: none; width: 100%; max-width: 300px; border-radius: 8px; margin-top: 10px;"></video>
+                            <button type="button" id="comment-change-video" class="btn btn-sm btn-outline">Record Again</button>
+                        </div>
+                        <div id="webcam-container" style="display: none;">
+                            <video id="webcam-preview" autoplay muted playsinline></video>
+                            <div class="webcam-controls">
+                                <button type="button" id="start-camera" class="btn btn-sm btn-primary" title="📷 Start Camera">📷</button>
+                                <button type="button" id="flip-camera" class="btn btn-sm btn-secondary" style="display: none;" title="🔄 Flip Camera">🔄</button>
+                                <button type="button" id="record-video" class="btn btn-sm btn-danger" style="display: none;" title="🔴 Record">🔴</button>
+                                <button type="button" id="stop-recording" class="btn btn-sm btn-warning" style="display: none;" title="⏹️ Stop">⏹️</button>
+                            </div>
+                            <div id="recording-status" style="display: none;">
+                                <p>🔴 Recording... <span id="recording-time">00:00</span></p>
+                            </div>
+                        </div>
+                        
+                        <div id="youtube-container" style="display: none;">
+                            <div class="form-group">
+                                <label for="youtube-url">📺 YouTube Video URL:</label>
+                                <input type="url" id="youtube-url" name="youtube_url" 
+                                       placeholder="https://www.youtube.com/watch?v=..." 
+                                       pattern="https?://(?:www\.)?(?:youtube\.com|youtu\.be)/.*"
+                                       title="Please enter a valid YouTube URL">
+                                <div class="form-help">Paste a YouTube video URL for your comment</div>
+                            </div>
+                            <div id="youtube-preview" style="display: none;">
+                                <div class="youtube-video-container">
+                                    <iframe id="youtube-embed" width="300" height="200" 
+                                            frameborder="0" allowfullscreen 
+                                            style="border-radius: 8px; margin-top: 10px;"></iframe>
+                                </div>
+                                <button type="button" id="change-youtube" class="btn btn-sm btn-outline" style="margin-top: 10px;">Change YouTube URL</button>
+                            </div>
+                        </div>
+                    </div>
+                        
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-success" onclick="return validateCommentForm()" title="💬 Add Comment">💬 Add Comment</button>
+                    </div>
+                </form>
+            </div>
+        {% else %}
             <p><a href="{% url 'exercises:login' %}" title="🔑 Login to add comments">🔑 Login to add comments</a></p>
         {% endif %}
     </div>
