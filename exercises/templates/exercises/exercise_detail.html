@@ -447,55 +447,116 @@ document.addEventListener('DOMContentLoaded', function() {
                 currentStream.getTracks().forEach(track => track.stop());
             }
             
-            // Mobile-friendly camera constraints
+            // Check if getUserMedia is supported
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('Camera access not supported in this browser');
+            }
+            
+            // Mobile-friendly camera constraints with better error handling
             const constraints = {
                 video: { 
                     width: { ideal: 480, max: 720 },
                     height: { ideal: 360, max: 480 },
-                    facingMode: currentFacingMode
+                    facingMode: currentFacingMode,
+                    frameRate: { ideal: 30, max: 30 }
                 },
-                audio: true 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }
             };
             
+            console.log('Requesting camera access with constraints:', constraints);
             currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+            
+            if (!currentStream) {
+                throw new Error('No stream returned from getUserMedia');
+            }
+            
             webcamPreview.srcObject = currentStream;
-            startCameraBtn.style.display = 'none';
-            if (flipCameraBtn) flipCameraBtn.style.display = 'inline-block';
-            recordVideoBtn.style.display = 'inline-block';
+            webcamPreview.onloadedmetadata = function() {
+                console.log('Camera stream loaded successfully');
+                startCameraBtn.style.display = 'none';
+                const flipCameraBtn = document.getElementById('flip-camera');
+                if (flipCameraBtn) flipCameraBtn.style.display = 'inline-block';
+                recordVideoBtn.style.display = 'inline-block';
+            };
+            
             console.log('Camera started successfully for comment with facing mode:', currentFacingMode);
         } catch (err) {
             console.error('Camera access error:', err);
             let errorMsg = 'Error accessing camera: ' + err.message;
             if (err.name === 'NotAllowedError') {
-                errorMsg += '\n\nPlease allow camera access in your browser settings.';
+                errorMsg = 'Camera access denied. Please allow camera access in your browser settings and refresh the page.';
             } else if (err.name === 'NotFoundError') {
-                errorMsg += '\n\nNo camera found. Please check your device.';
+                errorMsg = 'No camera found. Please check your device has a camera and try again.';
+            } else if (err.name === 'NotSupportedError') {
+                errorMsg = 'Camera not supported in this browser. Please try a different browser.';
+            } else if (err.name === 'NotReadableError') {
+                errorMsg = 'Camera is in use by another application. Please close other camera apps and try again.';
             }
             alert(errorMsg);
+            
+            // Reset UI state
+            startCameraBtn.style.display = 'inline-block';
+            const flipCameraBtn = document.getElementById('flip-camera');
+            if (flipCameraBtn) flipCameraBtn.style.display = 'none';
+            recordVideoBtn.style.display = 'none';
         }
     }
     
     // Start recording
     recordVideoBtn.addEventListener('click', function() {
+        if (!currentStream) {
+            alert('Camera not started. Please start the camera first.');
+            return;
+        }
+        
         recordedChunks = [];
-        const stream = webcamPreview.srcObject;
         
-        mediaRecorder = new MediaRecorder(stream);
+        // Check if MediaRecorder is supported
+        if (!window.MediaRecorder) {
+            alert('Video recording not supported in this browser. Please try a different browser.');
+            return;
+        }
         
-        mediaRecorder.ondataavailable = function(event) {
-            if (event.data.size > 0) {
-                recordedChunks.push(event.data);
-            }
-        };
-        
-        mediaRecorder.onstop = function() {
-            const blob = new Blob(recordedChunks, { type: 'video/webm' });
-            const file = new File([blob], 'webcam-comment.webm', { type: 'video/webm' });
+        try {
+            // Use better MIME type detection
+            const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') 
+                ? 'video/webm;codecs=vp9' 
+                : MediaRecorder.isTypeSupported('video/webm;codecs=vp8') 
+                ? 'video/webm;codecs=vp8' 
+                : 'video/webm';
             
-            console.log('Recording stopped, blob size:', blob.size, 'bytes');
+            mediaRecorder = new MediaRecorder(currentStream, { mimeType: mimeType });
+            console.log('MediaRecorder created with MIME type:', mimeType);
             
-            // Store the recorded file globally for form submission
-            window.recordedVideoFile = file;
+            mediaRecorder.ondataavailable = function(event) {
+                if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                    console.log('Data available, chunk size:', event.data.size);
+                }
+            };
+            
+            mediaRecorder.onerror = function(event) {
+                console.error('MediaRecorder error:', event.error);
+                alert('Recording error: ' + event.error);
+            };
+            
+            mediaRecorder.onstop = function() {
+                if (recordedChunks.length === 0) {
+                    alert('No video data recorded. Please try again.');
+                    return;
+                }
+                
+                const blob = new Blob(recordedChunks, { type: mimeType });
+                const file = new File([blob], 'webcam-comment.webm', { type: mimeType });
+                
+                console.log('Recording stopped, blob size:', blob.size, 'bytes');
+                
+                // Store the recorded file globally for form submission
+                window.recordedVideoFile = file;
             
             // Create a more reliable file attachment method
             try {
