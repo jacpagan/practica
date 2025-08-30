@@ -391,6 +391,33 @@
             color: #ffffff;
         }
         
+        .create-exercise-section {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .create-exercise-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: auto;
+            min-width: 200px;
+        }
+        
+        .btn-icon {
+            font-size: 18px;
+        }
+        
+        .btn-text {
+            font-weight: 500;
+        }
+        
+        .login-card {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        
         /* Video recording styles */
         .video-options {
             display: flex;
@@ -461,47 +488,240 @@
             font-weight: bold;
         }
         
-        /* Mobile-specific styles */
+        /* Mobile-first responsive design */
         @media (max-width: 768px) {
+            body {
+                font-size: 16px;
+                -webkit-text-size-adjust: 100%;
+            }
+            
+            .container {
+                padding: 10px;
+            }
+            
+            .header {
+                padding: 15px 0;
+                margin-bottom: 20px;
+            }
+            
+            .header h1 {
+                font-size: 24px;
+            }
+            
+            .nav {
+                padding: 10px 0;
+                margin-bottom: 20px;
+            }
+            
+            .nav-container {
+                flex-direction: column;
+                gap: 15px;
+                padding: 0 10px;
+            }
+            
+            .nav-links {
+                justify-content: center;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+            
+            .nav a {
+                padding: 12px 16px;
+                font-size: 16px;
+                min-width: 50px;
+                min-height: 50px;
+            }
+            
+            .card {
+                padding: 16px;
+                margin-bottom: 16px;
+                border-radius: 8px;
+            }
+            
+            .header-controls {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+            
+            .user-controls {
+                justify-content: center;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+            
+            .btn {
+                padding: 16px 20px;
+                font-size: 16px;
+                border-radius: 8px;
+                min-height: 50px;
+                width: 100%;
+                max-width: none;
+                touch-action: manipulation;
+            }
+            
+            .exercise-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            
+            .video-container {
+                margin: 10px 0;
+            }
+            
+            .video-player {
+                width: 100%;
+                height: auto;
+                max-width: 100%;
+                border-radius: 8px;
+            }
+            
+            .exercise-actions {
+                margin: 10px 0;
+            }
+            
+            .exercise-actions .btn {
+                width: 100%;
+                padding: 16px;
+                font-size: 16px;
+            }
+            
+            .form-group {
+                margin-bottom: 20px;
+            }
+            
+            .form-group input,
+            .form-group textarea,
+            .form-group select {
+                padding: 16px;
+                font-size: 16px;
+                border-radius: 8px;
+            }
+            
             .video-options {
                 flex-direction: column;
+                gap: 10px;
             }
+            
             .video-options .btn {
                 width: 100%;
-                margin-bottom: 10px;
+                margin-bottom: 0;
+                padding: 16px;
+                font-size: 16px;
             }
+            
             .webcam-controls {
                 flex-direction: column;
-                align-items: center;
+                align-items: stretch;
+                gap: 10px;
             }
+            
             .webcam-controls .btn {
                 width: 100%;
-                max-width: 200px;
-                margin-bottom: 10px;
+                max-width: none;
+                margin-bottom: 0;
+                padding: 16px;
             }
+            
             #webcam-preview {
                 height: 240px;
                 width: 100%;
                 max-width: 100%;
             }
-            .form-group {
-                margin-bottom: 20px;
-            }
-            .btn {
-                padding: 14px 20px;
-                font-size: 18px;
-                border-radius: 10px;
-            }
-            .video-player {
-                width: 100%;
-                height: auto;
-                max-width: 100%;
-            }
+            
             .comment-video video {
                 width: 100%;
                 height: auto;
                 max-width: 100%;
             }
+            
+            .form-actions {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+                         .form-actions .btn {
+                 width: 100%;
+             }
+             
+             .create-exercise-btn {
+                 width: 100%;
+                 min-width: none;
+                 padding: 18px 20px;
+                 font-size: 17px;
+             }
+             
+             .btn-icon {
+                 font-size: 20px;
+             }
+             
+             .login-card {
+                 max-width: none;
+                 margin: 0;
+             }
+             
+             h1 { font-size: 24px; }
+            h2 { font-size: 20px; }
+            h3 { font-size: 18px; }
+            h4 { font-size: 16px; }
+            
+            .recorder .controls {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .recording-controls {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .camera-controls {
+                flex-direction: row;
+                justify-content: center;
+                gap: 15px;
+            }
+            
+            .security-info {
+                padding: 12px;
+                font-size: 13px;
+            }
+            
+            .alert {
+                padding: 16px;
+                font-size: 14px;
+            }
+        }
+        
+        /* Extra small screens */
+        @media (max-width: 480px) {
+            .container {
+                padding: 8px;
+            }
+            
+            .header h1 {
+                font-size: 22px;
+            }
+            
+            .nav a {
+                padding: 14px 12px;
+                font-size: 14px;
+                min-width: 45px;
+                min-height: 45px;
+            }
+            
+            .card {
+                padding: 12px;
+            }
+            
+            .btn {
+                padding: 14px 16px;
+                font-size: 15px;
+                min-height: 48px;
+            }
+            
+            h1 { font-size: 20px; }
+            h2 { font-size: 18px; }
+            h3 { font-size: 16px; }
         }
         
         /* Video player styles */
@@ -757,29 +977,7 @@
             margin-bottom: 3px;
         }
         
-        @media (max-width: 768px) {
-            .container {
-                padding: 15px;
-            }
-            
-            .nav a {
-                display: block;
-                margin: 2px 0;
-                text-align: center;
-            }
-            
-            .recorder .controls {
-                flex-direction: column;
-            }
-            
-            .recording-controls {
-                flex-direction: column;
-            }
-            
-            .camera-controls {
-                flex-direction: column;
-            }
-        }
+
     </style>
 </head>
 <body>
