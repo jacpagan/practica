@@ -221,7 +221,7 @@ Resources:
   MediaBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub '${EnvironmentName}-media-${AWS::AccountId}'
+      BucketName: practika-videos
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -488,8 +488,8 @@ Resources:
                   - s3:DeleteObject
                   - s3:ListBucket
                 Resource:
-                  - !Sub 'arn:aws:s3:::${MediaBucket}/*'
-                  - !Sub 'arn:aws:s3:::${MediaBucket}'
+                  - 'arn:aws:s3:::practika-videos/*'
+                  - 'arn:aws:s3:::practika-videos'
 
 Outputs:
   LoadBalancerDNS:

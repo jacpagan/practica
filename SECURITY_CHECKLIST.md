@@ -72,7 +72,7 @@
 - **Domain Health**: DNS resolution and HTTPS availability
 
 ### **Manual Checks**
-- **Security Script**: `./security-monitoring.sh`
+- **Security Monitoring**: Use AWS CloudWatch and WAF metrics directly
 - **WAF Dashboard**: AWS Console → WAF & Shield
 - **CloudWatch Logs**: Real-time log monitoring
 - **SSL Certificate**: Certificate validity and renewal

@@ -15,6 +15,7 @@ from django.conf import settings
 from django.db import connection
 from .models import VideoAsset
 from .services.storage import VideoStorageService
+from .services.video_clip_service import video_clip_service
 
 logger = logging.getLogger(__name__)
 
@@ -182,3 +183,66 @@ def _get_mime_type_from_extension(filename):
         '.ogg': 'video/ogg'
     }
     return mime_map.get(extension, 'video/mp4')
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@login_required
+def create_clip(request):
+    """Create a video clip with idempotency"""
+    try:
+        import json
+        data = json.loads(request.body)
+        
+        video_id = data.get('video_id')
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+        destination = data.get('destination', 'exercise')
+        
+        # Validate required fields
+        if not all([video_id, start_time is not None, end_time is not None]):
+            return JsonResponse({
+                'error': 'Missing required fields: video_id, start_time, end_time'
+            }, status=400)
+        
+        # Validate time values
+        try:
+            start_time = float(start_time)
+            end_time = float(end_time)
+        except (ValueError, TypeError):
+            return JsonResponse({
+                'error': 'start_time and end_time must be valid numbers'
+            }, status=400)
+        
+        # Get video asset
+        try:
+            video_asset = VideoAsset.objects.get(id=video_id)
+        except VideoAsset.DoesNotExist:
+            return JsonResponse({'error': 'Video not found'}, status=404)
+        
+        # Create clip
+        clip = video_clip_service.create_clip(
+            video_asset=video_asset,
+            start_time=start_time,
+            end_time=end_time,
+            destination=destination
+        )
+        
+        logger.info(f"Clip created successfully: {clip.id}")
+        
+        return JsonResponse({
+            'success': True,
+            'clip_id': str(clip.id),
+            'clip_hash': clip.clip_hash,
+            'start_time': clip.start_time,
+            'end_time': clip.end_time,
+            'duration': clip.duration,
+            'status': clip.processing_status,
+            'url': clip.get_public_url() if clip.processing_status == 'completed' else None
+        })
+        
+    except ValueError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+    except Exception as e:
+        logger.error(f"Clip creation failed: {e}")
+        return JsonResponse({'error': str(e)}, status=500)

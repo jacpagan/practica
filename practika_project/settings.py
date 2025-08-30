@@ -55,6 +55,10 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SESSION_COOKIE_AGE = 3600  # 1 hour
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 
+# Admin security settings
+ADMIN_IP_WHITELIST = os.getenv('ADMIN_IP_WHITELIST', '').split(',') if os.getenv('ADMIN_IP_WHITELIST') else []
+ADMIN_SESSION_TIMEOUT = 1800  # 30 minutes for admin sessions
+
 # CSRF security
 CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access for testing
 CSRF_COOKIE_SAMESITE = 'Lax'
@@ -92,26 +96,11 @@ INSTALLED_APPS = [
     "core",
     "exercises",
     "comments",
-    "accounts",
 ]
 
-# Using default User model with Profile extension for email verification
+# Using default User model for MVP
 
-# Email settings
-EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
-EMAIL_HOST = os.getenv('EMAIL_HOST', 'localhost')
-EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
-EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
-EMAIL_USE_SSL = os.getenv('EMAIL_SSL', 'False').lower() == 'true'
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@practika.com')
-SITE_URL = os.getenv('SITE_URL', 'http://localhost:8000')
-
-# Amazon SES settings
-SES_FROM_NAME = os.getenv('SES_FROM_NAME', 'Practika')
-
-# Redis Queue (RQ) settings for async email sending
+# Redis Queue (RQ) settings for async tasks
 RQ_QUEUES = {
     'default': {
         'HOST': os.getenv('REDIS_HOST', 'localhost'),
@@ -135,6 +124,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "core.middleware.ErrorHandlingMiddleware",  # Error handling
     "core.middleware.RateLimitingMiddleware",  # Rate limiting
+    "core.middleware.admin_security.AdminSecurityMiddleware",  # Admin security
 ]
 
 ROOT_URLCONF = "practika_project.urls"

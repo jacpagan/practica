@@ -231,41 +231,11 @@
         document.querySelector('.tab-btn').classList.add('active');
     }
     
-    // Handle resend verification form submission
+    // Handle resend verification form submission (disabled for MVP)
     document.getElementById('resend-verification-form').addEventListener('submit', function(e) {
         e.preventDefault();
-        
-        const email = document.getElementById('resend-email').value;
-        const button = this.querySelector('button[type="submit"]');
-        const originalText = button.textContent;
-        
-        button.textContent = 'Sending...';
-        button.disabled = true;
-        
-        fetch('{% url "accounts:resend_verification" %}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            },
-            body: `email=${encodeURIComponent(email)}`
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                alert(data.error);
-            } else {
-                alert(data.message);
-                hideResendForm();
-            }
-        })
-        .catch(error => {
-            alert('An error occurred. Please try again.');
-        })
-        .finally(() => {
-            button.textContent = originalText;
-            button.disabled = false;
-        });
+        alert('Email verification is not required for MVP. Please proceed with login.');
+        hideResendForm();
     });
 </script>
 {% endblock %}

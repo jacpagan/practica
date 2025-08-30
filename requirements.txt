@@ -10,12 +10,9 @@ django-cors-headers
 Pillow
 python-magic
 django-storages
-celery
 
-# Email and Queue
-django-rq
-redis
-boto3
+# Video Processing
+ffmpeg-python
 
 # Cloud Services
 boto3

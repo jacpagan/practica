@@ -28,8 +28,35 @@ AWS_DEFAULT_ACL = 'private'
 AWS_QUERYSTRING_AUTH = False
 
 # Static and Media Files
-STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+STORAGES = {
+    'default': {
+        'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage',
+        'OPTIONS': {
+            'access_key': AWS_ACCESS_KEY_ID,
+            'secret_key': AWS_SECRET_ACCESS_KEY,
+            'bucket_name': AWS_STORAGE_BUCKET_NAME,
+            'region_name': AWS_S3_REGION_NAME,
+            'custom_domain': AWS_S3_CUSTOM_DOMAIN,
+            'object_parameters': AWS_S3_OBJECT_PARAMETERS,
+            'default_acl': AWS_DEFAULT_ACL,
+            'querystring_auth': AWS_QUERYSTRING_AUTH,
+        }
+    },
+    'staticfiles': {
+        'BACKEND': 'storages.backends.s3boto3.S3StaticStorage',
+        'OPTIONS': {
+            'access_key': AWS_ACCESS_KEY_ID,
+            'secret_key': AWS_SECRET_ACCESS_KEY,
+            'bucket_name': AWS_STORAGE_BUCKET_NAME,
+            'region_name': AWS_S3_REGION_NAME,
+            'custom_domain': AWS_S3_CUSTOM_DOMAIN,
+            'object_parameters': AWS_S3_OBJECT_PARAMETERS,
+            'default_acl': AWS_DEFAULT_ACL,
+            'querystring_auth': AWS_QUERYSTRING_AUTH,
+        }
+    }
+}
+
 STATIC_URL = f'https://{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/static/'
 MEDIA_URL = f'https://{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/media/'
 
@@ -123,30 +150,33 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB
 MAX_UPLOAD_SIZE = 104857600  # 100MB
 
 # AWS CloudFront CDN (if configured)
-if os.getenv('AWS_CLOUDFRONT_DOMAIN'):
-    AWS_S3_CUSTOM_DOMAIN = os.getenv('AWS_CLOUDFRONT_DOMAIN')
-    AWS_CLOUDFRONT_DISTRIBUTION_ID = os.getenv('AWS_CLOUDFRONT_DISTRIBUTION_ID')
+# Uncomment if you need CloudFront CDN for better performance
+# if os.getenv('AWS_CLOUDFRONT_DOMAIN'):
+#     AWS_S3_CUSTOM_DOMAIN = os.getenv('AWS_CLOUDFRONT_DOMAIN')
+#     AWS_CLOUDFRONT_DISTRIBUTION_ID = os.getenv('AWS_CLOUDFRONT_DISTRIBUTION_ID')
 
 # AWS SES Email Backend (if configured)
-if os.getenv('AWS_SES_REGION_NAME'):
-    EMAIL_BACKEND = 'django_ses.SESBackend'
-    AWS_SES_REGION_NAME = os.getenv('AWS_SES_REGION_NAME')
-    AWS_SES_ACCESS_KEY_ID = os.getenv('AWS_SES_ACCESS_KEY_ID')
-    AWS_SES_SECRET_ACCESS_KEY = os.getenv('AWS_SES_SECRET_ACCESS_KEY')
+# Uncomment if you need SES for email functionality
+# if os.getenv('AWS_SES_REGION_NAME'):
+#     EMAIL_BACKEND = 'django_ses.SESBackend'
+#     AWS_SES_REGION_NAME = os.getenv('AWS_SES_REGION_NAME')
+#     AWS_SES_ACCESS_KEY_ID = os.getenv('AWS_SES_ACCESS_KEY_ID')
+#     AWS_SES_SECRET_ACCESS_KEY = os.getenv('AWS_SES_SECRET_ACCESS_KEY')
 
 # AWS ElastiCache Redis (if configured)
-if os.getenv('REDIS_URL'):
-    CACHES = {
-        'default': {
-            'BACKEND': 'django_redis.cache.RedisCache',
-            'LOCATION': os.getenv('REDIS_URL'),
-            'OPTIONS': {
-                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-            }
-        }
-    }
-    SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
-    SESSION_CACHE_ALIAS = 'default'
+# Uncomment if you need Redis for caching/queues
+# if os.getenv('REDIS_URL'):
+#     CACHES = {
+#         'default': {
+#             'BACKEND': 'django_redis.cache.RedisCache',
+#             'LOCATION': os.getenv('REDIS_URL'),
+#             'OPTIONS': {
+#                 'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+#             }
+#         }
+#     }
+#     SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+#     SESSION_CACHE_ALIAS = 'default'
 
 # AWS Application Load Balancer Health Check
 HEALTH_CHECK = {
@@ -168,16 +198,18 @@ CONN_MAX_AGE = 60
 OPTIMIZE_TABLE_JOINS = True
 
 # AWS CloudWatch Metrics
-if IS_AWS:
-    INSTALLED_APPS += ['django_prometheus']
-    MIDDLEWARE = ['django_prometheus.middleware.PrometheusBeforeMiddleware'] + MIDDLEWARE + ['django_prometheus.middleware.PrometheusAfterMiddleware']
+# Uncomment if you need Prometheus metrics
+# if IS_AWS:
+#     INSTALLED_APPS += ['django_prometheus']
+#     MIDDLEWARE = ['django_prometheus.middleware.PrometheusBeforeMiddleware'] + MIDDLEWARE + ['django_prometheus.middleware.PrometheusAfterMiddleware']
 
 # AWS X-Ray Tracing (if enabled)
-if os.getenv('AWS_XRAY_DAEMON_ADDRESS'):
-    INSTALLED_APPS += ['aws_xray_sdk.ext.django']
-    MIDDLEWARE = ['aws_xray_sdk.ext.django.XRayMiddleware'] + MIDDLEWARE
-    XRAY_RECORDER = {
-        'AWS_XRAY_CONTEXT_MISSING': 'LOG_ERROR',
-        'AWS_XRAY_TRACING_NAME': 'Practika-Django-App',
-    }
+# Uncomment if you need X-Ray tracing
+# if os.getenv('AWS_XRAY_DAEMON_ADDRESS'):
+#     INSTALLED_APPS += ['aws_xray_sdk.ext.django']
+#     MIDDLEWARE = ['aws_xray_sdk.ext.django.XRayMiddleware'] + MIDDLEWARE
+#     XRAY_RECORDER = {
+#         'AWS_XRAY_CONTEXT_MISSING': 'LOG_ERROR',
+#         'AWS_XRAY_TRACING_NAME': 'Practika-Django-App',
+#     }
 

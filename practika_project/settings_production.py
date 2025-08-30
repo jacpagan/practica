@@ -119,9 +119,7 @@ os.makedirs(MEDIA_ROOT, exist_ok=True)
 USE_S3 = os.getenv('USE_S3', 'True').lower() == 'true'
 
 if USE_S3:
-    # S3 storage configuration
-    AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
-    AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+    # S3 storage configuration (no explicit keys; use IAM/default chain)
     AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
     AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME', 'us-east-1')
     AWS_S3_CUSTOM_DOMAIN = os.getenv('AWS_S3_CUSTOM_DOMAIN')
@@ -140,7 +138,7 @@ if USE_S3:
     AWS_S3_OBJECT_PARAMETERS = {
         'CacheControl': 'max-age=86400',
     }
-    AWS_DEFAULT_ACL = 'public-read'
+    AWS_DEFAULT_ACL = 'private'
     AWS_QUERYSTRING_AUTH = False
     AWS_S3_SECURE_URLS = True
     AWS_S3_VERIFY = True
@@ -162,13 +160,13 @@ else:
     }
     print("Local storage configured for production")
 
-# Email settings - Use Amazon SES if configured, otherwise fallback to console
-if os.getenv('AWS_ACCESS_KEY_ID') and os.getenv('AWS_SECRET_ACCESS_KEY'):
+# Email settings - Use Amazon SES if running in AWS (IAM role) else console
+if os.getenv('AWS_EXECUTION_ENV') or os.getenv('ECS_CONTAINER_METADATA_URI'):
     EMAIL_BACKEND = 'core.email_backends.AmazonSESEmailBackend'
-    print("Amazon SES email backend configured")
+    print("Amazon SES email backend configured (IAM role/default credentials)")
 else:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-    print("Console email backend configured (no AWS credentials)")
+    print("Console email backend configured (local/no IAM role)")
 
 # Email configuration
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'localhost')

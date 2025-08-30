@@ -8,4 +8,5 @@ urlpatterns = [
     path('api/upload-video/', views.upload_video, name='upload_video'),
     path('api/videos/', views.list_videos, name='list_videos'),
     path('api/videos/<uuid:video_id>/delete/', views.delete_video, name='delete_video'),
+    path('api/create-clip/', views.create_clip, name='create_clip'),
 ]
