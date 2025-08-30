@@ -254,6 +254,9 @@ def _handle_login(request):
             if next_url:
                 return redirect(next_url)
             else:
+                profile = getattr(user, 'profile', None)
+                if profile and getattr(profile.role, 'name', '') == 'student':
+                    return redirect('accounts:student_dashboard')
                 return redirect('exercises:exercise_list')
         else:
             logger.warning(f"Login attempt for inactive user: {username}")
