@@ -30,9 +30,8 @@ def _copy_for_rendition(original_path: str, rendition: str) -> str:
     return new_path
 
 
-@shared_task(bind=True)
-def transcode_video(self, video_asset_id: str) -> bool:
-    """Celery task to create adaptive bitrate renditions and store them"""
+def transcode_video_sync(video_asset_id: str) -> bool:
+    """Synchronous function to create adaptive bitrate renditions and store them"""
     try:
         asset = VideoAsset.objects.get(id=video_asset_id)
         asset.processing_status = 'processing'
@@ -60,3 +59,9 @@ def transcode_video(self, video_asset_id: str) -> bool:
         except Exception:  # pragma: no cover - fail silently if unable to update
             pass
         return False
+
+
+@shared_task(bind=True)
+def transcode_video(self, video_asset_id: str) -> bool:
+    """Celery task wrapper for transcode_video_sync"""
+    return transcode_video_sync(video_asset_id)

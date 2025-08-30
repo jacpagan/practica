@@ -109,7 +109,8 @@ class VideoStorageService:
                 transcode_video.delay(str(video_asset.id))
             except Exception as exc:
                 logger.warning(f"Celery not available, running sync transcode: {exc}")
-                transcode_video(str(video_asset.id))
+                from core.services.transcoder import transcode_video_sync
+                transcode_video_sync(str(video_asset.id))
 
             return video_asset
             
