@@ -62,8 +62,11 @@
     {% endif %}
     
     {% if user.is_authenticated %}
-        <div style="margin-top: 20px; text-align: center;">
-            <a href="{% url 'exercises:exercise_create' %}" class="btn btn-primary" title="➕ Create New Exercise">➕ Create New Exercise</a>
+        <div class="create-exercise-section">
+            <a href="{% url 'exercises:exercise_create' %}" class="btn btn-primary create-exercise-btn" title="➕ Create New Exercise">
+                <span class="btn-icon">➕</span>
+                <span class="btn-text">Create New Exercise</span>
+            </a>
         </div>
     {% endif %}
 </div>
