@@ -5,12 +5,14 @@ from django.contrib import messages
 from django.core.cache import cache
 from django.utils import timezone
 from django.http import JsonResponse
-from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.views import View
+
 from django.core.exceptions import ValidationError
 from django.contrib.auth.decorators import login_required
+
+
 import logging
 
 from django.contrib.auth.models import User
@@ -18,7 +20,12 @@ from .forms import SignUpForm
 from .models import Profile, Role
 from .email_verification import email_verification_token
 from .tasks import send_verification_email
+
 from comments.models import VideoComment
+
+from django.contrib.auth.decorators import login_required
+from exercises.models import Exercise
+
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +55,13 @@ def signup(request):
         form = SignUpForm()
 
     return render(request, "accounts/signup.html", {"form": form})
+
+
+@login_required
+def student_dashboard(request):
+    """Display exercises for the logged-in student."""
+    exercises = Exercise.objects.filter(created_by=request.user)
+    return render(request, "accounts/student_dashboard.html", {"exercises": exercises})
 
 
 class EmailVerificationView(View):

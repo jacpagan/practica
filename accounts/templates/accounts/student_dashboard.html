@@ -1,0 +1,13 @@
+{% extends 'base_generic.html' %}
+
+{% block content %}
+<h2>Student Dashboard</h2>
+<ul>
+  {% for exercise in exercises %}
+    <li><a href="{% url 'exercises:exercise_detail' exercise.id %}">{{ exercise.name }}</a></li>
+  {% empty %}
+    <li>No exercises found.</li>
+  {% endfor %}
+</ul>
+{% endblock %}
+
