@@ -11,12 +11,25 @@ class VideoAsset(models.Model):
     # Core fields
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     orig_filename = models.CharField(max_length=255, help_text="Original filename as uploaded")
-    storage_path = models.CharField(max_length=500, help_text="Full path to stored video file")
+    storage_path = models.CharField(max_length=500, blank=True, null=True, help_text="Full path to stored video file")
     mime_type = models.CharField(max_length=100, help_text="MIME type of the video")
-    size_bytes = models.PositiveIntegerField(help_text="File size in bytes")
-    checksum_sha256 = models.CharField(max_length=64, help_text="SHA256 checksum for integrity verification")
+    size_bytes = models.PositiveIntegerField(blank=True, null=True, help_text="File size in bytes")
+    checksum_sha256 = models.CharField(max_length=64, blank=True, null=True, help_text="SHA256 checksum for integrity verification")
     poster_path = models.CharField(max_length=500, blank=True, null=True, help_text="Path to video poster image")
     renditions = models.JSONField(default=dict, blank=True, help_text="Mapping of quality labels to rendition URLs")
+    
+    # YouTube support
+    youtube_url = models.URLField(blank=True, null=True, help_text="YouTube video URL")
+    video_type = models.CharField(
+        max_length=20,
+        choices=[
+            ('upload', 'Upload'),
+            ('recorded', 'Recorded'),
+            ('youtube', 'YouTube'),
+        ],
+        default='upload',
+        help_text="Type of video source"
+    )
 
     # Video metadata
     duration_sec = models.PositiveIntegerField(blank=True, null=True, help_text="Video duration in seconds")
@@ -91,6 +104,11 @@ class VideoAsset(models.Model):
     def get_public_url(self):
         """Get public URL for the video asset"""
         try:
+            # Handle YouTube videos
+            if self.video_type == 'youtube' and self.youtube_url:
+                return self.youtube_url
+            
+            # Handle uploaded/recorded videos
             if self.renditions:
                 return self.renditions.get('720p') or next(iter(self.renditions.values()))
 
@@ -101,7 +119,35 @@ class VideoAsset(models.Model):
             import logging
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to get public URL for video asset {self.id}: {e}")
-            return self.storage_path
+            return self.storage_path or self.youtube_url
+    
+    def get_youtube_embed_url(self):
+        """Get YouTube embed URL for the video"""
+        if self.video_type == 'youtube' and self.youtube_url:
+            # Extract video ID from various YouTube URL formats
+            import re
+            patterns = [
+                r'(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})',
+                r'youtube\.com\/watch\?.*v=([a-zA-Z0-9_-]{11})'
+            ]
+            
+            for pattern in patterns:
+                match = re.search(pattern, self.youtube_url)
+                if match:
+                    video_id = match.group(1)
+                    return f"https://www.youtube.com/embed/{video_id}"
+            
+            return self.youtube_url
+        return None
+    
+    def get_youtube_thumbnail_url(self):
+        """Get YouTube thumbnail URL for the video"""
+        if self.video_type == 'youtube' and self.youtube_url:
+            embed_url = self.get_youtube_embed_url()
+            if embed_url:
+                video_id = embed_url.split('/')[-1]
+                return f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
+        return None
 
 
 class VideoClip(models.Model):

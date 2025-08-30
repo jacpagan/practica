@@ -35,6 +35,7 @@
             <div class="video-options">
                 <button type="button" id="upload-btn" class="btn btn-secondary" title="📁 Upload Video">📁 Upload</button>
                 <button type="button" id="record-btn" class="btn btn-primary" title="🎥 Record Video">🎥 Record</button>
+                <button type="button" id="youtube-btn" class="btn btn-success" title="📺 Add YouTube Video">📺 YouTube</button>
             </div>
             <div id="video-preview" style="display: none;">
                 <p>✅ Video ready: <span id="video-name"></span></p>
@@ -53,6 +54,25 @@
                 </div>
                 <div id="recording-status" style="display: none;">
                     <p>🔴 Recording... <span id="recording-time">00:00</span></p>
+                </div>
+            </div>
+            
+            <div id="youtube-container" style="display: none;">
+                <div class="form-group">
+                    <label for="youtube-url">📺 YouTube Video URL:</label>
+                    <input type="url" id="youtube-url" name="youtube_url" 
+                           placeholder="https://www.youtube.com/watch?v=..." 
+                           pattern="https?://(?:www\.)?(?:youtube\.com|youtu\.be)/.*"
+                           title="Please enter a valid YouTube URL">
+                    <div class="form-help">Paste a YouTube video URL (e.g., https://www.youtube.com/watch?v=VIDEO_ID)</div>
+                </div>
+                <div id="youtube-preview" style="display: none;">
+                    <div class="youtube-video-container">
+                        <iframe id="youtube-embed" width="100%" height="300" 
+                                frameborder="0" allowfullscreen 
+                                style="border-radius: 8px; margin-top: 10px;"></iframe>
+                    </div>
+                    <button type="button" id="change-youtube" class="btn btn-sm btn-outline" style="margin-top: 10px;">Change YouTube URL</button>
                 </div>
             </div>
         </div>
@@ -81,10 +101,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     const uploadBtn = document.getElementById('upload-btn');
     const recordBtn = document.getElementById('record-btn');
+    const youtubeBtn = document.getElementById('youtube-btn');
     const videoInput = document.getElementById('video');
     const videoPreview = document.getElementById('video-preview');
     const videoName = document.getElementById('video-name');
     const webcamContainer = document.getElementById('webcam-container');
+    const youtubeContainer = document.getElementById('youtube-container');
+    const youtubeUrlInput = document.getElementById('youtube-url');
+    const youtubePreview = document.getElementById('youtube-preview');
+    const youtubeEmbed = document.getElementById('youtube-embed');
+    const changeYoutubeBtn = document.getElementById('change-youtube');
     const flipCameraBtn = document.getElementById('flip-camera');
     const recordVideoBtn = document.getElementById('record-video');
     const stopBtn = document.getElementById('stop-recording');
@@ -105,7 +131,60 @@ document.addEventListener('DOMContentLoaded', function() {
     // Upload button click
     uploadBtn.addEventListener('click', function() {
         videoInput.click();
+        youtubeContainer.style.display = 'none';
+        webcamContainer.style.display = 'none';
     });
+    
+    // YouTube URL input change
+    youtubeUrlInput.addEventListener('input', function() {
+        const url = this.value.trim();
+        if (isValidYouTubeUrl(url)) {
+            const videoId = extractYouTubeVideoId(url);
+            if (videoId) {
+                youtubeEmbed.src = `https://www.youtube.com/embed/${videoId}`;
+                youtubePreview.style.display = 'block';
+                // Store YouTube URL globally for form submission
+                window.youtubeVideoUrl = url;
+            }
+        } else {
+            youtubePreview.style.display = 'none';
+            window.youtubeVideoUrl = null;
+        }
+    });
+    
+    // Change YouTube URL button
+    changeYoutubeBtn.addEventListener('click', function() {
+        youtubePreview.style.display = 'none';
+        youtubeUrlInput.value = '';
+        youtubeUrlInput.focus();
+        window.youtubeVideoUrl = null;
+    });
+    
+    // YouTube URL validation function
+    function isValidYouTubeUrl(url) {
+        const patterns = [
+            /^https?:\/\/(?:www\.)?youtube\.com\/watch\?v=[a-zA-Z0-9_-]{11}/,
+            /^https?:\/\/youtu\.be\/[a-zA-Z0-9_-]{11}/,
+            /^https?:\/\/(?:www\.)?youtube\.com\/embed\/[a-zA-Z0-9_-]{11}/
+        ];
+        return patterns.some(pattern => pattern.test(url));
+    }
+    
+    // Extract YouTube video ID
+    function extractYouTubeVideoId(url) {
+        const patterns = [
+            /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+            /youtube\.com\/watch\?.*v=([a-zA-Z0-9_-]{11})/
+        ];
+        
+        for (const pattern of patterns) {
+            const match = url.match(pattern);
+            if (match) {
+                return match[1];
+            }
+        }
+        return null;
+    }
     
     // Change video button click
     changeVideoBtn.addEventListener('click', function() {
@@ -139,6 +218,7 @@ document.addEventListener('DOMContentLoaded', function() {
     recordBtn.addEventListener('click', async function() {
         webcamContainer.style.display = 'block';
         videoPreview.style.display = 'none';
+        youtubeContainer.style.display = 'none';
         
         try {
             await startCamera();
@@ -146,6 +226,15 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Camera start failed:', err);
             webcamContainer.style.display = 'none';
         }
+    });
+    
+    // YouTube button click
+    youtubeBtn.addEventListener('click', function() {
+        youtubeContainer.style.display = 'block';
+        videoPreview.style.display = 'none';
+        webcamContainer.style.display = 'none';
+        youtubePreview.style.display = 'none';
+        youtubeUrlInput.value = '';
     });
     
     // Cancel recording
@@ -412,8 +501,10 @@ document.addEventListener('DOMContentLoaded', function() {
             return false;
         }
         
-        // Check for video file in input or global storage
+        // Check for video file in input, global storage, or YouTube URL
         let file = null;
+        let youtubeUrl = null;
+        
         if (videoInput.files && videoInput.files.length > 0) {
             file = videoInput.files[0];
             console.log('Using file from input:', file.name, file.size, 'bytes');
@@ -428,22 +519,30 @@ document.addEventListener('DOMContentLoaded', function() {
             } catch (e) {
                 console.warn('Could not set file to input, but will proceed with global file');
             }
+        } else if (window.youtubeVideoUrl) {
+            youtubeUrl = window.youtubeVideoUrl;
+            console.log('Using YouTube URL:', youtubeUrl);
         }
         
-        if (!file) {
-            console.error('No video file found in input or global storage');
-            alert('Please upload a video file or record a video.');
+        if (!file && !youtubeUrl) {
+            console.error('No video file or YouTube URL found');
+            alert('Please upload a video file, record a video, or add a YouTube URL.');
             return false;
         }
         
-        console.log('Video file details:', file.name, file.size, 'bytes', file.type);
-        
-        if (file.size === 0) {
-            alert('The video file appears to be empty. Please try again.');
-            return false;
+        if (file) {
+            console.log('Video file details:', file.name, file.size, 'bytes', file.type);
+            
+            if (file.size === 0) {
+                alert('The video file appears to be empty. Please try again.');
+                return false;
+            }
+            
+            console.log('Form validation passed, submitting exercise with video file:', file.name, file.size, 'bytes');
+        } else if (youtubeUrl) {
+            console.log('Form validation passed, submitting exercise with YouTube URL:', youtubeUrl);
         }
         
-        console.log('Form validation passed, submitting exercise with video:', file.name, file.size, 'bytes');
         return true;
     }
 });

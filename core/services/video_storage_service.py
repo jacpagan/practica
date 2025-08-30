@@ -118,6 +118,60 @@ class VideoStorageService:
             logger.error(f"Failed to store uploaded video: {e}")
             raise
     
+    def create_youtube_video_asset(self, youtube_url: str) -> VideoAsset:
+        """Create VideoAsset record for YouTube video"""
+        try:
+            logger.info(f"Creating YouTube video asset for URL: {youtube_url}")
+            
+            # Validate YouTube URL
+            if not self._is_valid_youtube_url(youtube_url):
+                raise ValueError("Invalid YouTube URL format")
+            
+            # Extract video ID
+            video_id = self._extract_youtube_video_id(youtube_url)
+            if not video_id:
+                raise ValueError("Could not extract video ID from YouTube URL")
+            
+            # Create VideoAsset record for YouTube video
+            video_asset = VideoAsset.objects.create(
+                orig_filename=f"youtube_{video_id}.mp4",
+                youtube_url=youtube_url,
+                mime_type="video/youtube",
+                video_type="youtube",
+                processing_status='completed'  # YouTube videos are already processed
+            )
+            
+            logger.info(f"YouTube video asset created: {video_asset.id} for video ID {video_id}")
+            return video_asset
+            
+        except Exception as e:
+            logger.error(f"Failed to create YouTube video asset: {e}")
+            raise
+    
+    def _is_valid_youtube_url(self, url: str) -> bool:
+        """Validate YouTube URL format"""
+        import re
+        patterns = [
+            r'^https?://(?:www\.)?youtube\.com/watch\?v=[a-zA-Z0-9_-]{11}',
+            r'^https?://youtu\.be/[a-zA-Z0-9_-]{11}',
+            r'^https?://(?:www\.)?youtube\.com/embed/[a-zA-Z0-9_-]{11}'
+        ]
+        return any(re.match(pattern, url) for pattern in patterns)
+    
+    def _extract_youtube_video_id(self, url: str) -> str:
+        """Extract video ID from YouTube URL"""
+        import re
+        patterns = [
+            r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([a-zA-Z0-9_-]{11})',
+            r'youtube\.com/watch\?.*v=([a-zA-Z0-9_-]{11})'
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, url)
+            if match:
+                return match.group(1)
+        return None
+    
     def delete_video_asset(self, video_asset: VideoAsset) -> bool:
         """Delete video asset and associated file"""
         try:
