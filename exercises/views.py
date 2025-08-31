@@ -183,6 +183,9 @@ def _handle_signup(request):
         if next_url:
             return redirect(next_url)
         else:
+            profile = getattr(user, "profile", None)
+            if profile and profile.role and profile.role.name == "instructor":
+                return redirect('accounts:teacher_dashboard')
             return redirect('exercises:exercise_list')
         
     except Exception as e:
@@ -248,12 +251,21 @@ def _handle_login(request):
             request.session['user_agent'] = request.META.get('HTTP_USER_AGENT', '')
             
             messages.success(request, f'Welcome back, {username}!')
-            
+
             # Handle redirect after login
             next_url = request.GET.get('next')
             if next_url:
                 return redirect(next_url)
             else:
+
+                profile = getattr(user, "profile", None)
+                if profile and profile.role and profile.role.name == "instructor":
+                    return redirect('accounts:teacher_dashboard')
+
+                profile = getattr(user, 'profile', None)
+                if profile and getattr(profile.role, 'name', '') == 'student':
+                    return redirect('accounts:student_dashboard')
+
                 return redirect('exercises:exercise_list')
         else:
             logger.warning(f"Login attempt for inactive user: {username}")

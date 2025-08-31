@@ -5,11 +5,14 @@ from django.contrib import messages
 from django.core.cache import cache
 from django.utils import timezone
 from django.http import JsonResponse
-from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.views import View
+
 from django.core.exceptions import ValidationError
+from django.contrib.auth.decorators import login_required
+
+
 import logging
 
 from django.contrib.auth.models import User
@@ -17,6 +20,12 @@ from .forms import SignUpForm
 from .models import Profile, Role
 from .email_verification import email_verification_token
 from .tasks import send_verification_email
+
+from comments.models import VideoComment
+
+from django.contrib.auth.decorators import login_required
+from exercises.models import Exercise
+
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +55,13 @@ def signup(request):
         form = SignUpForm()
 
     return render(request, "accounts/signup.html", {"form": form})
+
+
+@login_required
+def student_dashboard(request):
+    """Display exercises for the logged-in student."""
+    exercises = Exercise.objects.filter(created_by=request.user)
+    return render(request, "accounts/student_dashboard.html", {"exercises": exercises})
 
 
 class EmailVerificationView(View):
@@ -150,3 +166,19 @@ class ResendVerificationView(View):
         else:
             ip = request.META.get('REMOTE_ADDR')
         return ip
+
+@login_required
+def teacher_dashboard(request):
+    """Display comments on exercises created by the logged-in teacher."""
+    user = request.user
+    if not hasattr(user, "profile") or user.profile.role is None or user.profile.role.name != "instructor":
+        return redirect("exercises:exercise_list")
+
+    comments = (
+        VideoComment.objects
+        .filter(exercise__created_by=user)
+        .select_related("exercise", "author")
+        .order_by("-created_at")
+    )
+
+    return render(request, "accounts/teacher_dashboard.html", {"comments": comments})
