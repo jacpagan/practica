@@ -178,11 +178,13 @@
                         </a>
                     </li>
                     {% if user.is_authenticated %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'exercises:exercise_create' %}">
-                            ✨ Create
-                        </a>
-                    </li>
+                        {% if user.profile.role.name == 'instructor' or user.is_staff %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'exercises:exercise_create' %}">
+                                ✨ Create Exercise
+                            </a>
+                        </li>
+                        {% endif %}
                     {% endif %}
                 </ul>
                 
@@ -193,7 +195,13 @@
                             👤 {{ user.username }}
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="{% url 'exercises:welcome' %}">🏠 Dashboard</a></li>
+                            {% if user.profile.role.name == 'instructor' %}
+                                <li><a class="dropdown-item" href="{% url 'accounts:teacher_dashboard' %}">👨‍🏫 Teacher Dashboard</a></li>
+                            {% elif user.profile.role.name == 'student' %}
+                                <li><a class="dropdown-item" href="{% url 'accounts:student_dashboard' %}">🎓 Student Dashboard</a></li>
+                            {% else %}
+                                <li><a class="dropdown-item" href="{% url 'exercises:welcome' %}">🏠 Dashboard</a></li>
+                            {% endif %}
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{% url 'exercises:logout' %}">🚪 Logout</a></li>
                         </ul>

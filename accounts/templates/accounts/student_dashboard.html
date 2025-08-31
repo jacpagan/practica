@@ -1,13 +1,101 @@
 {% extends 'base_generic.html' %}
 
 {% block content %}
-<h2>Student Dashboard</h2>
-<ul>
-  {% for exercise in exercises %}
-    <li><a href="{% url 'exercises:exercise_detail' exercise.id %}">{{ exercise.name }}</a></li>
-  {% empty %}
-    <li>No exercises found.</li>
-  {% endfor %}
-</ul>
+<div class="container">
+    <h2>🎓 Student Dashboard</h2>
+    <p>Welcome, {{ user.username }}! Here are exercises you can practice and your recent comments.</p>
+    
+    <div class="row">
+        <!-- Available Exercises -->
+        <div class="col-md-8">
+            <h3>📚 Available Exercises</h3>
+            {% if exercises %}
+                <div class="exercise-grid">
+                    {% for exercise in exercises %}
+                        <div class="exercise-card">
+                            <h4>{{ exercise.name }}</h4>
+                            {% if exercise.description %}
+                                <p>{{ exercise.description|truncatewords:20 }}</p>
+                            {% endif %}
+                            <p><small>Created by: {{ exercise.created_by.username }}</small></p>
+                            <p><small>Comments: {{ exercise.videocomment_set.count }}</small></p>
+                            <a href="{% url 'exercises:exercise_detail' exercise.id %}" class="btn btn-primary">
+                                Practice Exercise
+                            </a>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    <p>No exercises available yet. Teachers will create exercises for you to practice!</p>
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- Recent Comments -->
+        <div class="col-md-4">
+            <h3>💬 Your Recent Comments</h3>
+            {% if user_comments %}
+                <div class="comment-list">
+                    {% for comment in user_comments|slice:":5" %}
+                        <div class="comment-item">
+                            <p><strong>{{ comment.exercise.name }}</strong></p>
+                            <p>{{ comment.text|truncatewords:15 }}</p>
+                            <small>{{ comment.created_at|date:"M d, Y" }}</small>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    <p>You haven't made any comments yet. Start practicing exercises to leave feedback!</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.exercise-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.exercise-card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.exercise-card h4 {
+    margin-top: 0;
+    color: #333;
+}
+
+.comment-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.comment-item {
+    border-bottom: 1px solid #eee;
+    padding: 10px 0;
+}
+
+.comment-item:last-child {
+    border-bottom: none;
+}
+
+.comment-item p {
+    margin: 5px 0;
+}
+
+.comment-item small {
+    color: #666;
+}
+</style>
 {% endblock %}
 

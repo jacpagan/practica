@@ -60,8 +60,21 @@ def signup(request):
 @login_required
 def student_dashboard(request):
     """Display exercises for the logged-in student."""
-    exercises = Exercise.objects.filter(created_by=request.user)
-    return render(request, "accounts/student_dashboard.html", {"exercises": exercises})
+    # Students should see exercises created by teachers, not their own exercises
+    exercises = Exercise.objects.exclude(created_by=request.user).prefetch_related(
+        'videocomment_set', 'videocomment_set__author', 'videocomment_set__video_asset'
+    )
+    
+    # Get user's own comments
+    from comments.models import VideoComment
+    user_comments = VideoComment.objects.filter(author=request.user).select_related(
+        'exercise', 'video_asset'
+    ).order_by('-created_at')
+    
+    return render(request, "accounts/student_dashboard.html", {
+        "exercises": exercises,
+        "user_comments": user_comments
+    })
 
 
 class EmailVerificationView(View):
@@ -169,16 +182,32 @@ class ResendVerificationView(View):
 
 @login_required
 def teacher_dashboard(request):
-    """Display comments on exercises created by the logged-in teacher."""
+    """Display exercises and comments for the logged-in teacher."""
     user = request.user
     if not hasattr(user, "profile") or user.profile.role is None or user.profile.role.name != "instructor":
+        messages.error(request, "You must be a teacher to access this dashboard.")
         return redirect("exercises:exercise_list")
 
+    # Get exercises created by this teacher
+    exercises = Exercise.objects.filter(created_by=user).prefetch_related(
+        'videocomment_set', 'videocomment_set__author', 'videocomment_set__video_asset'
+    )
+    
+    # Get comments on exercises created by this teacher
     comments = (
         VideoComment.objects
         .filter(exercise__created_by=user)
-        .select_related("exercise", "author")
+        .select_related("exercise", "author", "video_asset")
         .order_by("-created_at")
     )
+    
+    # Get teacher's own comments on other exercises
+    teacher_comments = VideoComment.objects.filter(author=user).select_related(
+        'exercise', 'video_asset'
+    ).order_by('-created_at')
 
-    return render(request, "accounts/teacher_dashboard.html", {"comments": comments})
+    return render(request, "accounts/teacher_dashboard.html", {
+        "exercises": exercises,
+        "comments": comments,
+        "teacher_comments": teacher_comments
+    })
