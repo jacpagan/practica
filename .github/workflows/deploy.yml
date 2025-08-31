@@ -1,0 +1,182 @@
+name: Deploy to AWS ECS
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - staging
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: practika
+  ECS_CLUSTER: practika-prod-cluster
+  ECS_SERVICE: practika-prod-service
+  ECS_TASK_DEFINITION: practika-prod-task
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run tests
+      run: |
+        python manage.py test --verbosity=2
+
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+    
+    - name: Build, tag, and push image to Amazon ECR
+      id: build-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -f Dockerfile.aws -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+    
+    - name: Download task definition
+      run: |
+        aws ecs describe-task-definition --task-definition ${{ env.ECS_TASK_DEFINITION }} \
+        --query taskDefinition > task-definition.json
+    
+    - name: Fill in the new image ID in the Amazon ECS task definition
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@v2
+      with:
+        task-definition: task-definition.json
+        container-name: practika-web
+        image: ${{ steps.build-image.outputs.image }}
+    
+    - name: Deploy Amazon ECS task definition
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: ${{ env.ECS_SERVICE }}
+        cluster: ${{ env.ECS_CLUSTER }}
+        wait-for-service-stability: true
+        wait-for-minutes: 10
+    
+    - name: Wait for deployment to complete
+      run: |
+        echo "Waiting for ECS service to stabilize..."
+        aws ecs wait services-stable \
+          --cluster ${{ env.ECS_CLUSTER }} \
+          --services ${{ env.ECS_SERVICE }}
+    
+    - name: Test deployment
+      run: |
+        echo "Testing deployment health..."
+        # Wait a bit more for the load balancer to register targets
+        sleep 60
+        
+        # Get the load balancer DNS
+        ALB_DNS=$(aws cloudformation describe-stacks \
+          --stack-name practika-infrastructure \
+          --query 'Stacks[0].Outputs[?OutputKey==`LoadBalancerDNS`].OutputValue' \
+          --output text)
+        
+        echo "Load Balancer DNS: $ALB_DNS"
+        
+        # Test health endpoint
+        for i in {1..10}; do
+          if curl -f "https://$ALB_DNS/core/health/" >/dev/null 2>&1; then
+            echo "✅ Health check passed! App is running at https://$ALB_DNS"
+            break
+          else
+            echo "⏳ Health check attempt $i failed, retrying..."
+            sleep 30
+          fi
+        done
+        
+        # Test role selection endpoint
+        if curl -s "https://$ALB_DNS/exercises/login/" | grep -q "I am a"; then
+          echo "✅ Role selection is working!"
+        else
+          echo "❌ Role selection not found"
+          exit 1
+        fi
+    
+    - name: Notify deployment status
+      if: always()
+      run: |
+        if [ ${{ job.status }} == 'success' ]; then
+          echo "🎉 Deployment successful!"
+          echo "App URL: https://practika.jpagan.com"
+        else
+          echo "❌ Deployment failed!"
+          echo "Check the logs above for details"
+        fi
+
+  rollback:
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+    if: failure()
+    
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Rollback to previous task definition
+      run: |
+        echo "Rolling back to previous task definition..."
+        # Get the previous task definition
+        PREV_TASK_DEF=$(aws ecs describe-services \
+          --cluster ${{ env.ECS_CLUSTER }} \
+          --services ${{ env.ECS_SERVICE }} \
+          --query 'services[0].deployments[?status==`PRIMARY`].taskDefinition' \
+          --output text | cut -d'/' -f2 | cut -d':' -f1,2)
+        
+        if [ "$PREV_TASK_DEF" != "" ]; then
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.ECS_SERVICE }} \
+            --task-definition $PREV_TASK_DEF \
+            --force-new-deployment
+          
+          echo "Rollback initiated to task definition: $PREV_TASK_DEF"
+        else
+          echo "No previous task definition found for rollback"
+        fi
