@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y \
     libmagic-dev \
     ffmpeg \
     curl \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app directory
@@ -28,6 +29,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project files
 COPY . .
 
+# Make startup script executable and set proper permissions
+RUN chmod +x start.sh
+
 # Create necessary directories with proper permissions
 RUN mkdir -p /app/logs /app/media /app/staticfiles /app/media/videos && \
     chmod -R 755 /app/media && \
@@ -35,7 +39,8 @@ RUN mkdir -p /app/logs /app/media /app/staticfiles /app/media/videos && \
 
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash app && \
-    chown -R app:app /app
+    chown -R app:app /app && \
+    chmod +x /app/start.sh
 USER app
 
 # Expose port
@@ -45,5 +50,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/core/health/ || exit 1
 
-# Default command - use Gunicorn for production
+# Default command - can be overridden for AWS deployment
 CMD ["gunicorn", "--config", "gunicorn.conf.py", "practika_project.wsgi:application"]
