@@ -10,7 +10,7 @@ from rest_framework import viewsets, filters
 from rest_framework.parsers import MultiPartParser, FormParser
 from exercises.models import Exercise
 from exercises.serializers import ExerciseSerializer
-from exercises.permissions import IsAdminForExercise
+from exercises.permissions import IsTeacherOrAdminForExercise
 import re
 import logging
 
@@ -48,7 +48,17 @@ def exercise_detail(request, exercise_id):
 
 @login_required
 def exercise_create(request):
-    """Create new exercise (all authenticated users)"""
+    """Create new exercise (teachers only)"""
+    
+    # Check if user is a teacher or admin
+    if not request.user.is_staff:
+        if not hasattr(request.user, 'profile') or not request.user.profile.role:
+            messages.error(request, 'You must be a teacher to create exercises.')
+            return redirect('exercises:exercise_list')
+        
+        if request.user.profile.role.name != 'instructor':
+            messages.error(request, 'Only teachers can create exercises.')
+            return redirect('exercises:exercise_list')
     
     if request.method == 'POST':
         try:
@@ -137,9 +147,10 @@ def _handle_signup(request):
     email = request.POST.get('email')
     password1 = request.POST.get('password1')
     password2 = request.POST.get('password2')
+    role_name = request.POST.get('role')
     
     # Validation
-    if not all([username, email, password1, password2]):
+    if not all([username, email, password1, password2, role_name]):
         messages.error(request, 'All fields are required.')
         return render(request, 'exercises/login.html')
     
@@ -161,6 +172,14 @@ def _handle_signup(request):
         messages.error(request, 'Email already exists.')
         return render(request, 'exercises/login.html')
     
+    # Validate role
+    from accounts.models import Role
+    try:
+        role = Role.objects.get(name=role_name)
+    except Role.DoesNotExist:
+        messages.error(request, 'Invalid role selected.')
+        return render(request, 'exercises/login.html')
+    
     try:
         # Create user (active immediately for MVP)
         user = User.objects.create_user(
@@ -170,10 +189,14 @@ def _handle_signup(request):
             is_active=True  # Active immediately for MVP
         )
         
-        logger.info(f"New user registered: {username}")
+        # Create profile with role
+        from accounts.models import Profile
+        Profile.objects.create(user=user, role=role)
+        
+        logger.info(f"New user registered: {username} with role: {role_name}")
         messages.success(
             request, 
-            'Account created successfully! Welcome to Practika!'
+            f'Account created successfully! Welcome to Practika as a {role_name}!'
         )
         # Log the user in and redirect to exercise list
         login(request, user)
@@ -183,10 +206,10 @@ def _handle_signup(request):
         if next_url:
             return redirect(next_url)
         else:
-            profile = getattr(user, "profile", None)
-            if profile and profile.role and profile.role.name == "instructor":
+            if role_name == "instructor":
                 return redirect('accounts:teacher_dashboard')
-            return redirect('exercises:exercise_list')
+            else:
+                return redirect('accounts:student_dashboard')
         
     except Exception as e:
         logger.error(f"Signup error: {e}")
@@ -257,15 +280,15 @@ def _handle_login(request):
             if next_url:
                 return redirect(next_url)
             else:
-
+                # Route based on user role
                 profile = getattr(user, "profile", None)
-                if profile and profile.role and profile.role.name == "instructor":
-                    return redirect('accounts:teacher_dashboard')
-
-                profile = getattr(user, 'profile', None)
-                if profile and getattr(profile.role, 'name', '') == 'student':
-                    return redirect('accounts:student_dashboard')
-
+                if profile and profile.role:
+                    if profile.role.name == "instructor":
+                        return redirect('accounts:teacher_dashboard')
+                    elif profile.role.name == "student":
+                        return redirect('accounts:student_dashboard')
+                
+                # Fallback to exercise list if no role or unknown role
                 return redirect('exercises:exercise_list')
         else:
             logger.warning(f"Login attempt for inactive user: {username}")
@@ -308,7 +331,7 @@ def _get_client_ip(request):
 class ExerciseViewSet(viewsets.ModelViewSet):
     queryset = Exercise.objects.all()
     serializer_class = ExerciseSerializer
-    permission_classes = [IsAdminForExercise]
+    permission_classes = [IsTeacherOrAdminForExercise]
     parser_classes = [MultiPartParser, FormParser]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name', 'description']
