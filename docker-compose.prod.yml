@@ -50,18 +50,19 @@ services:
       - FALLBACK_VIDEO_METHODS=True
       
       # Security Settings
-      - SECURE_SSL_REDIRECT=True
-      - SECURE_HSTS_SECONDS=31536000
-      - SECURE_HSTS_INCLUDE_SUBDOMAINS=True
-      - SECURE_HSTS_PRELOAD=True
-      - SECURE_BROWSER_XSS_FILTER=True
-      - SECURE_CONTENT_TYPE_NOSNIFF=True
-      - X_FRAME_OPTIONS=DENY
-      - SECURE_REFERRER_POLICY=strict-origin-when-cross-origin
+      - SECURE_SSL_REDIRECT=False
+      - SECURE_HSTS_SECONDS=0
+      - SECURE_HSTS_INCLUDE_SUBDOMAINS=False
+      - SECURE_HSTS_PRELOAD=False
+      - SECURE_BROWSER_XSS_FILTER=False
+      - SECURE_CONTENT_TYPE_NOSNIFF=False
+      - X_FRAME_OPTIONS=SAMEORIGIN
+      - SECURE_REFERRER_POLICY=no-referrer-when-downgrade
+      - CSRF_USE_SESSIONS=False
       
       # Performance Settings
-      - DJANGO_CACHE_BACKEND=redis
-      - DJANGO_SESSION_ENGINE=redis
+      - DJANGO_CACHE_BACKEND=django.core.cache.backends.db
+      - DJANGO_SESSION_ENGINE=django.contrib.sessions.backends.db
       - DJANGO_CACHE_TIMEOUT=300
       - DJANGO_SESSION_COOKIE_AGE=3600
       - DJANGO_SESSION_COOKIE_SECURE=True
@@ -84,7 +85,7 @@ services:
       - practika-network
     restart: unless-stopped
     deploy:
-      replicas: 2
+      replicas: 1
       resources:
         limits:
           memory: 1G
@@ -119,8 +120,8 @@ services:
   nginx:
     image: nginx:alpine
     ports:
-      - "80:80"
-      - "443:443"
+      - "8080:80"
+      - "8443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./media:/app/media:ro
