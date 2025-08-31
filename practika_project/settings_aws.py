@@ -134,6 +134,14 @@ ALLOWED_HOSTS = [
     os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost'),
     os.getenv('ALB_DNS_NAME', ''),
     os.getenv('DOMAIN_NAME', ''),
+    # Allow internal AWS IPs for health checks
+    '10.0.0.0/8',
+    '172.16.0.0/12', 
+    '192.168.0.0/16',
+    '*.internal',
+    '*.local',
+    # Allow any host for AWS ECS health checks
+    '*',
 ]
 
 # Authentication Settings

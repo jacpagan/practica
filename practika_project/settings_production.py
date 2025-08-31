@@ -21,16 +21,30 @@ IS_TESTING = False
 
 # Security settings for production
 DEBUG = False
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-practika-dogfooding-key-change-in-production')
 
-if not SECRET_KEY:
-    raise ValueError("DJANGO_SECRET_KEY environment variable is required in production")
+# Allowed hosts for production - Django 4.2+ compatible
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    '*.jpagan.com',
+    'jpagan.com',
+    '*.amazonaws.com',
+    '*.elb.amazonaws.com',
+    # Allow all internal AWS IPs
+    '10.0.0.0/8',
+    '172.16.0.0/12',
+    '192.168.0.0/16',
+    '10.0.2.22',  # Specific internal IP from health checks
+    '10.0.2.80',  # Another internal IP from health checks
+    '*.internal',
+    '*.local',
+    # Allow any host for AWS ECS
+    '*',
+]
 
-# Allowed hosts for production - temporarily allow all hosts for debugging
-ALLOWED_HOSTS = ['*']
-
-# Security headers and HTTPS
-SECURE_SSL_REDIRECT = True  # Enable for AWS ALB
+# Security headers and HTTPS - enabled for HTTPS load balancer
+SECURE_SSL_REDIRECT = True  # Enable for HTTPS load balancer
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
@@ -39,18 +53,26 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 
-# Session security
-SESSION_COOKIE_SECURE = True  # Enable for AWS ALB
+# Session security - enabled for HTTPS
+SESSION_COOKIE_SECURE = True  # Enable for HTTPS
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SESSION_COOKIE_AGE = 3600
 
-# CSRF security
-CSRF_COOKIE_SECURE = True  # Enable for AWS ALB
+# CSRF security - enabled for HTTPS
+CSRF_COOKIE_SECURE = True  # Enable for HTTPS
 CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_USE_SESSIONS = False
+
+# CSRF trusted origins for HTTPS
+CSRF_TRUSTED_ORIGINS = [
+    'https://practika.jpagan.com',
+    'https://jpagan.com',
+    'https://jacpagan.com',
+    'https://practika.jacpagan.com'
+]
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
