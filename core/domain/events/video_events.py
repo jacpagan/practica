@@ -11,8 +11,8 @@ from .base_event import DomainEvent
 class VideoUploaded(DomainEvent):
     """Event raised when a video is uploaded"""
     
-    file_info: dict  # FileInfo as dict
-    storage_path: str
+    file_info: dict = None  # FileInfo as dict
+    storage_path: str = None
     
     @classmethod
     def create(cls, video_id: uuid.UUID, file_info: dict, storage_path: str) -> 'VideoUploaded':
@@ -33,7 +33,7 @@ class VideoUploaded(DomainEvent):
 class VideoProcessingStarted(DomainEvent):
     """Event raised when video processing starts"""
     
-    processing_job_id: str
+    processing_job_id: str = None
     
     @classmethod
     def create(cls, video_id: uuid.UUID, processing_job_id: str) -> 'VideoProcessingStarted':
@@ -53,8 +53,8 @@ class VideoProcessingStarted(DomainEvent):
 class VideoProcessingCompleted(DomainEvent):
     """Event raised when video processing completes"""
     
-    video_metadata: dict  # VideoMetadata as dict
-    poster_path: str
+    video_metadata: dict = None  # VideoMetadata as dict
+    poster_path: str = None
     
     @classmethod
     def create(cls, video_id: uuid.UUID, video_metadata: dict, poster_path: str) -> 'VideoProcessingCompleted':
@@ -75,7 +75,7 @@ class VideoProcessingCompleted(DomainEvent):
 class VideoProcessingFailed(DomainEvent):
     """Event raised when video processing fails"""
     
-    error_message: str
+    error_message: str = None
     error_code: str = None
     
     @classmethod

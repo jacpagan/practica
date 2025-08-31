@@ -6,8 +6,7 @@ import pytest
 from datetime import datetime
 from uuid import uuid4
 from core.domain.entities import (
-    VideoAsset, VideoClip, Comment, User, Exercise, TeacherStack,
-    TimeRange, VideoMetadata
+    VideoAsset, VideoComment, Exercise
 )
 
 

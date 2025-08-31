@@ -21,8 +21,20 @@ class TestDataFactory:
         temp_file = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
         
         if suffix == '.mp4':
-            # MP4 file signature
-            temp_file.write(b'\x00\x00\x00\x20ftypmp4')
+            # Create a more complete MP4 file structure
+            # MP4 file signature (ftyp box)
+            temp_file.write(b'\x00\x00\x00\x20')  # Box size
+            temp_file.write(b'ftyp')               # Box type
+            temp_file.write(b'mp4')                # Major brand
+            temp_file.write(b'\x00\x00\x00\x00')  # Minor version
+            temp_file.write(b'mp4')                # Compatible brand
+            temp_file.write(b'isom')               # Compatible brand
+            temp_file.write(b'avc1')               # Compatible brand
+            
+            # Add some dummy data to make it look more like a real MP4
+            remaining_size = size - temp_file.tell()
+            if remaining_size > 0:
+                temp_file.write(b'\x00' * remaining_size)
         elif suffix == '.webm':
             # WebM file signature
             temp_file.write(b'\x1a\x45\xdf\xa3')

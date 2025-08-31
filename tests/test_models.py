@@ -39,13 +39,13 @@ class VideoAssetModelTest(TestCase):
     def test_video_asset_validation(self):
         """Test VideoAsset validation"""
         # Test with invalid MIME type
+        invalid_asset = TestDataFactory.create_video_asset(mime_type='invalid/mime')
         with self.assertRaises(ValidationError):
-            invalid_asset = TestDataFactory.create_video_asset(mime_type='invalid/mime')
             invalid_asset.full_clean()
         
         # Test with invalid checksum length
+        invalid_asset = TestDataFactory.create_video_asset(checksum_sha256='short')
         with self.assertRaises(ValidationError):
-            invalid_asset = TestDataFactory.create_video_asset(checksum_sha256='short')
             invalid_asset.full_clean()
     
     def test_video_asset_processing_status(self):

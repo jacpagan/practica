@@ -7,6 +7,7 @@ from rest_framework import status
 from core.models import VideoAsset
 from exercises.models import Exercise
 from model_bakery import baker
+from tests.factories import TestDataFactory
 
 
 class ExerciseAPITest(APITestCase):
@@ -16,10 +17,14 @@ class ExerciseAPITest(APITestCase):
         self.video_asset = baker.make(VideoAsset)
         self.exercise = baker.make(Exercise, name="Test Exercise", video_asset=self.video_asset, created_by=self.admin_user)
         
-        # Create a test video file
+        # Create a test video file using factory
+        video_file_path = TestDataFactory.create_test_video_file('.mp4', 1024)
+        with open(video_file_path, 'rb') as f:
+            video_content = f.read()
+        
         self.video_file = SimpleUploadedFile(
             "test.mp4",
-            b"fake video content",
+            video_content,
             content_type="video/mp4"
         )
 
@@ -33,7 +38,7 @@ class ExerciseAPITest(APITestCase):
             'video': self.video_file
         }
         
-        response = self.client.post('/api/v1/exercises/', data, format='multipart')
+        response = self.client.post('/exercises/api/exercises/', data, format='multipart')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Exercise.objects.count(), 2)
 
@@ -47,22 +52,22 @@ class ExerciseAPITest(APITestCase):
             'video': self.video_file
         }
         
-        response = self.client.post('/api/v1/exercises/', data, format='multipart')
+        response = self.client.post('/exercises/api/exercises/', data, format='multipart')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_authenticated_user_can_read_exercise_list(self):
         """Test that authenticated users can read exercise list"""
         self.client.force_authenticate(user=self.user)
         
-        response = self.client.get('/api/v1/exercises/')
+        response = self.client.get('/exercises/api/exercises/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data['results']), 1)
 
     def test_authenticated_user_can_read_exercise_detail(self):
         """Test that authenticated users can read exercise detail"""
         self.client.force_authenticate(user=self.user)
         
-        response = self.client.get(f'/api/v1/exercises/{self.exercise.id}/')
+        response = self.client.get(f'/exercises/api/exercises/{self.exercise.id}/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['name'], self.exercise.name)
 
@@ -71,7 +76,7 @@ class ExerciseAPITest(APITestCase):
         self.client.force_authenticate(user=self.admin_user)
         
         data = {'name': 'Updated Exercise Name'}
-        response = self.client.patch(f'/api/v1/exercises/{self.exercise.id}/', data)
+        response = self.client.patch(f'/exercises/api/exercises/{self.exercise.id}/', data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
         self.exercise.refresh_from_db()
@@ -82,14 +87,14 @@ class ExerciseAPITest(APITestCase):
         self.client.force_authenticate(user=self.user)
         
         data = {'name': 'Updated Exercise Name'}
-        response = self.client.patch(f'/api/v1/exercises/{self.exercise.id}/', data)
+        response = self.client.patch(f'/exercises/api/exercises/{self.exercise.id}/', data)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_staff_can_delete_exercise(self):
         """Test that staff users can delete exercises"""
         self.client.force_authenticate(user=self.admin_user)
         
-        response = self.client.delete(f'/api/v1/exercises/{self.exercise.id}/')
+        response = self.client.delete(f'/exercises/api/exercises/{self.exercise.id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(Exercise.objects.count(), 0)
 
@@ -97,7 +102,7 @@ class ExerciseAPITest(APITestCase):
         """Test that non-staff users cannot delete exercises"""
         self.client.force_authenticate(user=self.user)
         
-        response = self.client.delete(f'/api/v1/exercises/{self.exercise.id}/')
+        response = self.client.delete(f'/exercises/api/exercises/{self.exercise.id}/')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_exercise_requires_video(self):
@@ -109,35 +114,39 @@ class ExerciseAPITest(APITestCase):
             'description': 'This should fail'
         }
         
-        response = self.client.post('/api/v1/exercises/', data, format='multipart')
+        response = self.client.post('/exercises/api/exercises/', data, format='multipart')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_exercise_video_replacement(self):
         """Test that exercise video can be replaced"""
         self.client.force_authenticate(user=self.admin_user)
         
+        new_video_path = TestDataFactory.create_test_video_file('.mp4', 1024)
+        with open(new_video_path, 'rb') as f:
+            new_video_content = f.read()
+        
         new_video = SimpleUploadedFile(
             "new.mp4",
-            b"new video content",
+            new_video_content,
             content_type="video/mp4"
         )
         
         data = {'video': new_video}
-        response = self.client.patch(f'/api/v1/exercises/{self.exercise.id}/', data, format='multipart')
+        response = self.client.patch(f'/exercises/api/exercises/{self.exercise.id}/', data, format='multipart')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_exercise_search(self):
         """Test exercise search functionality"""
         self.client.force_authenticate(user=self.user)
         
-        response = self.client.get('/api/v1/exercises/?search=Exercise')
+        response = self.client.get('/exercises/api/exercises/?search=Exercise')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data['results']), 1)
 
     def test_exercise_ordering(self):
         """Test exercise ordering"""
         self.client.force_authenticate(user=self.user)
         
-        response = self.client.get('/api/v1/exercises/?ordering=-created_at')
+        response = self.client.get('/exercises/api/exercises/?ordering=-created_at')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data['results']), 1)

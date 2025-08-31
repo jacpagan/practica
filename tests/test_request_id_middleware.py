@@ -176,7 +176,7 @@ class RequestIDMiddlewareIntegrationTest(TestCase):
     def test_api_endpoints(self):
         """Test that API endpoints include request ID."""
         # Test with API endpoint
-        response = self.client.get('/api/')
+        response = self.client.get('/exercises/api/exercises/')
         
         # Check that response has request ID header
         self.assertIn('X-Request-ID', response.headers)

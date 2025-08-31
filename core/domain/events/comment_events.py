@@ -11,8 +11,8 @@ from .base_event import DomainEvent
 class CommentAdded(DomainEvent):
     """Event raised when a comment is added"""
     
-    exercise_id: uuid.UUID
-    author_id: uuid.UUID
+    exercise_id: uuid.UUID = None
+    author_id: uuid.UUID = None
     text: str = None
     video_asset_id: uuid.UUID = None
     
@@ -60,8 +60,8 @@ class CommentUpdated(DomainEvent):
 class CommentDeleted(DomainEvent):
     """Event raised when a comment is deleted"""
     
-    exercise_id: uuid.UUID
-    deleted_by: uuid.UUID
+    exercise_id: uuid.UUID = None
+    deleted_by: uuid.UUID = None
     
     @classmethod
     def create(cls, comment_id: uuid.UUID, exercise_id: uuid.UUID, deleted_by: uuid.UUID) -> 'CommentDeleted':

@@ -30,7 +30,7 @@ class MimeTypeDetectionService(MimeTypeDetector):
         """Detect MIME type of file using multiple methods"""
         # Method 1: Try python-magic if available
         mime_type = self._detect_with_magic(file_obj)
-        if mime_type:
+        if mime_type and mime_type != 'application/octet-stream':
             return mime_type
         
         # Method 2: Use file's content_type attribute

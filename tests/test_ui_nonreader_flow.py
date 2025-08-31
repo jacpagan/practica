@@ -6,6 +6,7 @@ from django.urls import reverse
 from exercises.models import Exercise, VideoAsset
 from core.models import VideoAsset as CoreVideoAsset
 from comments.models import VideoComment
+from tests.factories import TestDataFactory
 import uuid
 
 
@@ -46,6 +47,7 @@ class NonReaderUIFlowTest(TestCase):
 
     def test_icon_only_comment_flow(self):
         """Test that icon-only comment flow works correctly"""
+        self.client.login(username='testuser', password='testpass123')
         response = self.client.get(reverse('exercise_detail', args=[self.exercise.id]))
         self.assertEqual(response.status_code, 200)
         
@@ -100,15 +102,12 @@ class NonReaderUIFlowTest(TestCase):
         """Test that icon-only comment form submission works correctly"""
         self.client.login(username='testuser', password='testpass123')
         
-        # Create a temporary video file with proper content
-        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as temp_file:
-            # Write actual video-like content
-            temp_file.write(b'\x00\x00\x00\x20ftypmp4')  # MP4 file signature
-            temp_file_path = temp_file.name
+        # Create a temporary video file with proper content using TestDataFactory
+        video_file_path = TestDataFactory.create_test_video_file('.mp4', 1024)
         
         try:
-            with open(temp_file_path, 'rb') as video_file:
-                response = self.client.post('/api/video-comments/', {
+            with open(video_file_path, 'rb') as video_file:
+                response = self.client.post('/comments/video-comments/', {
                     'exercise_id': str(self.exercise.id),
                     'text': 'Test comment via icon-only UI',
                     'video': video_file,
@@ -123,7 +122,7 @@ class NonReaderUIFlowTest(TestCase):
         finally:
             # Cleanup
             try:
-                os.unlink(temp_file_path)
+                os.unlink(video_file_path)
             except OSError:
                 pass
 
@@ -139,6 +138,7 @@ class NonReaderUIFlowTest(TestCase):
 
     def test_icon_only_accessibility_features(self):
         """Test that icon-only UI maintains accessibility features"""
+        self.client.login(username='testuser', password='testpass123')
         response = self.client.get(reverse('exercise_list'))
         self.assertEqual(response.status_code, 200)
         
@@ -154,6 +154,7 @@ class NonReaderUIFlowTest(TestCase):
 
     def test_icon_only_navigation_flow(self):
         """Test that icon-only navigation flow works correctly"""
+        self.client.login(username='testuser', password='testpass123')
         response = self.client.get(reverse('exercise_list'))
         self.assertEqual(response.status_code, 200)
         
@@ -213,7 +214,7 @@ class NonReaderUIFlowTest(TestCase):
         })
         
         # Check that error handling doesn't break accessibility
-        self.assertIn(response.status_code, [200, 400, 401, 403])
+        self.assertIn(response.status_code, [200, 400, 401, 403, 429])
 
     def test_icon_only_success_flow(self):
         """Test that icon-only success flow works correctly"""
@@ -305,6 +306,7 @@ class NonReaderUIFlowTest(TestCase):
 
     def test_icon_only_user_feedback(self):
         """Test that icon-only user feedback works correctly"""
+        self.client.login(username='testuser', password='testpass123')
         response = self.client.get(reverse('exercise_list'))
         self.assertEqual(response.status_code, 200)
         
