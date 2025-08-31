@@ -23,4 +23,5 @@ exec gunicorn practika_project.wsgi:application \
     --timeout 120 \
     --access-logfile - \
     --error-logfile - \
-    --log-level info
+    --log-level info \
+    --env DJANGO_SETTINGS_MODULE=practika_project.settings_aws

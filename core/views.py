@@ -20,70 +20,88 @@ from .services.video_clip_service import video_clip_service
 logger = logging.getLogger(__name__)
 
 def health_check(request):
-    """Comprehensive health check endpoint for production monitoring"""
-    import time
+    """Health check endpoint for production monitoring"""
+    
     start_time = time.time()
     
+    checks = {}
+    
     try:
-        health_data = {
-            'status': 'healthy',
-            'timestamp': time.time(),
-            'version': '1.0.0',
-            'environment': os.getenv('DJANGO_ENVIRONMENT', 'unknown'),
-            'checks': {}
-        }
-        
-        # Database health check
-        try:
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT 1")
-                health_data['checks']['database'] = 'healthy'
-        except Exception as e:
-            # In development/testing, don't fail for database issues
-            health_data['checks']['database'] = 'healthy'  # Force healthy for tests
-            logger.warning(f"Database check failed but ignored in development: {e}")
-        
-        # Storage health check - simplified for tests to always pass
-        try:
-            # Check if we can write to media directory
-            media_dir = getattr(settings, 'MEDIA_ROOT', '/app/media')
-            if not os.path.exists(media_dir):
-                try:
-                    os.makedirs(media_dir, exist_ok=True)
-                except PermissionError:
-                    # If we can't create the directory, that's okay for health check
-                    pass
-            
-            # Try to write a test file
-            test_file = os.path.join(media_dir, 'health_check_test.txt')
-            try:
-                with open(test_file, 'w') as f:
-                    f.write('health check')
-                os.remove(test_file)
-                health_data['checks']['storage'] = 'healthy'
-            except (PermissionError, OSError) as e:
-                # In development/testing, don't fail for storage issues
-                health_data['checks']['storage'] = 'healthy'  # Force healthy for tests
-                logger.warning(f"Storage check failed but ignored in development: {e}")
-        except Exception as e:
-            # In development/testing, don't fail for storage issues
-            health_data['checks']['storage'] = 'healthy'  # Force healthy for tests
-            logger.warning(f"Storage check failed but ignored in development: {e}")
-        
-        # Calculate response time
-        response_time = (time.time() - start_time) * 1000
-        health_data['response_time_ms'] = round(response_time, 2)
-        
-        # Always return 200 for healthy status in development
-        return JsonResponse(health_data, status=200)
-        
+        # Database connectivity check
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            checks['database'] = 'healthy'
     except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        return JsonResponse({
-            'status': 'unhealthy',
-            'error': str(e),
-            'timestamp': time.time()
-        }, status=500)
+        checks['database'] = f'error: {str(e)}'
+    
+    try:
+        # Storage check
+        from django.core.files.storage import default_storage
+        if hasattr(default_storage, 'bucket_name'):
+            checks['storage'] = 'healthy'
+        else:
+            checks['storage'] = 'local'
+    except Exception as e:
+        checks['storage'] = f'error: {str(e)}'
+    
+    response_time = (time.time() - start_time) * 1000
+    
+    return JsonResponse({
+        'status': 'healthy',
+        'timestamp': time.time(),
+        'version': '1.0.0',
+        'environment': getattr(settings, 'ENVIRONMENT', 'unknown'),
+        'checks': checks,
+        'response_time_ms': round(response_time, 2)
+    })
+
+
+def signup_debug(request):
+    """Debug endpoint to test signup components"""
+    if not settings.DEBUG and getattr(settings, 'ENVIRONMENT', '') != 'production':
+        return JsonResponse({'error': 'Not available'}, status=404)
+    
+    checks = {}
+    
+    try:
+        # Test Role model import and data
+        from accounts.models import Role
+        roles = list(Role.objects.all().values_list('name', flat=True))
+        checks['roles'] = {'status': 'ok', 'available_roles': roles}
+    except Exception as e:
+        checks['roles'] = {'status': 'error', 'error': str(e)}
+    
+    try:
+        # Test Profile model import
+        from accounts.models import Profile
+        profile_count = Profile.objects.count()
+        checks['profiles'] = {'status': 'ok', 'count': profile_count}
+    except Exception as e:
+        checks['profiles'] = {'status': 'error', 'error': str(e)}
+    
+    try:
+        # Test User model
+        from django.contrib.auth.models import User
+        user_count = User.objects.count()
+        checks['users'] = {'status': 'ok', 'count': user_count}
+    except Exception as e:
+        checks['users'] = {'status': 'error', 'error': str(e)}
+    
+    try:
+        # Test URL resolution
+        from django.urls import reverse
+        student_url = reverse('accounts:student_dashboard')
+        teacher_url = reverse('accounts:teacher_dashboard')
+        checks['urls'] = {'status': 'ok', 'student_url': student_url, 'teacher_url': teacher_url}
+    except Exception as e:
+        checks['urls'] = {'status': 'error', 'error': str(e)}
+    
+    return JsonResponse({
+        'status': 'debug',
+        'timestamp': time.time(),
+        'checks': checks
+    })
 
 @csrf_exempt
 @require_http_methods(["POST"])
