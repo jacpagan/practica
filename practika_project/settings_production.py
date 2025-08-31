@@ -41,8 +41,12 @@ ALLOWED_HOSTS = [
     '192.168.0.0/16',
     '*.internal',
     '*.local',
-    # Allow all AWS internal IPs
+    # Allow all hosts for AWS ECS
     '*',
+    '10.0.2.189',
+    '10.0.1.142',
+    '10.0.2.109',
+    '10.0.1.133',
 ]
 
 # Security headers and HTTPS
