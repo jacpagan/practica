@@ -11,10 +11,10 @@ from .base_event import DomainEvent
 class ExerciseCreated(DomainEvent):
     """Event raised when an exercise is created"""
     
-    name: str
-    description: str
-    video_asset_id: uuid.UUID
-    created_by: uuid.UUID
+    name: str = None
+    description: str = None
+    video_asset_id: uuid.UUID = None
+    created_by: uuid.UUID = None
     
     @classmethod
     def create(cls, exercise_id: uuid.UUID, name: str, description: str, 
@@ -63,7 +63,7 @@ class ExerciseUpdated(DomainEvent):
 class ExerciseDeleted(DomainEvent):
     """Event raised when an exercise is deleted"""
     
-    deleted_by: uuid.UUID
+    deleted_by: uuid.UUID = None
     
     @classmethod
     def create(cls, exercise_id: uuid.UUID, deleted_by: uuid.UUID) -> 'ExerciseDeleted':

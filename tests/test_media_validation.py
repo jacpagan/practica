@@ -9,6 +9,7 @@ from core.models import VideoAsset
 from exercises.models import Exercise
 from core.services.storage import VideoStorageService
 from model_bakery import baker
+from tests.factories import TestDataFactory
 
 
 class MediaValidationTest(APITestCase):
@@ -22,9 +23,13 @@ class MediaValidationTest(APITestCase):
         storage_service = VideoStorageService()
         
         # Test MP4
+        video_file_path = TestDataFactory.create_test_video_file('.mp4', 1024)
+        with open(video_file_path, 'rb') as f:
+            video_content = f.read()
+        
         mp4_file = SimpleUploadedFile(
             "test.mp4",
-            b"fake mp4 content",
+            video_content,
             content_type="video/mp4"
         )
         
@@ -70,7 +75,7 @@ class MediaValidationTest(APITestCase):
             'description': 'This should fail'
         }
         
-        response = self.client.post('/api/v1/exercises/', data, format='multipart')
+        response = self.client.post('/exercises/api/exercises/', data, format='multipart')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_comment_creation_requires_video(self):
@@ -82,16 +87,20 @@ class MediaValidationTest(APITestCase):
             'text': 'Comment without video should fail'
         }
         
-        response = self.client.post('/api/v1/video-comments/', data, format='multipart')
+        response = self.client.post('/comments/video-comments/', data, format='multipart')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_video_comment_requires_exercise_id(self):
         """Test that video comment creation fails without exercise_id"""
         self.client.force_authenticate(user=self.user)
         
+        video_file_path = TestDataFactory.create_test_video_file('.mp4', 1024)
+        with open(video_file_path, 'rb') as f:
+            video_content = f.read()
+        
         video_file = SimpleUploadedFile(
             "comment.mp4",
-            b"fake comment video content",
+            video_content,
             content_type="video/mp4"
         )
         
@@ -100,16 +109,20 @@ class MediaValidationTest(APITestCase):
             'text': 'Comment without exercise_id should fail'
         }
         
-        response = self.client.post('/api/v1/video-comments/', data, format='multipart')
+        response = self.client.post('/comments/video-comments/', data, format='multipart')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_video_asset_checksum_calculation(self):
         """Test that video asset checksum is calculated"""
         storage_service = VideoStorageService()
         
+        video_file_path = TestDataFactory.create_test_video_file('.mp4', 1024)
+        with open(video_file_path, 'rb') as f:
+            video_content = f.read()
+        
         video_file = SimpleUploadedFile(
             "test.mp4",
-            b"fake video content for checksum test",
+            video_content,
             content_type="video/mp4"
         )
         
@@ -121,7 +134,10 @@ class MediaValidationTest(APITestCase):
         """Test that video asset size is recorded"""
         storage_service = VideoStorageService()
         
-        video_content = b"fake video content for size test"
+        video_file_path = TestDataFactory.create_test_video_file('.mp4', 1024)
+        with open(video_file_path, 'rb') as f:
+            video_content = f.read()
+        
         video_file = SimpleUploadedFile(
             "test.mp4",
             video_content,
@@ -135,9 +151,13 @@ class MediaValidationTest(APITestCase):
         """Test that video asset MIME type is correctly detected"""
         storage_service = VideoStorageService()
         
+        video_file_path = TestDataFactory.create_test_video_file('.webm', 1024)
+        with open(video_file_path, 'rb') as f:
+            video_content = f.read()
+        
         video_file = SimpleUploadedFile(
             "test.webm",
-            b"fake webm content",
+            video_content,
             content_type="video/webm"
         )
         
@@ -149,9 +169,13 @@ class MediaValidationTest(APITestCase):
         storage_service = VideoStorageService()
         
         original_filename = "my_exercise_video.mp4"
+        video_file_path = TestDataFactory.create_test_video_file('.mp4', 1024)
+        with open(video_file_path, 'rb') as f:
+            video_content = f.read()
+        
         video_file = SimpleUploadedFile(
             original_filename,
-            b"fake video content",
+            video_content,
             content_type="video/mp4"
         )
         
@@ -162,9 +186,13 @@ class MediaValidationTest(APITestCase):
         """Test that video asset generates proper storage path"""
         storage_service = VideoStorageService()
         
+        video_file_path = TestDataFactory.create_test_video_file('.mp4', 1024)
+        with open(video_file_path, 'rb') as f:
+            video_content = f.read()
+        
         video_file = SimpleUploadedFile(
             "test.mp4",
-            b"fake video content",
+            video_content,
             content_type="video/mp4"
         )
         

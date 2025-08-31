@@ -83,20 +83,37 @@ class VideoAsset(models.Model):
         if self.size_bytes and self.size_bytes <= 0:
             raise ValidationError("File size must be greater than 0")
         
-        # MIME type validation is handled during upload
+        # Validate MIME type
+        if self.mime_type:
+            valid_mime_types = [
+                'video/mp4', 'video/webm', 'video/ogg', 'video/avi',
+                'video/mov', 'video/wmv', 'video/flv', 'video/mkv'
+            ]
+            if self.mime_type not in valid_mime_types:
+                raise ValidationError(f"Unsupported MIME type: {self.mime_type}")
+        
+        # Validate checksum format
+        if self.checksum_sha256:
+            import re
+            if not re.match(r'^[a-fA-F0-9]{64}$', self.checksum_sha256):
+                raise ValidationError("Invalid checksum format")
 
     def save(self, *args, **kwargs):
-        """Override save method with basic validation"""
-        # Skip validation if this is a new instance and checksum is not set yet
-        # (it will be set during the upload process)
-        if not self.pk or self.checksum_sha256:
-            try:
-                self.full_clean()
-            except ValidationError:
-                # If validation fails, log it but don't crash
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.warning(f"Validation failed for VideoAsset {self.id}: {self.checksum_sha256}")
+        """Override save method with basic validation and auto-checksum calculation"""
+        # Auto-calculate checksum if missing and we have a storage path
+        if not self.checksum_sha256 and self.storage_path:
+            calculated_checksum = self.calculate_checksum()
+            if calculated_checksum:
+                self.checksum_sha256 = calculated_checksum
+        
+        # Run validation
+        try:
+            self.full_clean()
+        except ValidationError:
+            # If validation fails, log it but don't crash
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Validation failed for VideoAsset {self.id}: {self.checksum_sha256}")
         
         # Call parent save
         super().save(*args, **kwargs)
@@ -150,6 +167,66 @@ class VideoAsset(models.Model):
                 video_id = embed_url.split('/')[-1]
                 return f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
         return None
+
+    def validate_integrity(self):
+        """Validate the integrity of the video asset"""
+        import re
+        from django.utils import timezone
+        
+        errors = []
+        warnings = []
+        
+        # Check if checksum exists
+        if not self.checksum_sha256:
+            errors.append("Missing checksum")
+        else:
+            # Validate checksum format
+            if not re.match(r'^[a-fA-F0-9]{64}$', self.checksum_sha256):
+                errors.append("Invalid checksum format")
+        
+        # Check file size
+        if self.size_bytes and self.size_bytes <= 0:
+            errors.append("Invalid file size")
+        
+        # Check MIME type
+        if self.mime_type:
+            valid_mime_types = [
+                'video/mp4', 'video/webm', 'video/ogg', 'video/avi',
+                'video/mov', 'video/wmv', 'video/flv', 'video/mkv'
+            ]
+            if self.mime_type not in valid_mime_types:
+                warnings.append(f"Unsupported MIME type: {self.mime_type}")
+        
+        # Check processing status
+        if self.processing_status == 'failed':
+            warnings.append("Video processing failed")
+        
+        return {
+            'is_valid': len(errors) == 0,
+            'errors': errors,
+            'warnings': warnings,
+            'timestamp': timezone.now().isoformat()
+        }
+
+    def calculate_checksum(self):
+        """Calculate SHA256 checksum for the video file"""
+        import hashlib
+        import os
+        
+        if not self.storage_path or not os.path.exists(self.storage_path):
+            return None
+        
+        try:
+            with open(self.storage_path, 'rb') as f:
+                sha256_hash = hashlib.sha256()
+                for chunk in iter(lambda: f.read(4096), b""):
+                    sha256_hash.update(chunk)
+                return sha256_hash.hexdigest()
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to calculate checksum for {self.storage_path}: {e}")
+            return None
 
 
 class VideoClip(models.Model):
