@@ -26,8 +26,24 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 if not SECRET_KEY:
     raise ValueError("DJANGO_SECRET_KEY environment variable is required in production")
 
-# Allowed hosts for production
-ALLOWED_HOSTS = ['*', 'jpagan.com', 'practika.jpagan.com', 'jacpagan.com', 'practika.jacpagan.com']
+# Allowed hosts for production - comprehensive list for AWS ECS
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    '*.jpagan.com',
+    'jpagan.com',
+    '*.amazonaws.com',
+    '*.elb.amazonaws.com',
+    '10.0.0.0/8',
+    '10.0.1.0/24',
+    '10.0.2.0/24',
+    '172.16.0.0/12',
+    '192.168.0.0/16',
+    '*.internal',
+    '*.local',
+    # Allow all AWS internal IPs
+    '*',
+]
 
 # Security headers and HTTPS
 SECURE_SSL_REDIRECT = True  # Enable for AWS ALB
