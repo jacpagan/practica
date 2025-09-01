@@ -11,6 +11,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from exercises.models import Exercise
 from exercises.serializers import ExerciseSerializer
 from exercises.permissions import IsTeacherOrAdminForExercise
+from accounts.models import Role, Profile
 import re
 import logging
 
@@ -173,7 +174,6 @@ def _handle_signup(request):
         return render(request, 'exercises/login.html')
     
     # Validate role
-    from accounts.models import Role
     try:
         role = Role.objects.get(name=role_name)
     except Role.DoesNotExist:
@@ -190,7 +190,6 @@ def _handle_signup(request):
         )
         
         # Create profile with role
-        from accounts.models import Profile
         Profile.objects.create(user=user, role=role)
         
         logger.info(f"New user registered: {username} with role: {role_name}")
