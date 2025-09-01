@@ -113,10 +113,7 @@ jobs:
         sleep 60
         
         # Get the load balancer DNS
-        ALB_DNS=$(aws cloudformation describe-stacks \
-          --stack-name practika-infrastructure \
-          --query 'Stacks[0].Outputs[?OutputKey==`LoadBalancerDNS`].OutputValue' \
-          --output text)
+        ALB_DNS="practika-https-alb-1030541967.us-east-1.elb.amazonaws.com"
         
         echo "Load Balancer DNS: $ALB_DNS"
         
