@@ -176,3 +176,4 @@ This project is proprietary and confidential.
 *Status: Production Ready with HTTPS*
 # Trigger deployment with latest fixes
 # Unit tests fixed and working
+# IAM permissions fixed - testing GitHub Actions
