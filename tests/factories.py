@@ -9,6 +9,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from core.models import VideoAsset
 from exercises.models import Exercise
 from comments.models import VideoComment
+from accounts.models import Profile, Role
 
 
 class TestDataFactory:
@@ -92,6 +93,11 @@ class TestDataFactory:
             user.set_password('testpass123')
             user.save()
         
+        # Create Profile for the user
+        role_name = kwargs.get('role', 'student')
+        role, _ = Role.objects.get_or_create(name=role_name)
+        Profile.objects.get_or_create(user=user, defaults={'role': role})
+        
         return user
     
     @staticmethod
@@ -113,6 +119,11 @@ class TestDataFactory:
         else:
             user.set_password('adminpass123')
             user.save()
+        
+        # Create Profile for the admin user
+        role_name = kwargs.get('role', 'instructor')
+        role, _ = Role.objects.get_or_create(name=role_name)
+        Profile.objects.get_or_create(user=user, defaults={'role': role})
         
         return user
     
