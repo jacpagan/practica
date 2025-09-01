@@ -10,11 +10,11 @@ IS_TESTING = True
 IS_DEVELOPMENT = False
 IS_PRODUCTION = False
 
-# Use SQLite database for tests
+# Use in-memory SQLite database for tests
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'test_db.sqlite3',
+        'NAME': ':memory:',
     }
 }
 
@@ -33,4 +33,18 @@ CELERY_TASK_ALWAYS_EAGER = True
 # Separate media directory for tests
 MEDIA_ROOT = BASE_DIR / 'test_media'
 os.makedirs(MEDIA_ROOT, exist_ok=True)
+
+# Disable logging during tests
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': True,
+    'handlers': {
+        'null': {
+            'class': 'logging.NullHandler',
+        },
+    },
+    'root': {
+        'handlers': ['null'],
+    },
+}
 
