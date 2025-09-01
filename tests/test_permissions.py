@@ -1,5 +1,5 @@
 import pytest
-from django.test import TestCase, RequestFactory
+from django.test import RequestFactory
 from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework.test import APIClient
@@ -8,14 +8,16 @@ from core.models import VideoAsset
 from exercises.models import Exercise
 from comments.models import VideoComment
 from tests.factories import TestDataFactory
+from tests.base import PractikaTestCase
 import tempfile
 import os
 
 
-class ExercisePermissionsTest(TestCase):
+class ExercisePermissionsTest(PractikaTestCase):
     """Test exercise permissions"""
     
     def setUp(self):
+        super().setUp()
         self.factory = RequestFactory()
         self.user = TestDataFactory.create_user()
         self.admin_user = TestDataFactory.create_admin_user()
@@ -62,10 +64,11 @@ class ExercisePermissionsTest(TestCase):
         self.assertTrue(self.admin_user.is_staff)
 
 
-class VideoCommentPermissionsTest(TestCase):
+class VideoCommentPermissionsTest(PractikaTestCase):
     """Test video comment permissions"""
     
     def setUp(self):
+        super().setUp()
         self.factory = RequestFactory()
         self.user = TestDataFactory.create_user()
         self.admin_user = TestDataFactory.create_admin_user()
