@@ -131,18 +131,31 @@ LOGGING = {
 
 # AWS ECS Specific Settings
 ALLOWED_HOSTS = [
-    os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost'),
-    os.getenv('ALB_DNS_NAME', ''),
-    os.getenv('DOMAIN_NAME', ''),
-    # Allow internal AWS IPs for health checks
+    'localhost',
+    '127.0.0.1',
+    '*.jpagan.com',
+    'jpagan.com',
+    '*.amazonaws.com',
+    '*.elb.amazonaws.com',
+    # Allow all internal AWS IPs
     '10.0.0.0/8',
-    '172.16.0.0/12', 
+    '172.16.0.0/12',
     '192.168.0.0/16',
+    '10.0.2.22',  # Specific internal IP from health checks
+    '10.0.2.80',  # Another internal IP from health checks
     '*.internal',
     '*.local',
-    # Allow any host for AWS ECS health checks
+    # Allow any host for AWS ECS
     '*',
 ]
+
+# Override with environment variable if provided
+if os.getenv('DJANGO_ALLOWED_HOSTS'):
+    allowed_hosts_env = os.getenv('DJANGO_ALLOWED_HOSTS')
+    if allowed_hosts_env == '*':
+        ALLOWED_HOSTS = ['*']
+    else:
+        ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',')]
 
 # Authentication Settings
 LOGIN_URL = '/exercises/login/'
