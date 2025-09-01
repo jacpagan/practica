@@ -177,8 +177,14 @@ def _handle_signup(request):
     try:
         role = Role.objects.get(name=role_name)
     except Role.DoesNotExist:
-        messages.error(request, 'Invalid role selected.')
-        return render(request, 'exercises/login.html')
+        # Create roles if they don't exist (for first-time setup)
+        if role_name in ['student', 'instructor']:
+            role, created = Role.objects.get_or_create(name=role_name)
+            if created:
+                logger.info(f"Created role: {role_name}")
+        else:
+            messages.error(request, 'Invalid role selected.')
+            return render(request, 'exercises/login.html')
     
     try:
         # Create user (active immediately for MVP)
