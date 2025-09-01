@@ -11,6 +11,10 @@ python manage.py wait_for_db
 echo "Running database migrations..."
 python manage.py migrate
 
+# Seed roles
+echo "Seeding roles..."
+python manage.py seed_roles
+
 # Collect static files (if needed)
 echo "Collecting static files..."
 python manage.py collectstatic --noinput
