@@ -175,3 +175,4 @@ This project is proprietary and confidential.
 *Architecture: ECS Fargate + RDS PostgreSQL + S3 + HTTPS ALB*
 *Status: Production Ready with HTTPS*
 # Trigger deployment with latest fixes
+# Unit tests fixed and working
