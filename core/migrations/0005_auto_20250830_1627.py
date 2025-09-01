@@ -13,14 +13,14 @@ class Migration(migrations.Migration):
         # Remove accounts tables for MVP - handle dependencies first
         migrations.RunSQL(
             """
-            DROP TABLE IF EXISTS accounts_usermetrics CASCADE;
-            DROP TABLE IF EXISTS accounts_profile CASCADE;
-            DROP TABLE IF EXISTS accounts_role CASCADE;
+            DROP TABLE IF EXISTS accounts_usermetrics;
+            DROP TABLE IF EXISTS accounts_profile;
+            DROP TABLE IF EXISTS accounts_role;
             """,
             reverse_sql="""
-            CREATE TABLE accounts_role (id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR(50) NOT NULL UNIQUE);
-            CREATE TABLE accounts_profile (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, role_id INTEGER NOT NULL, email_verified BOOLEAN NOT NULL DEFAULT 0, onboarding_completed BOOLEAN NOT NULL DEFAULT 0, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL);
-            CREATE TABLE accounts_usermetrics (id INTEGER PRIMARY KEY AUTOINCREMENT, profile_id INTEGER NOT NULL, created_at DATETIME NOT NULL);
+            CREATE TABLE IF NOT EXISTS accounts_role (id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR(50) NOT NULL UNIQUE);
+            CREATE TABLE IF NOT EXISTS accounts_profile (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, role_id INTEGER NOT NULL, email_verified BOOLEAN NOT NULL DEFAULT 0, onboarding_completed BOOLEAN NOT NULL DEFAULT 0, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL);
+            CREATE TABLE IF NOT EXISTS accounts_usermetrics (id INTEGER PRIMARY KEY AUTOINCREMENT, profile_id INTEGER NOT NULL, created_at DATETIME NOT NULL);
             """
         ),
     ]
