@@ -30,15 +30,12 @@ class Profile(models.Model):
     preferences = models.JSONField(default=dict, blank=True)
     
     def is_email_verified(self):
-        """Check if user's email is verified."""
-        return self.email_verified_at is not None
+        """Check if user's email is verified (MVP approach - always True)."""
+        return True  # MVP approach - no email verification required
     
     def verify_email(self):
-        """Mark email as verified."""
-        self.email_verified_at = timezone.now()
-        self.user.is_active = True
-        self.user.save(update_fields=['is_active'])
-        self.save(update_fields=['email_verified_at'])
+        """Mark email as verified (MVP approach - no-op)."""
+        pass  # MVP approach - no email verification required
 
     def __str__(self) -> str:  # pragma: no cover - simple string representation
         return self.user.username
