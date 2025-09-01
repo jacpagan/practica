@@ -18,8 +18,6 @@ import logging
 from django.contrib.auth.models import User
 from .forms import SignUpForm
 from .models import Profile, Role
-from .email_verification import email_verification_token
-from .tasks import send_verification_email
 
 from comments.models import VideoComment
 
@@ -31,7 +29,18 @@ logger = logging.getLogger(__name__)
 
 
 def signup(request):
-    """Register a new user and send verification email."""
+    """Register a new user (MVP approach - immediate activation)."""
+    # Check if roles exist, if not create them
+    if Role.objects.count() == 0:
+        from django.core.management import call_command
+        try:
+            call_command('seed_roles')
+        except Exception as e:
+            logger.error(f"Failed to seed roles: {e}")
+            # Create roles manually if command fails
+            Role.objects.get_or_create(name='student')
+            Role.objects.get_or_create(name='instructor')
+    
     if request.method == "POST":
         form = SignUpForm(request.POST)
         if form.is_valid():
@@ -39,18 +48,19 @@ def signup(request):
             role = form.cleaned_data["role"]
             Profile.objects.create(user=user, role=role)
             
-            # Send verification email
-            try:
-                send_verification_email.delay(user.pk)
-            except:
-                # Fallback to sync if RQ not available
-                send_verification_email(user.pk)
+            # Log the user in immediately (MVP approach)
+            login(request, user)
             
             messages.success(
                 request, 
-                'Account created! Please check your email to verify your account before logging in.'
+                f'Account created successfully! Welcome to Practika as a {role.name}!'
             )
-            return redirect('exercises:login')
+            
+            # Redirect based on role
+            if role.name == "instructor":
+                return redirect('accounts:teacher_dashboard')
+            else:
+                return redirect('accounts:student_dashboard')
     else:
         form = SignUpForm()
 
@@ -76,109 +86,6 @@ def student_dashboard(request):
         "user_comments": user_comments
     })
 
-
-class EmailVerificationView(View):
-    """Handle email verification."""
-    
-    def get(self, request):
-        """Verify email with token."""
-        uid = request.GET.get('uid')
-        token = request.GET.get('token')
-        
-        if not uid or not token:
-            messages.error(request, 'Invalid verification link.')
-            return redirect('exercises:login?m=invalid_or_expired')
-        
-        try:
-            # Decode user ID
-            user_id = int(uid)
-            user = get_object_or_404(User, pk=user_id)
-            
-            # Verify token
-            if email_verification_token.verify_token(token, user):
-                profile = user.profile
-                profile.verify_email()
-                logger.info(f"Email verified for user: {user.username}")
-                messages.success(request, 'Email verified successfully! You can now log in.')
-                return redirect(reverse('exercises:login') + '?m=verified')
-            else:
-                messages.error(request, 'Invalid or expired verification link.')
-                return redirect(reverse('exercises:login') + '?m=invalid_or_expired')
-                
-        except (ValueError, TypeError):
-            messages.error(request, 'Invalid verification link.')
-            return redirect(reverse('exercises:login') + '?m=invalid_or_expired')
-
-
-@method_decorator(csrf_exempt, name='dispatch')
-class ResendVerificationView(View):
-    """Handle resend verification email."""
-    
-    def post(self, request):
-        """Resend verification email with rate limiting."""
-        email = request.POST.get('email')
-        
-        if not email:
-            return JsonResponse({'error': 'Email is required.'}, status=400)
-        
-        # Rate limiting
-        ip_address = self._get_client_ip(request)
-        rate_limit_key = f"resend_verification:{ip_address}:{email}"
-        
-        # Check rate limits: 3 per hour, 10 per day
-        hourly_count = cache.get(f"{rate_limit_key}:hourly", 0)
-        daily_count = cache.get(f"{rate_limit_key}:daily", 0)
-        
-        if hourly_count >= 3:
-            return JsonResponse({
-                'error': 'Too many requests. Please wait before requesting another verification email.'
-            }, status=429)
-        
-        if daily_count >= 10:
-            return JsonResponse({
-                'error': 'Daily limit reached. Please try again tomorrow.'
-            }, status=429)
-        
-        try:
-            user = User.objects.get(email=email)
-            
-            # Don't leak if user exists or is already verified
-            if user.profile.is_email_verified():
-                return JsonResponse({
-                    'message': 'If this email is registered and unverified, a verification email has been sent.'
-                })
-            
-            # Send verification email
-            try:
-                send_verification_email.delay(user.pk)
-            except:
-                # Fallback to sync if RQ not available
-                send_verification_email(user.pk)
-            
-            # Update rate limits
-            cache.set(f"{rate_limit_key}:hourly", hourly_count + 1, 3600)  # 1 hour
-            cache.set(f"{rate_limit_key}:daily", daily_count + 1, 86400)   # 24 hours
-            
-            logger.info(f"Verification email resent for user: {user.username}")
-            
-            return JsonResponse({
-                'message': 'If this email is registered and unverified, a verification email has been sent.'
-            })
-            
-        except User.DoesNotExist:
-            # Don't leak if user exists
-            return JsonResponse({
-                'message': 'If this email is registered and unverified, a verification email has been sent.'
-            })
-    
-    def _get_client_ip(self, request):
-        """Get client IP address."""
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0]
-        else:
-            ip = request.META.get('REMOTE_ADDR')
-        return ip
 
 @login_required
 def teacher_dashboard(request):
