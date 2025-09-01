@@ -173,10 +173,8 @@ def _handle_signup(request):
         messages.error(request, 'Email already exists.')
         return render(request, 'exercises/login.html')
     
-    # Validate role
+    # Ensure roles exist and get the role
     try:
-        role = Role.objects.get(name=role_name)
-    except Role.DoesNotExist:
         # Create roles if they don't exist (for first-time setup)
         if role_name in ['student', 'instructor']:
             role, created = Role.objects.get_or_create(name=role_name)
@@ -185,6 +183,10 @@ def _handle_signup(request):
         else:
             messages.error(request, 'Invalid role selected.')
             return render(request, 'exercises/login.html')
+    except Exception as e:
+        logger.error(f"Error creating/getting role {role_name}: {e}")
+        messages.error(request, 'Error processing role selection. Please try again.')
+        return render(request, 'exercises/login.html')
     
     try:
         # Create user (active immediately for MVP)
