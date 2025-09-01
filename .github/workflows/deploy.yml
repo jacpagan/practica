@@ -45,6 +45,8 @@ jobs:
     
     - name: Run tests
       run: |
+        python manage.py migrate
+        python manage.py seed_roles
         python manage.py test --verbosity=2
 
   build-and-deploy:
