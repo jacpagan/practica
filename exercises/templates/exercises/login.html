@@ -10,19 +10,7 @@
     </div>
     
     <!-- Verification status messages -->
-    {% if request.GET.m == 'verified' %}
-        <div class="alert alert-success">
-            ✅ Email verified successfully! You can now log in.
-        </div>
-    {% elif request.GET.m == 'invalid_or_expired' %}
-        <div class="alert alert-danger">
-            ❌ Invalid or expired verification link. Please request a new one.
-        </div>
-    {% elif request.GET.m == 'resent' %}
-        <div class="alert alert-info">
-            📧 Verification email sent! Please check your inbox.
-        </div>
-    {% endif %}
+    <!-- MVP approach - no email verification required -->
     
     <div class="security-info">
         <h4>Security Features</h4>
@@ -120,20 +108,6 @@
         <button type="submit" class="btn btn-primary" style="width: 100%;" title="📝 Sign Up">📝 Sign Up</button>
     </form>
     
-    <!-- Resend Verification Form -->
-    <div id="resend-form" class="auth-form" style="display: none;">
-        <h3>📧 Resend Verification Email</h3>
-        <form id="resend-verification-form">
-            <div class="form-group">
-                <label for="resend-email">📧 Email Address</label>
-                <input type="email" id="resend-email" name="email" required 
-                       placeholder="Enter your email address...">
-            </div>
-            <button type="submit" class="btn btn-info" style="width: 100%;" title="📧 Resend Verification">📧 Resend Verification</button>
-        </form>
-        <button type="button" class="btn btn-secondary" style="width: 100%; margin-top: 10px;" onclick="hideResendForm()">Cancel</button>
-    </div>
-    
 </div>
 
 <style>
@@ -224,25 +198,5 @@
     setupPasswordToggle('toggle-password', 'password');
     setupPasswordToggle('toggle-signup-password1', 'signup-password1');
     setupPasswordToggle('toggle-signup-password2', 'signup-password2');
-    
-    // Resend verification form functions
-    function showResendForm() {
-        document.querySelectorAll('.auth-form').forEach(form => form.style.display = 'none');
-        document.getElementById('resend-form').style.display = 'block';
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    }
-    
-    function hideResendForm() {
-        document.getElementById('resend-form').style.display = 'none';
-        document.getElementById('login-form').style.display = 'block';
-        document.querySelector('.tab-btn').classList.add('active');
-    }
-    
-    // Handle resend verification form submission (disabled for MVP)
-    document.getElementById('resend-verification-form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        alert('Email verification is not required for MVP. Please proceed with login.');
-        hideResendForm();
-    });
 </script>
 {% endblock %}

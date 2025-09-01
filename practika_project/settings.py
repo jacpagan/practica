@@ -37,7 +37,11 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', "django-insecure-^mso&+&9%q-5cj+)jed
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DJANGO_DEBUG', 'True').lower() == 'true' and not IS_PRODUCTION
 
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,testserver').split(',')
+# Add testserver to ALLOWED_HOSTS for testing
+env_allowed_hosts = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,testserver')
+if 'testserver' not in env_allowed_hosts:
+    env_allowed_hosts += ',testserver'
+ALLOWED_HOSTS = env_allowed_hosts.split(',')
 
 # Security settings
 SECURE_BROWSER_XSS_FILTER = True

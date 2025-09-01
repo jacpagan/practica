@@ -21,10 +21,10 @@ class SignUpForm(UserCreationForm):
         fields = ("username", "email", "password1", "password2", "role")
     
     def save(self, commit=True):
-        """Save user as inactive until email is verified."""
+        """Save user as active (MVP approach)."""
         user = super().save(commit=False)
         user.email = self.cleaned_data["email"]
-        user.is_active = False  # Inactive until email verified
+        user.is_active = True  # Active immediately for MVP
         if commit:
             user.save()
         return user
