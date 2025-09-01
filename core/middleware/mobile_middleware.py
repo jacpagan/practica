@@ -106,8 +106,14 @@ class DeviceOptimizationMiddleware(MiddlewareMixin):
             # Add legacy iOS header for old devices
             if hasattr(request, 'mobile_settings') and request.mobile_settings.get('platform') == 'ios':
                 version = request.mobile_settings.get('version', '0')
-                if version and float(version.split('.')[0]) < 12:
-                    response['X-Legacy-iOS'] = 'true'
+                if version:
+                    # Handle both string and integer versions
+                    if isinstance(version, str):
+                        version_num = float(version.split('.')[0])
+                    else:
+                        version_num = float(version)
+                    if version_num < 12:
+                        response['X-Legacy-iOS'] = 'true'
         
         return response
     
