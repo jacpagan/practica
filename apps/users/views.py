@@ -111,6 +111,22 @@ class PlaylistViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    @action(detail=True, methods=['get'])
+    def videos(self, request, pk=None):
+        """Get videos for a specific playlist"""
+        playlist = self.get_object()
+        
+        # Check if user can access this playlist
+        if playlist.privacy == 'private' and playlist.user != request.user and not request.user.is_admin:
+            return Response(
+                {'error': 'You do not have permission to view this playlist'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        videos = Video.objects.filter(playlist=playlist)
+        serializer = VideoSerializer(videos, many=True)
+        return Response(serializer.data)
+    
     @action(detail=False, methods=['get'])
     def public(self, request):
         """List only public playlists"""
