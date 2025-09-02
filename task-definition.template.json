@@ -1,0 +1,71 @@
+{
+  "family": "practika-task",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/practika-ecs-task-execution-role",
+  "taskRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/practika-ecs-task-execution-role",
+  "containerDefinitions": [
+    {
+      "name": "practika-app",
+      "image": "YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/practika-mvp:latest",
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "DEBUG",
+          "value": "False"
+        },
+        {
+          "name": "ALLOWED_HOSTS",
+          "value": "your-domain.com,your-alb-dns-name"
+        },
+        {
+          "name": "SECRET_KEY",
+          "value": "your-secret-key-here"
+        },
+        {
+          "name": "DB_NAME",
+          "value": "practika"
+        },
+        {
+          "name": "DB_USER",
+          "value": "your_db_user"
+        },
+        {
+          "name": "DB_PASSWORD",
+          "value": "your_db_password"
+        },
+        {
+          "name": "DB_HOST",
+          "value": "your-rds-endpoint"
+        },
+        {
+          "name": "DB_PORT",
+          "value": "5432"
+        },
+        {
+          "name": "AWS_STORAGE_BUCKET_NAME",
+          "value": "your-s3-bucket-name"
+        },
+        {
+          "name": "AWS_S3_REGION_NAME",
+          "value": "us-east-1"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/practika",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}
