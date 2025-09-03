@@ -1,29 +1,30 @@
-# Django Core
-Django==4.2.7
-djangorestframework==3.14.0
-django-cors-headers==4.3.1
+# Practika v1 Requirements - Cleaned Dependencies
 
-# Database
-psycopg2-binary==2.9.7
-django-environ==0.11.2
+# Core Framework
+Django
+djangorestframework
+django-filter
+django-cors-headers
 
-# Authentication & Security
-djangorestframework-simplejwt==5.3.0
-
-# AWS Integration
-boto3==1.29.3
-django-storages==1.14.2
+# File Handling
+Pillow
+python-magic
+django-storages
 
 # Video Processing
-Pillow==10.0.1
+ffmpeg-python
 
-# API Documentation
-drf-spectacular==0.26.5
+# Cloud Services
+boto3
+psycopg2-binary
 
-# Development & Testing
-pytest==7.4.3
-pytest-django==4.7.0
+# Deployment
+gunicorn
+whitenoise
+python-dotenv
+dj-database-url
 
-# Production
-gunicorn==21.2.0
-whitenoise==6.6.0
+# Testing
+pytest
+pytest-django
+model-bakery

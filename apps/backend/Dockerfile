@@ -1,17 +1,22 @@
-# Multi-stage Docker build for Django backend
+# Use Python 3.11 slim image as base
 FROM python:3.11-slim as base
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PYTHONPATH=/app \
+    DJANGO_SETTINGS_MODULE=practika_project.settings \
+    DJANGO_ENVIRONMENT=production \
+    DJANGO_DEBUG=False
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
-    postgresql-client \
+    libmagic1 \
+    libmagic-dev \
     ffmpeg \
+    curl \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app directory
@@ -21,39 +26,29 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Development stage
-FROM base as development
-ENV DJANGO_SETTINGS_MODULE=practika.settings
-ENV DJANGO_DEBUG=True
-
-# Copy application code
+# Copy project files
 COPY . .
 
-# Create media directory
-RUN mkdir -p media
+# Make startup script executable and set proper permissions
+RUN chmod +x start.sh
+
+# Create necessary directories with proper permissions
+RUN mkdir -p /app/logs /app/media /app/staticfiles /app/media/videos && \
+    chmod -R 755 /app/media && \
+    chmod -R 755 /app/logs
+
+# Create non-root user
+RUN useradd --create-home --shell /bin/bash app && \
+    chown -R app:app /app && \
+    chmod +x /app/start.sh
+USER app
 
 # Expose port
 EXPOSE 8000
 
-# Development command
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/core/health/ || exit 1
 
-# Production stage
-FROM base as production
-ENV DJANGO_SETTINGS_MODULE=practika.settings
-ENV DJANGO_DEBUG=False
-
-# Copy application code
-COPY . .
-
-# Collect static files
-RUN python manage.py collectstatic --noinput
-
-# Create media directory
-RUN mkdir -p media
-
-# Expose port
-EXPOSE 8000
-
-# Production command
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "--timeout", "120", "practika.wsgi:application"]
+# Default command - can be overridden for AWS deployment
+CMD ["gunicorn", "--config", "gunicorn.conf.py", "practika_project.wsgi:application"]
