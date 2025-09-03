@@ -1,0 +1,256 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM UTC
+
+env:
+  PYTHON_VERSION: '3.11'
+  DJANGO_SETTINGS_MODULE: practika_project.settings
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11']
+        django-version: ['4.2']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-${{ matrix.python-version }}-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-django pytest-cov coverage
+    
+    - name: Run unit tests with coverage
+      run: |
+        python manage.py test --verbosity=2 --parallel=4
+        coverage run --source='.' manage.py test
+        coverage report
+        coverage xml
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run integration tests
+      env:
+        DATABASE_URL: postgres://postgres:postgres@localhost:5432/test_db
+        DJANGO_SETTINGS_MODULE: practika_project.settings_test
+      run: |
+        python manage.py test exercises.tests.test_integration --verbosity=2
+        python manage.py test accounts.tests.test_integration --verbosity=2
+        python manage.py test comments.tests.test_integration --verbosity=2
+
+  security-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install security tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install bandit safety
+    
+    - name: Run security checks
+      run: |
+        # Run bandit for security vulnerabilities
+        bandit -r . -f json -o bandit-report.json || true
+        
+        # Check for known security vulnerabilities in dependencies
+        safety check --json --output safety-report.json || true
+        
+        # Display results
+        echo "=== Security Scan Results ==="
+        if [ -f bandit-report.json ]; then
+          echo "Bandit found $(jq '.results | length' bandit-report.json) issues"
+        fi
+        if [ -f safety-report.json ]; then
+          echo "Safety found $(jq '.vulnerabilities | length' safety-report.json) vulnerabilities"
+        fi
+
+  performance-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install performance testing tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install locust
+    
+    - name: Run performance tests
+      run: |
+        # Start Django server in background
+        python manage.py runserver 0.0.0.0:8000 &
+        SERVER_PID=$!
+        
+        # Wait for server to start
+        sleep 10
+        
+        # Run basic performance test
+        python -c "import requests; import time; start_time = time.time(); response = requests.get('http://localhost:8000/core/health/'); end_time = time.time(); print(f'Health endpoint response time: {end_time - start_time:.3f}s'); print(f'Status code: {response.status_code}')"
+        
+        # Kill server
+        kill $SERVER_PID
+
+  student-teacher-flow-test:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run student-teacher flow tests
+      run: |
+        python test_student_teacher_flow.py
+        echo "✅ Student-teacher flow tests completed"
+
+  lint-and-format:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install linting tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 black isort mypy
+    
+    - name: Run linting checks
+      run: |
+        # Check code formatting
+        black --check --diff .
+        
+        # Check import sorting
+        isort --check-only --diff .
+        
+        # Run flake8
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        
+        # Run mypy for type checking
+        mypy . --ignore-missing-imports
+
+  docker-build-test:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build Docker image
+      run: |
+        docker build -f Dockerfile.aws -t practika:test .
+        
+        # Test that the image can start
+        docker run --rm practika:test python manage.py check --deploy
+        
+        echo "✅ Docker image builds and passes Django checks"
+
+  test-results:
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, security-tests, performance-tests, student-teacher-flow-test, lint-and-format, docker-build-test]
+    if: always()
+    
+    steps:
+    - name: Test Results Summary
+      run: |
+        echo "🎉 All tests completed!"
+        echo "Check the individual job results above for detailed information."
+        
+        # This job will always pass, but the overall workflow will fail if any required jobs failed

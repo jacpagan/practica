@@ -1,0 +1,129 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "PractikaS3Storage",
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "s3:GetObjectAcl",
+                "s3:PutObject",
+                "s3:PutObjectAcl",
+                "s3:DeleteObject",
+                "s3:ListBucket",
+                "s3:GetBucketLocation"
+            ],
+            "Resource": [
+                "arn:aws:s3:::practika-simple-videos",
+                "arn:aws:s3:::practika-simple-videos/*"
+            ]
+        },
+        {
+            "Sid": "PractikaECR",
+            "Effect": "Allow",
+            "Action": [
+                "ecr:GetAuthorizationToken",
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:BatchGetImage",
+                "ecr:InitiateLayerUpload",
+                "ecr:UploadLayerPart",
+                "ecr:CompleteLayerUpload",
+                "ecr:PutImage",
+                "ecr:DescribeRepositories",
+                "ecr:ListImages",
+                "ecr:DescribeImages"
+            ],
+            "Resource": "arn:aws:ecr:us-east-1:164782963509:repository/practika"
+        },
+        {
+            "Sid": "PractikaECS",
+            "Effect": "Allow",
+            "Action": [
+                "ecs:DescribeClusters",
+                "ecs:ListServices",
+                "ecs:DescribeServices",
+                "ecs:UpdateService",
+                "ecs:DescribeTaskDefinition",
+                "ecs:RegisterTaskDefinition",
+                "ecs:ListTaskDefinitions",
+                "ecs:ListTasks",
+                "ecs:DescribeTasks",
+                "ecs:StopTask",
+                "ecs:RunTask"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "PractikaLoadBalancer",
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:DescribeLoadBalancers",
+                "elasticloadbalancing:DescribeTargetGroups",
+                "elasticloadbalancing:DescribeTargetHealth",
+                "elasticloadbalancing:DescribeListeners",
+                "elasticloadbalancing:DescribeRules"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "PractikaLogs",
+            "Effect": "Allow",
+            "Action": [
+                "logs:DescribeLogGroups",
+                "logs:DescribeLogStreams",
+                "logs:GetLogEvents",
+                "logs:FilterLogEvents"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "PractikaIAMReadOnly",
+            "Effect": "Allow",
+            "Action": [
+                "iam:GetUser",
+                "iam:ListAttachedUserPolicies",
+                "iam:GetPolicy",
+                "iam:GetPolicyVersion",
+                "iam:ListPolicyVersions"
+            ],
+            "Resource": [
+                "arn:aws:iam::164782963509:user/practika-s3-user",
+                "arn:aws:iam::164782963509:policy/PractikaDeploymentPolicy"
+            ]
+        },
+        {
+            "Sid": "PractikaRDS",
+            "Effect": "Allow",
+            "Action": [
+                "rds:DescribeDBInstances",
+                "rds:DescribeDBClusters",
+                "rds:DescribeDBClusterParameters",
+                "rds:DescribeDBParameters"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "PractikaCloudWatch",
+            "Effect": "Allow",
+            "Action": [
+                "cloudwatch:GetMetricStatistics",
+                "cloudwatch:ListMetrics",
+                "cloudwatch:DescribeAlarms",
+                "cloudwatch:GetMetricData"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "PractikaVPC",
+            "Effect": "Allow",
+            "Action": [
+                "ec2:DescribeVpcs",
+                "ec2:DescribeSubnets",
+                "ec2:DescribeSecurityGroups",
+                "ec2:DescribeNetworkInterfaces"
+            ],
+            "Resource": "*"
+        }
+    ]
+}

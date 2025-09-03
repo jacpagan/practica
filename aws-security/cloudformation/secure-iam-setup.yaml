@@ -1,0 +1,226 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Secure IAM setup for Practika application with least privilege access'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues: [production, staging, development]
+    Description: Environment name for resource tagging
+  
+  ApplicationName:
+    Type: String
+    Default: practika
+    Description: Application name for resource naming
+
+Resources:
+  # Application Execution Role (for ECS tasks)
+  PractikaApplicationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ApplicationName}-${Environment}-application-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref PractikaS3Policy
+        - !Ref PractikaSESPolicy
+        - !Ref PractikaSecretsPolicy
+        - !Ref PractikaCloudWatchPolicy
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref ApplicationName
+        - Key: Purpose
+          Value: ApplicationExecution
+
+  # S3 Access Policy
+  PractikaS3Policy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub '${ApplicationName}-${Environment}-s3-policy'
+      Description: 'Least privilege S3 access for Practika application'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: PractikaS3ReadWrite
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:GetObjectAcl
+              - s3:PutObject
+              - s3:PutObjectAcl
+              - s3:DeleteObject
+            Resource:
+              - !Sub 'arn:aws:s3:::${ApplicationName}-${Environment}-media/*'
+              - !Sub 'arn:aws:s3:::${ApplicationName}-${Environment}-static/*'
+          - Sid: PractikaS3ListBuckets
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+              - s3:GetBucketLocation
+            Resource:
+              - !Sub 'arn:aws:s3:::${ApplicationName}-${Environment}-media'
+              - !Sub 'arn:aws:s3:::${ApplicationName}-${Environment}-static'
+
+  # SES Email Policy
+  PractikaSESPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub '${ApplicationName}-${Environment}-ses-policy'
+      Description: 'Restricted SES access for Practika application'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: PractikaSESEmail
+            Effect: Allow
+            Action:
+              - ses:SendEmail
+              - ses:SendRawEmail
+              - ses:SendBulkTemplatedEmail
+              - ses:SendTemplatedEmail
+            Resource: '*'
+            Condition:
+              StringEquals:
+                'ses:FromAddress':
+                  - noreply@practika.com
+                  - support@practika.com
+          - Sid: PractikaSESIdentity
+            Effect: Allow
+            Action:
+              - ses:GetIdentityVerificationAttributes
+              - ses:GetSendQuota
+              - ses:GetSendStatistics
+            Resource: '*'
+
+  # Secrets Manager Policy
+  PractikaSecretsPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub '${ApplicationName}-${Environment}-secrets-policy'
+      Description: 'Secrets Manager access for Practika application'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: PractikaSecretsRead
+            Effect: Allow
+            Action:
+              - secretsmanager:GetSecretValue
+              - secretsmanager:DescribeSecret
+            Resource:
+              - !Sub 'arn:aws:secretsmanager:*:*:secret:${ApplicationName}/${Environment}/*'
+
+  # CloudWatch Logging Policy
+  PractikaCloudWatchPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub '${ApplicationName}-${Environment}-cloudwatch-policy'
+      Description: 'CloudWatch logging access for Practika application'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: PractikaCloudWatchLogs
+            Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+              - logs:DescribeLogStreams
+              - logs:DescribeLogGroups
+            Resource:
+              - !Sub 'arn:aws:logs:*:*:log-group:/aws/ecs/${ApplicationName}/*'
+              - !Sub 'arn:aws:logs:*:*:log-group:/${ApplicationName}/*'
+          - Sid: PractikaCloudWatchMetrics
+            Effect: Allow
+            Action:
+              - cloudwatch:PutMetricData
+            Resource: '*'
+            Condition:
+              StringEquals:
+                'cloudwatch:namespace': !Sub '${ApplicationName}/Application'
+
+  # Deployment Role (for CI/CD with MFA requirement)
+  PractikaDeploymentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ApplicationName}-${Environment}-deployment-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:user/${ApplicationName}-deployer'
+            Action: sts:AssumeRole
+            Condition:
+              Bool:
+                aws:MultiFactorAuthPresent: 'true'
+              NumericLessThan:
+                aws:MultiFactorAuthAge: '3600'
+      ManagedPolicyArns:
+        - !Ref PractikaDeploymentPolicy
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref ApplicationName
+        - Key: Purpose
+          Value: Deployment
+
+  # Deployment Policy (minimal permissions for CI/CD)
+  PractikaDeploymentPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub '${ApplicationName}-${Environment}-deployment-policy'
+      Description: 'Deployment permissions for Practika CI/CD'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ECSDeployment
+            Effect: Allow
+            Action:
+              - ecs:UpdateService
+              - ecs:DescribeServices
+              - ecs:DescribeTaskDefinition
+              - ecs:RegisterTaskDefinition
+            Resource:
+              - !Sub 'arn:aws:ecs:*:*:service/${ApplicationName}-*'
+              - !Sub 'arn:aws:ecs:*:*:task-definition/${ApplicationName}-*'
+          - Sid: ECRAccess
+            Effect: Allow
+            Action:
+              - ecr:GetAuthorizationToken
+              - ecr:BatchCheckLayerAvailability
+              - ecr:GetDownloadUrlForLayer
+              - ecr:BatchGetImage
+              - ecr:PutImage
+              - ecr:InitiateLayerUpload
+              - ecr:UploadLayerPart
+              - ecr:CompleteLayerUpload
+            Resource:
+              - !Sub 'arn:aws:ecr:*:*:repository/${ApplicationName}'
+          - Sid: SecretsUpdate
+            Effect: Allow
+            Action:
+              - secretsmanager:UpdateSecret
+              - secretsmanager:PutSecretValue
+            Resource:
+              - !Sub 'arn:aws:secretsmanager:*:*:secret:${ApplicationName}/${Environment}/*'
+
+Outputs:
+  ApplicationRoleArn:
+    Description: 'ARN of the application role for ECS tasks'
+    Value: !GetAtt PractikaApplicationRole.Arn
+    Export:
+      Name: !Sub '${ApplicationName}-${Environment}-application-role-arn'
+  
+  DeploymentRoleArn:
+    Description: 'ARN of the deployment role for CI/CD'
+    Value: !GetAtt PractikaDeploymentRole.Arn
+    Export:
+      Name: !Sub '${ApplicationName}-${Environment}-deployment-role-arn'

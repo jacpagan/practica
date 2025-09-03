@@ -1,0 +1,199 @@
+name: Production Monitoring
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'  # Every 15 minutes
+  workflow_dispatch:
+    inputs:
+      check_type:
+        description: 'Type of health check to perform'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - health
+        - role_selection
+        - performance
+
+env:
+  AWS_REGION: us-east-1
+  ECS_CLUSTER: practika-prod-cluster
+  ECS_SERVICE: practika-prod-service
+  APP_URL: https://practika.jpagan.com
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Check ECS Service Status
+      id: ecs-status
+      run: |
+        STATUS=$(aws ecs describe-services \
+          --cluster ${{ env.ECS_CLUSTER }} \
+          --services ${{ env.ECS_SERVICE }} \
+          --query 'services[0].{Status:status,RunningCount:runningCount,DesiredCount:desiredCount}' \
+          --output json)
+        
+        echo "ECS Status: $STATUS"
+        
+        RUNNING_COUNT=$(echo $STATUS | jq -r '.RunningCount')
+        DESIRED_COUNT=$(echo $STATUS | jq -r '.DesiredCount')
+        
+        if [ "$RUNNING_COUNT" -eq "$DESIRED_COUNT" ]; then
+          echo "✅ ECS service is healthy: $RUNNING_COUNT/$DESIRED_COUNT tasks running"
+          echo "ecs_healthy=true" >> $GITHUB_OUTPUT
+        else
+          echo "❌ ECS service is unhealthy: $RUNNING_COUNT/$DESIRED_COUNT tasks running"
+          echo "ecs_healthy=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Check Application Health
+      id: app-health
+      run: |
+        # Test health endpoint
+        if curl -f -s "${{ env.APP_URL }}/core/health/" >/dev/null; then
+          echo "✅ Application health endpoint is responding"
+          echo "app_healthy=true" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Application health endpoint is not responding"
+          echo "app_healthy=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Check Role Selection
+      id: role-check
+      run: |
+        # Test role selection endpoint
+        if curl -s "${{ env.APP_URL }}/exercises/login/" | grep -q "I am a"; then
+          echo "✅ Role selection is working"
+          echo "role_working=true" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Role selection is not working"
+          echo "role_working=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Check Response Time
+      id: performance
+      run: |
+        # Measure response time
+        START_TIME=$(date +%s.%N)
+        curl -s "${{ env.APP_URL }}/core/health/" >/dev/null
+        END_TIME=$(date +%s.%N)
+        
+        RESPONSE_TIME=$(echo "$END_TIME - $START_TIME" | bc)
+        echo "Response time: ${RESPONSE_TIME}s"
+        
+        if (( $(echo "$RESPONSE_TIME < 2.0" | bc -l) )); then
+          echo "✅ Response time is acceptable: ${RESPONSE_TIME}s"
+          echo "performance_ok=true" >> $GITHUB_OUTPUT
+        else
+          echo "⚠️ Response time is slow: ${RESPONSE_TIME}s"
+          echo "performance_ok=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Check Load Balancer Health
+      id: lb-health
+      run: |
+        # Get target group health
+        TARGET_GROUP_ARN=$(aws elbv2 describe-target-groups \
+          --names practika-prod-tg \
+          --query 'TargetGroups[0].TargetGroupArn' \
+          --output text)
+        
+        HEALTH_STATUS=$(aws elbv2 describe-target-health \
+          --target-group-arn $TARGET_GROUP_ARN \
+          --query 'TargetHealthDescriptions[0].TargetHealth.State' \
+          --output text)
+        
+        echo "Load balancer target health: $HEALTH_STATUS"
+        
+        if [ "$HEALTH_STATUS" = "healthy" ]; then
+          echo "✅ Load balancer targets are healthy"
+          echo "lb_healthy=true" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Load balancer targets are unhealthy: $HEALTH_STATUS"
+          echo "lb_healthy=false" >> $GITHUB_OUTPUT
+        fi
+
+  alert:
+    runs-on: ubuntu-latest
+    needs: health-check
+    if: always()
+    steps:
+    - name: Check for Issues
+      id: check-issues
+      run: |
+        # Check if any health checks failed
+        if [ "${{ needs.health-check.outputs.ecs_healthy }}" = "false" ] || \
+           [ "${{ needs.health-check.outputs.app_healthy }}" = "false" ] || \
+           [ "${{ needs.health-check.outputs.role_working }}" = "false" ] || \
+           [ "${{ needs.health-check.outputs.lb_healthy }}" = "false" ]; then
+          echo "issues_found=true" >> $GITHUB_OUTPUT
+          echo "❌ Health check issues detected!"
+        else
+          echo "issues_found=false" >> $GITHUB_OUTPUT
+          echo "✅ All health checks passed!"
+        fi
+    
+    - name: Create Issue for Problems
+      if: steps.check-issues.outputs.issues_found == 'true'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const issue = await github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: `🚨 Production Health Check Failed - ${new Date().toISOString()}`,
+            body: `
+          ## Production Health Check Failed
+          
+          **Time:** ${new Date().toISOString()}
+          **Workflow:** ${context.workflow}
+          **Run ID:** ${context.runId}
+          
+          ### Health Check Results:
+          - ECS Service: ${{ needs.health-check.outputs.ecs_healthy }}
+          - Application Health: ${{ needs.health-check.outputs.app_healthy }}
+          - Role Selection: ${{ needs.health-check.outputs.role_working }}
+          - Load Balancer: ${{ needs.health-check.outputs.lb_healthy }}
+          - Performance: ${{ needs.health-check.outputs.performance_ok }}
+          
+          ### Next Steps:
+          1. Check ECS service logs
+          2. Verify application configuration
+          3. Test manually at ${{ env.APP_URL }}
+          4. Review recent deployments
+          
+          ### Quick Commands:
+          \`\`\`bash
+          # Check ECS status
+          aws ecs describe-services --cluster ${{ env.ECS_CLUSTER }} --services ${{ env.ECS_SERVICE }}
+          
+          # Check logs
+          aws logs tail /ecs/${{ env.ECS_CLUSTER }} --follow
+          
+          # Test manually
+          curl -v ${{ env.APP_URL }}/core/health/
+          \`\`\`
+          `,
+            labels: ['production', 'health-check', 'urgent']
+          });
+          
+          console.log(`Created issue: ${issue.data.html_url}`);
+    
+    - name: Log Success
+      if: steps.check-issues.outputs.issues_found == 'false'
+      run: |
+        echo "🎉 All production health checks passed!"
+        echo "ECS: ${{ needs.health-check.outputs.ecs_healthy }}"
+        echo "App: ${{ needs.health-check.outputs.app_healthy }}"
+        echo "Role: ${{ needs.health-check.outputs.role_working }}"
+        echo "LB: ${{ needs.health-check.outputs.lb_healthy }}"
+        echo "Performance: ${{ needs.health-check.outputs.performance_ok }}"
