@@ -70,7 +70,7 @@
             <div class="prose prose-lg max-w-none">
 <h1 id="practika---video-annotation-flow">Practika - Video Annotation
 Flow</h1>
-<pre class="mermaid"><code>sequenceDiagram
+<div class="mermaid">sequenceDiagram
     participant U as User
     participant F as Frontend
     participant A as API
@@ -92,14 +92,14 @@ Flow</h1>
     F--&gt;&gt;U: Video ready for annotation
 
     Note over U,DB: Annotation Creation Process
-    U-&gt;&gt;F: Click &quot;Add Annotation&quot;
+    U-&gt;&gt;F: Click "Add Annotation"
     F-&gt;&gt;F: Show annotation form
     U-&gt;&gt;F: Select annotation type
     U-&gt;&gt;F: Set timestamp (15.5s)
     U-&gt;&gt;F: Enter content
     U-&gt;&gt;F: Set coordinates (optional)
     U-&gt;&gt;F: Choose visibility (public/private)
-    U-&gt;&gt;F: Click &quot;Save Annotation&quot;
+    U-&gt;&gt;F: Click "Save Annotation"
     F-&gt;&gt;A: POST /annotations/
     A-&gt;&gt;DB: Create annotation record
     DB--&gt;&gt;A: Annotation saved
@@ -130,7 +130,7 @@ Flow</h1>
     A-&gt;&gt;DB: Create report record
     DB--&gt;&gt;A: Report saved
     A--&gt;&gt;F: Report submitted
-    F--&gt;&gt;U: Confirmation message</code></pre>
+    F--&gt;&gt;U: Confirmation message</div>
             </div>
         </div>
     </div>

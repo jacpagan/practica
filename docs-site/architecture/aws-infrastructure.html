@@ -70,42 +70,42 @@
             <div class="prose prose-lg max-w-none">
 <h1 id="practika---aws-infrastructure-components">Practika - AWS
 Infrastructure Components</h1>
-<pre class="mermaid"><code>graph TB
-    subgraph &quot;Global Services&quot;
-        ROUTE53[Route53&lt;br/&gt;DNS Management]
-        ACM[ACM&lt;br/&gt;SSL Certificates]
-        CLOUDFRONT[CloudFront&lt;br/&gt;CDN Distribution]
+<div class="mermaid">graph TB
+    subgraph "Global Services"
+        ROUTE53[Route53<br/>DNS Management]
+        ACM[ACM<br/>SSL Certificates]
+        CLOUDFRONT[CloudFront<br/>CDN Distribution]
     end
 
-    subgraph &quot;Compute &amp; Storage&quot;
-        ECS[ECS Fargate&lt;br/&gt;Container Orchestration]
-        ECR[ECR&lt;br/&gt;Container Registry]
-        S3_VIDEOS[S3 Video Storage&lt;br/&gt;Movement Videos]
-        S3_STATIC[S3 Static Hosting&lt;br/&gt;Frontend Assets]
-        S3_LOGS[S3 Log Storage&lt;br/&gt;Application Logs]
+    subgraph "Compute &amp; Storage"
+        ECS[ECS Fargate<br/>Container Orchestration]
+        ECR[ECR<br/>Container Registry]
+        S3_VIDEOS[S3 Video Storage<br/>Movement Videos]
+        S3_STATIC[S3 Static Hosting<br/>Frontend Assets]
+        S3_LOGS[S3 Log Storage<br/>Application Logs]
     end
 
-    subgraph &quot;Networking&quot;
-        VPC[VPC&lt;br/&gt;Virtual Private Cloud]
-        ALB[ALB&lt;br/&gt;Application Load Balancer]
-        SG[Security Groups&lt;br/&gt;Network Security]
-        NAT[NAT Gateway&lt;br/&gt;Internet Access]
-        SUBNET_PUB[Public Subnets&lt;br/&gt;ALB, NAT]
-        SUBNET_PRIV[Private Subnets&lt;br/&gt;ECS, RDS]
+    subgraph "Networking"
+        VPC[VPC<br/>Virtual Private Cloud]
+        ALB[ALB<br/>Application Load Balancer]
+        SG[Security Groups<br/>Network Security]
+        NAT[NAT Gateway<br/>Internet Access]
+        SUBNET_PUB[Public Subnets<br/>ALB, NAT]
+        SUBNET_PRIV[Private Subnets<br/>ECS, RDS]
     end
 
-    subgraph &quot;Database &amp; Security&quot;
-        RDS[(RDS PostgreSQL&lt;br/&gt;Primary Database)]
-        SECRETS[Secrets Manager&lt;br/&gt;Credential Storage]
-        WAF[WAF&lt;br/&gt;Web Application Firewall]
-        IAM[IAM&lt;br/&gt;Identity &amp; Access Management]
+    subgraph "Database &amp; Security"
+        RDS[(RDS PostgreSQL<br/>Primary Database)]
+        SECRETS[Secrets Manager<br/>Credential Storage]
+        WAF[WAF<br/>Web Application Firewall]
+        IAM[IAM<br/>Identity &amp; Access Management]
     end
 
-    subgraph &quot;Monitoring &amp; Observability&quot;
-        CW_LOGS[CloudWatch Logs&lt;br/&gt;Application Logging]
-        CW_METRICS[CloudWatch Metrics&lt;br/&gt;Performance Monitoring]
-        CW_ALARMS[CloudWatch Alarms&lt;br/&gt;Alerting]
-        XRAY[X-Ray&lt;br/&gt;Distributed Tracing]
+    subgraph "Monitoring &amp; Observability"
+        CW_LOGS[CloudWatch Logs<br/>Application Logging]
+        CW_METRICS[CloudWatch Metrics<br/>Performance Monitoring]
+        CW_ALARMS[CloudWatch Alarms<br/>Alerting]
+        XRAY[X-Ray<br/>Distributed Tracing]
     end
 
     %% Global connections
@@ -162,7 +162,7 @@ Infrastructure Components</h1>
     class ECS,ECR,S3_VIDEOS,S3_STATIC,S3_LOGS compute
     class VPC,ALB,SG,NAT,SUBNET_PUB,SUBNET_PRIV network
     class RDS,SECRETS,WAF,IAM security
-    class CW_LOGS,CW_METRICS,CW_ALARMS,XRAY monitoring</code></pre>
+    class CW_LOGS,CW_METRICS,CW_ALARMS,XRAY monitoring</div>
             </div>
         </div>
     </div>

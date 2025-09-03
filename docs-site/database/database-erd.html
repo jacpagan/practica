@@ -70,7 +70,7 @@
             <div class="prose prose-lg max-w-none">
 <h1 id="practika---database-entity-relationship-diagram">Practika -
 Database Entity Relationship Diagram</h1>
-<pre class="mermaid"><code>erDiagram
+<div class="mermaid">erDiagram
     auth_user {
         int id PK
         string username UK
@@ -193,23 +193,23 @@ Database Entity Relationship Diagram</h1>
     }
 
     %% Relationships
-    auth_user ||--o{ users_profile : &quot;has&quot;
-    auth_user ||--o{ exercises_exercise : &quot;creates&quot;
-    auth_user ||--o{ exercises_exercisevideo : &quot;uploads&quot;
-    auth_user ||--o{ workouts_workout : &quot;owns&quot;
-    auth_user ||--o{ annotations_videoannotation : &quot;creates&quot;
-    auth_user ||--o{ users_userfavorite : &quot;favorites&quot;
+    auth_user ||--o{ users_profile : "has"
+    auth_user ||--o{ exercises_exercise : "creates"
+    auth_user ||--o{ exercises_exercisevideo : "uploads"
+    auth_user ||--o{ workouts_workout : "owns"
+    auth_user ||--o{ annotations_videoannotation : "creates"
+    auth_user ||--o{ users_userfavorite : "favorites"
 
-    exercises_category ||--o{ exercises_exercise : &quot;categorizes&quot;
-    exercises_exercise ||--o{ exercises_exercisevideo : &quot;has&quot;
-    exercises_exercise ||--o{ exercises_exercise_tags : &quot;tagged_with&quot;
-    exercises_tag ||--o{ exercises_exercise_tags : &quot;tags&quot;
+    exercises_category ||--o{ exercises_exercise : "categorizes"
+    exercises_exercise ||--o{ exercises_exercisevideo : "has"
+    exercises_exercise ||--o{ exercises_exercise_tags : "tagged_with"
+    exercises_tag ||--o{ exercises_exercise_tags : "tags"
 
-    workouts_workout ||--o{ workouts_workoutexercise : &quot;contains&quot;
-    exercises_exercise ||--o{ workouts_workoutexercise : &quot;included_in&quot;
+    workouts_workout ||--o{ workouts_workoutexercise : "contains"
+    exercises_exercise ||--o{ workouts_workoutexercise : "included_in"
 
-    exercises_exercisevideo ||--o{ annotations_videoannotation : &quot;annotated&quot;
-    exercises_exercise ||--o{ users_userfavorite : &quot;favorited&quot;</code></pre>
+    exercises_exercisevideo ||--o{ annotations_videoannotation : "annotated"
+    exercises_exercise ||--o{ users_userfavorite : "favorited"</div>
             </div>
         </div>
     </div>

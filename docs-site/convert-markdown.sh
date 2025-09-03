@@ -126,6 +126,12 @@ EOF
         sed -n '/<body>/,/<\/body>/p' | \
         sed '1d;$d' > /tmp/content.html
         
+        # Fix Mermaid wrapper tags and HTML entities
+        sed -i '' 's/<pre class="mermaid"><code>/<div class="mermaid">/g' /tmp/content.html
+        sed -i '' 's/<\/code><\/pre>/<\/div>/g' /tmp/content.html
+        sed -i '' 's/&quot;/"/g' /tmp/content.html
+        sed -i '' 's/&lt;br\/&gt;/<br\/>/g' /tmp/content.html
+        
         # Insert content into the template
         sed -i '' '/<!-- Content will be inserted here -->/r /tmp/content.html' "$output_file"
         sed -i '' '/<!-- Content will be inserted here -->/d' "$output_file"

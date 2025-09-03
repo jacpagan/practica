@@ -70,8 +70,8 @@
             <div class="prose prose-lg max-w-none">
 <h1 id="practika---playlist-creation-flow">Practika - Playlist Creation
 Flow</h1>
-<pre class="mermaid"><code>flowchart TD
-    subgraph &quot;Playlist Creation&quot;
+<div class="mermaid">flowchart TD
+    subgraph "Playlist Creation"
         START([User wants to create playlist])
         TITLE[Add title]
         DESCRIPTION[Add description]
@@ -79,7 +79,7 @@ Flow</h1>
         VISIBILITY[Set visibility]
     end
 
-    subgraph &quot;Moment Selection&quot;
+    subgraph "Moment Selection"
         BROWSE[Browse moments]
         SEARCH[Search by keyword]
         FILTER[Filter by category/difficulty]
@@ -87,7 +87,7 @@ Flow</h1>
         SELECT[Add to playlist]
     end
 
-    subgraph &quot;Playlist Organization&quot;
+    subgraph "Playlist Organization"
         ORDER[Arrange order]
         SETS[Set number of sets]
         REPS[Set number of reps]
@@ -95,14 +95,14 @@ Flow</h1>
         NOTES[Add personal notes]
     end
 
-    subgraph &quot;Playlist Management&quot;
+    subgraph "Playlist Management"
         SAVE[Save playlist]
         SHARE[Share with others]
         EXPORT[Export playlist]
         DUPLICATE[Duplicate playlist]
     end
 
-    subgraph &quot;Playlist Execution&quot;
+    subgraph "Playlist Execution"
         START_PLAYLIST[Start playlist]
         TRACK_PROGRESS[Track progress]
         MARK_COMPLETE[Mark moments complete]
@@ -150,7 +150,7 @@ Flow</h1>
     class BROWSE,SEARCH,FILTER,PREVIEW,SELECT selection
     class ORDER,SETS,REPS,DURATION,NOTES organization
     class SAVE,SHARE,EXPORT,DUPLICATE management
-    class START_PLAYLIST,TRACK_PROGRESS,MARK_COMPLETE,RECORD_RESULTS,SAVE_PROGRESS execution</code></pre>
+    class START_PLAYLIST,TRACK_PROGRESS,MARK_COMPLETE,RECORD_RESULTS,SAVE_PROGRESS execution</div>
             </div>
         </div>
     </div>
