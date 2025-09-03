@@ -1,0 +1,151 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.aws
+    ports:
+      - "8000:8000"
+    environment:
+      - DJANGO_ENVIRONMENT=production
+      - DJANGO_DEBUG=False
+      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+      - DJANGO_DB_ENGINE=django.db.backends.sqlite3
+      - DJANGO_DB_NAME=/app/db.sqlite3
+      - DJANGO_REDIS_URL=redis:6379/1
+      - DJANGO_CORS_ALLOWED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000
+      - DJANGO_CORS_ALLOW_CREDENTIALS=True
+      - DJANGO_CORS_ALLOW_METHODS=GET,POST,PUT,PATCH,DELETE,OPTIONS
+      - DJANGO_CORS_ALLOW_HEADERS=*
+      
+      # S3 Configuration (required for production)
+      - USE_S3=${USE_S3:-True}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME}
+      - AWS_S3_REGION_NAME=${AWS_S3_REGION_NAME:-us-east-1}
+      - AWS_S3_CUSTOM_DOMAIN=${AWS_S3_CUSTOM_DOMAIN}
+      - AWS_S3_SECURE_URLS=True
+      - AWS_S3_VERIFY=True
+      - AWS_S3_SIGNATURE_VERSION=s3v4
+      - AWS_S3_ADDRESSING_STYLE=virtual
+      - AWS_S3_FILE_OVERWRITE=False
+      - AWS_S3_MAX_AGE_SECONDS=31536000
+      - AWS_DEFAULT_ACL=public-read
+      - AWS_QUERYSTRING_AUTH=False
+      
+      # Video Upload Settings
+      - MAX_UPLOAD_SIZE=104857600
+      - UPLOAD_RATE_LIMIT=10/minute
+      - RATE_LIMIT_ENABLED=True
+      
+      # Mobile Optimization Settings - Enhanced for older devices
+      - MOBILE_OPTIMIZATION_ENABLED=True
+      - PWA_ENABLED=True
+      - VIDEO_COMPRESSION_ENABLED=True
+      - MOBILE_CAMERA_QUALITY=480p
+      - MOBILE_MAX_RECORDING_TIME=180
+      - LEGACY_DEVICE_SUPPORT=True
+      - FALLBACK_VIDEO_METHODS=True
+      
+      # Security Settings
+      - SECURE_SSL_REDIRECT=False
+      - SECURE_HSTS_SECONDS=0
+      - SECURE_HSTS_INCLUDE_SUBDOMAINS=False
+      - SECURE_HSTS_PRELOAD=False
+      - SECURE_BROWSER_XSS_FILTER=False
+      - SECURE_CONTENT_TYPE_NOSNIFF=False
+      - X_FRAME_OPTIONS=SAMEORIGIN
+      - SECURE_REFERRER_POLICY=no-referrer-when-downgrade
+      - CSRF_USE_SESSIONS=False
+      
+      # Performance Settings
+      - DJANGO_CACHE_BACKEND=django.core.cache.backends.db
+      - DJANGO_SESSION_ENGINE=django.contrib.sessions.backends.db
+      - DJANGO_CACHE_TIMEOUT=300
+      - DJANGO_SESSION_COOKIE_AGE=3600
+      - DJANGO_SESSION_COOKIE_SECURE=True
+      - DJANGO_SESSION_COOKIE_HTTPONLY=True
+      - DJANGO_SESSION_COOKIE_SAMESITE=Lax
+      
+      # Monitoring and Health
+      - HEALTH_CHECK_ENABLED=True
+      - METRICS_ENABLED=True
+      - LOGGING_LEVEL=INFO
+      
+    volumes:
+      - ./media:/app/media
+      - ./logs:/app/logs
+      - ./db.sqlite3:/app/db.sqlite3
+      - ./staticfiles:/app/staticfiles
+    depends_on:
+      - redis
+    networks:
+      - practika-network
+    restart: unless-stopped
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"  # Changed to avoid port conflict
+    volumes:
+      - redis_data:/data
+    networks:
+      - practika-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./media:/app/media:ro
+      - ./staticfiles:/app/staticfiles:ro
+    depends_on:
+      - web
+    networks:
+      - practika-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  redis_data:
+    driver: local
+
+networks:
+  practika-network:
+    driver: bridge

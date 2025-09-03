@@ -1,0 +1,30 @@
+# Practika v1 Requirements - Cleaned Dependencies
+
+# Core Framework
+Django
+djangorestframework
+django-filter
+django-cors-headers
+
+# File Handling
+Pillow
+python-magic
+django-storages
+
+# Video Processing
+ffmpeg-python
+
+# Cloud Services
+boto3
+psycopg2-binary
+
+# Deployment
+gunicorn
+whitenoise
+python-dotenv
+dj-database-url
+
+# Testing
+pytest
+pytest-django
+model-bakery
