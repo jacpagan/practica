@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playlist Creation Flow - Practika Docs</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .mermaid {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .content {
+            max-width: 4xl;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            color: #4299e1;
+            text-decoration: none;
+            margin-bottom: 2rem;
+            font-weight: 600;
+        }
+        .back-link:hover {
+            color: #3182ce;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="gradient-bg text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-6">
+                <div class="flex items-center">
+                    <i class="fas fa-dumbbell text-3xl mr-3"></i>
+                    <div>
+                        <h1 class="text-2xl font-bold">Practika</h1>
+                        <p class="text-sm opacity-90">Documentation Hub</p>
+                    </div>
+                </div>
+                <div class="hidden md:flex space-x-6">
+                    <a href="../index.html" class="hover:text-blue-200">Home</a>
+                    <a href="../interactive-diagrams.html" class="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-chart-network mr-2"></i>Interactive Diagrams
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="content">
+        <a href="../index.html" class="back-link">
+            <i class="fas fa-arrow-left mr-2"></i>
+            Back to Documentation
+        </a>
+        
+        <div class="bg-white rounded-lg shadow-md p-8">
+            <h1 class="text-4xl font-bold mb-6">Playlist Creation Flow</h1>
+            
+            <div class="prose prose-lg max-w-none">
+<h1 id="practika---playlist-creation-flow">Practika - Playlist Creation
+Flow</h1>
+<pre class="mermaid"><code>flowchart TD
+    subgraph &quot;Playlist Creation&quot;
+        START([User wants to create playlist])
+        TITLE[Add title]
+        DESCRIPTION[Add description]
+        TAGS[Add tags]
+        VISIBILITY[Set visibility]
+    end
+
+    subgraph &quot;Moment Selection&quot;
+        BROWSE[Browse moments]
+        SEARCH[Search by keyword]
+        FILTER[Filter by category/difficulty]
+        PREVIEW[Preview moment]
+        SELECT[Add to playlist]
+    end
+
+    subgraph &quot;Playlist Organization&quot;
+        ORDER[Arrange order]
+        SETS[Set number of sets]
+        REPS[Set number of reps]
+        DURATION[Set duration]
+        NOTES[Add personal notes]
+    end
+
+    subgraph &quot;Playlist Management&quot;
+        SAVE[Save playlist]
+        SHARE[Share with others]
+        EXPORT[Export playlist]
+        DUPLICATE[Duplicate playlist]
+    end
+
+    subgraph &quot;Playlist Execution&quot;
+        START_PLAYLIST[Start playlist]
+        TRACK_PROGRESS[Track progress]
+        MARK_COMPLETE[Mark moments complete]
+        RECORD_RESULTS[Record results]
+        SAVE_PROGRESS[Save progress]
+    end
+
+    %% Flow connections
+    START --&gt; TITLE
+    TITLE --&gt; DESCRIPTION
+    DESCRIPTION --&gt; TAGS
+    TAGS --&gt; VISIBILITY
+    VISIBILITY --&gt; BROWSE
+
+    BROWSE --&gt; SEARCH
+    SEARCH --&gt; FILTER
+    FILTER --&gt; PREVIEW
+    PREVIEW --&gt; SELECT
+    SELECT --&gt; ORDER
+
+    ORDER --&gt; SETS
+    SETS --&gt; REPS
+    REPS --&gt; DURATION
+    DURATION --&gt; NOTES
+    NOTES --&gt; SAVE
+
+    SAVE --&gt; SHARE
+    SHARE --&gt; EXPORT
+    EXPORT --&gt; DUPLICATE
+    DUPLICATE --&gt; START_PLAYLIST
+
+    START_PLAYLIST --&gt; TRACK_PROGRESS
+    TRACK_PROGRESS --&gt; MARK_COMPLETE
+    MARK_COMPLETE --&gt; RECORD_RESULTS
+    RECORD_RESULTS --&gt; SAVE_PROGRESS
+
+    %% Styling
+    classDef creation fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
+    classDef selection fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef organization fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    classDef management fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef execution fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+
+    class START,TITLE,DESCRIPTION,TAGS,VISIBILITY creation
+    class BROWSE,SEARCH,FILTER,PREVIEW,SELECT selection
+    class ORDER,SETS,REPS,DURATION,NOTES organization
+    class SAVE,SHARE,EXPORT,DUPLICATE management
+    class START_PLAYLIST,TRACK_PROGRESS,MARK_COMPLETE,RECORD_RESULTS,SAVE_PROGRESS execution</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Mermaid
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+    </script>
+</body>
+</html>

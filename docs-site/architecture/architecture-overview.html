@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Architecture Overview - Practika Docs</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .mermaid {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .content {
+            max-width: 4xl;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            color: #4299e1;
+            text-decoration: none;
+            margin-bottom: 2rem;
+            font-weight: 600;
+        }
+        .back-link:hover {
+            color: #3182ce;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="gradient-bg text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-6">
+                <div class="flex items-center">
+                    <i class="fas fa-dumbbell text-3xl mr-3"></i>
+                    <div>
+                        <h1 class="text-2xl font-bold">Practika</h1>
+                        <p class="text-sm opacity-90">Documentation Hub</p>
+                    </div>
+                </div>
+                <div class="hidden md:flex space-x-6">
+                    <a href="../index.html" class="hover:text-blue-200">Home</a>
+                    <a href="../interactive-diagrams.html" class="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-chart-network mr-2"></i>Interactive Diagrams
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="content">
+        <a href="../index.html" class="back-link">
+            <i class="fas fa-arrow-left mr-2"></i>
+            Back to Documentation
+        </a>
+        
+        <div class="bg-white rounded-lg shadow-md p-8">
+            <h1 class="text-4xl font-bold mb-6">System Architecture Overview</h1>
+            
+            <div class="prose prose-lg max-w-none">
+<h1 id="practika---system-architecture-overview">Practika - System
+Architecture Overview</h1>
+<div class="mermaid">graph TB
+    subgraph "Frontend Layer"
+        UI["React Frontend<br/>Vite + Tailwind"]
+        CF[CloudFront CDN]
+        S3_STATIC[S3 Static Hosting]
+    end
+
+    subgraph "API Layer"
+        ALB[Application Load Balancer]
+        API["Django REST API<br/>ECS Fargate"]
+        AUTH[JWT Authentication]
+    end
+
+    subgraph "Data Layer"
+        RDS[(PostgreSQL RDS)]
+        S3_VIDEOS[S3 Video Storage]
+        S3_LOGS[S3 Log Storage]
+        SECRETS[Secrets Manager]
+    end
+
+    subgraph "Infrastructure"
+        VPC[VPC with Private Subnets]
+        ECS[ECS Fargate Cluster]
+        WAF[AWS WAF]
+        CW[CloudWatch]
+    end
+
+    subgraph "External Services"
+        ROUTE53[Route53 DNS]
+        ACM[SSL Certificates]
+        ECR[ECR Container Registry]
+    end
+
+    %% Frontend connections
+    UI --&gt; CF
+    CF --&gt; S3_STATIC
+    UI --&gt; API
+
+    %% API connections
+    ALB --&gt; API
+    API --&gt; AUTH
+    API --&gt; RDS
+    API --&gt; S3_VIDEOS
+    API --&gt; SECRETS
+
+    %% Infrastructure connections
+    VPC --&gt; ECS
+    VPC --&gt; RDS
+    WAF --&gt; ALB
+    CW --&gt; API
+    CW --&gt; ALB
+
+    %% External connections
+    ROUTE53 --&gt; CF
+    ROUTE53 --&gt; ALB
+    ACM --&gt; CF
+    ACM --&gt; ALB
+    ECR --&gt; ECS
+
+    %% Styling
+    classDef frontend fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef api fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef data fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef infra fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef external fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+
+    class UI,CF,S3_STATIC frontend
+    class ALB,API,AUTH api
+    class RDS,S3_VIDEOS,S3_LOGS,SECRETS data
+    class VPC,ECS,WAF,CW infra
+    class ROUTE53,ACM,ECR external</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Mermaid
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+    </script>
+</body>
+</html>

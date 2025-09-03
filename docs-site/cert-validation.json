@@ -1,0 +1,17 @@
+{
+    "Changes": [
+        {
+            "Action": "UPSERT",
+            "ResourceRecordSet": {
+                "Name": "_c3e7b7f81e6d4bff355631df955c599c.practika.docs.jpagan.com",
+                "Type": "CNAME",
+                "TTL": 300,
+                "ResourceRecords": [
+                    {
+                        "Value": "_acfac0ff750146ba06b06e7f8d970437.xlfgrmvvlj.acm-validations.aws"
+                    }
+                ]
+            }
+        }
+    ]
+}
