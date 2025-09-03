@@ -1,0 +1,56 @@
+# Production Environment Configuration
+environment: prod
+region: us-east-1
+
+# VPC Configuration
+vpc:
+  cidr_block: "10.0.0.0/16"
+  availability_zones: ["us-east-1a", "us-east-1b", "us-east-1c"]
+  public_subnets: ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  private_subnets: ["10.0.11.0/24", "10.0.12.0/24", "10.0.13.0/24"]
+
+# ECS Configuration
+ecs:
+  cluster_name: "practika-prod-cluster"
+  backend_service_name: "practika-backend-prod"
+  frontend_service_name: "practika-frontend-prod"
+  cpu: "512"
+  memory: "1024"
+  desired_count: 2
+
+# Database Configuration
+database:
+  instance_class: "db.t3.small"
+  allocated_storage: 100
+  backup_retention_period: 30
+  multi_az: true
+  deletion_protection: true
+
+# Load Balancer Configuration
+alb:
+  name: "practika-alb-prod"
+  idle_timeout: 60
+  health_check_path: "/health/"
+
+# S3 Configuration
+s3:
+  uploads_bucket: "practika-uploads-prod"
+  static_bucket: "practika-static-prod"
+  logs_bucket: "practika-logs-prod"
+
+# CloudFront Configuration
+cloudfront:
+  domain_name: "practika.com"
+  price_class: "PriceClass_200"
+
+# Application Configuration
+app:
+  secret_key: "{{ secrets.PROD_SECRET_KEY }}"
+  debug: false
+  allowed_hosts: ["practika.jpagan.com", "www.practika.jpagan.com"]
+  cors_origins: ["https://practika.jpagan.com", "https://www.practika.jpagan.com"]
+
+# Monitoring Configuration
+monitoring:
+  log_retention_days: 30
+  enable_cloudwatch_metrics: true
