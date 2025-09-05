@@ -1,3 +1,7 @@
 ---
+description: >
+  Use reason over emotion. Use AWS. Use cost saving techniques in AWS. Use containers.  
+globs:
+  - "**/*"
 alwaysApply: true
 ---
