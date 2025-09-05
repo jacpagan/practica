@@ -86,6 +86,7 @@ class ExerciseVideoViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
     
     @action(detail=False, methods=['post'])
+    @method_decorator(csrf_exempt)
     def upload(self, request):
         """Upload a new exercise video"""
         serializer = ExerciseVideoSerializer(data=request.data)
@@ -95,6 +96,7 @@ class ExerciseVideoViewSet(viewsets.ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=True, methods=['post'])
+    @method_decorator(csrf_exempt)
     def upload_thread(self, request, pk=None):
         """Upload a practice thread for an exercise video"""
         exercise_video = get_object_or_404(ExerciseVideo, pk=pk)
@@ -107,6 +109,7 @@ class ExerciseVideoViewSet(viewsets.ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=True, methods=['put', 'patch'])
+    @method_decorator(csrf_exempt)
     def update_thread(self, request, pk=None):
         """Update a practice thread"""
         exercise_video = get_object_or_404(ExerciseVideo, pk=pk)
@@ -128,6 +131,7 @@ class ExerciseVideoViewSet(viewsets.ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=True, methods=['delete'])
+    @method_decorator(csrf_exempt)
     def delete_thread(self, request, pk=None):
         """Delete a practice thread"""
         exercise_video = get_object_or_404(ExerciseVideo, pk=pk)
@@ -145,6 +149,7 @@ class ExerciseVideoViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Practice thread not found'}, status=status.HTTP_404_NOT_FOUND)
     
     @action(detail=True, methods=['put', 'patch'])
+    @method_decorator(csrf_exempt)
     def update_exercise(self, request, pk=None):
         """Update an exercise video"""
         exercise_video = get_object_or_404(ExerciseVideo, pk=pk)
@@ -155,6 +160,7 @@ class ExerciseVideoViewSet(viewsets.ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=True, methods=['delete'])
+    @method_decorator(csrf_exempt)
     def delete_exercise(self, request, pk=None):
         """Delete an exercise video"""
         exercise_video = get_object_or_404(ExerciseVideo, pk=pk)
