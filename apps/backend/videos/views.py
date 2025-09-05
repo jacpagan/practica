@@ -9,6 +9,8 @@ from django.db import connection
 from django.core.cache import cache
 from django.utils import timezone
 from django.conf import settings
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -65,6 +67,7 @@ def upload_practice_thread(request, video_id):
         'video': exercise_video
     })
 
+@method_decorator(csrf_exempt, name='dispatch')
 class ExerciseVideoViewSet(viewsets.ModelViewSet):
     """API viewset for exercise videos"""
     queryset = ExerciseVideo.objects.all()
