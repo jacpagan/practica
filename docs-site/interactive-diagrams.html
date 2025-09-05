@@ -90,16 +90,18 @@
     <div class="container">
         <div class="header">
             <h1>🏗️ Practika Architecture Diagrams</h1>
-            <p>Interactive visualization of your AWS infrastructure and app flows</p>
+            <p>Interactive visualization of Personal Exercise Threads architecture and flows</p>
         </div>
         
         <div class="nav">
             <button onclick="showDiagram('architecture')" class="active">🏛️ System Architecture</button>
-            <button onclick="showDiagram('aws-infrastructure')">☁️ AWS Infrastructure</button>
+            <button onclick="showDiagram('database-erd')">🗄️ Database ERD</button>
             <button onclick="showDiagram('user-journey')">👤 User Journey</button>
             <button onclick="showDiagram('video-flow')">🎬 Video Annotation Flow</button>
-            <button onclick="showDiagram('playlist-flow')">📋 Playlist Creation Flow</button>
-            <button onclick="showDiagram('database-erd')">🗄️ Database ERD</button>
+            <button onclick="showDiagram('access-control')">🔐 Access Control</button>
+            <button onclick="showDiagram('api-surface')">🔌 API Surface</button>
+            <button onclick="showDiagram('progress-dashboard')">📊 Progress Dashboard</button>
+            <button onclick="showDiagram('mobile-interface')">📱 Mobile Interface</button>
         </div>
         
         <div class="content">
@@ -132,519 +134,459 @@
         // Diagram definitions
         const diagrams = {
             'architecture': {
-                title: 'System Architecture Overview',
-                description: 'Complete AWS infrastructure visualization with component relationships',
+                title: 'Practika - Complete Video Practice Platform',
+                description: 'Comprehensive platform architecture with all user flows and technical components',
                 mermaid: `graph TB
-    subgraph "Frontend Layer"
-        UI[React Frontend<br/>Vite + Tailwind]
-        CF[CloudFront CDN]
-        S3_STATIC[S3 Static Hosting]
+    subgraph "Teacher Content"
+        TEACHER[Teacher Upload<br/>Video Exercise]
+        EXERCISE[Exercise Library<br/>Structured Content]
+        QUALITY[Quality Control<br/>Teacher Review]
     end
 
-    subgraph "API Layer"
-        ALB[Application Load Balancer]
-        API[Django REST API<br/>ECS Fargate]
-        AUTH[JWT Authentication]
+    subgraph "Student Practice"
+        STUDENT[Student Practice<br/>Webcam Recording]
+        COMPARE[Self Comparison<br/>Progress Tracking]
+        THREAD[Practice Threads<br/>Linked to Exercise]
+        ANALYTICS[Progress Analytics<br/>Measurable Growth]
     end
 
-    subgraph "Data Layer"
-        RDS[(PostgreSQL RDS)]
-        S3_VIDEOS[S3 Video Storage]
-        S3_LOGS[S3 Log Storage]
-        SECRETS[Secrets Manager]
+    subgraph "Video Platform"
+        VP[Video Player<br/>Exercise + Practice]
+        RECORD[Recording System<br/>Webcam Integration]
+        STORAGE[Video Storage<br/>S3 + CDN]
+        PROCESS[Video Processing<br/>Compression + Analysis]
     end
 
-    subgraph "Infrastructure"
-        VPC[VPC with Private Subnets]
-        ECS[ECS Fargate Cluster]
-        WAF[AWS WAF]
-        CW[CloudWatch]
+    subgraph "Threading System"
+        THREAD_MGR[Thread Manager<br/>Exercise → Practice]
+        COMMENTS[Video Comments<br/>Mandatory Video]
+        TIMELINE[Practice Timeline<br/>Progress History]
+        SHARING[Thread Sharing<br/>Peer Learning]
     end
 
-    subgraph "External Services"
-        ROUTE53[Route53 DNS]
-        ACM[SSL Certificates]
-        ECR[ECR Container Registry]
-    end
-
-    %% Frontend connections
-    UI --> CF
-    CF --> S3_STATIC
-    UI --> API
-
-    %% API connections
-    ALB --> API
-    API --> AUTH
-    API --> RDS
-    API --> S3_VIDEOS
-    API --> SECRETS
-
-    %% Infrastructure connections
-    VPC --> ECS
-    VPC --> RDS
-    WAF --> ALB
-    CW --> API
-    CW --> ALB
-
-    %% External connections
-    ROUTE53 --> CF
-    ROUTE53 --> ALB
-    ACM --> CF
-    ACM --> ALB
-    ECR --> ECS
-
-    %% Styling
-    classDef frontend fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef api fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef data fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
-    classDef infra fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    classDef external fill:#fce4ec,stroke:#880e4f,stroke-width:2px
-
-    class UI,CF,S3_STATIC frontend
-    class ALB,API,AUTH api
-    class RDS,S3_VIDEOS,S3_LOGS,SECRETS data
-    class VPC,ECS,WAF,CW infra
-    class ROUTE53,ACM,ECR external`
-            },
-            'aws-infrastructure': {
-                title: 'AWS Infrastructure Components',
-                description: 'Detailed breakdown of AWS services and their configurations',
-                mermaid: `graph TB
-    subgraph "Global Services"
-        ROUTE53[Route53<br/>DNS Management]
-        ACM[ACM<br/>SSL Certificates]
-        CLOUDFRONT[CloudFront<br/>CDN Distribution]
-    end
-
-    subgraph "Compute & Storage"
-        ECS[ECS Fargate<br/>Container Orchestration]
-        ECR[ECR<br/>Container Registry]
-        S3_VIDEOS[S3 Video Storage<br/>Movement Videos]
-        S3_STATIC[S3 Static Hosting<br/>Frontend Assets]
-        S3_LOGS[S3 Log Storage<br/>Application Logs]
-    end
-
-    subgraph "Networking"
-        VPC[VPC<br/>Virtual Private Cloud]
-        ALB[ALB<br/>Application Load Balancer]
-        SG[Security Groups<br/>Network Security]
-        NAT[NAT Gateway<br/>Internet Access]
-        SUBNET_PUB[Public Subnets<br/>ALB, NAT]
-        SUBNET_PRIV[Private Subnets<br/>ECS, RDS]
-    end
-
-    subgraph "Database & Security"
-        RDS[(RDS PostgreSQL<br/>Primary Database)]
-        SECRETS[Secrets Manager<br/>Credential Storage]
-        WAF[WAF<br/>Web Application Firewall]
-        IAM[IAM<br/>Identity & Access Management]
-    end
-
-    subgraph "Monitoring & Observability"
-        CW_LOGS[CloudWatch Logs<br/>Application Logging]
-        CW_METRICS[CloudWatch Metrics<br/>Performance Monitoring]
-        CW_ALARMS[CloudWatch Alarms<br/>Alerting]
-        XRAY[X-Ray<br/>Distributed Tracing]
-    end
-
-    %% Global connections
-    ROUTE53 --> CLOUDFRONT
-    ROUTE53 --> ALB
-    ACM --> CLOUDFRONT
-    ACM --> ALB
-
-    %% CDN connections
-    CLOUDFRONT --> S3_STATIC
-    CLOUDFRONT --> S3_VIDEOS
-
-    %% Networking connections
-    VPC --> SUBNET_PUB
-    VPC --> SUBNET_PRIV
-    SUBNET_PUB --> ALB
-    SUBNET_PUB --> NAT
-    SUBNET_PRIV --> ECS
-    SUBNET_PRIV --> RDS
-    ALB --> ECS
-    NAT --> ECS
-    SG --> ALB
-    SG --> ECS
-    SG --> RDS
-
-    %% Compute connections
-    ECR --> ECS
-    ECS --> S3_VIDEOS
-    ECS --> S3_LOGS
-    ECS --> RDS
-    ECS --> SECRETS
-
-    %% Security connections
-    WAF --> ALB
-    IAM --> ECS
-    IAM --> RDS
-    IAM --> S3_VIDEOS
-
-    %% Monitoring connections
-    CW_LOGS --> ECS
-    CW_METRICS --> ECS
-    CW_METRICS --> ALB
-    CW_ALARMS --> CW_METRICS
-    XRAY --> ECS
-
-    %% Styling
-    classDef global fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef compute fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef network fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
-    classDef security fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    classDef monitoring fill:#fce4ec,stroke:#880e4f,stroke-width:2px
-
-    class ROUTE53,ACM,CLOUDFRONT global
-    class ECS,ECR,S3_VIDEOS,S3_STATIC,S3_LOGS compute
-    class VPC,ALB,SG,NAT,SUBNET_PUB,SUBNET_PRIV network
-    class RDS,SECRETS,WAF,IAM security
-    class CW_LOGS,CW_METRICS,CW_ALARMS,XRAY monitoring`
-            },
-            'user-journey': {
-                title: 'User Journey Flow',
-                description: 'Emotional journey map with satisfaction levels',
-                mermaid: `journey
-    title Practika User Journey
-    section Discovery
-      User visits app: 5: User
-      User browses moments: 4: User
-      User filters by category: 3: User
-      User finds interesting moment: 5: User
-    section Registration
-      User clicks sign up: 3: User
-      User fills registration form: 2: User
-      User verifies email: 4: User
-      User completes profile: 3: User
-    section Content Creation
-      User uploads movement video: 5: User
-      User adds moment details: 4: User
-      User categorizes moment: 3: User
-      User adds tags: 3: User
-      User publishes moment: 5: User
-    section Video Annotation
-      User watches movement video: 4: User
-      User adds form correction: 5: User
-      User adds technique tip: 4: User
-      User sets timestamp: 3: User
-      User saves annotation: 5: User
-    section Playlist Creation
-      User creates new playlist: 4: User
-      User adds moments to playlist: 5: User
-      User arranges order: 3: User
-      User saves playlist: 4: User
-    section Progress Tracking
-      User records workout: 4: User
-      User tracks progress: 5: User
-      User views analytics: 4: User
-      User celebrates achievements: 5: User
-    section Social Features
-      User shares playlist: 4: User
-      User follows other users: 3: User
-      User receives notifications: 4: User
-      User participates in community: 5: User`
-            },
-            'video-flow': {
-                title: 'Video Annotation Flow',
-                description: 'Video upload and annotation process',
-                mermaid: `sequenceDiagram
-    participant U as User
-    participant F as Frontend
-    participant A as API
-    participant S3 as S3 Storage
-    participant DB as Database
-
-    Note over U,DB: Video Upload Process
-    U->>F: Upload movement video
-    F->>A: Request presigned URL
-    A->>S3: Generate presigned URL
-    S3-->>A: Return presigned URL
-    A-->>F: Return presigned URL
-    F->>S3: Upload video directly
-    S3-->>F: Upload confirmation
-    F->>A: Create moment video record
-    A->>DB: Save video metadata
-    DB-->>A: Video record created
-    A-->>F: Video uploaded successfully
-    F-->>U: Video ready for annotation
-
-    Note over U,DB: Annotation Creation Process
-    U->>F: Click "Add Annotation"
-    F->>F: Show annotation form
-    U->>F: Select annotation type
-    U->>F: Set timestamp (15.5s)
-    U->>F: Enter content
-    U->>F: Set coordinates (optional)
-    U->>F: Choose visibility (public/private)
-    U->>F: Click "Save Annotation"
-    F->>A: POST /annotations/
-    A->>DB: Create annotation record
-    DB-->>A: Annotation saved
-    A-->>F: Annotation created
-    F-->>U: Annotation appears on video
-
-    Note over U,DB: Real-time Collaboration
-    U->>F: View video with annotations
-    F->>A: GET /annotations/?video_id=X
-    A->>DB: Query annotations
-    DB-->>A: Return annotations
-    A-->>F: Return annotations
-    F-->>U: Display all annotations
-
-    Note over U,DB: Annotation Interaction
-    U->>F: Click on annotation
-    F->>F: Show annotation details
-    U->>F: Rate annotation helpfulness
-    F->>A: POST /annotations/{id}/rate
-    A->>DB: Update rating
-    DB-->>A: Rating saved
-    A-->>F: Rating updated
-    F-->>U: Show updated rating
-
-    Note over U,DB: Annotation Moderation
-    U->>F: Report inappropriate annotation
-    F->>A: POST /annotations/{id}/report
-    A->>DB: Create report record
-    DB-->>A: Report saved
-    A-->>F: Report submitted
-    F-->>U: Confirmation message`
-            },
-            'playlist-flow': {
-                title: 'Playlist Creation Flow',
-                description: 'Playlist creation and execution process',
-                mermaid: `flowchart TD
-    subgraph "Playlist Creation"
-        START([User wants to create playlist])
-        TITLE[Add title]
-        DESCRIPTION[Add description]
-        TAGS[Add tags]
-        VISIBILITY[Set visibility]
-    end
-
-    subgraph "Moment Selection"
-        BROWSE[Browse moments]
-        SEARCH[Search by keyword]
-        FILTER[Filter by category/difficulty]
-        PREVIEW[Preview moment]
-        SELECT[Add to playlist]
-    end
-
-    subgraph "Playlist Organization"
-        ORDER[Arrange order]
-        SETS[Set number of sets]
-        REPS[Set number of reps]
-        DURATION[Set duration]
-        NOTES[Add personal notes]
-    end
-
-    subgraph "Playlist Management"
-        SAVE[Save playlist]
-        SHARE[Share with others]
-        EXPORT[Export playlist]
-        DUPLICATE[Duplicate playlist]
-    end
-
-    subgraph "Playlist Execution"
-        START_PLAYLIST[Start playlist]
-        TRACK_PROGRESS[Track progress]
-        MARK_COMPLETE[Mark moments complete]
-        RECORD_RESULTS[Record results]
-        SAVE_PROGRESS[Save progress]
-    end
-
-    %% Flow connections
-    START --> TITLE
-    TITLE --> DESCRIPTION
-    DESCRIPTION --> TAGS
-    TAGS --> VISIBILITY
-    VISIBILITY --> BROWSE
-
-    BROWSE --> SEARCH
-    SEARCH --> FILTER
-    FILTER --> PREVIEW
-    PREVIEW --> SELECT
-    SELECT --> ORDER
-
-    ORDER --> SETS
-    SETS --> REPS
-    REPS --> DURATION
-    DURATION --> NOTES
-    NOTES --> SAVE
-
-    SAVE --> SHARE
-    SHARE --> EXPORT
-    EXPORT --> DUPLICATE
-    DUPLICATE --> START_PLAYLIST
-
-    START_PLAYLIST --> TRACK_PROGRESS
-    TRACK_PROGRESS --> MARK_COMPLETE
-    MARK_COMPLETE --> RECORD_RESULTS
-    RECORD_RESULTS --> SAVE_PROGRESS
-
-    %% Styling
-    classDef creation fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
-    classDef selection fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
-    classDef organization fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
-    classDef management fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    classDef execution fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-
-    class START,TITLE,DESCRIPTION,TAGS,VISIBILITY creation
-    class BROWSE,SEARCH,FILTER,PREVIEW,SELECT selection
-    class ORDER,SETS,REPS,DURATION,NOTES organization
-    class SAVE,SHARE,EXPORT,DUPLICATE management
-    class START_PLAYLIST,TRACK_PROGRESS,MARK_COMPLETE,RECORD_RESULTS,SAVE_PROGRESS execution`
+    TEACHER --> EXERCISE
+    EXERCISE --> QUALITY
+    STUDENT --> COMPARE
+    COMPARE --> THREAD
+    THREAD --> ANALYTICS
+    VP --> RECORD
+    RECORD --> STORAGE
+    STORAGE --> PROCESS
+    THREAD_MGR --> COMMENTS
+    COMMENTS --> TIMELINE
+    TIMELINE --> SHARING`
             },
             'database-erd': {
-                title: 'Database Entity Relationship Diagram',
-                description: 'Complete database schema with relationships',
+                title: 'Practika - BETA Video Practice Platform',
+                description: 'Database ERD for José (drumming student), Dorothy (Qi Gong teacher), and Jimmy (drumming teacher)',
                 mermaid: `erDiagram
-    auth_user {
-        int id PK
-        string username UK
+    %% Core Users - José, Dorothy, Jimmy
+    User {
+        uuid id PK
         string email UK
-        string password
-        string first_name
-        string last_name
-        boolean is_active
-        boolean is_staff
-        boolean is_superuser
-        timestamp date_joined
-        timestamp last_login
-    }
-
-    users_profile {
-        int id PK
-        int user_id FK
-        text bio
-        string profile_picture
-        date date_of_birth
-        int height_cm
-        decimal weight_kg
-        string fitness_level
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    exercises_category {
-        int id PK
+        string username UK
+        string user_type
         string name
-        text description
-        string icon
-        string color
-        timestamp created_at
+        json profile_data
+        datetime created_at
+        datetime last_active
     }
-
-    exercises_exercise {
-        int id PK
+    
+    %% Teacher Exercises (Jimmy & Dorothy)
+    Exercise {
+        uuid id PK
+        uuid teacher_id FK
         string title
-        text description
-        int category_id FK
-        string difficulty_level
-        array equipment_needed
-        array muscle_groups
-        text instructions
-        text tips
-        int created_by FK
-        boolean is_public
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    exercises_exercisevideo {
-        int id PK
-        int exercise_id FK
-        string video_file
-        string thumbnail
+        string description
+        string exercise_type
+        string video_source
+        string video_url
         int duration_seconds
-        bigint file_size_bytes
-        string s3_key
-        int created_by FK
-        timestamp created_at
+        json learning_objectives
+        datetime created_at
+        datetime published_at
     }
-
-    exercises_tag {
-        int id PK
-        string name UK
-        timestamp created_at
-    }
-
-    exercises_exercise_tags {
-        int id PK
-        int exercise_id FK
-        int tag_id FK
-    }
-
-    workouts_workout {
-        int id PK
-        int user_id FK
-        string title
-        text notes
-        timestamp start_time
-        timestamp end_time
-        int total_duration_minutes
-        timestamp created_at
-    }
-
-    workouts_workoutexercise {
-        int id PK
-        int workout_id FK
-        int exercise_id FK
-        int sets
-        int reps
+    
+    %% Student Practice Recordings (José)
+    PracticeRecording {
+        uuid id PK
+        uuid student_id FK
+        uuid exercise_id FK
+        string recording_title
         int duration_seconds
-        decimal weight_kg
-        int order_index
-        text notes
-        timestamp created_at
+        string video_url
+        datetime recorded_at
+        string practice_notes
+        string practice_status
     }
-
-    annotations_videoannotation {
-        int id PK
-        int exercise_video_id FK
-        int user_id FK
-        string annotation_type
-        decimal timestamp_start
-        decimal timestamp_end
+    
+    %% Practice Threads (José's Learning Journey)
+    PracticeThread {
+        uuid id PK
+        uuid student_id FK
+        uuid exercise_id FK
+        string thread_title
+        string learning_goals
+        datetime started_at
+        datetime last_practice
+        int total_practices
+        string thread_status
+    }
+    
+    %% Video Comments (José & Jimmy & Dorothy)
+    VideoComment {
+        uuid id PK
+        uuid thread_id FK
+        uuid author_id FK
+        int timestamp_start
+        int timestamp_end
+        string comment_type
         text content
-        jsonb coordinates
-        boolean is_public
-        timestamp created_at
-        timestamp updated_at
+        string video_url
+        datetime created_at
     }
-
-    users_userfavorite {
-        int id PK
-        int user_id FK
-        int exercise_id FK
-        timestamp created_at
+    
+    %% Practice Sessions (José's Daily Practice)
+    PracticeSession {
+        uuid id PK
+        uuid student_id FK
+        uuid exercise_id FK
+        datetime session_date
+        int practice_duration
+        string session_notes
+        string session_status
+    }
+    
+    %% Teacher-Student Relationships
+    TeacherStudent {
+        uuid id PK
+        uuid student_id FK
+        uuid teacher_id FK
+        string subject
+        datetime started_at
+        string relationship_status
+    }
+    
+    %% Practice Goals (Jimmy's Instructions)
+    PracticeGoal {
+        uuid id PK
+        uuid teacher_id FK
+        uuid student_id FK
+        uuid exercise_id FK
+        string goal_description
+        int target_duration
+        string frequency
+        datetime assigned_at
+        string goal_status
     }
 
     %% Relationships
-    auth_user ||--o{ users_profile : "has"
-    auth_user ||--o{ exercises_exercise : "creates"
-    auth_user ||--o{ exercises_exercisevideo : "uploads"
-    auth_user ||--o{ workouts_workout : "owns"
-    auth_user ||--o{ annotations_videoannotation : "creates"
-    auth_user ||--o{ users_userfavorite : "favorites"
+    User ||--o{ Exercise : "creates"
+    User ||--o{ PracticeRecording : "records"
+    User ||--o{ PracticeThread : "maintains"
+    User ||--o{ VideoComment : "creates"
+    User ||--o{ TeacherStudent : "student_of"
+    User ||--o{ PracticeSession : "logs"
+    User ||--o{ PracticeGoal : "assigns"
+    
+    Exercise ||--o{ PracticeRecording : "practiced_in"
+    Exercise ||--o{ PracticeThread : "threaded_by"
+    Exercise ||--o{ PracticeSession : "practiced_in"
+    Exercise ||--o{ PracticeGoal : "assigned_in"
+    
+    PracticeThread ||--o{ PracticeRecording : "contains"
+    PracticeThread ||--o{ VideoComment : "receives"
+    
+    PracticeSession ||--o{ VideoComment : "receives"`
+            },
+            'user-journey': {
+                title: 'José\'s Practice Upload Flow - Detailed UI Wireframes',
+                description: 'Step-by-step UI flow for José uploading practice videos with webcam recording',
+                mermaid: `journey
+    title José's Practice Upload Flow - Detailed UI Wireframes
+    section Login & Discovery
+      José Opens Practika App: 5: José
+      José Logs in with Email/Password: 5: José
+      José Sees Dashboard with Recent Exercises: 5: José
+      José Clicks on Jimmy's Drumming Exercise: 5: José
+    section Exercise Preview
+      José Views Exercise Details Page: 5: José
+      José Watches Jimmy's Exercise Video: 5: José
+      José Reads Learning Objectives: 4: José
+      José Clicks "Start Practice Session": 5: José
+    section Webcam Setup
+      José Grants Camera Permission: 4: José
+      José Sees Camera Preview: 5: José
+      José Adjusts Camera Position: 4: José
+      José Clicks "Start Recording": 5: José
+    section Practice Recording
+      José Practices Drumming Exercise: 5: José
+      José Sees Recording Timer: 4: José
+      José Clicks "Stop Recording": 5: José
+      José Reviews Recording Preview: 4: José
+    section Upload Process
+      José Adds Practice Title: 4: José
+      José Writes Practice Notes: 4: José
+      José Clicks "Upload Practice": 5: José
+      José Sees Upload Progress Bar: 4: José
+      José Gets Upload Confirmation: 5: José
+    section Thread Creation
+      José Views New Practice Thread: 5: José
+      José Adds Video Comment: 4: José
+      José Sets Learning Goals: 4: José
+      José Saves Thread Settings: 5: José`
+            },
+            'video-flow': {
+                title: 'Video Processing Architecture - Storage & Compression',
+                description: 'Technical architecture for video upload, processing, compression, and storage',
+                mermaid: `sequenceDiagram
+    participant USER as José/Jimmy
+    participant UI as Frontend App
+    participant API as Backend API
+    participant PROCESSOR as Video Processor
+    participant S3 as S3 Storage
+    participant CDN as CloudFront CDN
+    participant DB as Database
 
-    exercises_category ||--o{ exercises_exercise : "categorizes"
-    exercises_exercise ||--o{ exercises_exercisevideo : "has"
-    exercises_exercise ||--o{ exercises_exercise_tags : "tagged_with"
-    exercises_tag ||--o{ exercises_exercise_tags : "tags"
+    Note over USER,DB: Video Upload Process
+    USER->>UI: Upload video file
+    UI->>API: POST /upload/video {file, metadata}
+    API->>PROCESSOR: Send to video processor
+    PROCESSOR->>S3: Store original video
+    S3-->>PROCESSOR: Original stored
+    PROCESSOR-->>API: Upload confirmed
 
-    workouts_workout ||--o{ workouts_workoutexercise : "contains"
-    exercises_exercise ||--o{ workouts_workoutexercise : "included_in"
+    Note over USER,DB: Video Processing Pipeline
+    API->>PROCESSOR: Process video (compress, analyze)
+    PROCESSOR->>PROCESSOR: Compress to multiple formats
+    PROCESSOR->>PROCESSOR: Generate thumbnails
+    PROCESSOR->>PROCESSOR: Extract metadata
+    PROCESSOR->>S3: Store processed videos
+    S3-->>PROCESSOR: Processed videos stored
 
-    exercises_exercisevideo ||--o{ annotations_videoannotation : "annotated"
-    exercises_exercise ||--o{ users_userfavorite : "favorited"`
+    Note over USER,DB: CDN Distribution
+    PROCESSOR->>CDN: Distribute to CDN
+    CDN-->>PROCESSOR: CDN ready
+    PROCESSOR->>API: Processing complete
+    API->>DB: Store video metadata
+    DB-->>API: Metadata saved
+    API-->>UI: Video ready
+    UI-->>USER: Upload successful
+
+    Note over USER,DB: Video Playback
+    USER->>UI: Request video playback
+    UI->>API: GET /video/{id}
+    API->>CDN: Get video URL
+    CDN-->>API: Video URL
+    API-->>UI: Video URL
+    UI-->>USER: Video playing`
+            },
+            'access-control': {
+                title: 'YouTube Integration Flow - Dorothy\'s Video Linking',
+                description: 'How Dorothy links existing YouTube videos as exercises without re-recording',
+                mermaid: `sequenceDiagram
+    participant DOROTHY as Dorothy (Teacher)
+    participant UI as Practika UI
+    participant API as Backend API
+    participant YT as YouTube API
+    participant DB as Database
+    participant JOSE as José (Student)
+
+    Note over DOROTHY,JOSE: YouTube Video Discovery
+    DOROTHY->>UI: Click "Add YouTube Exercise"
+    UI->>DOROTHY: Show YouTube URL input
+    DOROTHY->>UI: Paste YouTube URL
+    UI->>API: POST /exercises/youtube/validate {url}
+    API->>YT: Get video metadata
+    YT-->>API: Video info (title, duration, thumbnail)
+    API-->>UI: Video validated
+    UI-->>DOROTHY: Show video preview
+
+    Note over DOROTHY,JOSE: Exercise Creation
+    DOROTHY->>UI: Confirm video selection
+    DOROTHY->>UI: Add exercise title
+    DOROTHY->>UI: Add description
+    DOROTHY->>UI: Set difficulty level
+    DOROTHY->>UI: Add learning objectives
+    UI->>API: POST /exercises {youtube_url, title, description}
+    API->>DB: Create exercise record
+    DB-->>API: Exercise created
+    API-->>UI: Exercise published
+    UI-->>DOROTHY: Exercise ready
+
+    Note over DOROTHY,JOSE: Student Assignment
+    DOROTHY->>UI: Select José as student
+    DOROTHY->>UI: Set practice goals
+    UI->>API: POST /practice_goals {student_id, exercise_id}
+    API->>DB: Assign exercise to José
+    DB-->>API: Assignment saved
+    API->>JOSE: Send notification
+    JOSE-->>API: José receives exercise
+
+    Note over DOROTHY,JOSE: Progress Monitoring
+    DOROTHY->>UI: View José's progress
+    UI->>API: GET /students/{jose_id}/progress
+    API->>DB: Query José's practice data
+    DB-->>API: Progress data
+    API-->>UI: Progress dashboard
+    UI-->>DOROTHY: Show José's improvement`
+            },
+            'api-surface': {
+                title: 'Real-time Comment System - Jimmy\'s Video Feedback',
+                description: 'Real-time video comment system for Jimmy to give feedback to José',
+                mermaid: `sequenceDiagram
+    participant JIMMY as Jimmy (Teacher)
+    participant JOSE as José (Student)
+    participant UI as Practika UI
+    participant API as Backend API
+    participant WEBSOCKET as WebSocket Server
+    participant STORAGE as Video Storage
+    participant DB as Database
+
+    Note over JIMMY,JOSE: Jimmy Reviews José's Practice
+    JIMMY->>UI: Open José's practice thread
+    UI->>API: GET /threads/{thread_id}
+    API->>DB: Fetch thread data
+    DB-->>API: Thread with José's videos
+    API-->>UI: Thread loaded
+    UI-->>JIMMY: Show José's practice videos
+
+    Note over JIMMY,JOSE: Jimmy Records Video Feedback
+    JIMMY->>UI: Click "Add Video Comment"
+    UI->>JIMMY: Activate camera
+    JIMMY->>UI: Start recording feedback
+    UI->>STORAGE: Begin video capture
+    STORAGE-->>UI: Recording active
+    JIMMY->>UI: Stop recording
+    UI->>STORAGE: Stop recording
+    STORAGE-->>UI: Video saved
+
+    Note over JIMMY,JOSE: Real-time Comment Creation
+    JIMMY->>UI: Add comment text
+    JIMMY->>UI: Set timestamp range
+    JIMMY->>UI: Click "Post Comment"
+    UI->>API: POST /comments {video_url, content, timestamp}
+    API->>STORAGE: Store comment video
+    STORAGE-->>API: Video stored
+    API->>DB: Save comment
+    DB-->>API: Comment saved
+
+    Note over JIMMY,JOSE: Real-time Notification
+    API->>WEBSOCKET: Broadcast new comment
+    WEBSOCKET->>JOSE: Send real-time notification
+    JOSE-->>WEBSOCKET: José receives notification
+    JOSE->>UI: View Jimmy's feedback
+    UI->>API: GET /comments/{comment_id}
+    API-->>UI: Comment data
+    UI-->>JOSE: Show Jimmy's video feedback`
+            },
+            'progress-dashboard': {
+                title: 'Progress Dashboard Design - José\'s Improvement Tracking',
+                description: 'Comprehensive dashboard showing José\'s practice progress and improvement over time',
+                mermaid: `graph TB
+    subgraph "José's Learning Dashboard"
+        HEADER[José's Progress Dashboard]
+        WELCOME[Welcome back, José!]
+        QUICK_STATS[Quick Stats]
+        RECENT_ACTIVITY[Recent Activity]
+    end
+
+    subgraph "Practice Statistics"
+        TOTAL_SESSIONS[Total Practice Sessions: 47]
+        TOTAL_HOURS[Total Practice Hours: 23.5]
+        CURRENT_STREAK[Current Streak: 5 days]
+        IMPROVEMENT_SCORE[Improvement Score: 85%]
+    end
+
+    subgraph "Exercise Progress"
+        DRUMMING_PROGRESS[Drumming Exercises: 8/12 completed]
+        QIGONG_PROGRESS[Qi Gong Exercises: 5/8 completed]
+        RECENT_VIDEOS[Recent Practice Videos: 3 new]
+        PENDING_FEEDBACK[Pending Feedback: 2 from Jimmy]
+    end
+
+    subgraph "Learning Goals"
+        DAILY_GOAL[Daily Goal: 10 min drumming ✓]
+        WEEKLY_TARGET[Weekly Target: 5 sessions ✓]
+        MONTHLY_MILESTONE[Monthly Milestone: Master basic rhythm]
+        ACHIEVEMENTS[Achievements: 3 badges earned]
+    end
+
+    subgraph "Progress Timeline"
+        TIMELINE[Practice Timeline - Last 30 Days]
+        BEFORE_AFTER[Before/After Comparison Videos]
+        KEY_MILESTONES[Key Milestones: 5 reached]
+        LEARNING_INSIGHTS[Learning Insights: 12 generated]
+    end
+
+    subgraph "Teacher Feedback"
+        JIMMY_FEEDBACK[Jimmy's Latest Feedback: 2 hours ago]
+        DOROTHY_FEEDBACK[Dorothy's Qi Gong Notes: 1 day ago]
+        FEEDBACK_HISTORY[Feedback History: 23 total]
+        IMPROVEMENT_AREAS[Areas for Improvement: 3 identified]
+    end
+
+    HEADER --> WELCOME
+    HEADER --> QUICK_STATS
+    HEADER --> RECENT_ACTIVITY
+    QUICK_STATS --> TOTAL_SESSIONS
+    QUICK_STATS --> TOTAL_HOURS
+    QUICK_STATS --> CURRENT_STREAK
+    QUICK_STATS --> IMPROVEMENT_SCORE
+    RECENT_ACTIVITY --> DRUMMING_PROGRESS
+    RECENT_ACTIVITY --> QIGONG_PROGRESS
+    RECENT_ACTIVITY --> RECENT_VIDEOS
+    RECENT_ACTIVITY --> PENDING_FEEDBACK
+    WELCOME --> DAILY_GOAL
+    WELCOME --> WEEKLY_TARGET
+    WELCOME --> MONTHLY_MILESTONE
+    WELCOME --> ACHIEVEMENTS
+    HEADER --> TIMELINE
+    HEADER --> BEFORE_AFTER
+    HEADER --> KEY_MILESTONES
+    HEADER --> LEARNING_INSIGHTS
+    HEADER --> JIMMY_FEEDBACK
+    HEADER --> DOROTHY_FEEDBACK
+    HEADER --> FEEDBACK_HISTORY
+    HEADER --> IMPROVEMENT_AREAS`
+            },
+            'mobile-interface': {
+                title: 'Mobile Interface Flows - Jimmy\'s On-the-Go Recording',
+                description: 'Mobile app flows for Jimmy to record exercises from anywhere using phone/laptop',
+                mermaid: `journey
+    title Mobile Interface Flows - Jimmy's On-the-Go Recording
+    section Quick Access
+      Jimmy Opens Mobile App: 5: Jimmy
+      Jimmy Sees Quick Actions Menu: 5: Jimmy
+      Jimmy Clicks "Record Exercise": 5: Jimmy
+      Jimmy Grants Camera Permission: 4: Jimmy
+    section Exercise Recording
+      Jimmy Positions Phone Camera: 5: Jimmy
+      Jimmy Clicks "Start Recording": 5: Jimmy
+      Jimmy Records Drumming Exercise: 5: Jimmy
+      Jimmy Clicks "Stop Recording": 5: Jimmy
+      Jimmy Reviews Recording: 4: Jimmy
+    section Quick Details
+      Jimmy Adds Exercise Title: 4: Jimmy
+      Jimmy Selects Difficulty Level: 4: Jimmy
+      Jimmy Adds Brief Description: 4: Jimmy
+      Jimmy Clicks "Save Exercise": 5: Jimmy
+    section Student Assignment
+      Jimmy Selects José from List: 4: Jimmy
+      Jimmy Sets Practice Goal: 4: Jimmy
+      Jimmy Clicks "Assign to José": 5: Jimmy
+      Jimmy Gets Confirmation: 5: Jimmy
+    section Follow-up Actions
+      Jimmy Views Exercise Dashboard: 4: Jimmy
+      Jimmy Checks José's Progress: 4: Jimmy
+      Jimmy Records Video Feedback: 4: Jimmy
+      Jimmy Sends Encouragement: 3: Jimmy`
             }
         };
 
         // Function to show diagram
-        function showDiagram(type) {
-            const diagram = diagrams[type];
+        function showDiagram(diagramKey) {
+            const diagram = diagrams[diagramKey];
             if (!diagram) {
                 document.getElementById('diagram-content').innerHTML = '<div class="error">Diagram not found</div>';
                 return;
@@ -654,31 +596,25 @@
             document.querySelectorAll('.nav button').forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
 
-            // Show loading
-            document.getElementById('diagram-content').innerHTML = '<div class="loading">Loading diagram...</div>';
-
-            // Render diagram
-            setTimeout(() => {
-                const content = `
+            // Show diagram
+            document.getElementById('diagram-content').innerHTML = `
+                <div class="info">
                     <h2>${diagram.title}</h2>
-                    <div class="info">
-                        <strong>Description:</strong> ${diagram.description}
+                    <p>${diagram.description}</p>
+                </div>
+                <div class="diagram-container">
+                    <div class="mermaid">
+                        ${diagram.mermaid}
                     </div>
-                    <div class="diagram-container">
-                        <div class="mermaid">
-                            ${diagram.mermaid}
-                        </div>
-                    </div>
-                `;
-                document.getElementById('diagram-content').innerHTML = content;
-                mermaid.init();
-            }, 100);
+                </div>
+            `;
+
+            // Reinitialize Mermaid
+            mermaid.init();
         }
 
-        // Show default diagram on load
-        window.onload = function() {
-            showDiagram('architecture');
-        };
+        // Show default diagram
+        showDiagram('architecture');
     </script>
 </body>
 </html>
