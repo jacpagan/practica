@@ -4,6 +4,11 @@ Views for your personal practice tracking system.
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
+from django.http import JsonResponse
+from django.db import connection
+from django.core.cache import cache
+from django.utils import timezone
+from django.conf import settings
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -152,3 +157,44 @@ class ExerciseVideoViewSet(viewsets.ModelViewSet):
         exercise_video = get_object_or_404(ExerciseVideo, pk=pk)
         exercise_video.delete()
         return Response({'message': 'Exercise video deleted successfully'}, status=status.HTTP_200_OK)
+
+
+def health_check(request):
+    """Health check endpoint for monitoring"""
+    health_status = {
+        'status': 'healthy',
+        'timestamp': timezone.now().isoformat(),
+        'services': {},
+        'version': '1.0.0',
+        'environment': 'development' if settings.DEBUG else 'production'
+    }
+    
+    # Check database connectivity
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+        health_status['services']['database'] = 'healthy'
+    except Exception as e:
+        health_status['services']['database'] = f'unhealthy: {str(e)}'
+        health_status['status'] = 'unhealthy'
+    
+    # Check Redis connectivity
+    try:
+        cache.set('health_check', 'ok', 10)
+        cache.get('health_check')
+        health_status['services']['redis'] = 'healthy'
+    except Exception as e:
+        health_status['services']['redis'] = f'unhealthy: {str(e)}'
+        health_status['status'] = 'unhealthy'
+    
+    # Check model access
+    try:
+        ExerciseVideo.objects.count()
+        health_status['services']['models'] = 'healthy'
+    except Exception as e:
+        health_status['services']['models'] = f'unhealthy: {str(e)}'
+        health_status['status'] = 'unhealthy'
+    
+    # Return appropriate HTTP status code
+    status_code = 200 if health_status['status'] == 'healthy' else 503
+    return JsonResponse(health_status, status=status_code)

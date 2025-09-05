@@ -8,7 +8,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
-from videos.views import ExerciseVideoViewSet
+from videos.views import ExerciseVideoViewSet, health_check
 
 # API Router
 router = DefaultRouter()
@@ -17,6 +17,7 @@ router.register(r'videos', ExerciseVideoViewSet, basename='exercisevideo')
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
+    path('health/', health_check, name='health_check'),
 ]
 
 # Serve media files in development
