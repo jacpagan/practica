@@ -1,11 +1,11 @@
-# Practika - Movement Training Platform
+# Practica - Movement Training Platform
 
 A comprehensive platform for movement training with video annotation, playlist creation, and progress tracking.
 
 ## 📁 Current Project Structure
 
 ```
-practika/
+practica/
 ├── docs/                 # Documentation source files (Markdown)
 │   ├── api/             # API documentation
 │   ├── architecture/    # System architecture docs
@@ -22,7 +22,7 @@ practika/
 
 ## 📚 Documentation
 
-Visit [https://practika.docs.jpagan.com](https://practika.docs.jpagan.com) for:
+Visit [https://practica.docs.jpagan.com](https://practica.docs.jpagan.com) for:
 - Interactive architecture diagrams
 - User journey flows
 - Database schema
