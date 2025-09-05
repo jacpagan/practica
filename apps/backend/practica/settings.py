@@ -137,6 +137,12 @@ CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript to access CSRF token
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_USE_SESSIONS = False
 
+# Disable CSRF for API endpoints entirely
+CSRF_EXEMPT_PATHS = [
+    '/api/',
+    '/health/',
+]
+
 # AWS S3 Configuration
 AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')

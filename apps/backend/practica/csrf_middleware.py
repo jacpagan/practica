@@ -4,6 +4,7 @@ This allows the React frontend to make API calls without CSRF tokens.
 """
 
 from django.middleware.csrf import CsrfViewMiddleware
+from django.conf import settings
 
 
 class CustomCsrfMiddleware(CsrfViewMiddleware):
@@ -16,13 +17,11 @@ class CustomCsrfMiddleware(CsrfViewMiddleware):
     """
     
     def process_view(self, request, callback, callback_args, callback_kwargs):
-        # Exempt API endpoints from CSRF protection
-        if request.path.startswith('/api/'):
-            return None
-        
-        # Exempt health check endpoint
-        if request.path.startswith('/health/'):
-            return None
+        # Check if the path should be exempt from CSRF protection
+        exempt_paths = getattr(settings, 'CSRF_EXEMPT_PATHS', [])
+        for exempt_path in exempt_paths:
+            if request.path.startswith(exempt_path):
+                return None
             
         # For all other endpoints, use normal CSRF protection
         return super().process_view(request, callback, callback_args, callback_kwargs)
