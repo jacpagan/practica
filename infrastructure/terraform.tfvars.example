@@ -1,0 +1,13 @@
+# Terraform Variables for Practica AWS Infrastructure
+# Copy this to terraform.tfvars and fill in your values
+
+# AWS Configuration
+aws_region = "us-east-1"
+environment = "dev"
+
+# Database Configuration
+db_password = "your-secure-database-password-here"
+
+# Optional: Custom domain (uncomment if you have a domain)
+# domain_name = "practica.yourdomain.com"
+# certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/your-cert-id"

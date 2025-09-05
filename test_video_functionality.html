@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Practica Video Functionality Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        video { max-width: 100%; height: auto; }
+        .video-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+        .video-item { border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Practica Video Functionality Test</h1>
+    
+    <div id="status" class="test-section info">
+        <h2>Test Status</h2>
+        <p>Testing video upload and playback functionality...</p>
+    </div>
+
+    <div class="test-section">
+        <h2>1. Test API Connection</h2>
+        <button onclick="testApiConnection()">Test API Connection</button>
+        <div id="api-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. Test Video Upload</h2>
+        <input type="file" id="videoFile" accept="video/*">
+        <button onclick="testVideoUpload()">Upload Test Video</button>
+        <div id="upload-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Test Video Playback</h2>
+        <div id="video-list" class="video-list"></div>
+        <div id="playback-result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+        
+        async function testApiConnection() {
+            const resultDiv = document.getElementById('api-result');
+            try {
+                const response = await fetch(`${API_BASE}/videos/`);
+                const data = await response.json();
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        <h3>✅ API Connection Successful</h3>
+                        <p>Found ${data.length} videos in the system</p>
+                        <pre>${JSON.stringify(data.slice(0, 2), null, 2)}</pre>
+                    </div>
+                `;
+                loadVideoList();
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h3>❌ API Connection Failed</h3>
+                        <p>Error: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function testVideoUpload() {
+            const fileInput = document.getElementById('videoFile');
+            const resultDiv = document.getElementById('upload-result');
+            
+            if (!fileInput.files[0]) {
+                resultDiv.innerHTML = '<div class="error">Please select a video file first</div>';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('title', 'Test Video Upload');
+            formData.append('description', 'Testing video upload functionality');
+            formData.append('tags', 'test,upload');
+            formData.append('video_file', fileInput.files[0]);
+
+            try {
+                const response = await fetch(`${API_BASE}/videos/upload/`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <h3>✅ Video Upload Successful</h3>
+                            <p>Video ID: ${data.id}</p>
+                            <p>File: ${data.video_file}</p>
+                        </div>
+                    `;
+                    loadVideoList(); // Refresh the list
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <h3>❌ Video Upload Failed</h3>
+                            <p>Status: ${response.status}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Video Upload Error</h3>
+                        <p>Error: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadVideoList() {
+            const videoListDiv = document.getElementById('video-list');
+            try {
+                const response = await fetch(`${API_BASE}/videos/`);
+                const videos = await response.json();
+                
+                videoListDiv.innerHTML = videos.map(video => `
+                    <div class="video-item">
+                        <h3>${video.title}</h3>
+                        <p>${video.description}</p>
+                        <p><strong>Tags:</strong> ${video.tags}</p>
+                        <p><strong>Created:</strong> ${new Date(video.created_at).toLocaleDateString()}</p>
+                        <p><strong>File:</strong> ${video.video_file}</p>
+                        <button onclick="testVideoPlayback('${video.video_file}')">Test Playback</button>
+                        <div id="playback-${video.id}"></div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                videoListDiv.innerHTML = `<div class="error">Failed to load videos: ${error.message}</div>`;
+            }
+        }
+
+        function testVideoPlayback(videoFile) {
+            const videoUrl = videoFile.startsWith('/media/') 
+                ? `http://localhost:8000${videoFile}`
+                : videoFile;
+            
+            const playbackDiv = document.getElementById('playback-result');
+            playbackDiv.innerHTML = `
+                <div class="info">
+                    <h3>🎥 Testing Video Playback</h3>
+                    <p>Video URL: ${videoUrl}</p>
+                    <video controls>
+                        <source src="${videoUrl}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                    <p>If you can see the video player above and it loads, playback is working correctly!</p>
+                </div>
+            `;
+        }
+
+        // Auto-run API connection test on page load
+        window.onload = function() {
+            testApiConnection();
+        };
+    </script>
+</body>
+</html>
+
