@@ -1,5 +1,147 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 
+// Metronome Component
+function Metronome({ isEnabled, tempo, onTempoChange, isPlaying }) {
+  const [audioContext, setAudioContext] = useState(null)
+  const [intervalId, setIntervalId] = useState(null)
+  const [isMetronomePlaying, setIsMetronomePlaying] = useState(false)
+  
+  // Initialize audio context
+  useEffect(() => {
+    if (isEnabled && !audioContext) {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      setAudioContext(ctx)
+    }
+  }, [isEnabled, audioContext])
+
+  // Play metronome click
+  const playClick = () => {
+    if (!audioContext) return
+    
+    const osc = audioContext.createOscillator()
+    const gainNode = audioContext.createGain()
+    
+    osc.connect(gainNode)
+    gainNode.connect(audioContext.destination)
+    
+    osc.frequency.setValueAtTime(800, audioContext.currentTime) // High pitch for click
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1)
+    
+    osc.start(audioContext.currentTime)
+    osc.stop(audioContext.currentTime + 0.1)
+  }
+
+  // Start metronome
+  const startMetronome = () => {
+    if (!audioContext || isMetronomePlaying) return
+    
+    setIsMetronomePlaying(true)
+    const interval = setInterval(playClick, 60000 / tempo) // Convert BPM to milliseconds
+    setIntervalId(interval)
+  }
+
+  // Stop metronome
+  const stopMetronome = () => {
+    if (intervalId) {
+      clearInterval(intervalId)
+      setIntervalId(null)
+    }
+    setIsMetronomePlaying(false)
+  }
+
+  // Auto-start/stop based on recording state
+  useEffect(() => {
+    if (isEnabled && isPlaying) {
+      startMetronome()
+    } else {
+      stopMetronome()
+    }
+    
+    return () => stopMetronome()
+  }, [isEnabled, isPlaying, tempo])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopMetronome()
+      if (audioContext) {
+        audioContext.close()
+      }
+    }
+  }, [audioContext])
+
+  if (!isEnabled) return null
+
+  return (
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-lg font-semibold text-blue-800 flex items-center">
+          🎵 Metronome
+          {isMetronomePlaying && (
+            <span className="ml-2 text-green-600 animate-pulse">●</span>
+          )}
+        </h3>
+        <div className="flex items-center space-x-2">
+          <span className="text-sm text-blue-600">BPM:</span>
+          <input
+            type="number"
+            min="40"
+            max="200"
+            value={tempo}
+            onChange={(e) => onTempoChange(parseInt(e.target.value))}
+            className="w-20 px-2 py-1 border border-blue-300 rounded text-center text-sm font-medium"
+            disabled={isMetronomePlaying}
+            placeholder="120"
+          />
+          <div className="flex flex-col space-y-1">
+            <button
+              onClick={() => onTempoChange(Math.min(200, tempo + 5))}
+              disabled={isMetronomePlaying}
+              className="w-6 h-4 bg-blue-100 hover:bg-blue-200 text-blue-600 text-xs rounded flex items-center justify-center disabled:opacity-50"
+            >
+              +
+            </button>
+            <button
+              onClick={() => onTempoChange(Math.max(40, tempo - 5))}
+              disabled={isMetronomePlaying}
+              className="w-6 h-4 bg-blue-100 hover:bg-blue-200 text-blue-600 text-xs rounded flex items-center justify-center disabled:opacity-50"
+            >
+              −
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-blue-600">
+          {isMetronomePlaying ? `Playing at ${tempo} BPM` : `Ready at ${tempo} BPM`}
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={isMetronomePlaying ? stopMetronome : startMetronome}
+            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+              isMetronomePlaying
+                ? 'bg-red-500 text-white hover:bg-red-600'
+                : 'bg-green-500 text-white hover:bg-green-600'
+            }`}
+          >
+            {isMetronomePlaying ? '⏹️ Stop' : '▶️ Play'}
+          </button>
+        </div>
+      </div>
+      
+      {/* Visual metronome indicator */}
+      {isMetronomePlaying && (
+        <div className="mt-3 flex justify-center">
+          <div className="w-4 h-4 bg-blue-500 rounded-full animate-pulse"></div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Helper function to format time in user-friendly format
 const formatTime = (timeString) => {
   if (!timeString) return 'Unknown time'
@@ -53,6 +195,10 @@ function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onCom
   const [recordedVideo, setRecordedVideo] = useState(null)
   const recordedChunksRef = useRef([])
   const recordedVideoUrlRef = useRef(null)
+  
+  // Metronome state
+  const [metronomeEnabled, setMetronomeEnabled] = useState(false)
+  const [metronomeTempo, setMetronomeTempo] = useState(120) // Default 120 BPM
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentVideo, setCurrentVideo] = useState(null)
   const [comparisonMode, setComparisonMode] = useState(false)
@@ -1444,6 +1590,33 @@ function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onCom
                       </div>
                     )}
                 </div>
+
+                {/* Metronome Settings - Only show for webcam recording */}
+                {recordingMode === 'webcam' && (
+                  <div className="border-t pt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-lg font-semibold text-gray-800">Metronome Settings</h4>
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={metronomeEnabled}
+                          onChange={(e) => setMetronomeEnabled(e.target.checked)}
+                          className="mr-2"
+                        />
+                        Enable Metronome
+                      </label>
+                    </div>
+                    
+                    {metronomeEnabled && (
+                      <Metronome
+                        isEnabled={metronomeEnabled}
+                        tempo={metronomeTempo}
+                        onTempoChange={setMetronomeTempo}
+                        isPlaying={isRecording}
+                      />
+                    )}
+                  </div>
+                )}
 
                 {/* File Upload Mode */}
                 {recordingMode === 'file' && (
