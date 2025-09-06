@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 
 // Helper function to format time in user-friendly format
 const formatTime = (timeString) => {
@@ -25,276 +25,6 @@ const formatTime = (timeString) => {
     console.error('Error formatting time:', error)
     return 'Invalid time'
   }
-}
-
-// QuickPracticeButton Component - One-click practice recording
-const QuickPracticeButton = ({ video, onPracticeComplete }) => {
-  const [isRecording, setIsRecording] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
-  const [showSuccess, setShowSuccess] = useState(false)
-  const [recordingTime, setRecordingTime] = useState(0)
-  const [mediaRecorder, setMediaRecorder] = useState(null)
-  const [stream, setStream] = useState(null)
-  const [recordedChunks, setRecordedChunks] = useState([])
-  const intervalRef = useRef(null)
-
-  const startQuickPractice = async () => {
-    try {
-      // Request camera and microphone access
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: true, 
-        audio: true 
-      })
-      setStream(mediaStream)
-
-      // Auto-generate title with current time
-      const now = new Date()
-      const timeStr = now.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        hour12: true 
-      })
-      const autoTitle = `Quick Practice - ${video.title} - ${timeStr}`
-      const autoDescription = `Practice session for ${video.title} recorded at ${timeStr}`
-
-      // Set up MediaRecorder
-      const options = { mimeType: 'video/webm;codecs=vp9' }
-      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-        options.mimeType = 'video/webm;codecs=vp8'
-        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-          options.mimeType = 'video/webm'
-        }
-      }
-
-      const recorder = new MediaRecorder(mediaStream, options)
-      setMediaRecorder(recorder)
-      setRecordedChunks([])
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          setRecordedChunks(prev => [...prev, event.data])
-        }
-      }
-
-      recorder.onstop = async () => {
-        // Create blob and upload
-        const blob = new Blob(recordedChunks, { type: options.mimeType })
-        const videoFile = new File([blob], `quick-practice-${Date.now()}.webm`, { type: options.mimeType })
-        
-        // Upload the practice session
-        await uploadPracticeSession(videoFile, autoTitle, autoDescription)
-        
-        // Clean up
-        mediaStream.getTracks().forEach(track => track.stop())
-        setStream(null)
-        setMediaRecorder(null)
-        setRecordedChunks([])
-        setIsRecording(false)
-        setRecordingTime(0)
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current)
-        }
-      }
-
-      // Start recording
-      recorder.start(1000) // Record in 1-second chunks
-      setIsRecording(true)
-      setRecordingTime(0)
-
-      // Start timer
-      intervalRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1)
-      }, 1000)
-
-      // Auto-stop after 10 minutes (600 seconds)
-      setTimeout(() => {
-        if (recorder.state === 'recording') {
-          recorder.stop()
-        }
-      }, 600000)
-
-    } catch (error) {
-      console.error('Error starting quick practice:', error)
-      alert('Unable to access camera/microphone. Please check permissions.')
-    }
-  }
-
-  const stopRecording = () => {
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-      mediaRecorder.stop()
-    }
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-    }
-  }
-
-  const uploadPracticeSession = async (videoFile, title, description) => {
-    setIsUploading(true)
-    
-    try {
-      const formData = new FormData()
-      formData.append('title', title)
-      formData.append('description', description)
-      formData.append('video_file', videoFile)
-
-      const response = await fetch(`/api/videos/${video.id}/upload_thread/`, {
-        method: 'POST',
-        body: formData
-      })
-
-      if (response.ok) {
-        setShowSuccess(true)
-        if (onPracticeComplete) {
-          onPracticeComplete()
-        }
-        // Auto-hide success modal after 3 seconds
-        setTimeout(() => {
-          setShowSuccess(false)
-        }, 3000)
-      } else {
-        const errorData = await response.json()
-        console.error('Upload failed:', errorData)
-        alert(`Upload failed: ${errorData.error || 'Please try again.'}`)
-      }
-    } catch (error) {
-      console.error('Error uploading practice session:', error)
-      alert('Error uploading practice session. Please try again.')
-    } finally {
-      setIsUploading(false)
-    }
-  }
-
-  const formatRecordingTime = (seconds) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
-
-  // Clean up on unmount
-  useEffect(() => {
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop())
-      }
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
-    }
-  }, [stream])
-
-  if (isRecording) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-          <h3 className="text-lg font-bold text-gray-800 mb-4 text-center">
-            🎥 Quick Practice Recording
-          </h3>
-          
-          {/* Video Preview */}
-          <div className="relative mb-4">
-            <video
-              ref={(video) => {
-                if (video && stream) {
-                  video.srcObject = stream
-                  video.play()
-                }
-              }}
-              className="w-full h-48 bg-gray-900 rounded-lg object-cover"
-              muted
-              playsInline
-            />
-            <div className="absolute top-2 left-2 bg-red-600 text-white px-2 py-1 rounded text-xs font-medium">
-              🔴 REC
-            </div>
-            <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs font-medium">
-              {formatRecordingTime(recordingTime)}
-            </div>
-          </div>
-          
-          {/* Recording Controls */}
-          <div className="flex flex-col items-center space-y-3">
-            <button
-              onClick={stopRecording}
-              className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors font-medium w-full"
-            >
-              ⏹️ Stop Recording
-            </button>
-            
-            <div className="flex items-center space-x-2 text-red-600">
-              <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></div>
-              <span className="text-sm">Recording your practice session...</span>
-            </div>
-            
-            <p className="text-xs text-gray-500 text-center">
-              Recording will auto-stop after 10 minutes
-            </p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (showSuccess) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 text-center">
-          <div className="mb-4">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <span className="text-3xl">🎉</span>
-            </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-2">
-              Practice Session Saved!
-            </h3>
-            <p className="text-gray-600 text-sm">
-              Your quick practice session has been successfully recorded and saved.
-            </p>
-          </div>
-          
-          <button
-            onClick={() => setShowSuccess(false)}
-            className="bg-green-500 text-white px-6 py-2 rounded-lg hover:bg-green-600 transition-colors font-medium"
-          >
-            Great!
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  if (isUploading) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 text-center">
-          <div className="mb-4">
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <span className="text-2xl">📤</span>
-            </div>
-            <h3 className="text-lg font-bold text-gray-800 mb-2">
-              Uploading Practice Session
-            </h3>
-            <p className="text-gray-600 text-sm">
-              Please wait while we save your practice session...
-            </p>
-          </div>
-          
-          <div className="flex items-center justify-center space-x-2">
-            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <button
-      onClick={startQuickPractice}
-      className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors text-sm font-medium"
-    >
-      🎥 Quick Practice
-    </button>
-  )
 }
 
 function VideoList({ videos, onVideoSelect, onUploadClick, onVideoDelete, comparisonQueue = [], onComparisonQueueUpdate }) {
@@ -465,7 +195,7 @@ function VideoList({ videos, onVideoSelect, onUploadClick, onVideoDelete, compar
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center space-x-4">
               <div className="text-4xl">🧘</div>
-              <div>
+    <div>
                 <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                   Practice Sanctuary
                 </h1>
@@ -473,8 +203,8 @@ function VideoList({ videos, onVideoSelect, onUploadClick, onVideoDelete, compar
               </div>
             </div>
             <div className="flex items-center space-x-3">
-              <button 
-                onClick={onUploadClick}
+        <button 
+          onClick={onUploadClick}
                 className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white px-4 py-2 rounded-full hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 shadow-lg hover:shadow-xl"
               >
                 ✨ Add Exercise
@@ -580,14 +310,14 @@ function VideoList({ videos, onVideoSelect, onUploadClick, onVideoDelete, compar
                     className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Compare ({comparisonQueue.length})
-                  </button>
+        </button>
                 </div>
               </div>
             </div>
           )}
         </div>
       </div>
-
+      
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
         {viewMode === 'discovery' ? (
@@ -610,11 +340,11 @@ function VideoList({ videos, onVideoSelect, onUploadClick, onVideoDelete, compar
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                   {insight.videos.map(video => (
-                    <div
-                      key={video.id}
+          <div 
+            key={video.id} 
                       className="bg-white/80 backdrop-blur-sm rounded-xl p-4 shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer group"
-                      onClick={() => onVideoSelect(video)}
-                    >
+            onClick={() => onVideoSelect(video)}
+          >
                       <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg mb-3 flex items-center justify-center">
                         <span className="text-2xl">🎥</span>
                       </div>
@@ -705,18 +435,11 @@ function VideoList({ videos, onVideoSelect, onUploadClick, onVideoDelete, compar
                           </div>
                         )}
                         <div className="flex space-x-2 pt-2">
-                          <QuickPracticeButton 
-                            video={video} 
-                            onPracticeComplete={() => {
-                              // Refresh the video list to show updated practice count
-                              window.location.reload()
-                            }}
-                          />
                           <button
                             onClick={() => onVideoSelect(video)}
                             className="flex-1 bg-blue-500 text-white px-3 py-2 rounded-lg hover:bg-blue-600 transition-colors text-sm"
                           >
-                            🎯 View Details
+                            🎯 Practice
                           </button>
                         </div>
                       </div>
@@ -749,24 +472,17 @@ function VideoList({ videos, onVideoSelect, onUploadClick, onVideoDelete, compar
                         </div>
                       </div>
                       <div className="flex space-x-2">
-                        <QuickPracticeButton 
-                          video={video} 
-                          onPracticeComplete={() => {
-                            // Refresh the video list to show updated practice count
-                            window.location.reload()
-                          }}
-                        />
                         <button
                           onClick={() => onVideoSelect(video)}
                           className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors text-sm"
                         >
-                          🎯 View Details
+                          🎯 Practice
                         </button>
                       </div>
                     </>
                   )}
-                </div>
-              ))}
+          </div>
+        ))}
             </div>
 
             {/* Pagination */}
@@ -809,7 +525,7 @@ function VideoList({ videos, onVideoSelect, onUploadClick, onVideoDelete, compar
           </div>
         )}
       </div>
-
+      
       {/* Empty State */}
       {videos.length === 0 && (
         <div className="text-center py-16">
