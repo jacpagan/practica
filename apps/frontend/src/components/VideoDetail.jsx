@@ -14,8 +14,7 @@ function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onCom
   const [newThread, setNewThread] = useState({ 
     title: '', 
     description: '', 
-    video_file: null,
-    time_of_day: new Date().toTimeString().slice(0, 5) // Default to current time
+    video_file: null
   })
   const [isUploading, setIsUploading] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
@@ -580,7 +579,6 @@ function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onCom
       const formDataToSend = new FormData()
       formDataToSend.append('title', newThread.title.trim())
       formDataToSend.append('description', newThread.description.trim())
-      formDataToSend.append('time_of_day', newThread.time_of_day)
       formDataToSend.append('video_file', newThread.video_file)
 
       const response = await fetch(`/api/videos/${video.id}/upload_thread/`, {
@@ -592,7 +590,7 @@ function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onCom
         const updatedVideo = await response.json()
         setPracticeThreads(updatedVideo.practice_threads || [])
         setShowUploadForm(false)
-        setNewThread({ title: '', description: '', video_file: null, time_of_day: new Date().toTimeString().slice(0, 5) })
+        setNewThread({ title: '', description: '', video_file: null })
         // Show success message
         alert('Practice session uploaded successfully!')
       } else {
@@ -1381,22 +1379,6 @@ function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onCom
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="thread_time_of_day" className="block text-sm font-medium text-gray-700 mb-1">
-                    Practice Time *
-                  </label>
-                  <input
-                    type="time"
-                    id="thread_time_of_day"
-                    name="time_of_day"
-                    value={newThread.time_of_day}
-                    onChange={handleThreadInputChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">What time of day did you practice this session?</p>
-                </div>
-
                 {/* Recording Mode Selection */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1545,7 +1527,7 @@ function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onCom
                     type="button"
                       onClick={() => {
                         setShowUploadForm(false)
-                        setNewThread({ title: '', description: '', video_file: null, time_of_day: new Date().toTimeString().slice(0, 5) })
+                        setNewThread({ title: '', description: '', video_file: null })
                         setRecordedVideo(null)
                         stopWebcam()
                       }}
