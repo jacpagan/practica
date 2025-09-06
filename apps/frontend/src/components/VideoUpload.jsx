@@ -5,8 +5,7 @@ function VideoUpload({ onUploadComplete, onCancel }) {
     title: '',
     description: '',
     tags: '',
-    video_file: null,
-    time_of_day: new Date().toTimeString().slice(0, 5) // Default to current time in HH:MM format
+    video_file: null
   })
   const [isUploading, setIsUploading] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
@@ -182,14 +181,12 @@ function VideoUpload({ onUploadComplete, onCancel }) {
       formDataToSend.append('title', formData.title)
       formDataToSend.append('description', formData.description)
       formDataToSend.append('tags', formData.tags)
-      formDataToSend.append('time_of_day', formData.time_of_day)
       formDataToSend.append('video_file', formData.video_file)
 
       console.log('Uploading video:', {
         title: formData.title,
         description: formData.description,
         tags: formData.tags,
-        time_of_day: formData.time_of_day,
         videoFile: formData.video_file,
         videoFileName: formData.video_file?.name,
         videoFileSize: formData.video_file?.size,
@@ -275,22 +272,6 @@ function VideoUpload({ onUploadComplete, onCancel }) {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="e.g., drums, basic-beats, rhythm"
             />
-          </div>
-
-          <div>
-            <label htmlFor="time_of_day" className="block text-sm font-medium text-gray-700 mb-1">
-              Practice Time *
-            </label>
-            <input
-              type="time"
-              id="time_of_day"
-              name="time_of_day"
-              value={formData.time_of_day}
-              onChange={handleInputChange}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="text-xs text-gray-500 mt-1">What time of day did you practice this exercise?</p>
           </div>
 
           {/* Recording Mode Selection */}
