@@ -375,8 +375,72 @@ function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onCom
     }
   }
 
+  // Create mixed audio stream with metronome
+  const createMixedAudioStream = async (originalStream) => {
+    if (!metronomeEnabled || !metronomeTempo) {
+      return originalStream
+    }
+
+    try {
+      // Get audio context
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      
+      // Create audio sources
+      const microphoneSource = audioContext.createMediaStreamSource(originalStream)
+      const masterGain = audioContext.createGain()
+      const destination = audioContext.createMediaStreamDestination()
+
+      // Configure master gain
+      masterGain.gain.setValueAtTime(1.0, audioContext.currentTime)
+
+      // Connect microphone to master gain
+      microphoneSource.connect(masterGain)
+      masterGain.connect(destination)
+
+      // Create metronome click pattern
+      const playMetronomeClick = () => {
+        const clickOsc = audioContext.createOscillator()
+        const clickGain = audioContext.createGain()
+        
+        clickOsc.frequency.setValueAtTime(800, audioContext.currentTime)
+        clickGain.gain.setValueAtTime(0.4, audioContext.currentTime)
+        clickGain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1)
+        
+        clickOsc.connect(clickGain)
+        clickGain.connect(masterGain)
+        
+        clickOsc.start(audioContext.currentTime)
+        clickOsc.stop(audioContext.currentTime + 0.1)
+      }
+
+      // Set up metronome interval
+      const metronomeInterval = setInterval(playMetronomeClick, 60000 / metronomeTempo)
+
+      // Store references for cleanup
+      streamRef.current.metronomeInterval = metronomeInterval
+      streamRef.current.audioContext = audioContext
+
+      // Combine video from original stream with mixed audio
+      const videoTrack = originalStream.getVideoTracks()[0]
+      const mixedStream = new MediaStream([videoTrack, ...destination.stream.getAudioTracks()])
+      
+      return mixedStream
+    } catch (error) {
+      console.error('Error creating mixed audio stream:', error)
+      return originalStream
+    }
+  }
+
   const stopWebcam = () => {
     if (streamRef.current) {
+      // Clean up metronome resources
+      if (streamRef.current.metronomeInterval) {
+        clearInterval(streamRef.current.metronomeInterval)
+      }
+      if (streamRef.current.audioContext) {
+        streamRef.current.audioContext.close()
+      }
+      
       streamRef.current.getTracks().forEach(track => track.stop())
       streamRef.current = null
     }
@@ -408,7 +472,10 @@ function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onCom
       }
     }
 
-    const mediaRecorder = new MediaRecorder(streamRef.current, options)
+    // Create mixed audio stream with metronome
+    const recordingStream = await createMixedAudioStream(streamRef.current)
+    
+    const mediaRecorder = new MediaRecorder(recordingStream, options)
     setMediaRecorder(mediaRecorder)
     recordedChunksRef.current = []
     setRecordedChunks([])
@@ -450,6 +517,17 @@ function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onCom
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       mediaRecorder.stop()
       setIsRecording(false)
+      
+      // Clean up metronome resources
+      if (streamRef.current && streamRef.current.metronomeInterval) {
+        clearInterval(streamRef.current.metronomeInterval)
+        streamRef.current.metronomeInterval = null
+      }
+      if (streamRef.current && streamRef.current.audioContext) {
+        streamRef.current.audioContext.close()
+        streamRef.current.audioContext = null
+      }
+      
       stopWebcam()
     }
   }
