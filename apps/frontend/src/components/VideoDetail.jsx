@@ -1,5 +1,32 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 
+// Helper function to format time in user-friendly format
+const formatTime = (timeString) => {
+  if (!timeString) return 'Unknown time'
+  
+  try {
+    // Handle different time formats
+    let time
+    if (typeof timeString === 'string') {
+      // Extract just the time part if it includes microseconds
+      const timePart = timeString.split('.')[0]
+      time = new Date(`2000-01-01T${timePart}`)
+    } else {
+      time = timeString
+    }
+    
+    // Format as 12-hour time with AM/PM
+    return time.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    })
+  } catch (error) {
+    console.error('Error formatting time:', error)
+    return 'Invalid time'
+  }
+}
+
 function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onComparisonQueueUpdate }) {
   const [practiceThreads, setPracticeThreads] = useState(video.practice_threads || [])
   const [showPracticeThreads, setShowPracticeThreads] = useState(false)
@@ -1559,7 +1586,7 @@ function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onCom
                             <h4 className="font-semibold text-gray-800 line-clamp-1">{thread.title}</h4>
                             <div className="text-xs text-gray-500 text-right">
                               <div>{new Date(thread.created_at).toLocaleDateString()}</div>
-                              <div className="font-medium text-blue-600">🕐 {thread.time_of_day}</div>
+                              <div className="font-medium text-blue-600">🕐 {formatTime(thread.time_of_day)}</div>
                             </div>
                     </div>
                           <p className="text-sm text-gray-600 line-clamp-2 mb-3">{thread.description}</p>
@@ -1632,7 +1659,7 @@ function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onCom
                             <h4 className="font-semibold text-gray-800">{thread.title}</h4>
                             <div className="text-xs text-gray-500">
                               <div>{new Date(thread.created_at).toLocaleDateString()}</div>
-                              <div className="font-medium text-blue-600">🕐 {thread.time_of_day}</div>
+                              <div className="font-medium text-blue-600">🕐 {formatTime(thread.time_of_day)}</div>
                             </div>
                             {thread.description && thread.description.length > 50 && (
                               <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
@@ -1722,7 +1749,7 @@ function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onCom
                           <h4 className="font-semibold text-gray-800 text-sm line-clamp-1">{thread.title}</h4>
                           <div className="text-xs text-gray-500 text-right">
                             <div>{new Date(thread.created_at).toLocaleDateString()}</div>
-                            <div className="font-medium text-blue-600">🕐 {thread.time_of_day}</div>
+                            <div className="font-medium text-blue-600">🕐 {formatTime(thread.time_of_day)}</div>
                           </div>
                         </div>
                         <p className="text-xs text-gray-600 line-clamp-2">{thread.description}</p>

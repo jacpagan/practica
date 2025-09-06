@@ -1,5 +1,32 @@
 import React, { useState, useEffect, useMemo } from 'react'
 
+// Helper function to format time in user-friendly format
+const formatTime = (timeString) => {
+  if (!timeString) return 'Unknown time'
+  
+  try {
+    // Handle different time formats
+    let time
+    if (typeof timeString === 'string') {
+      // Extract just the time part if it includes microseconds
+      const timePart = timeString.split('.')[0]
+      time = new Date(`2000-01-01T${timePart}`)
+    } else {
+      time = timeString
+    }
+    
+    // Format as 12-hour time with AM/PM
+    return time.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    })
+  } catch (error) {
+    console.error('Error formatting time:', error)
+    return 'Invalid time'
+  }
+}
+
 function VideoList({ videos, onVideoSelect, onUploadClick, onVideoDelete, comparisonQueue = [], onComparisonQueueUpdate }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTags, setSelectedTags] = useState([])
@@ -395,7 +422,7 @@ function VideoList({ videos, onVideoSelect, onUploadClick, onVideoDelete, compar
                           </span>
                           <div className="text-xs text-gray-500 text-right">
                             <div>{new Date(video.created_at).toLocaleDateString()}</div>
-                            <div className="font-medium text-blue-600">🕐 {video.time_of_day}</div>
+                            <div className="font-medium text-blue-600">🕐 {formatTime(video.time_of_day)}</div>
                           </div>
                         </div>
                         {video.tags && (
@@ -435,7 +462,7 @@ function VideoList({ videos, onVideoSelect, onUploadClick, onVideoDelete, compar
                           </span>
                           <div className="text-xs text-gray-500">
                             <div>{new Date(video.created_at).toLocaleDateString()}</div>
-                            <div className="font-medium text-blue-600">🕐 {video.time_of_day}</div>
+                            <div className="font-medium text-blue-600">🕐 {formatTime(video.time_of_day)}</div>
                           </div>
                           {video.tags && (
                             <span className="text-xs text-gray-500">
