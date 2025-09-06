@@ -27,6 +27,46 @@ const formatTime = (timeString) => {
   }
 }
 
+// Video Thumbnail Component
+function VideoThumbnail({ video, className = "" }) {
+  const [thumbnailError, setThumbnailError] = useState(false)
+  
+  // Construct the video URL
+  const videoUrl = video.video_file?.startsWith('/media/') 
+    ? `http://localhost:8000${video.video_file}`
+    : video.video_file
+
+  return (
+    <div className={`relative ${className}`}>
+      {videoUrl && !thumbnailError ? (
+        <video
+          src={videoUrl}
+          className="w-full h-full object-cover rounded-lg"
+          muted
+          preload="metadata"
+          onError={() => setThumbnailError(true)}
+          onLoadedMetadata={(e) => {
+            // Seek to 1 second to get a better thumbnail
+            e.target.currentTime = 1
+          }}
+        />
+      ) : (
+        <div className="w-full h-full bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg flex items-center justify-center">
+          <span className="text-4xl">🎥</span>
+        </div>
+      )}
+      {/* Play overlay */}
+      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 hover:bg-opacity-20 transition-all duration-200 rounded-lg group">
+        <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <div className="w-12 h-12 bg-white bg-opacity-90 rounded-full flex items-center justify-center">
+            <span className="text-2xl">▶️</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function VideoList({ videos, onVideoSelect, onUploadClick, onVideoDelete, comparisonQueue = [], onComparisonQueueUpdate }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTags, setSelectedTags] = useState([])
@@ -406,9 +446,10 @@ function VideoList({ videos, onVideoSelect, onUploadClick, onVideoDelete, compar
                 >
                   {viewMode === 'grid' ? (
                     <>
-                      <div className="aspect-video bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl mb-4 flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
-                        <span className="text-4xl">🎥</span>
-                      </div>
+                      <VideoThumbnail 
+                        video={video} 
+                        className="aspect-video bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl mb-4 group-hover:scale-105 transition-transform duration-300"
+                      />
                       <div className="space-y-3">
                         <h3 className="font-bold text-lg text-gray-800 group-hover:text-blue-600 transition-colors line-clamp-2">
                           {video.title}
@@ -457,9 +498,10 @@ function VideoList({ videos, onVideoSelect, onUploadClick, onVideoDelete, compar
                     </>
                   ) : (
                     <>
-                      <div className="w-24 h-16 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <span className="text-xl">🎥</span>
-                      </div>
+                      <VideoThumbnail 
+                        video={video} 
+                        className="w-24 h-16 flex-shrink-0"
+                      />
                       <div className="flex-1 min-w-0">
                         <h3 className="font-bold text-lg text-gray-800 group-hover:text-blue-600 transition-colors">
                           {video.title}
