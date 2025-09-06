@@ -143,6 +143,14 @@ CSRF_EXEMPT_PATHS = [
     '/health/',
 ]
 
+# Additional CSRF bypass for API endpoints
+CSRF_COOKIE_DOMAIN = None
+CSRF_COOKIE_PATH = '/'
+CSRF_COOKIE_NAME = 'csrftoken'
+CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'
+CSRF_COOKIE_AGE = 31449600
+CSRF_FAILURE_VIEW = 'django.views.csrf.csrf_failure'
+
 # AWS S3 Configuration
 AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
