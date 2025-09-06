@@ -4,6 +4,7 @@ Video models for your personal practice tracking system.
 
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 class ExerciseVideo(models.Model):
     """Your exercise videos (like drum lessons)"""
@@ -11,6 +12,7 @@ class ExerciseVideo(models.Model):
     description = models.TextField(blank=True)
     video_file = models.FileField(upload_to='exercise_videos/')
     tags = models.CharField(max_length=500, blank=True)
+    time_of_day = models.TimeField(help_text="Time of day when this exercise was practiced", default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -26,6 +28,7 @@ class PracticeThread(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     video_file = models.FileField(upload_to='practice_threads/')
+    time_of_day = models.TimeField(help_text="Time of day when this practice session occurred", default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

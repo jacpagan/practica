@@ -393,9 +393,10 @@ function VideoList({ videos, onVideoSelect, onUploadClick, onVideoDelete, compar
                           <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
                             {video.practice_threads?.length || 0} practices
                           </span>
-                          <span className="text-xs text-gray-500">
-                            {new Date(video.created_at).toLocaleDateString()}
-                          </span>
+                          <div className="text-xs text-gray-500 text-right">
+                            <div>{new Date(video.created_at).toLocaleDateString()}</div>
+                            <div className="font-medium text-blue-600">🕐 {video.time_of_day}</div>
+                          </div>
                         </div>
                         {video.tags && (
                           <div className="flex flex-wrap gap-1">
@@ -432,9 +433,10 @@ function VideoList({ videos, onVideoSelect, onUploadClick, onVideoDelete, compar
                           <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
                             {video.practice_threads?.length || 0} practices
                           </span>
-                          <span className="text-xs text-gray-500">
-                            {new Date(video.created_at).toLocaleDateString()}
-                          </span>
+                          <div className="text-xs text-gray-500">
+                            <div>{new Date(video.created_at).toLocaleDateString()}</div>
+                            <div className="font-medium text-blue-600">🕐 {video.time_of_day}</div>
+                          </div>
                           {video.tags && (
                             <span className="text-xs text-gray-500">
                               {video.tags.split(',').slice(0, 2).join(', ')}

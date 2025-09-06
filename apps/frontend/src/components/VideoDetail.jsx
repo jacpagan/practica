@@ -11,7 +11,12 @@ function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onCom
     description: video.description,
     tags: video.tags
   })
-  const [newThread, setNewThread] = useState({ title: '', description: '', video_file: null })
+  const [newThread, setNewThread] = useState({ 
+    title: '', 
+    description: '', 
+    video_file: null,
+    time_of_day: new Date().toTimeString().slice(0, 5) // Default to current time
+  })
   const [isUploading, setIsUploading] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -575,6 +580,7 @@ function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onCom
       const formDataToSend = new FormData()
       formDataToSend.append('title', newThread.title.trim())
       formDataToSend.append('description', newThread.description.trim())
+      formDataToSend.append('time_of_day', newThread.time_of_day)
       formDataToSend.append('video_file', newThread.video_file)
 
       const response = await fetch(`/api/videos/${video.id}/upload_thread/`, {
@@ -586,7 +592,7 @@ function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onCom
         const updatedVideo = await response.json()
         setPracticeThreads(updatedVideo.practice_threads || [])
         setShowUploadForm(false)
-        setNewThread({ title: '', description: '', video_file: null })
+        setNewThread({ title: '', description: '', video_file: null, time_of_day: new Date().toTimeString().slice(0, 5) })
         // Show success message
         alert('Practice session uploaded successfully!')
       } else {
@@ -1375,6 +1381,22 @@ function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onCom
                   />
                 </div>
 
+                <div>
+                  <label htmlFor="thread_time_of_day" className="block text-sm font-medium text-gray-700 mb-1">
+                    Practice Time *
+                  </label>
+                  <input
+                    type="time"
+                    id="thread_time_of_day"
+                    name="time_of_day"
+                    value={newThread.time_of_day}
+                    onChange={handleThreadInputChange}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">What time of day did you practice this session?</p>
+                </div>
+
                 {/* Recording Mode Selection */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1523,7 +1545,7 @@ function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onCom
                     type="button"
                       onClick={() => {
                         setShowUploadForm(false)
-                        setNewThread({ title: '', description: '', video_file: null })
+                        setNewThread({ title: '', description: '', video_file: null, time_of_day: new Date().toTimeString().slice(0, 5) })
                         setRecordedVideo(null)
                         stopWebcam()
                       }}
@@ -1553,9 +1575,10 @@ function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onCom
                         >
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="font-semibold text-gray-800 line-clamp-1">{thread.title}</h4>
-                            <span className="text-xs text-gray-500">
-                        {new Date(thread.created_at).toLocaleDateString()}
-                            </span>
+                            <div className="text-xs text-gray-500 text-right">
+                              <div>{new Date(thread.created_at).toLocaleDateString()}</div>
+                              <div className="font-medium text-blue-600">🕐 {thread.time_of_day}</div>
+                            </div>
                     </div>
                           <p className="text-sm text-gray-600 line-clamp-2 mb-3">{thread.description}</p>
                           <div className="flex space-x-2">
@@ -1625,9 +1648,10 @@ function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onCom
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-3 mb-2">
                             <h4 className="font-semibold text-gray-800">{thread.title}</h4>
-                            <span className="text-xs text-gray-500">
-                              {new Date(thread.created_at).toLocaleDateString()}
-                            </span>
+                            <div className="text-xs text-gray-500">
+                              <div>{new Date(thread.created_at).toLocaleDateString()}</div>
+                              <div className="font-medium text-blue-600">🕐 {thread.time_of_day}</div>
+                            </div>
                             {thread.description && thread.description.length > 50 && (
                               <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
                                 Detailed
@@ -1714,9 +1738,10 @@ function VideoDetail({ video, onBack, onVideoUpdate, comparisonQueue = [], onCom
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <h4 className="font-semibold text-gray-800 text-sm line-clamp-1">{thread.title}</h4>
-                          <span className="text-xs text-gray-500">
-                            {new Date(thread.created_at).toLocaleDateString()}
-                          </span>
+                          <div className="text-xs text-gray-500 text-right">
+                            <div>{new Date(thread.created_at).toLocaleDateString()}</div>
+                            <div className="font-medium text-blue-600">🕐 {thread.time_of_day}</div>
+                          </div>
                         </div>
                         <p className="text-xs text-gray-600 line-clamp-2">{thread.description}</p>
                         <div className="flex space-x-1">

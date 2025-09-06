@@ -10,7 +10,7 @@ class PracticeThreadSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = PracticeThread
-        fields = ['id', 'title', 'description', 'video_file', 'created_at', 'updated_at']
+        fields = ['id', 'title', 'description', 'video_file', 'time_of_day', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 class ExerciseVideoSerializer(serializers.ModelSerializer):
@@ -19,4 +19,4 @@ class ExerciseVideoSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = ExerciseVideo
-        fields = ['id', 'title', 'description', 'video_file', 'tags', 'created_at', 'updated_at', 'practice_threads']
+        fields = ['id', 'title', 'description', 'video_file', 'tags', 'time_of_day', 'created_at', 'updated_at', 'practice_threads']
