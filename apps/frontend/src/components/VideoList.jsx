@@ -441,6 +441,17 @@ function VideoList({ videos, onVideoSelect, onUploadClick, onVideoDelete, compar
                           >
                             🎯 Practice
                           </button>
+                          <button
+                            onClick={() => {
+                              if (confirm(`Are you sure you want to delete "${video.title}"?`)) {
+                                onVideoDelete(video.id)
+                              }
+                            }}
+                            className="bg-red-500 text-white px-3 py-2 rounded-lg hover:bg-red-600 transition-colors text-sm"
+                            title="Delete Exercise"
+                          >
+                            🗑️
+                          </button>
                         </div>
                       </div>
                     </>
@@ -477,6 +488,17 @@ function VideoList({ videos, onVideoSelect, onUploadClick, onVideoDelete, compar
                           className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors text-sm"
                         >
                           🎯 Practice
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Are you sure you want to delete "${video.title}"?`)) {
+                              onVideoDelete(video.id)
+                            }
+                          }}
+                          className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors text-sm"
+                          title="Delete Exercise"
+                        >
+                          🗑️
                         </button>
                       </div>
                     </>
