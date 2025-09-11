@@ -1,0 +1,17 @@
+# .cursor/rules.yaml
+description: >
+  Enforce Django+DRF architecture, short-clip policy (<=180s),
+  safe migrations (RunPython backfills), and production-ready defaults.
+globs:
+  - "**/*"
+alwaysApply: true
+rules:
+  - "Prefer Django 5, DRF, Celery, Redis, Postgres 15."
+  - "Implement S3 presigned uploads; do NOT stream media through Django."
+  - "PracticeClip.duration_sec <= Exercise.max_clip_sec (default 180). Enforce server-side."
+  - "Teacher may upload long Lesson videos; students limited to short clips."
+  - "Migrations: add nullable -> backfill via RunPython -> flip to non-null."
+  - "Views: REST writes; JSON only; pagination = cursor based."
+  - "Security: signed CloudFront URLs; least-privilege IAM (document)."
+  - "Tests for upload-url, commit, and Celery transcode happy-path."
+  - "Lint (ruff), type-check (mypy), format (black). CI must run."
