@@ -1,14 +1,5 @@
-# .gitignore
-__pycache__/
+db.sqlite3
+.venv
+__pycache__
 *.pyc
 .env
-.mypy_cache/
-.pytest_cache/
-.coverage
-htmlcov/
-dist/
-build/
-node_modules/
-.vscode/
-.DS_Store
-/media/
