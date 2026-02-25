@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 
-function SessionUpload({ onComplete, onCancel }) {
+function SessionUpload({ token, onComplete, onCancel }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [videoFile, setVideoFile] = useState(null)
@@ -70,7 +70,10 @@ function SessionUpload({ onComplete, onCancel }) {
       fd.append('title', title.trim())
       fd.append('description', description.trim())
       fd.append('video_file', videoFile)
-      const res = await fetch('/api/sessions/', { method: 'POST', body: fd })
+      const res = await fetch('/api/sessions/', {
+        method: 'POST', body: fd,
+        headers: token ? { 'Authorization': `Token ${token}` } : {},
+      })
       if (res.ok) onComplete()
       else alert('Upload failed.')
     } catch { alert('Error uploading.') }

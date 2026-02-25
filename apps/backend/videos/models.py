@@ -1,10 +1,23 @@
 from django.db import models
+from django.contrib.auth.models import User
+
+
+class Profile(models.Model):
+    """Extended user profile with role."""
+    ROLE_CHOICES = [
+        ('student', 'Student'),
+        ('teacher', 'Teacher'),
+    ]
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='student')
+    display_name = models.CharField(max_length=100, blank=True)
+
+    def __str__(self):
+        return f"{self.user.username} ({self.role})"
 
 
 class Exercise(models.Model):
-    """A named exercise in the user's personal library.
-    Examples: 'Single Stroke Rolls', 'Songo', 'Cloud Hands'
-    """
+    """A named exercise in the user's personal library."""
     name = models.CharField(max_length=200, unique=True)
     category = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True)
@@ -18,7 +31,8 @@ class Exercise(models.Model):
 
 
 class Session(models.Model):
-    """A practice session — typically one long recording (e.g. 1 hour)."""
+    """A practice session — typically one long recording."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sessions', null=True, blank=True)
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     video_file = models.FileField(upload_to='sessions/')
@@ -51,3 +65,23 @@ class Chapter(models.Model):
         label = self.exercise.name if self.exercise else self.title
         mins, secs = divmod(self.timestamp_seconds, 60)
         return f"{label} @ {mins}:{secs:02d}"
+
+
+class Comment(models.Model):
+    """A timestamped comment on a session, optionally with a video reply."""
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='comments')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='comments')
+    timestamp_seconds = models.IntegerField(
+        null=True, blank=True,
+        help_text="Video timestamp this comment refers to (seconds)",
+    )
+    text = models.TextField()
+    video_reply = models.FileField(upload_to='comment_videos/', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['timestamp_seconds', 'created_at']
+
+    def __str__(self):
+        prefix = f"@{self.timestamp_seconds}s " if self.timestamp_seconds is not None else ""
+        return f"{prefix}{self.user.username}: {self.text[:50]}"
