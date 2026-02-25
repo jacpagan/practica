@@ -1,7 +1,8 @@
+import secrets
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
 from django.db import connection
-from django.core.cache import cache
+from django.db.models import Q
 from django.utils import timezone
 from django.conf import settings
 from django.contrib.auth import authenticate
@@ -12,14 +13,24 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
-from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
+from rest_framework.permissions import AllowAny, IsAuthenticated
 
-from .models import Profile, Exercise, Session, Chapter, Comment
+from .models import Profile, Exercise, Session, Chapter, Comment, TeacherStudent, InviteCode
 from .serializers import (
     UserSerializer, RegisterSerializer,
     ExerciseSerializer, SessionSerializer, SessionListSerializer,
     ChapterSerializer, CommentSerializer, ProgressChapterSerializer,
 )
+
+
+def _visible_user_ids(user):
+    """Return the set of user IDs whose sessions this user can see."""
+    ids = {user.id}
+    if hasattr(user, 'profile') and user.profile.role == 'teacher':
+        ids |= set(TeacherStudent.objects.filter(teacher=user).values_list('student_id', flat=True))
+    else:
+        ids |= set(TeacherStudent.objects.filter(student=user).values_list('teacher_id', flat=True))
+    return ids
 
 
 # ── Auth views ──────────────────────────────────────────────────────
@@ -61,6 +72,79 @@ def me_view(request):
     return Response(UserSerializer(request.user).data)
 
 
+# ── Invite views ────────────────────────────────────────────────────
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_invite(request):
+    code = secrets.token_hex(4).upper()
+    InviteCode.objects.create(code=code, created_by=request.user)
+    return Response({'code': code}, status=status.HTTP_201_CREATED)
+
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def accept_invite(request):
+    code = request.data.get('code', '').strip().upper()
+    if not code:
+        return Response({'error': 'Code required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        invite = InviteCode.objects.get(code=code, used_by__isnull=True)
+    except InviteCode.DoesNotExist:
+        return Response({'error': 'Invalid or already used code'}, status=status.HTTP_404_NOT_FOUND)
+
+    creator = invite.created_by
+    acceptor = request.user
+
+    if creator == acceptor:
+        return Response({'error': 'Cannot use your own invite code'}, status=status.HTTP_400_BAD_REQUEST)
+
+    creator_role = creator.profile.role if hasattr(creator, 'profile') else 'student'
+    acceptor_role = acceptor.profile.role if hasattr(acceptor, 'profile') else 'student'
+
+    if creator_role == 'teacher' and acceptor_role == 'student':
+        teacher, student = creator, acceptor
+    elif creator_role == 'student' and acceptor_role == 'teacher':
+        teacher, student = acceptor, creator
+    elif creator_role == acceptor_role:
+        return Response(
+            {'error': f'Both users are {creator_role}s. One must be a teacher and the other a student.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    else:
+        teacher, student = creator, acceptor
+
+    link, created = TeacherStudent.objects.get_or_create(teacher=teacher, student=student)
+
+    invite.used_by = acceptor
+    invite.used_at = timezone.now()
+    invite.save()
+
+    return Response({
+        'message': 'Linked successfully',
+        'teacher': UserSerializer(teacher).data.get('display_name'),
+        'student': UserSerializer(student).data.get('display_name'),
+        'already_linked': not created,
+        'user': UserSerializer(acceptor).data,
+    })
+
+
+@csrf_exempt
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def remove_link(request, user_id):
+    other = get_object_or_404(User, pk=user_id)
+    deleted = TeacherStudent.objects.filter(
+        Q(teacher=request.user, student=other) | Q(teacher=other, student=request.user)
+    ).delete()
+    if deleted[0] == 0:
+        return Response({'error': 'No link found'}, status=status.HTTP_404_NOT_FOUND)
+    return Response({'message': 'Unlinked', 'user': UserSerializer(request.user).data})
+
+
 # ── Exercise views ──────────────────────────────────────────────────
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -72,12 +156,13 @@ class ExerciseViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def progress(self, request, pk=None):
         exercise = self.get_object()
-        chapters = (
-            exercise.chapters
-            .select_related('session')
-            .order_by('session__recorded_at')
-        )
-        serializer = ProgressChapterSerializer(chapters, many=True)
+        qs = exercise.chapters.select_related('session').order_by('session__recorded_at')
+
+        if request.user.is_authenticated:
+            visible = _visible_user_ids(request.user)
+            qs = qs.filter(session__user_id__in=visible)
+
+        serializer = ProgressChapterSerializer(qs, many=True)
         return Response({
             'exercise': ExerciseSerializer(exercise).data,
             'chapters': serializer.data,
@@ -88,11 +173,21 @@ class ExerciseViewSet(viewsets.ModelViewSet):
 
 @method_decorator(csrf_exempt, name='dispatch')
 class SessionViewSet(viewsets.ModelViewSet):
-    queryset = Session.objects.prefetch_related(
-        'chapters', 'chapters__exercise',
-        'comments', 'comments__user', 'comments__user__profile',
-    )
     permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        qs = Session.objects.prefetch_related(
+            'chapters', 'chapters__exercise',
+            'comments', 'comments__user', 'comments__user__profile',
+        ).select_related('user', 'user__profile')
+
+        if self.request.user.is_authenticated:
+            visible = _visible_user_ids(self.request.user)
+            qs = qs.filter(user_id__in=visible)
+        else:
+            qs = qs.none()
+
+        return qs
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -129,10 +224,7 @@ class SessionViewSet(viewsets.ModelViewSet):
 
         if serializer.is_valid():
             serializer.save()
-            return Response(
-                SessionSerializer(session).data,
-                status=status.HTTP_201_CREATED,
-            )
+            return Response(SessionSerializer(session).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['delete'], url_path='chapters/(?P<chapter_id>[0-9]+)')
@@ -145,9 +237,8 @@ class SessionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def add_comment(self, request, pk=None):
         session = self.get_object()
-
         if not request.user.is_authenticated:
-            return Response({'error': 'Login required to comment'}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({'error': 'Login required'}, status=status.HTTP_401_UNAUTHORIZED)
 
         text = request.data.get('text', '').strip()
         if not text:
@@ -157,13 +248,10 @@ class SessionViewSet(viewsets.ModelViewSet):
         timestamp = int(ts) if ts is not None and str(ts).strip() != '' else None
 
         Comment.objects.create(
-            session=session,
-            user=request.user,
-            timestamp_seconds=timestamp,
-            text=text,
+            session=session, user=request.user,
+            timestamp_seconds=timestamp, text=text,
             video_reply=request.FILES.get('video_reply'),
         )
-
         session.refresh_from_db()
         return Response(SessionSerializer(session).data, status=status.HTTP_201_CREATED)
 
@@ -171,10 +259,8 @@ class SessionViewSet(viewsets.ModelViewSet):
     def remove_comment(self, request, pk=None, comment_id=None):
         session = self.get_object()
         comment = get_object_or_404(Comment, pk=comment_id, session=session)
-
         if request.user != comment.user and not request.user.is_staff:
             return Response({'error': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
-
         comment.delete()
         return Response(SessionSerializer(session).data)
 
@@ -189,7 +275,6 @@ def health_check(request):
         'version': '2.0.0',
         'environment': 'development' if settings.DEBUG else 'production',
     }
-
     try:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")

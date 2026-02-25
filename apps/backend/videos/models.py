@@ -67,6 +67,37 @@ class Chapter(models.Model):
         return f"{label} @ {mins}:{secs:02d}"
 
 
+class TeacherStudent(models.Model):
+    """A link between a teacher and a student."""
+    teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name='students')
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='teachers')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['teacher', 'student']
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.teacher.username} → {self.student.username}"
+
+
+class InviteCode(models.Model):
+    """A short-lived code for linking a teacher and student."""
+    code = models.CharField(max_length=8, unique=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='invite_codes')
+    used_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='used_invites')
+    used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def is_used(self):
+        return self.used_by is not None
+
+    def __str__(self):
+        status = f"used by {self.used_by.username}" if self.used_by else "pending"
+        return f"{self.code} ({self.created_by.username}) — {status}"
+
+
 class Comment(models.Model):
     """A timestamped comment on a session, optionally with a video reply."""
     session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='comments')
