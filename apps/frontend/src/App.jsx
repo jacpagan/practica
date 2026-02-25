@@ -6,6 +6,7 @@ import SessionUpload from './components/SessionUpload'
 import SessionDetail from './components/SessionDetail'
 import ProgressView from './components/ProgressView'
 import ConnectionsView from './components/ConnectionsView'
+import QuickRecord from './components/QuickRecord'
 
 function AppContent() {
   const { user, token, loading, logout, refreshUser } = useAuth()
@@ -20,7 +21,7 @@ function AppContent() {
   }, [user])
 
   useEffect(() => {
-    const handler = (e) => refreshUser()
+    const handler = () => refreshUser()
     window.addEventListener('user-updated', handler)
     return () => window.removeEventListener('user-updated', handler)
   }, [refreshUser])
@@ -54,12 +55,31 @@ function AppContent() {
     fetchExercises()
   }
 
+  const handleQuickRecordComplete = (session) => {
+    fetchSessions()
+    fetchExercises()
+    setSelectedSession(session)
+    setView('detail')
+  }
+
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center"><p className="text-sm text-gray-400">Loading...</p></div>
   if (!user) return <AuthForm />
 
   const isTeacher = user.role === 'teacher'
   const linked = isTeacher ? (user.linked_students || []) : (user.linked_teachers || [])
   const hasConnections = linked.length > 0
+
+  // QuickRecord is full-screen overlay — renders on top of everything
+  if (view === 'quickRecord') {
+    return (
+      <QuickRecord
+        token={token}
+        exercises={exercises}
+        onComplete={handleQuickRecordComplete}
+        onCancel={goHome}
+      />
+    )
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -73,8 +93,8 @@ function AppContent() {
               <>
                 {!isTeacher && (
                   <button onClick={() => setView('upload')}
-                    className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
-                    + New session
+                    className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors hidden sm:block">
+                    + Upload
                   </button>
                 )}
                 <button onClick={() => setView('connections')}
@@ -104,7 +124,7 @@ function AppContent() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto">
+      <main className="max-w-5xl mx-auto pb-24">
         {view === 'sessions' && (
           <SessionList
             sessions={sessions} exercises={exercises} user={user}
@@ -132,6 +152,19 @@ function AppContent() {
           <ConnectionsView onBack={goHome} />
         )}
       </main>
+
+      {/* Floating record button — students only, on home screen */}
+      {view === 'sessions' && !isTeacher && (
+        <div className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-40">
+          <button
+            onClick={() => setView('quickRecord')}
+            className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/30 flex items-center justify-center transition-all active:scale-90 hover:scale-105"
+          >
+            <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white rounded-full" />
+          </button>
+          <p className="text-[10px] text-gray-400 text-center mt-1.5">Record</p>
+        </div>
+      )}
     </div>
   )
 }
