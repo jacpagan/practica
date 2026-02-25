@@ -20,7 +20,7 @@ function SessionDetail({ session: initialSession, exercises, onBack, onSessionUp
 
   const refreshSession = async () => {
     try {
-      const res = await fetch(`/api/sessions/${session.id}/`)
+      const res = await fetch(`/api/sessions/${initialSession.id}/`)
       if (res.ok) {
         const data = await res.json()
         setSession(data)
@@ -28,6 +28,8 @@ function SessionDetail({ session: initialSession, exercises, onBack, onSessionUp
       }
     } catch (e) { console.error(e) }
   }
+
+  useEffect(() => { refreshSession() }, [initialSession.id])
 
   const handleTimeUpdate = () => {
     if (videoRef.current) setCurrentTime(videoRef.current.currentTime)
