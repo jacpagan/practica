@@ -11,11 +11,17 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
+      },
+      '/media': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
       }
     }
   },
   build: {
     outDir: 'dist',
-    sourcemap: false, // Cost-saving: No source maps in production
+    sourcemap: false,
+    assetsDir: 'assets',
   }
 })
