@@ -7,7 +7,6 @@ function App() {
   const [videos, setVideos] = useState([])
   const [currentView, setCurrentView] = useState('list')
   const [selectedVideo, setSelectedVideo] = useState(null)
-  const [comparisonQueue, setComparisonQueue] = useState([])
 
   useEffect(() => {
     fetchVideos()
@@ -31,11 +30,12 @@ function App() {
   const handleBackToList = () => {
     setCurrentView('list')
     setSelectedVideo(null)
+    fetchVideos()
   }
 
   const handleVideoUpdate = (updatedVideo) => {
-    setVideos(prevVideos => 
-      prevVideos.map(video => 
+    setVideos(prevVideos =>
+      prevVideos.map(video =>
         video.id === updatedVideo.id ? updatedVideo : video
       )
     )
@@ -44,46 +44,62 @@ function App() {
 
   const handleVideoDelete = async (videoId) => {
     try {
-      const response = await fetch(`/api/videos/${videoId}/`, {
+      const response = await fetch(`/api/videos/${videoId}/delete_exercise/`, {
         method: 'DELETE'
       })
-
       if (response.ok) {
         setVideos(prevVideos => prevVideos.filter(video => video.id !== videoId))
         if (selectedVideo && selectedVideo.id === videoId) {
           setCurrentView('list')
           setSelectedVideo(null)
         }
-      } else {
-        alert('Failed to delete video. Please try again.')
       }
     } catch (error) {
       console.error('Error deleting video:', error)
-      alert('Error deleting video. Please check your connection.')
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-blue-600 text-white p-4">
-        <h1 className="text-2xl font-bold">Practica - Your Personal Practice Tracking</h1>
-        <p className="text-blue-100">Upload exercise videos, record practice sessions, track your progress</p>
+    <div className="min-h-screen bg-white">
+      <header className="border-b border-gray-100 px-4 py-3 sm:px-6">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
+          <button
+            onClick={handleBackToList}
+            className="text-lg font-semibold text-gray-900 tracking-tight"
+          >
+            Practica
+          </button>
+          {currentView === 'list' && (
+            <button
+              onClick={() => setCurrentView('upload')}
+              className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              + New exercise
+            </button>
+          )}
+          {currentView !== 'list' && (
+            <button
+              onClick={handleBackToList}
+              className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
+            >
+              Back
+            </button>
+          )}
+        </div>
       </header>
-      
-      <main className="container mx-auto p-4">
+
+      <main className="max-w-5xl mx-auto">
         {currentView === 'list' && (
-          <VideoList 
-            videos={videos} 
+          <VideoList
+            videos={videos}
             onVideoSelect={handleVideoSelect}
             onUploadClick={() => setCurrentView('upload')}
             onVideoDelete={handleVideoDelete}
-            comparisonQueue={comparisonQueue}
-            onComparisonQueueUpdate={setComparisonQueue}
           />
         )}
-        
+
         {currentView === 'upload' && (
-          <VideoUpload 
+          <VideoUpload
             onUploadComplete={() => {
               fetchVideos()
               setCurrentView('list')
@@ -91,14 +107,13 @@ function App() {
             onCancel={() => setCurrentView('list')}
           />
         )}
-        
+
         {currentView === 'detail' && selectedVideo && (
-          <VideoDetail 
+          <VideoDetail
             video={selectedVideo}
             onBack={handleBackToList}
             onVideoUpdate={handleVideoUpdate}
-            comparisonQueue={comparisonQueue}
-            onComparisonQueueUpdate={setComparisonQueue}
+            onVideoDelete={handleVideoDelete}
           />
         )}
       </main>
