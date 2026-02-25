@@ -1,119 +1,107 @@
 import React, { useState, useEffect } from 'react'
-import VideoList from './components/VideoList'
-import VideoUpload from './components/VideoUpload'
-import VideoDetail from './components/VideoDetail'
+import SessionList from './components/SessionList'
+import SessionUpload from './components/SessionUpload'
+import SessionDetail from './components/SessionDetail'
+import ProgressView from './components/ProgressView'
 
 function App() {
-  const [videos, setVideos] = useState([])
-  const [currentView, setCurrentView] = useState('list')
-  const [selectedVideo, setSelectedVideo] = useState(null)
+  const [sessions, setSessions] = useState([])
+  const [exercises, setExercises] = useState([])
+  const [view, setView] = useState('sessions') // sessions | upload | detail | progress
+  const [selectedSession, setSelectedSession] = useState(null)
+  const [selectedExercise, setSelectedExercise] = useState(null)
 
-  useEffect(() => {
-    fetchVideos()
-  }, [])
+  useEffect(() => { fetchSessions(); fetchExercises() }, [])
 
-  const fetchVideos = async () => {
+  const fetchSessions = async () => {
     try {
-      const response = await fetch('/api/videos/')
-      const data = await response.json()
-      setVideos(data)
-    } catch (error) {
-      console.error('Error fetching videos:', error)
-    }
+      const res = await fetch('/api/sessions/')
+      const data = await res.json()
+      setSessions(data.results || data)
+    } catch (e) { console.error(e) }
   }
 
-  const handleVideoSelect = (video) => {
-    setSelectedVideo(video)
-    setCurrentView('detail')
-  }
-
-  const handleBackToList = () => {
-    setCurrentView('list')
-    setSelectedVideo(null)
-    fetchVideos()
-  }
-
-  const handleVideoUpdate = (updatedVideo) => {
-    setVideos(prevVideos =>
-      prevVideos.map(video =>
-        video.id === updatedVideo.id ? updatedVideo : video
-      )
-    )
-    setSelectedVideo(updatedVideo)
-  }
-
-  const handleVideoDelete = async (videoId) => {
+  const fetchExercises = async () => {
     try {
-      const response = await fetch(`/api/videos/${videoId}/delete_exercise/`, {
-        method: 'DELETE'
-      })
-      if (response.ok) {
-        setVideos(prevVideos => prevVideos.filter(video => video.id !== videoId))
-        if (selectedVideo && selectedVideo.id === videoId) {
-          setCurrentView('list')
-          setSelectedVideo(null)
-        }
-      }
-    } catch (error) {
-      console.error('Error deleting video:', error)
-    }
+      const res = await fetch('/api/exercises/')
+      const data = await res.json()
+      setExercises(data.results || data)
+    } catch (e) { console.error(e) }
+  }
+
+  const openSession = (session) => { setSelectedSession(session); setView('detail') }
+  const openProgress = (exercise) => { setSelectedExercise(exercise); setView('progress') }
+
+  const goHome = () => {
+    setView('sessions')
+    setSelectedSession(null)
+    setSelectedExercise(null)
+    fetchSessions()
+    fetchExercises()
   }
 
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-100 px-4 py-3 sm:px-6">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <button
-            onClick={handleBackToList}
-            className="text-lg font-semibold text-gray-900 tracking-tight"
-          >
+          <button onClick={goHome} className="text-lg font-semibold text-gray-900 tracking-tight">
             Practica
           </button>
-          {currentView === 'list' && (
-            <button
-              onClick={() => setCurrentView('upload')}
-              className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              + New exercise
-            </button>
-          )}
-          {currentView !== 'list' && (
-            <button
-              onClick={handleBackToList}
-              className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
-            >
-              Back
-            </button>
-          )}
+          <div className="flex items-center gap-4">
+            {view === 'sessions' && (
+              <>
+                <button
+                  onClick={() => setView('upload')}
+                  className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                  + New session
+                </button>
+              </>
+            )}
+            {view !== 'sessions' && (
+              <button onClick={goHome} className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
+                Back
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto">
-        {currentView === 'list' && (
-          <VideoList
-            videos={videos}
-            onVideoSelect={handleVideoSelect}
-            onUploadClick={() => setCurrentView('upload')}
-            onVideoDelete={handleVideoDelete}
-          />
-        )}
-
-        {currentView === 'upload' && (
-          <VideoUpload
-            onUploadComplete={() => {
-              fetchVideos()
-              setCurrentView('list')
+        {view === 'sessions' && (
+          <SessionList
+            sessions={sessions}
+            exercises={exercises}
+            onSessionSelect={openSession}
+            onExerciseSelect={openProgress}
+            onUploadClick={() => setView('upload')}
+            onDeleteSession={async (id) => {
+              await fetch(`/api/sessions/${id}/`, { method: 'DELETE' })
+              fetchSessions()
             }}
-            onCancel={() => setCurrentView('list')}
           />
         )}
 
-        {currentView === 'detail' && selectedVideo && (
-          <VideoDetail
-            video={selectedVideo}
-            onBack={handleBackToList}
-            onVideoUpdate={handleVideoUpdate}
-            onVideoDelete={handleVideoDelete}
+        {view === 'upload' && (
+          <SessionUpload
+            onComplete={() => { fetchSessions(); setView('sessions') }}
+            onCancel={() => setView('sessions')}
+          />
+        )}
+
+        {view === 'detail' && selectedSession && (
+          <SessionDetail
+            session={selectedSession}
+            exercises={exercises}
+            onBack={goHome}
+            onSessionUpdate={(updated) => { setSelectedSession(updated); fetchExercises() }}
+          />
+        )}
+
+        {view === 'progress' && selectedExercise && (
+          <ProgressView
+            exercise={selectedExercise}
+            onBack={goHome}
           />
         )}
       </main>

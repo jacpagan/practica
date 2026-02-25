@@ -1,45 +1,32 @@
-"""
-Admin configuration for your personal practice tracking system.
-"""
-
 from django.contrib import admin
-from .models import ExerciseVideo, PracticeThread
+from .models import Exercise, Session, Chapter
 
-@admin.register(ExerciseVideo)
-class ExerciseVideoAdmin(admin.ModelAdmin):
-    """Admin interface for exercise videos"""
-    list_display = ['title', 'tags', 'created_at']
-    list_filter = ['created_at', 'updated_at']
-    search_fields = ['title', 'description', 'tags']
-    readonly_fields = ['created_at', 'updated_at']
-    
-    fieldsets = (
-        ('Video Information', {
-            'fields': ('title', 'description', 'video_file')
-        }),
-        ('Organization', {
-            'fields': ('tags',)
-        }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
-    )
 
-@admin.register(PracticeThread)
-class PracticeThreadAdmin(admin.ModelAdmin):
-    """Admin interface for practice threads"""
-    list_display = ['title', 'exercise_video', 'created_at']
-    list_filter = ['created_at', 'updated_at', 'exercise_video']
-    search_fields = ['title', 'description', 'exercise_video__title']
-    readonly_fields = ['created_at', 'updated_at']
-    
-    fieldsets = (
-        ('Thread Information', {
-            'fields': ('exercise_video', 'title', 'description', 'video_file')
-        }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
-    )
+class ChapterInline(admin.TabularInline):
+    model = Chapter
+    extra = 0
+    raw_id_fields = ['exercise']
+
+
+@admin.register(Exercise)
+class ExerciseAdmin(admin.ModelAdmin):
+    list_display = ['name', 'category', 'created_at']
+    search_fields = ['name', 'category']
+
+
+@admin.register(Session)
+class SessionAdmin(admin.ModelAdmin):
+    list_display = ['title', 'recorded_at', 'chapter_count']
+    search_fields = ['title', 'description']
+    inlines = [ChapterInline]
+
+    def chapter_count(self, obj):
+        return obj.chapters.count()
+    chapter_count.short_description = 'Chapters'
+
+
+@admin.register(Chapter)
+class ChapterAdmin(admin.ModelAdmin):
+    list_display = ['__str__', 'session', 'exercise', 'timestamp_seconds']
+    list_filter = ['exercise']
+    raw_id_fields = ['session', 'exercise']
