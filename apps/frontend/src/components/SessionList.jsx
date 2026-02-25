@@ -5,7 +5,8 @@ const formatDate = (d) => {
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
-function SessionList({ sessions, exercises, onSessionSelect, onExerciseSelect, onUploadClick, onDeleteSession }) {
+function SessionList({ sessions, exercises, user, onSessionSelect, onExerciseSelect, onUploadClick, onDeleteSession }) {
+  const isTeacher = user?.role === 'teacher'
   const [tab, setTab] = useState('sessions') // sessions | exercises
 
   return (
@@ -71,6 +72,9 @@ function SessionList({ sessions, exercises, onSessionSelect, onExerciseSelect, o
                       <span className="text-xs text-gray-400">{formatDate(session.recorded_at || session.created_at)}</span>
                       {session.chapter_count > 0 && (
                         <span className="text-xs text-gray-400">{session.chapter_count} chapters</span>
+                      )}
+                      {isTeacher && session.owner_name && (
+                        <span className="text-xs text-blue-500">{session.owner_name}</span>
                       )}
                     </div>
                   </div>

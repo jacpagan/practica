@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Profile, Exercise, Session, Chapter, Comment
+from .models import Profile, Exercise, Session, Chapter, Comment, TeacherStudent, InviteCode
 
 
 class ChapterInline(admin.TabularInline):
@@ -50,3 +50,15 @@ class CommentAdmin(admin.ModelAdmin):
     list_display = ['__str__', 'session', 'user', 'timestamp_seconds', 'created_at']
     list_filter = ['user']
     raw_id_fields = ['session', 'user']
+
+
+@admin.register(TeacherStudent)
+class TeacherStudentAdmin(admin.ModelAdmin):
+    list_display = ['teacher', 'student', 'created_at']
+    raw_id_fields = ['teacher', 'student']
+
+
+@admin.register(InviteCode)
+class InviteCodeAdmin(admin.ModelAdmin):
+    list_display = ['code', 'created_by', 'used_by', 'created_at']
+    list_filter = ['created_at']

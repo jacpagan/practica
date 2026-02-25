@@ -58,8 +58,16 @@ export function AuthProvider({ children }) {
     setUser(null)
   }
 
+  const refreshUser = async () => {
+    if (!token) return
+    try {
+      const res = await fetch('/api/auth/me/', { headers: { 'Authorization': `Token ${token}` } })
+      if (res.ok) setUser(await res.json())
+    } catch {}
+  }
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   )

@@ -6,6 +6,7 @@ from rest_framework.routers import DefaultRouter
 from videos.views import (
     SessionViewSet, ExerciseViewSet, health_check,
     register_view, login_view, me_view,
+    create_invite, accept_invite, remove_link,
 )
 
 router = DefaultRouter()
@@ -18,6 +19,9 @@ urlpatterns = [
     path('api/auth/register/', register_view, name='register'),
     path('api/auth/login/', login_view, name='login'),
     path('api/auth/me/', me_view, name='me'),
+    path('api/invite/create/', create_invite, name='create_invite'),
+    path('api/invite/accept/', accept_invite, name='accept_invite'),
+    path('api/link/<int:user_id>/remove/', remove_link, name='remove_link'),
     path('health/', health_check, name='health_check'),
 ]
 

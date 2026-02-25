@@ -5,9 +5,10 @@ import SessionList from './components/SessionList'
 import SessionUpload from './components/SessionUpload'
 import SessionDetail from './components/SessionDetail'
 import ProgressView from './components/ProgressView'
+import ConnectionsView from './components/ConnectionsView'
 
 function AppContent() {
-  const { user, token, loading, logout } = useAuth()
+  const { user, token, loading, logout, refreshUser } = useAuth()
   const [sessions, setSessions] = useState([])
   const [exercises, setExercises] = useState([])
   const [view, setView] = useState('sessions')
@@ -17,6 +18,12 @@ function AppContent() {
   useEffect(() => {
     if (user) { fetchSessions(); fetchExercises() }
   }, [user])
+
+  useEffect(() => {
+    const handler = (e) => refreshUser()
+    window.addEventListener('user-updated', handler)
+    return () => window.removeEventListener('user-updated', handler)
+  }, [refreshUser])
 
   const headers = authHeaders(token)
 
@@ -50,6 +57,10 @@ function AppContent() {
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center"><p className="text-sm text-gray-400">Loading...</p></div>
   if (!user) return <AuthForm />
 
+  const isTeacher = user.role === 'teacher'
+  const linked = isTeacher ? (user.linked_students || []) : (user.linked_teachers || [])
+  const hasConnections = linked.length > 0
+
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-100 px-4 py-3 sm:px-6">
@@ -57,19 +68,30 @@ function AppContent() {
           <button onClick={goHome} className="text-lg font-semibold text-gray-900 tracking-tight">
             Practica
           </button>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {view === 'sessions' && (
-              <button onClick={() => setView('upload')}
-                className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
-                + New session
-              </button>
+              <>
+                {!isTeacher && (
+                  <button onClick={() => setView('upload')}
+                    className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+                    + New session
+                  </button>
+                )}
+                <button onClick={() => setView('connections')}
+                  className="relative text-sm text-gray-500 hover:text-gray-900 transition-colors">
+                  Connections
+                  {!hasConnections && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-400 rounded-full" />
+                  )}
+                </button>
+              </>
             )}
             {view !== 'sessions' && (
               <button onClick={goHome} className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
                 Back
               </button>
             )}
-            <div className="flex items-center gap-2 border-l border-gray-100 pl-4">
+            <div className="flex items-center gap-2 border-l border-gray-100 pl-3">
               <span className="text-xs text-gray-400">
                 {user.display_name}
                 <span className="ml-1 text-gray-300">({user.role})</span>
@@ -85,7 +107,7 @@ function AppContent() {
       <main className="max-w-5xl mx-auto">
         {view === 'sessions' && (
           <SessionList
-            sessions={sessions} exercises={exercises}
+            sessions={sessions} exercises={exercises} user={user}
             onSessionSelect={openSession} onExerciseSelect={openProgress}
             onUploadClick={() => setView('upload')}
             onDeleteSession={async (id) => {
@@ -105,6 +127,9 @@ function AppContent() {
         )}
         {view === 'progress' && selectedExercise && (
           <ProgressView exercise={selectedExercise} token={token} onBack={goHome} />
+        )}
+        {view === 'connections' && (
+          <ConnectionsView onBack={goHome} />
         )}
       </main>
     </div>
