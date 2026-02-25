@@ -25,6 +25,7 @@ python-decouple
 
 # Production Server
 gunicorn
+whitenoise
 
 # Development Tools
 pytest
