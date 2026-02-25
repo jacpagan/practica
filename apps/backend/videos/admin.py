@@ -1,11 +1,23 @@
 from django.contrib import admin
-from .models import Exercise, Session, Chapter
+from .models import Profile, Exercise, Session, Chapter, Comment
 
 
 class ChapterInline(admin.TabularInline):
     model = Chapter
     extra = 0
     raw_id_fields = ['exercise']
+
+
+class CommentInline(admin.TabularInline):
+    model = Comment
+    extra = 0
+    raw_id_fields = ['user']
+
+
+@admin.register(Profile)
+class ProfileAdmin(admin.ModelAdmin):
+    list_display = ['user', 'role', 'display_name']
+    list_filter = ['role']
 
 
 @admin.register(Exercise)
@@ -16,9 +28,10 @@ class ExerciseAdmin(admin.ModelAdmin):
 
 @admin.register(Session)
 class SessionAdmin(admin.ModelAdmin):
-    list_display = ['title', 'recorded_at', 'chapter_count']
+    list_display = ['title', 'user', 'recorded_at', 'chapter_count']
     search_fields = ['title', 'description']
-    inlines = [ChapterInline]
+    list_filter = ['user']
+    inlines = [ChapterInline, CommentInline]
 
     def chapter_count(self, obj):
         return obj.chapters.count()
@@ -30,3 +43,10 @@ class ChapterAdmin(admin.ModelAdmin):
     list_display = ['__str__', 'session', 'exercise', 'timestamp_seconds']
     list_filter = ['exercise']
     raw_id_fields = ['session', 'exercise']
+
+
+@admin.register(Comment)
+class CommentAdmin(admin.ModelAdmin):
+    list_display = ['__str__', 'session', 'user', 'timestamp_seconds', 'created_at']
+    list_filter = ['user']
+    raw_id_fields = ['session', 'user']
