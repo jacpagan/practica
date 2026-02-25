@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import VideoRecorder from './VideoRecorder'
 
 const fmtTime = (s) => {
   const m = Math.floor(s / 60)
@@ -34,13 +35,14 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
   const [commentText, setCommentText] = useState('')
   const [commentAtTimestamp, setCommentAtTimestamp] = useState(false)
   const [commentVideoFile, setCommentVideoFile] = useState(null)
+  const [commentVideoPreview, setCommentVideoPreview] = useState(null)
+  const [showRecorder, setShowRecorder] = useState(false)
   const [submittingComment, setSubmittingComment] = useState(false)
 
-  // Tab state
-  const [tab, setTab] = useState('chapters') // chapters | comments
+  // Tab
+  const [tab, setTab] = useState('chapters')
 
   const videoRef = useRef(null)
-
   const authHeaders = token ? { 'Authorization': `Token ${token}` } : {}
 
   const refreshSession = async () => {
@@ -56,13 +58,8 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
 
   useEffect(() => { refreshSession() }, [initialSession.id])
 
-  const handleTimeUpdate = () => {
-    if (videoRef.current) setCurrentTime(videoRef.current.currentTime)
-  }
-
-  const seekTo = (seconds) => {
-    if (videoRef.current) { videoRef.current.currentTime = seconds; videoRef.current.play() }
-  }
+  const handleTimeUpdate = () => { if (videoRef.current) setCurrentTime(videoRef.current.currentTime) }
+  const seekTo = (seconds) => { if (videoRef.current) { videoRef.current.currentTime = seconds; videoRef.current.play() } }
 
   // ── Chapter actions ──
 
@@ -78,8 +75,7 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
     setChapterExercise(value)
     setSuggestions(value.length > 0
       ? exercises.filter(e => e.name.toLowerCase().includes(value.toLowerCase()))
-      : []
-    )
+      : [])
   }
 
   const addChapter = async () => {
@@ -88,32 +84,29 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
       const res = await fetch(`/api/sessions/${session.id}/add_chapter/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({
-          exercise_name: chapterExercise.trim(),
-          timestamp_seconds: chapterTimestamp,
-          notes: chapterNotes.trim(),
-        }),
+        body: JSON.stringify({ exercise_name: chapterExercise.trim(), timestamp_seconds: chapterTimestamp, notes: chapterNotes.trim() }),
       })
-      if (res.ok) {
-        const data = await res.json()
-        setSession(data); onSessionUpdate(data)
-        setShowAddChapter(false)
-        setSuggestions([])
-      }
+      if (res.ok) { const d = await res.json(); setSession(d); onSessionUpdate(d); setShowAddChapter(false); setSuggestions([]) }
     } catch { alert('Error adding chapter.') }
   }
 
   const removeChapter = async (chapterId) => {
     if (!confirm('Remove this chapter?')) return
     try {
-      const res = await fetch(`/api/sessions/${session.id}/chapters/${chapterId}/`, {
-        method: 'DELETE', headers: authHeaders
-      })
+      const res = await fetch(`/api/sessions/${session.id}/chapters/${chapterId}/`, { method: 'DELETE', headers: authHeaders })
       if (res.ok) { const d = await res.json(); setSession(d); onSessionUpdate(d) }
     } catch { alert('Error removing chapter.') }
   }
 
   // ── Comment actions ──
+
+  const resetCommentForm = () => {
+    setCommentText('')
+    setCommentAtTimestamp(false)
+    setCommentVideoFile(null)
+    setCommentVideoPreview(null)
+    setShowRecorder(false)
+  }
 
   const addComment = async () => {
     if (!commentText.trim()) return
@@ -124,16 +117,11 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
       if (commentAtTimestamp) fd.append('timestamp_seconds', Math.floor(currentTime))
       if (commentVideoFile) fd.append('video_reply', commentVideoFile)
 
-      const res = await fetch(`/api/sessions/${session.id}/add_comment/`, {
-        method: 'POST', body: fd,
-        headers: authHeaders,
-      })
+      const res = await fetch(`/api/sessions/${session.id}/add_comment/`, { method: 'POST', body: fd, headers: authHeaders })
       if (res.ok) {
         const data = await res.json()
         setSession(data); onSessionUpdate(data)
-        setCommentText('')
-        setCommentAtTimestamp(false)
-        setCommentVideoFile(null)
+        resetCommentForm()
       } else {
         const err = await res.json()
         alert(err.error || 'Failed to add comment')
@@ -145,11 +133,21 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
   const removeComment = async (commentId) => {
     if (!confirm('Delete this comment?')) return
     try {
-      const res = await fetch(`/api/sessions/${session.id}/comments/${commentId}/`, {
-        method: 'DELETE', headers: authHeaders
-      })
+      const res = await fetch(`/api/sessions/${session.id}/comments/${commentId}/`, { method: 'DELETE', headers: authHeaders })
       if (res.ok) { const d = await res.json(); setSession(d); onSessionUpdate(d) }
     } catch { alert('Error deleting comment.') }
+  }
+
+  const handleVideoRecorded = (file, previewUrl) => {
+    setCommentVideoFile(file)
+    setCommentVideoPreview(previewUrl)
+    setShowRecorder(false)
+  }
+
+  const removeAttachedVideo = () => {
+    if (commentVideoPreview) URL.revokeObjectURL(commentVideoPreview)
+    setCommentVideoFile(null)
+    setCommentVideoPreview(null)
   }
 
   const chapters = session.chapters || []
@@ -162,16 +160,13 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
       <div className="mb-4">
         <h1 className="text-lg font-semibold text-gray-900">{session.title}</h1>
         {session.description && <p className="text-sm text-gray-500 mt-0.5">{session.description}</p>}
-        {session.owner && (
-          <p className="text-xs text-gray-400 mt-1">by {session.owner.display_name}</p>
-        )}
+        {session.owner && <p className="text-xs text-gray-400 mt-1">by {session.owner.display_name}</p>}
       </div>
 
       {/* Video player */}
       <div className="mb-4">
         <div className="aspect-video bg-black rounded-lg overflow-hidden">
-          <video ref={videoRef} src={videoUrl(session.video_file)} controls className="w-full h-full"
-            onTimeUpdate={handleTimeUpdate} />
+          <video ref={videoRef} src={videoUrl(session.video_file)} controls className="w-full h-full" onTimeUpdate={handleTimeUpdate} />
         </div>
         {chapters.length > 0 && videoRef.current?.duration > 0 && (
           <div className="mt-1 h-1 bg-gray-100 rounded-full relative overflow-hidden">
@@ -180,25 +175,20 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
               const width = ch.end_seconds ? ((ch.end_seconds - ch.timestamp_seconds) / videoRef.current.duration) * 100 : 2
               return <div key={ch.id} onClick={() => seekTo(ch.timestamp_seconds)}
                 className="absolute top-0 h-full bg-gray-400 hover:bg-gray-600 cursor-pointer rounded-full transition-colors"
-                style={{ left: `${left}%`, width: `${Math.max(width, 1)}%` }}
-                title={ch.exercise_name || ch.title} />
+                style={{ left: `${left}%`, width: `${Math.max(width, 1)}%` }} title={ch.exercise_name || ch.title} />
             })}
           </div>
         )}
       </div>
 
-      {/* Tabs: Chapters | Comments */}
+      {/* Tabs */}
       <div className="flex gap-1 mb-4 border-b border-gray-100">
         <button onClick={() => setTab('chapters')}
-          className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-            tab === 'chapters' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'
-          }`}>
+          className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === 'chapters' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
           Chapters{chapters.length > 0 && <span className="ml-1 text-gray-400 font-normal">{chapters.length}</span>}
         </button>
         <button onClick={() => setTab('comments')}
-          className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-            tab === 'comments' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'
-          }`}>
+          className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === 'comments' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
           Feedback{comments.length > 0 && <span className="ml-1 text-gray-400 font-normal">{comments.length}</span>}
         </button>
       </div>
@@ -208,8 +198,7 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
         <>
           <div className="flex items-center justify-between mb-3">
             <span />
-            <button onClick={openAddChapter}
-              className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+            <button onClick={openAddChapter} className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
               + Add at {fmtTime(currentTime)}
             </button>
           </div>
@@ -285,78 +274,172 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
         </>
       )}
 
-      {/* ── COMMENTS / FEEDBACK TAB ── */}
+      {/* ── FEEDBACK TAB ── */}
       {tab === 'comments' && (
         <>
-          {/* Add comment form */}
-          <div className="mb-4 p-4 bg-gray-50 rounded-xl space-y-3">
-            <textarea value={commentText} onChange={(e) => setCommentText(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white resize-none"
-              rows={2} placeholder={user?.role === 'teacher' ? 'Leave feedback for your student...' : 'Add a note...'} />
+          {/* ── Compose ── */}
+          <div className="mb-6">
+            <div className="rounded-2xl border border-gray-200 overflow-hidden transition-all">
+              {/* Text input */}
+              <textarea
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                className="w-full px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none resize-none border-0"
+                rows={2}
+                placeholder={user?.role === 'teacher' ? 'Leave feedback for your student...' : 'Add a note...'}
+              />
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
-                  <input type="checkbox" checked={commentAtTimestamp} onChange={(e) => setCommentAtTimestamp(e.target.checked)}
-                    className="rounded border-gray-300" />
-                  At {fmtTime(currentTime)}
-                </label>
+              {/* Attached video preview */}
+              {commentVideoFile && !showRecorder && (
+                <div className="mx-3 mb-3">
+                  <div className="relative rounded-xl overflow-hidden bg-gray-950 inline-block max-w-xs">
+                    <video
+                      src={commentVideoPreview}
+                      className="w-full rounded-xl"
+                      controls
+                      playsInline
+                    />
+                    <button
+                      onClick={removeAttachedVideo}
+                      className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center transition-colors"
+                    >
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              )}
 
-                <label className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
-                  <input type="file" accept="video/*" className="hidden"
-                    onChange={(e) => setCommentVideoFile(e.target.files[0])} />
-                  {commentVideoFile ? `📎 ${commentVideoFile.name}` : '📎 Attach video'}
-                </label>
+              {/* Video recorder */}
+              {showRecorder && (
+                <div className="mx-3 mb-3">
+                  <VideoRecorder
+                    onRecorded={handleVideoRecorded}
+                    onCancel={() => setShowRecorder(false)}
+                    maxDuration={60}
+                  />
+                </div>
+              )}
+
+              {/* Toolbar */}
+              <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100 bg-gray-50/50">
+                <div className="flex items-center gap-1">
+                  {/* Timestamp toggle */}
+                  <button
+                    onClick={() => setCommentAtTimestamp(!commentAtTimestamp)}
+                    className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-all ${
+                      commentAtTimestamp
+                        ? 'bg-gray-900 text-white'
+                        : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                    }`}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {fmtTime(currentTime)}
+                  </button>
+
+                  {/* Record video button */}
+                  {!showRecorder && !commentVideoFile && (
+                    <button
+                      onClick={() => { setShowRecorder(true); if (videoRef.current) videoRef.current.pause() }}
+                      className="flex items-center gap-1.5 text-xs text-gray-500 hover:bg-gray-100 hover:text-gray-700 px-2.5 py-1.5 rounded-lg transition-all"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+                      </svg>
+                      Record video
+                    </button>
+                  )}
+
+                  {/* Video attached indicator */}
+                  {commentVideoFile && !showRecorder && (
+                    <span className="flex items-center gap-1 text-xs text-green-600 px-2.5 py-1.5">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Video attached
+                    </span>
+                  )}
+                </div>
+
+                {/* Send */}
+                <button
+                  onClick={addComment}
+                  disabled={!commentText.trim() || submittingComment}
+                  className="text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 disabled:opacity-30 px-4 py-1.5 rounded-lg transition-all active:scale-95"
+                >
+                  {submittingComment ? (
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Sending
+                    </span>
+                  ) : 'Send'}
+                </button>
               </div>
-
-              <button onClick={addComment} disabled={!commentText.trim() || submittingComment}
-                className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-1.5 hover:bg-gray-800 disabled:opacity-40 transition-colors">
-                {submittingComment ? 'Sending...' : 'Send'}
-              </button>
             </div>
           </div>
 
-          {/* Comment list */}
-          <div className="space-y-3">
+          {/* ── Comment thread ── */}
+          <div className="space-y-1">
             {comments.map(comment => (
               <div key={comment.id} className="group">
-                <div className="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors">
-                  {/* Avatar placeholder */}
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0 ${
-                    comment.role === 'teacher' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+                <div className="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50/80 transition-colors">
+                  {/* Avatar */}
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 ${
+                    comment.role === 'teacher'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-gray-100 text-gray-600'
                   }`}>
                     {(comment.display_name || comment.username)[0].toUpperCase()}
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900">{comment.display_name || comment.username}</span>
+                    {/* Header */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-gray-900">
+                        {comment.display_name || comment.username}
+                      </span>
                       {comment.role === 'teacher' && (
-                        <span className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">Teacher</span>
+                        <span className="text-[10px] font-medium uppercase tracking-wider bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">
+                          Teacher
+                        </span>
                       )}
-                      <span className="text-xs text-gray-400">{fmtDate(comment.created_at)}</span>
+                      {comment.timestamp_seconds !== null && (
+                        <button
+                          onClick={() => seekTo(comment.timestamp_seconds)}
+                          className="text-[11px] font-mono text-gray-400 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-1.5 py-0.5 rounded transition-all"
+                        >
+                          {fmtTime(comment.timestamp_seconds)}
+                        </button>
+                      )}
+                      <span className="text-xs text-gray-300">{fmtDate(comment.created_at)}</span>
                     </div>
 
-                    {comment.timestamp_seconds !== null && (
-                      <button onClick={() => seekTo(comment.timestamp_seconds)}
-                        className="text-xs text-gray-500 hover:text-gray-900 mt-0.5 font-mono transition-colors">
-                        @ {fmtTime(comment.timestamp_seconds)}
-                      </button>
-                    )}
+                    {/* Text */}
+                    <p className="text-sm text-gray-700 mt-1 leading-relaxed">{comment.text}</p>
 
-                    <p className="text-sm text-gray-700 mt-1">{comment.text}</p>
-
+                    {/* Video reply */}
                     {comment.video_reply && (
-                      <div className="mt-2 max-w-xs">
-                        <video src={videoUrl(comment.video_reply)} controls
-                          className="w-full rounded-lg border border-gray-200" />
+                      <div className="mt-3 max-w-sm">
+                        <div className="rounded-xl overflow-hidden bg-gray-950 border border-gray-800">
+                          <video
+                            src={videoUrl(comment.video_reply)}
+                            controls
+                            playsInline
+                            className="w-full"
+                            preload="metadata"
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
 
-                  {(comment.username === user?.username || user?.role === 'teacher') && (
+                  {/* Delete */}
+                  {(comment.username === user?.username) && (
                     <button onClick={() => removeComment(comment.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-red-400 transition-all flex-shrink-0">
+                      className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-300 hover:text-red-400 transition-all flex-shrink-0 mt-0.5">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
                       </svg>
@@ -368,10 +451,12 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
           </div>
 
           {comments.length === 0 && (
-            <div className="text-center py-10">
+            <div className="text-center py-12">
               <p className="text-sm text-gray-400">No feedback yet</p>
               <p className="text-xs text-gray-400 mt-1">
-                {user?.role === 'teacher' ? 'Watch the video and leave feedback for your student' : 'Your teacher can leave feedback here'}
+                {user?.role === 'teacher'
+                  ? 'Watch the video and leave feedback for your student'
+                  : 'Your teacher can leave feedback here'}
               </p>
             </div>
           )}
