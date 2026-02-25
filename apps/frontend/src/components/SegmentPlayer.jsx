@@ -1,6 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react'
-
-const fmtTime = (s) => `${Math.floor(s / 60)}:${(Math.floor(s % 60)).toString().padStart(2, '0')}`
+import { fmtTime } from '../utils'
 
 function SegmentPlayer({ src, start = 0, end = null, className = '' }) {
   const ref = useRef(null)

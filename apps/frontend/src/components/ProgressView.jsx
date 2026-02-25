@@ -1,18 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import SegmentPlayer from './SegmentPlayer'
 import { authHeaders } from '../auth'
-
-const fmtTime = (s) => `${Math.floor(s / 60)}:${(Math.floor(s % 60)).toString().padStart(2, '0')}`
-const fmtDate = (d) => new Date(d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-const videoUrl = (path) => path?.startsWith('/media/') ? `http://localhost:8000${path}` : path
-
-const fmtDuration = (start, end) => {
-  if (end == null) return null
-  const d = end - start
-  if (d <= 0) return null
-  if (d < 60) return `${d}s`
-  return `${Math.floor(d / 60)}m ${d % 60}s`
-}
+import { fmtTime, fmtDateLong, videoUrl, fmtDuration } from '../utils'
 
 function ProgressView({ exercise, token, onBack }) {
   const [data, setData] = useState(null)
@@ -78,7 +67,7 @@ function ProgressView({ exercise, token, onBack }) {
                 <div className="mt-1.5">
                   <p className="text-xs font-medium text-gray-700">{ch.session_title}</p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-gray-400">{fmtDate(ch.session_date)}</span>
+                    <span className="text-xs text-gray-400">{fmtDateLong(ch.session_date)}</span>
                     <span className="text-xs text-gray-300 font-mono">
                       {fmtTime(ch.timestamp_seconds)}
                       {ch.end_seconds && ` – ${fmtTime(ch.end_seconds)}`}
