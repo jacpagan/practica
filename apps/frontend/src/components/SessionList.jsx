@@ -60,7 +60,12 @@ function SessionList({ sessions, exercises, user, onSessionSelect, onExerciseSel
                     />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-medium text-gray-900 truncate">{session.title}</h3>
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="text-sm font-medium text-gray-900 truncate">{session.title}</h3>
+                      {session.has_unread && (
+                        <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" title="New feedback" />
+                      )}
+                    </div>
                     {session.description && (
                       <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{session.description}</p>
                     )}
@@ -69,8 +74,13 @@ function SessionList({ sessions, exercises, user, onSessionSelect, onExerciseSel
                       {session.chapter_count > 0 && (
                         <span className="text-xs text-gray-400">{session.chapter_count} chapters</span>
                       )}
+                      {session.comment_count > 0 && (
+                        <span className={`text-xs ${session.has_unread ? 'text-blue-500 font-medium' : 'text-gray-400'}`}>
+                          {session.comment_count} feedback
+                        </span>
+                      )}
                       {isTeacher && session.owner_name && (
-                        <span className="text-xs text-blue-500">{session.owner_name}</span>
+                        <span className="text-xs text-gray-400">{session.owner_name}</span>
                       )}
                     </div>
                   </div>

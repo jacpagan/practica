@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { useToast } from './Toast'
 
 function SessionUpload({ token, onComplete, onCancel }) {
+  const toast = useToast()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [videoFile, setVideoFile] = useState(null)
@@ -22,7 +24,7 @@ function SessionUpload({ token, onComplete, onCancel }) {
       })
       streamRef.current = stream
       if (videoRef.current) videoRef.current.srcObject = stream
-    } catch { alert('Could not access camera.') }
+    } catch { toast.error('Could not access camera') }
   }
 
   const stopWebcam = () => {
@@ -62,8 +64,8 @@ function SessionUpload({ token, onComplete, onCancel }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!title.trim()) return alert('Please enter a title.')
-    if (!videoFile) return alert('Please select or record a video.')
+    if (!title.trim()) return toast.error('Please enter a title')
+    if (!videoFile) return toast.error('Please select or record a video')
     setIsUploading(true)
     try {
       const fd = new FormData()
@@ -74,9 +76,9 @@ function SessionUpload({ token, onComplete, onCancel }) {
         method: 'POST', body: fd,
         headers: token ? { 'Authorization': `Token ${token}` } : {},
       })
-      if (res.ok) onComplete()
-      else alert('Upload failed.')
-    } catch { alert('Error uploading.') }
+      if (res.ok) { toast.success('Session uploaded'); onComplete() }
+      else toast.error('Upload failed')
+    } catch { toast.error('Error uploading') }
     finally { setIsUploading(false) }
   }
 
