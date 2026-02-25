@@ -1,40 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import VideoRecorder from './VideoRecorder'
-
-const fmtTime = (s) => {
-  const m = Math.floor(s / 60)
-  const sec = Math.floor(s % 60)
-  return `${m}:${sec.toString().padStart(2, '0')}`
-}
-
-const fmtDate = (d) => {
-  const date = new Date(d)
-  const now = new Date()
-  const diff = now - date
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-  if (days === 0) return 'Today'
-  if (days === 1) return 'Yesterday'
-  if (days < 7) return `${days}d ago`
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-const videoUrl = (path) => path?.startsWith('/media/') ? `http://localhost:8000${path}` : path
-
-const parseTimeInput = (str) => {
-  if (!str || !str.trim()) return null
-  const parts = str.split(':')
-  if (parts.length === 2) return Math.max(0, parseInt(parts[0] || 0) * 60 + parseInt(parts[1] || 0))
-  if (parts.length === 1) return Math.max(0, parseInt(parts[0] || 0))
-  return null
-}
-
-const fmtDuration = (start, end) => {
-  if (end == null) return null
-  const d = end - start
-  if (d <= 0) return null
-  if (d < 60) return `${d}s`
-  return `${Math.floor(d / 60)}m ${d % 60}s`
-}
+import { fmtTime, fmtDate, videoUrl, parseTimeInput, fmtDuration } from '../utils'
 
 function SessionDetail({ session: initialSession, exercises, token, user, onBack, onSessionUpdate }) {
   const [session, setSession] = useState(initialSession)

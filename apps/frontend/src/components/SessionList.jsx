@@ -1,9 +1,5 @@
 import React, { useState } from 'react'
-
-const formatDate = (d) => {
-  const date = new Date(d)
-  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-}
+import { fmtDateLong, videoUrl } from '../utils'
 
 function SessionList({ sessions, exercises, user, onSessionSelect, onExerciseSelect, onUploadClick, onDeleteSession }) {
   const isTeacher = user?.role === 'teacher'
@@ -57,7 +53,7 @@ function SessionList({ sessions, exercises, user, onSessionSelect, onExerciseSel
                 >
                   <div className="w-16 h-11 sm:w-24 sm:h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                     <video
-                      src={session.video_file?.startsWith('/media/') ? `http://localhost:8000${session.video_file}` : session.video_file}
+                      src={videoUrl(session.video_file)}
                       className="w-full h-full object-cover"
                       muted preload="metadata"
                       onLoadedMetadata={(e) => { e.target.currentTime = 1 }}
@@ -69,7 +65,7 @@ function SessionList({ sessions, exercises, user, onSessionSelect, onExerciseSel
                       <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{session.description}</p>
                     )}
                     <div className="flex items-center gap-3 mt-1">
-                      <span className="text-xs text-gray-400">{formatDate(session.recorded_at || session.created_at)}</span>
+                      <span className="text-xs text-gray-400">{fmtDateLong(session.recorded_at || session.created_at)}</span>
                       {session.chapter_count > 0 && (
                         <span className="text-xs text-gray-400">{session.chapter_count} chapters</span>
                       )}
