@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react'
 import VideoRecorder from './VideoRecorder'
+import { useToast } from './Toast'
 import { fmtTime, fmtDate, videoUrl, parseTimeInput, fmtDuration } from '../utils'
 
 function SessionDetail({ session: initialSession, exercises, token, user, onBack, onSessionUpdate }) {
+  const toast = useToast()
   const [session, setSession] = useState(initialSession)
   const [currentTime, setCurrentTime] = useState(0)
 
@@ -27,6 +29,17 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
 
   const videoRef = useRef(null)
   const authHeaders = token ? { 'Authorization': `Token ${token}` } : {}
+
+  const markSeen = async (sessionId) => {
+    try {
+      await fetch(`/api/sessions/${sessionId}/mark_seen/`, { method: 'POST', headers: authHeaders })
+    } catch {}
+  }
+
+  const switchTab = (t) => {
+    setTab(t)
+    if (t === 'comments') markSeen(session.id)
+  }
 
   const refreshSession = async () => {
     try {
@@ -63,7 +76,7 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
   }
 
   const addChapter = async () => {
-    if (!chapterExercise.trim()) return alert('Please enter an exercise name.')
+    if (!chapterExercise.trim()) return toast.error('Please enter an exercise name.')
     try {
       const res = await fetch(`/api/sessions/${session.id}/add_chapter/`, {
         method: 'POST',
@@ -75,16 +88,16 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
           notes: chapterNotes.trim(),
         }),
       })
-      if (res.ok) { const d = await res.json(); setSession(d); onSessionUpdate(d); setShowAddChapter(false); setSuggestions([]) }
-    } catch { alert('Error adding chapter.') }
+      if (res.ok) { const d = await res.json(); setSession(d); onSessionUpdate(d); setShowAddChapter(false); setSuggestions([]); toast.success('Chapter added') }
+    } catch { toast.error('Error adding chapter') }
   }
 
   const removeChapter = async (chapterId) => {
     if (!confirm('Remove this chapter?')) return
     try {
       const res = await fetch(`/api/sessions/${session.id}/chapters/${chapterId}/`, { method: 'DELETE', headers: authHeaders })
-      if (res.ok) { const d = await res.json(); setSession(d); onSessionUpdate(d) }
-    } catch { alert('Error removing chapter.') }
+      if (res.ok) { const d = await res.json(); setSession(d); onSessionUpdate(d); toast.success('Chapter removed') }
+    } catch { toast.error('Error removing chapter') }
   }
 
   // ── Comment actions ──
@@ -111,11 +124,12 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
         const data = await res.json()
         setSession(data); onSessionUpdate(data)
         resetCommentForm()
+        toast.success('Feedback posted')
       } else {
         const err = await res.json()
-        alert(err.error || 'Failed to add comment')
+        toast.error(err.error || 'Failed to add comment')
       }
-    } catch { alert('Error adding comment.') }
+    } catch { toast.error('Error adding comment') }
     finally { setSubmittingComment(false) }
   }
 
@@ -123,8 +137,8 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
     if (!confirm('Delete this comment?')) return
     try {
       const res = await fetch(`/api/sessions/${session.id}/comments/${commentId}/`, { method: 'DELETE', headers: authHeaders })
-      if (res.ok) { const d = await res.json(); setSession(d); onSessionUpdate(d) }
-    } catch { alert('Error deleting comment.') }
+      if (res.ok) { const d = await res.json(); setSession(d); onSessionUpdate(d); toast.success('Comment deleted') }
+    } catch { toast.error('Error deleting comment') }
   }
 
   const handleVideoRecorded = (file, previewUrl) => {
@@ -172,11 +186,11 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
 
       {/* Tabs */}
       <div className="flex gap-1 mb-4 border-b border-gray-100">
-        <button onClick={() => setTab('chapters')}
+        <button onClick={() => switchTab('chapters')}
           className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === 'chapters' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
           Chapters{chapters.length > 0 && <span className="ml-1 text-gray-400 font-normal">{chapters.length}</span>}
         </button>
-        <button onClick={() => setTab('comments')}
+        <button onClick={() => switchTab('comments')}
           className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === 'comments' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
           Feedback{comments.length > 0 && <span className="ml-1 text-gray-400 font-normal">{comments.length}</span>}
         </button>

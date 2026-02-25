@@ -15,7 +15,7 @@ from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
-from .models import Profile, Exercise, Session, Chapter, Comment, TeacherStudent, InviteCode
+from .models import Profile, Exercise, Session, Chapter, Comment, TeacherStudent, InviteCode, SessionLastSeen
 from .serializers import (
     UserSerializer, RegisterSerializer,
     ExerciseSerializer, SessionSerializer, SessionListSerializer,
@@ -198,10 +198,16 @@ class SessionViewSet(viewsets.ModelViewSet):
         qs = Session.objects.prefetch_related(
             'chapters', 'chapters__exercise',
             'comments', 'comments__user', 'comments__user__profile',
+            'last_seen_by',
         ).select_related('user', 'user__profile')
 
         visible = _visible_user_ids(self.request.user)
         return qs.filter(user_id__in=visible)
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['request'] = self.request
+        return ctx
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -307,6 +313,16 @@ class SessionViewSet(viewsets.ModelViewSet):
         )
         session.refresh_from_db()
         return Response(SessionSerializer(session).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'])
+    def mark_seen(self, request, pk=None):
+        """Mark feedback on this session as seen by the current user."""
+        session = self.get_object()
+        SessionLastSeen.objects.update_or_create(
+            user=request.user, session=session,
+            defaults={'seen_at': timezone.now()},
+        )
+        return Response({'status': 'ok'})
 
     @action(detail=True, methods=['delete'], url_path='comments/(?P<comment_id>[0-9]+)')
     def remove_comment(self, request, pk=None, comment_id=None):

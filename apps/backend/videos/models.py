@@ -98,6 +98,19 @@ class InviteCode(models.Model):
         return f"{self.code} ({self.created_by.username}) — {status}"
 
 
+class SessionLastSeen(models.Model):
+    """Tracks when a user last viewed a session's feedback."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='session_views')
+    session = models.ForeignKey('Session', on_delete=models.CASCADE, related_name='last_seen_by')
+    seen_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['user', 'session']
+
+    def __str__(self):
+        return f"{self.user.username} saw {self.session.title} at {self.seen_at}"
+
+
 class Comment(models.Model):
     """A timestamped comment on a session, optionally with a video reply."""
     session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='comments')

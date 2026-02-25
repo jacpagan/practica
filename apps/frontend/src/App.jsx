@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { AuthProvider, useAuth, authHeaders } from './auth'
+import { ToastProvider } from './components/Toast'
 import AuthForm from './components/AuthForm'
 import SessionList from './components/SessionList'
 import SessionUpload from './components/SessionUpload'
@@ -172,7 +173,9 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
     </AuthProvider>
   )
 }

@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import Profile, Exercise, Session, Chapter, Comment, TeacherStudent, InviteCode
+from .models import Profile, Exercise, Session, Chapter, Comment, TeacherStudent, InviteCode, SessionLastSeen
 
 
 class ProfileSerializer(serializers.ModelSerializer):
@@ -150,6 +150,8 @@ class SessionListSerializer(serializers.ModelSerializer):
     chapter_count = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
     owner_name = serializers.SerializerMethodField()
+    has_unread = serializers.SerializerMethodField()
+    last_comment_at = serializers.SerializerMethodField()
 
     class Meta:
         model = Session
@@ -157,6 +159,7 @@ class SessionListSerializer(serializers.ModelSerializer):
             'id', 'title', 'description', 'video_file',
             'duration_seconds', 'recorded_at', 'created_at',
             'chapter_count', 'comment_count', 'owner_name',
+            'has_unread', 'last_comment_at',
         ]
         read_only_fields = ['id', 'recorded_at', 'created_at']
 
@@ -170,6 +173,26 @@ class SessionListSerializer(serializers.ModelSerializer):
         if obj.user and hasattr(obj.user, 'profile') and obj.user.profile.display_name:
             return obj.user.profile.display_name
         return obj.user.username if obj.user else None
+
+    def get_has_unread(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        comments = obj.comments.all()
+        if not comments:
+            return False
+        latest_comment = max(c.created_at for c in comments)
+        try:
+            last_seen = obj.last_seen_by.get(user=request.user)
+            return latest_comment > last_seen.seen_at
+        except SessionLastSeen.DoesNotExist:
+            return True
+
+    def get_last_comment_at(self, obj):
+        comments = obj.comments.all()
+        if not comments:
+            return None
+        return max(c.created_at for c in comments).isoformat()
 
 
 class ProgressChapterSerializer(serializers.ModelSerializer):

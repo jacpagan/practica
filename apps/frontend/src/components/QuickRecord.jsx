@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { authHeaders } from '../auth'
+import { useToast } from './Toast'
 import { fmtTimer } from '../utils'
 
 const STEPS = { CAMERA: 'camera', RECORDING: 'recording', REVIEW: 'review', SAVE: 'save' }
 
 function QuickRecord({ token, exercises, onComplete, onCancel }) {
+  const toast = useToast()
   const [step, setStep] = useState(STEPS.CAMERA)
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState(null)
@@ -121,11 +123,12 @@ function QuickRecord({ token, exercises, onComplete, onCancel }) {
       const res = await fetch('/api/sessions/', { method: 'POST', body: fd, headers })
       if (res.ok) {
         const session = await res.json()
+        toast.success('Session saved')
         onComplete(session)
       } else {
-        alert('Failed to save session')
+        toast.error('Failed to save session')
       }
-    } catch { alert('Error saving.') }
+    } catch { toast.error('Error saving') }
     finally { setSaving(false) }
   }
 
