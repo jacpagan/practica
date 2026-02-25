@@ -20,6 +20,22 @@ const fmtDate = (d) => {
 
 const videoUrl = (path) => path?.startsWith('/media/') ? `http://localhost:8000${path}` : path
 
+const parseTimeInput = (str) => {
+  if (!str || !str.trim()) return null
+  const parts = str.split(':')
+  if (parts.length === 2) return Math.max(0, parseInt(parts[0] || 0) * 60 + parseInt(parts[1] || 0))
+  if (parts.length === 1) return Math.max(0, parseInt(parts[0] || 0))
+  return null
+}
+
+const fmtDuration = (start, end) => {
+  if (end == null) return null
+  const d = end - start
+  if (d <= 0) return null
+  if (d < 60) return `${d}s`
+  return `${Math.floor(d / 60)}m ${d % 60}s`
+}
+
 function SessionDetail({ session: initialSession, exercises, token, user, onBack, onSessionUpdate }) {
   const [session, setSession] = useState(initialSession)
   const [currentTime, setCurrentTime] = useState(0)
@@ -29,6 +45,7 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
   const [chapterExercise, setChapterExercise] = useState('')
   const [chapterNotes, setChapterNotes] = useState('')
   const [chapterTimestamp, setChapterTimestamp] = useState(0)
+  const [chapterEndTime, setChapterEndTime] = useState(null)
   const [suggestions, setSuggestions] = useState([])
 
   // Comment state
@@ -66,6 +83,7 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
   const openAddChapter = () => {
     if (videoRef.current) videoRef.current.pause()
     setChapterTimestamp(Math.floor(currentTime))
+    setChapterEndTime(null)
     setChapterExercise('')
     setChapterNotes('')
     setShowAddChapter(true)
@@ -84,7 +102,12 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
       const res = await fetch(`/api/sessions/${session.id}/add_chapter/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({ exercise_name: chapterExercise.trim(), timestamp_seconds: chapterTimestamp, notes: chapterNotes.trim() }),
+        body: JSON.stringify({
+          exercise_name: chapterExercise.trim(),
+          timestamp_seconds: chapterTimestamp,
+          end_seconds: chapterEndTime,
+          notes: chapterNotes.trim(),
+        }),
       })
       if (res.ok) { const d = await res.json(); setSession(d); onSessionUpdate(d); setShowAddChapter(false); setSuggestions([]) }
     } catch { alert('Error adding chapter.') }
@@ -205,11 +228,48 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
 
           {showAddChapter && (
             <div className="mb-4 p-4 bg-gray-50 rounded-xl space-y-3">
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                <span>Chapter at {fmtTime(chapterTimestamp)}</span>
-                <button onClick={() => { if (videoRef.current) setChapterTimestamp(Math.floor(videoRef.current.currentTime)) }}
-                  className="text-gray-900 underline">use current time</button>
+              {/* Time range */}
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-500 mb-1">Start</label>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={fmtTime(chapterTimestamp)}
+                      onChange={(e) => { const v = parseTimeInput(e.target.value); if (v !== null) setChapterTimestamp(v) }}
+                      className="w-20 px-2 py-1.5 text-sm font-mono text-center border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white"
+                    />
+                    <button
+                      onClick={() => { if (videoRef.current) setChapterTimestamp(Math.floor(videoRef.current.currentTime)) }}
+                      className="text-[11px] text-gray-400 hover:text-gray-900 whitespace-nowrap transition-colors"
+                    >now</button>
+                  </div>
+                </div>
+                <div className="text-gray-300 pb-1.5">→</div>
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-500 mb-1">End <span className="text-gray-400">(optional)</span></label>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={chapterEndTime !== null ? fmtTime(chapterEndTime) : ''}
+                      onChange={(e) => { setChapterEndTime(e.target.value ? parseTimeInput(e.target.value) : null) }}
+                      placeholder="—"
+                      className="w-20 px-2 py-1.5 text-sm font-mono text-center border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white placeholder-gray-300"
+                    />
+                    <button
+                      onClick={() => { if (videoRef.current) setChapterEndTime(Math.floor(videoRef.current.currentTime)) }}
+                      className="text-[11px] text-gray-400 hover:text-gray-900 whitespace-nowrap transition-colors"
+                    >now</button>
+                  </div>
+                </div>
+                {chapterEndTime !== null && chapterEndTime > chapterTimestamp && (
+                  <div className="pb-1.5">
+                    <span className="text-xs text-gray-400 font-mono">{fmtDuration(chapterTimestamp, chapterEndTime)}</span>
+                  </div>
+                )}
               </div>
+
+              {/* Exercise */}
               <div className="relative">
                 <label className="block text-xs text-gray-500 mb-1">Exercise</label>
                 <input type="text" value={chapterExercise} onChange={(e) => handleExerciseInput(e.target.value)}
@@ -226,12 +286,16 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
                   </div>
                 )}
               </div>
+
+              {/* Notes */}
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Notes</label>
                 <input type="text" value={chapterNotes} onChange={(e) => setChapterNotes(e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white"
                   placeholder="How did it go?" />
               </div>
+
+              {/* Actions */}
               <div className="flex gap-2">
                 <button onClick={() => setShowAddChapter(false)}
                   className="flex-1 text-sm text-gray-600 border border-gray-200 rounded-lg py-2 hover:bg-white transition-colors">Cancel</button>
@@ -247,12 +311,19 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
               return (
                 <div key={chapter.id} onClick={() => seekTo(chapter.timestamp_seconds)}
                   className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all group ${isActive ? 'bg-gray-100' : 'hover:bg-gray-50'}`}>
-                  <span className="text-xs text-gray-400 font-mono w-10 flex-shrink-0">{fmtTime(chapter.timestamp_seconds)}</span>
+                  <div className="flex flex-col items-center flex-shrink-0 w-12">
+                    <span className="text-xs text-gray-400 font-mono">{fmtTime(chapter.timestamp_seconds)}</span>
+                    {chapter.end_seconds && (
+                      <span className="text-[10px] text-gray-300 font-mono">{fmtTime(chapter.end_seconds)}</span>
+                    )}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm font-medium text-gray-900 truncate">{chapter.exercise_name || chapter.title || 'Untitled'}</h4>
                     {chapter.notes && <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{chapter.notes}</p>}
                   </div>
-                  {chapter.end_seconds && <span className="text-xs text-gray-300 flex-shrink-0">{fmtTime(chapter.end_seconds - chapter.timestamp_seconds)}</span>}
+                  {chapter.end_seconds && (
+                    <span className="text-xs text-gray-300 flex-shrink-0">{fmtDuration(chapter.timestamp_seconds, chapter.end_seconds)}</span>
+                  )}
                   {isActive && <span className="w-1.5 h-1.5 bg-gray-900 rounded-full flex-shrink-0" />}
                   <button onClick={(e) => { e.stopPropagation(); removeChapter(chapter.id) }}
                     className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-red-400 transition-all flex-shrink-0">

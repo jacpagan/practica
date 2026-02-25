@@ -1,16 +1,26 @@
 import React, { useState, useEffect } from 'react'
+import SegmentPlayer from './SegmentPlayer'
+import { authHeaders } from '../auth'
 
 const fmtTime = (s) => `${Math.floor(s / 60)}:${(Math.floor(s % 60)).toString().padStart(2, '0')}`
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 const videoUrl = (path) => path?.startsWith('/media/') ? `http://localhost:8000${path}` : path
 
-function ProgressView({ exercise, onBack }) {
+const fmtDuration = (start, end) => {
+  if (end == null) return null
+  const d = end - start
+  if (d <= 0) return null
+  if (d < 60) return `${d}s`
+  return `${Math.floor(d / 60)}m ${d % 60}s`
+}
+
+function ProgressView({ exercise, token, onBack }) {
   const [data, setData] = useState(null)
   const [compareLeft, setCompareLeft] = useState(null)
   const [compareRight, setCompareRight] = useState(null)
 
   useEffect(() => {
-    fetch(`/api/exercises/${exercise.id}/progress/`)
+    fetch(`/api/exercises/${exercise.id}/progress/`, { headers: authHeaders(token) })
       .then(r => r.json())
       .then(setData)
       .catch(() => {})
@@ -58,14 +68,24 @@ function ProgressView({ exercise, onBack }) {
             {[compareLeft, compareRight].map((ch, i) => (
               <div key={i}>
                 <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                  <video
-                    src={`${videoUrl(ch.session_video)}#t=${ch.timestamp_seconds}${ch.end_seconds ? `,${ch.end_seconds}` : ''}`}
-                    controls className="w-full h-full"
+                  <SegmentPlayer
+                    src={videoUrl(ch.session_video)}
+                    start={ch.timestamp_seconds}
+                    end={ch.end_seconds}
+                    className="w-full h-full"
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-1.5">{ch.session_title}</p>
-                <p className="text-xs text-gray-400">{fmtDate(ch.session_date)}</p>
-                {ch.notes && <p className="text-xs text-gray-400 mt-0.5 italic">"{ch.notes}"</p>}
+                <div className="mt-1.5">
+                  <p className="text-xs font-medium text-gray-700">{ch.session_title}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs text-gray-400">{fmtDate(ch.session_date)}</span>
+                    <span className="text-xs text-gray-300 font-mono">
+                      {fmtTime(ch.timestamp_seconds)}
+                      {ch.end_seconds && ` – ${fmtTime(ch.end_seconds)}`}
+                    </span>
+                  </div>
+                  {ch.notes && <p className="text-xs text-gray-500 mt-1 italic">"{ch.notes}"</p>}
+                </div>
               </div>
             ))}
           </div>
@@ -94,19 +114,27 @@ function ProgressView({ exercise, onBack }) {
               }`}
             >
               {/* Thumbnail */}
-              <div className="w-20 h-14 sm:w-24 sm:h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+              <div className="w-20 h-14 sm:w-24 sm:h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 relative">
                 <video
                   src={`${videoUrl(chapter.session_video)}#t=${chapter.timestamp_seconds}`}
                   className="w-full h-full object-cover"
                   muted preload="metadata"
                 />
+                {chapter.end_seconds && (
+                  <div className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[9px] font-mono px-1 py-0.5 rounded">
+                    {fmtDuration(chapter.timestamp_seconds, chapter.end_seconds)}
+                  </div>
+                )}
               </div>
 
               <div className="flex-1 min-w-0 py-0.5">
                 <h4 className="text-sm font-medium text-gray-900 truncate">{chapter.session_title}</h4>
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-xs text-gray-400">{fmtDate(chapter.session_date)}</span>
-                  <span className="text-xs text-gray-300">at {fmtTime(chapter.timestamp_seconds)}</span>
+                  <span className="text-xs text-gray-300 font-mono">
+                    {fmtTime(chapter.timestamp_seconds)}
+                    {chapter.end_seconds && ` – ${fmtTime(chapter.end_seconds)}`}
+                  </span>
                 </div>
                 {chapter.notes && (
                   <p className="text-xs text-gray-500 mt-1 line-clamp-1 italic">"{chapter.notes}"</p>
