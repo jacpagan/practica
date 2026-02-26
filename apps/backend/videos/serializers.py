@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from django.utils import timezone
 from rest_framework import serializers
 from .models import Profile, Exercise, Session, Chapter, Comment, TeacherStudent, InviteCode, SessionLastSeen, Tag
 
@@ -50,13 +51,23 @@ class RegisterSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, min_length=6)
     role = serializers.ChoiceField(choices=['student', 'teacher'], default='student')
     display_name = serializers.CharField(max_length=100, required=False, default='')
+    invite_code = serializers.CharField(max_length=8)
 
     def validate_username(self, value):
         if User.objects.filter(username__iexact=value).exists():
             raise serializers.ValidationError("Username already taken.")
         return value
 
+    def validate_invite_code(self, value):
+        code = value.strip().upper()
+        try:
+            invite = InviteCode.objects.get(code=code, used_by__isnull=True)
+        except InviteCode.DoesNotExist:
+            raise serializers.ValidationError("Invalid or already used invite code.")
+        return code
+
     def create(self, validated_data):
+        code = validated_data.pop('invite_code').strip().upper()
         user = User.objects.create_user(
             username=validated_data['username'],
             email=validated_data.get('email', ''),
@@ -67,6 +78,22 @@ class RegisterSerializer(serializers.Serializer):
             role=validated_data.get('role', 'student'),
             display_name=validated_data.get('display_name', ''),
         )
+
+        # Mark invite as used and auto-link teacher/student
+        invite = InviteCode.objects.get(code=code, used_by__isnull=True)
+        invite.used_by = user
+        invite.used_at = timezone.now()
+        invite.save()
+
+        creator = invite.created_by
+        creator_role = creator.profile.role if hasattr(creator, 'profile') else 'student'
+        new_role = validated_data.get('role', 'student')
+
+        if creator_role != new_role:
+            teacher = creator if creator_role == 'teacher' else user
+            student = user if creator_role == 'teacher' else creator
+            TeacherStudent.objects.get_or_create(teacher=teacher, student=student)
+
         return user
 
 

@@ -15,7 +15,7 @@ router.register(r'sessions', SessionViewSet, basename='session')
 router.register(r'exercises', ExerciseViewSet, basename='exercise')
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path(settings.ADMIN_URL, admin.site.urls),
     path('api/', include(router.urls)),
     path('api/auth/register/', register_view, name='register'),
     path('api/auth/login/', login_view, name='login'),

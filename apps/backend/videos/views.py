@@ -9,6 +9,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from django_ratelimit.decorators import ratelimit
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
@@ -54,6 +55,7 @@ def _can_modify_session(user, session):
 # ── Auth views ──────────────────────────────────────────────────────
 
 @csrf_exempt
+@ratelimit(key='ip', rate='5/h', method='POST', block=True)
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_view(request):
@@ -69,6 +71,7 @@ def register_view(request):
 
 
 @csrf_exempt
+@ratelimit(key='ip', rate='10/m', method='POST', block=True)
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):
