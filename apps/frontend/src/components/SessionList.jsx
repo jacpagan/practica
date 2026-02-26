@@ -30,12 +30,7 @@ const timeLabel = (dateStr) => {
 function SessionList({ sessions, exercises, user, spaces, activeSpace, onSessionSelect, onExerciseSelect, onUploadClick, onDeleteSession }) {
   const isTeacher = user?.role === 'teacher'
   const [tab, setTab] = useState('sessions')
-  const [filterTag, setFilterTag] = useState(null)
-
-  const allTags = [...new Set(sessions.flatMap(s => s.tag_names || []))].sort()
-  const filteredSessions = filterTag
-    ? sessions.filter(s => (s.tag_names || []).includes(filterTag))
-    : sessions
+  const filteredSessions = sessions
 
   const groupedSessions = useMemo(() => {
     const groups = []
@@ -79,33 +74,7 @@ function SessionList({ sessions, exercises, user, spaces, activeSpace, onSession
       {/* Sessions tab */}
       {tab === 'sessions' && (
         <>
-          {/* Tag filter pills */}
-          {allTags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-4">
-              <button
-                onClick={() => setFilterTag(null)}
-                className={`text-xs px-2.5 py-1 rounded-md transition-colors ${
-                  !filterTag ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >All</button>
-              {allTags.map(tag => (
-                <button
-                  key={tag}
-                  onClick={() => setFilterTag(filterTag === tag ? null : tag)}
-                  className={`text-xs px-2.5 py-1 rounded-md transition-colors ${
-                    filterTag === tag ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >{tag}</button>
-              ))}
-            </div>
-          )}
-
-          {filteredSessions.length === 0 && filterTag ? (
-            <div className="text-center py-12">
-              <p className="text-gray-400 text-sm mb-3">No sessions tagged "{filterTag}"</p>
-              <button onClick={() => setFilterTag(null)} className="text-sm text-gray-500 underline">Show all</button>
-            </div>
-          ) : sessions.length === 0 ? (
+          {sessions.length === 0 ? (
             <div className="text-center py-20">
               <p className="text-gray-400 text-sm mb-6">No sessions yet</p>
               <button
