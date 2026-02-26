@@ -23,6 +23,7 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
   const [chapterTimestamp, setChapterTimestamp] = useState(0)
   const [chapterEndTime, setChapterEndTime] = useState(null)
   const [suggestions, setSuggestions] = useState([])
+  const [editingChapter, setEditingChapter] = useState(null) // { id, exercise_name, notes, timestamp_seconds, end_seconds }
 
   // Comment state
   const [commentText, setCommentText] = useState('')
@@ -106,6 +107,40 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
       const res = await fetch(`/api/sessions/${session.id}/chapters/${chapterId}/`, { method: 'DELETE', headers: authHeaders })
       if (res.ok) { const d = await res.json(); setSession(d); onSessionUpdate(d); toast.success('Chapter removed') }
     } catch { toast.error('Error removing chapter') }
+  }
+
+  const startEditChapter = (chapter) => {
+    setEditingChapter({
+      id: chapter.id,
+      exercise_name: chapter.exercise_name || chapter.title || '',
+      notes: chapter.notes || '',
+      timestamp_seconds: chapter.timestamp_seconds,
+      end_seconds: chapter.end_seconds,
+    })
+  }
+
+  const saveEditChapter = async () => {
+    if (!editingChapter) return
+    try {
+      const res = await fetch(`/api/sessions/${session.id}/chapters/${editingChapter.id}/update/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({
+          exercise_name: editingChapter.exercise_name,
+          notes: editingChapter.notes,
+          timestamp_seconds: editingChapter.timestamp_seconds,
+          end_seconds: editingChapter.end_seconds,
+        }),
+      })
+      if (res.ok) {
+        const d = await res.json()
+        setSession(d); onSessionUpdate(d)
+        setEditingChapter(null)
+        toast.success('Chapter updated')
+      } else {
+        toast.error('Failed to update')
+      }
+    } catch { toast.error('Error updating chapter') }
   }
 
   // ── Comment actions ──
@@ -376,6 +411,48 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
           <div className="space-y-1">
             {chapters.map(chapter => {
               const isActive = activeChapter?.id === chapter.id
+              const isEditing = editingChapter?.id === chapter.id
+
+              if (isEditing) {
+                return (
+                  <div key={chapter.id} className="p-3 bg-gray-50 rounded-xl space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text" value={editingChapter.exercise_name}
+                        onChange={(e) => setEditingChapter(prev => ({ ...prev, exercise_name: e.target.value }))}
+                        className="flex-1 px-2 py-1.5 text-sm font-medium border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white"
+                        placeholder="Exercise name" autoFocus
+                        onKeyDown={(e) => e.key === 'Enter' && saveEditChapter()}
+                      />
+                      <input
+                        type="text" value={fmtTime(editingChapter.timestamp_seconds)}
+                        onChange={(e) => { const v = parseTimeInput(e.target.value); if (v !== null) setEditingChapter(prev => ({ ...prev, timestamp_seconds: v })) }}
+                        className="w-16 px-2 py-1.5 text-xs font-mono text-center border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white"
+                      />
+                      <input
+                        type="text" value={editingChapter.end_seconds ? fmtTime(editingChapter.end_seconds) : ''}
+                        onChange={(e) => setEditingChapter(prev => ({ ...prev, end_seconds: e.target.value ? parseTimeInput(e.target.value) : null }))}
+                        placeholder="end"
+                        className="w-16 px-2 py-1.5 text-xs font-mono text-center border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white placeholder-gray-300"
+                      />
+                    </div>
+                    <input
+                      type="text" value={editingChapter.notes}
+                      onChange={(e) => setEditingChapter(prev => ({ ...prev, notes: e.target.value }))}
+                      className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white"
+                      placeholder="Notes"
+                      onKeyDown={(e) => e.key === 'Enter' && saveEditChapter()}
+                    />
+                    <div className="flex gap-2">
+                      <button onClick={saveEditChapter}
+                        className="text-xs font-medium text-white bg-gray-900 px-3 py-1 rounded-md">Save</button>
+                      <button onClick={() => setEditingChapter(null)}
+                        className="text-xs text-gray-500 px-3 py-1">Cancel</button>
+                    </div>
+                  </div>
+                )
+              }
+
               return (
                 <div key={chapter.id} onClick={() => seekTo(chapter.timestamp_seconds)}
                   className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all group ${isActive ? 'bg-gray-100' : 'hover:bg-gray-50'}`}>
@@ -393,8 +470,16 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
                     <span className="text-xs text-gray-300 flex-shrink-0">{fmtDuration(chapter.timestamp_seconds, chapter.end_seconds)}</span>
                   )}
                   {isActive && <span className="w-1.5 h-1.5 bg-gray-900 rounded-full flex-shrink-0" />}
+                  <button onClick={(e) => { e.stopPropagation(); startEditChapter(chapter) }}
+                    className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-gray-600 transition-all flex-shrink-0"
+                    aria-label="Edit chapter">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                    </svg>
+                  </button>
                   <button onClick={(e) => { e.stopPropagation(); removeChapter(chapter.id) }}
-                    className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-red-400 transition-all flex-shrink-0">
+                    className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-red-400 transition-all flex-shrink-0"
+                    aria-label="Delete chapter">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
                     </svg>

@@ -326,6 +326,41 @@ class SessionViewSet(viewsets.ModelViewSet):
             return Response(SessionSerializer(session).data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(detail=True, methods=['patch'], url_path='chapters/(?P<chapter_id>[0-9]+)/update')
+    def update_chapter(self, request, pk=None, chapter_id=None):
+        session = self.get_object()
+        if not _can_modify_session(request.user, session):
+            return Response({'error': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
+        chapter = get_object_or_404(Chapter, pk=chapter_id, session=session)
+
+        exercise_name = request.data.get('exercise_name', '').strip()
+        if exercise_name:
+            exercise, _ = Exercise.objects.get_or_create(name__iexact=exercise_name, defaults={'name': exercise_name})
+            chapter.exercise = exercise
+
+        if 'notes' in request.data:
+            chapter.notes = request.data['notes'].strip()
+        if 'timestamp_seconds' in request.data:
+            try:
+                chapter.timestamp_seconds = max(0, int(request.data['timestamp_seconds']))
+            except (ValueError, TypeError):
+                pass
+        if 'end_seconds' in request.data:
+            end = request.data['end_seconds']
+            if end is not None and str(end).strip():
+                try:
+                    end = int(end)
+                    if end > chapter.timestamp_seconds:
+                        chapter.end_seconds = end
+                except (ValueError, TypeError):
+                    pass
+            else:
+                chapter.end_seconds = None
+
+        chapter.save()
+        session.refresh_from_db()
+        return Response(SessionSerializer(session).data)
+
     @action(detail=True, methods=['delete'], url_path='chapters/(?P<chapter_id>[0-9]+)')
     def remove_chapter(self, request, pk=None, chapter_id=None):
         session = self.get_object()
