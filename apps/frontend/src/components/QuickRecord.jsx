@@ -156,7 +156,10 @@ function QuickRecord({ token, exercises, onComplete, onCancel }) {
   // ── Save ──
   const saveSession = async () => {
     if (!recordedFile) return
-    const sessionTitle = title.trim() || `Practice — ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}`
+    const now = new Date()
+    const timeOfDay = now.getHours() < 12 ? 'Morning' : now.getHours() < 17 ? 'Afternoon' : 'Evening'
+    const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+    const sessionTitle = title.trim() || `${timeOfDay} Practice — ${dateStr}`
 
     setSaving(true)
     try {
@@ -292,7 +295,7 @@ function QuickRecord({ token, exercises, onComplete, onCancel }) {
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder={`Practice — ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}`}
+                placeholder={`${new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 17 ? 'Afternoon' : 'Evening'} Practice — ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}`}
                 className="w-full px-0 py-2 text-base font-medium text-gray-900 placeholder-gray-300 border-b border-gray-200 focus:border-gray-900 focus:outline-none transition-colors"
                 autoFocus
               />
