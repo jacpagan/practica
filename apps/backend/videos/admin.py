@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Profile, Exercise, Session, Chapter, Comment, TeacherStudent, InviteCode
+from .models import Profile, Exercise, Session, Chapter, Comment, TeacherStudent, InviteCode, Tag
 
 
 class ChapterInline(admin.TabularInline):
@@ -62,3 +62,9 @@ class TeacherStudentAdmin(admin.ModelAdmin):
 class InviteCodeAdmin(admin.ModelAdmin):
     list_display = ['code', 'created_by', 'used_by', 'created_at']
     list_filter = ['created_at']
+
+
+@admin.register(Tag)
+class TagAdmin(admin.ModelAdmin):
+    list_display = ['name', 'created_at']
+    search_fields = ['name']

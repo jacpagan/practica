@@ -30,12 +30,25 @@ class Exercise(models.Model):
         return self.name
 
 
+class Tag(models.Model):
+    """A freeform label for organizing sessions."""
+    name = models.CharField(max_length=100, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
 class Session(models.Model):
     """A practice session — typically one long recording."""
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sessions', null=True, blank=True)
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     video_file = models.FileField(upload_to='sessions/')
+    tags = models.ManyToManyField(Tag, blank=True, related_name='sessions')
     duration_seconds = models.IntegerField(null=True, blank=True)
     recorded_at = models.DateTimeField(auto_now_add=True)
     created_at = models.DateTimeField(auto_now_add=True)

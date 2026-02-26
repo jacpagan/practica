@@ -3,7 +3,13 @@ import { fmtDateLong, videoUrl } from '../utils'
 
 function SessionList({ sessions, exercises, user, onSessionSelect, onExerciseSelect, onUploadClick, onDeleteSession }) {
   const isTeacher = user?.role === 'teacher'
-  const [tab, setTab] = useState('sessions') // sessions | exercises
+  const [tab, setTab] = useState('sessions')
+  const [filterTag, setFilterTag] = useState(null)
+
+  const allTags = [...new Set(sessions.flatMap(s => s.tag_names || []))].sort()
+  const filteredSessions = filterTag
+    ? sessions.filter(s => (s.tag_names || []).includes(filterTag))
+    : sessions
 
   return (
     <div className="px-4 sm:px-6 py-4">
@@ -33,7 +39,33 @@ function SessionList({ sessions, exercises, user, onSessionSelect, onExerciseSel
       {/* Sessions tab */}
       {tab === 'sessions' && (
         <>
-          {sessions.length === 0 ? (
+          {/* Tag filter pills */}
+          {allTags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              <button
+                onClick={() => setFilterTag(null)}
+                className={`text-xs px-2.5 py-1 rounded-md transition-colors ${
+                  !filterTag ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >All</button>
+              {allTags.map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => setFilterTag(filterTag === tag ? null : tag)}
+                  className={`text-xs px-2.5 py-1 rounded-md transition-colors ${
+                    filterTag === tag ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >{tag}</button>
+              ))}
+            </div>
+          )}
+
+          {filteredSessions.length === 0 && filterTag ? (
+            <div className="text-center py-12">
+              <p className="text-gray-400 text-sm mb-3">No sessions tagged "{filterTag}"</p>
+              <button onClick={() => setFilterTag(null)} className="text-sm text-gray-500 underline">Show all</button>
+            </div>
+          ) : sessions.length === 0 ? (
             <div className="text-center py-20">
               <p className="text-gray-400 text-sm mb-6">No sessions yet</p>
               <button
@@ -45,7 +77,7 @@ function SessionList({ sessions, exercises, user, onSessionSelect, onExerciseSel
             </div>
           ) : (
             <div className="space-y-2">
-              {sessions.map(session => (
+              {filteredSessions.map(session => (
                 <div
                   key={session.id}
                   onClick={() => onSessionSelect(session)}
@@ -83,6 +115,15 @@ function SessionList({ sessions, exercises, user, onSessionSelect, onExerciseSel
                         <span className="text-xs text-gray-400">{session.owner_name}</span>
                       )}
                     </div>
+                    {(session.tag_names || []).length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {session.tag_names.map(tag => (
+                          <span key={tag} className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); if (confirm(`Delete "${session.title}"?`)) onDeleteSession(session.id) }}

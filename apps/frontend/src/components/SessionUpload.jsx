@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useToast } from './Toast'
+import TagInput from './TagInput'
 
 function SessionUpload({ token, onComplete, onCancel }) {
   const toast = useToast()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [tags, setTags] = useState([])
   const [videoFile, setVideoFile] = useState(null)
   const [isUploading, setIsUploading] = useState(false)
   const [recordingMode, setRecordingMode] = useState('file')
@@ -72,6 +74,7 @@ function SessionUpload({ token, onComplete, onCancel }) {
       fd.append('title', title.trim())
       fd.append('description', description.trim())
       fd.append('video_file', videoFile)
+      if (tags.length > 0) fd.append('tags', tags.join(','))
       const res = await fetch('/api/sessions/', {
         method: 'POST', body: fd,
         headers: token ? { 'Authorization': `Token ${token}` } : {},
@@ -98,6 +101,10 @@ function SessionUpload({ token, onComplete, onCancel }) {
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2}
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
               placeholder="What did you work on?" />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-600 mb-1.5">Tags</label>
+            <TagInput value={tags} onChange={setTags} token={token} placeholder="e.g. Drumming, Rudiments, Brando" />
           </div>
           <div>
             <label className="block text-sm text-gray-600 mb-2">Video</label>
