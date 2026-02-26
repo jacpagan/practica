@@ -9,6 +9,7 @@ import SessionDetail from './components/SessionDetail'
 import ProgressView from './components/ProgressView'
 import ConnectionsView from './components/ConnectionsView'
 import QuickRecord from './components/QuickRecord'
+import ScreenRecord from './components/ScreenRecord'
 
 function AppContent() {
   const { user, token, loading, logout, refreshUser } = useAuth()
@@ -106,6 +107,15 @@ function AppContent() {
     return (
       <QuickRecord
         token={token} exercises={exercises} spaces={spaces}
+        onComplete={handleQuickRecordComplete} onCancel={goHome}
+      />
+    )
+  }
+
+  if (view === 'screenRecord') {
+    return (
+      <ScreenRecord
+        token={token} spaces={spaces}
         onComplete={handleQuickRecordComplete} onCancel={goHome}
       />
     )
@@ -241,14 +251,25 @@ function AppContent() {
       </main>
 
       {view === 'sessions' && !isTeacher && (
-        <div className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-40">
+        <div className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-40 flex flex-col items-center gap-3">
+          {/* Screen record button — desktop only */}
+          <button
+            onClick={() => setView('screenRecord')}
+            className="w-10 h-10 rounded-full bg-gray-800 hover:bg-gray-700 shadow-lg flex items-center justify-center transition-all active:scale-90 hover:scale-105 hidden sm:flex"
+            title="Record screen"
+          >
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
+            </svg>
+          </button>
+          {/* Camera record button */}
           <button
             onClick={() => setView('quickRecord')}
             className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/30 flex items-center justify-center transition-all active:scale-90 hover:scale-105"
           >
             <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white rounded-full" />
           </button>
-          <p className="text-[10px] text-gray-400 text-center mt-1.5">Record</p>
+          <p className="text-[10px] text-gray-400 text-center">Record</p>
         </div>
       )}
     </div>
