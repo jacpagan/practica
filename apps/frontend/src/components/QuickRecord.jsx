@@ -14,6 +14,7 @@ function QuickRecord({ token, exercises, onComplete, onCancel }) {
   const [description, setDescription] = useState('')
   const [saving, setSaving] = useState(false)
   const [recordedFile, setRecordedFile] = useState(null)
+  const [facing, setFacing] = useState('environment') // 'environment' (back) or 'user' (front)
 
   const liveRef = useRef(null)
   const playbackRef = useRef(null)
@@ -22,6 +23,7 @@ function QuickRecord({ token, exercises, onComplete, onCancel }) {
   const chunksRef = useRef([])
   const timerRef = useRef(null)
   const blobUrlRef = useRef(null)
+  const facingRef = useRef('environment')
 
   const headers = authHeaders(token)
 
@@ -42,28 +44,72 @@ function QuickRecord({ token, exercises, onComplete, onCancel }) {
     if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
   }, [stopTimer, stopStream])
 
-  // ── Auto-open camera on mount ──
-  useEffect(() => { openCamera() }, [])
-
-  const openCamera = async () => {
+  // ── Camera ──
+  const openCamera = async (mode) => {
+    const facingMode = mode || facingRef.current
     setError(null)
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1920 }, height: { ideal: 1080 }, facingMode: 'environment' },
+        video: { width: { ideal: 1920 }, height: { ideal: 1080 }, facingMode },
         audio: true,
       })
       streamRef.current = stream
+      facingRef.current = facingMode
+      setFacing(facingMode)
       if (liveRef.current) {
         liveRef.current.srcObject = stream
         await liveRef.current.play()
       }
-      setStep(STEPS.CAMERA)
+      if (step !== STEPS.RECORDING) setStep(STEPS.CAMERA)
     } catch (e) {
       setError(e.name === 'NotAllowedError'
         ? 'Camera permission denied. Please allow access.'
         : 'Could not access camera.')
     }
   }
+
+  const flipCamera = async () => {
+    const newFacing = facingRef.current === 'environment' ? 'user' : 'environment'
+
+    if (step === STEPS.RECORDING && recorderRef.current?.state === 'recording') {
+      // Mid-recording flip: get new camera stream, replace video track
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1920 }, height: { ideal: 1080 }, facingMode: newFacing },
+          audio: false, // keep existing audio track
+        })
+        const newVideoTrack = newStream.getVideoTracks()[0]
+
+        // Replace video track in the live preview
+        if (liveRef.current?.srcObject) {
+          const oldVideoTrack = liveRef.current.srcObject.getVideoTracks()[0]
+          if (oldVideoTrack) oldVideoTrack.stop()
+          liveRef.current.srcObject.removeTrack(oldVideoTrack)
+          liveRef.current.srcObject.addTrack(newVideoTrack)
+        }
+
+        // Replace video track in the recorder's stream
+        if (streamRef.current) {
+          const oldVideoTrack = streamRef.current.getVideoTracks()[0]
+          if (oldVideoTrack) oldVideoTrack.stop()
+          streamRef.current.removeTrack(oldVideoTrack)
+          streamRef.current.addTrack(newVideoTrack)
+        }
+
+        facingRef.current = newFacing
+        setFacing(newFacing)
+      } catch {
+        toast.error('Could not switch camera')
+      }
+    } else {
+      // Not recording: just reopen camera
+      stopStream()
+      await openCamera(newFacing)
+    }
+  }
+
+  // Auto-open on mount
+  useEffect(() => { openCamera('environment') }, [])
 
   // ── Recording ──
   const startRecording = () => {
@@ -142,26 +188,26 @@ function QuickRecord({ token, exercises, onComplete, onCancel }) {
     onCancel()
   }
 
-  // ── Render ──
+  const isFront = facing === 'user'
+
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
 
       {/* ── CAMERA / RECORDING ── */}
       {(step === STEPS.CAMERA || step === STEPS.RECORDING) && (
         <>
-          {/* Live video fills screen */}
           <div className="flex-1 relative overflow-hidden">
             <video
               ref={liveRef}
               autoPlay muted playsInline
-              className="absolute inset-0 w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-cover transition-transform duration-200"
+              style={isFront ? { transform: 'scaleX(-1)' } : undefined}
             />
 
-            {/* Error overlay */}
             {error && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 px-6">
                 <p className="text-sm text-red-400 text-center mb-4">{error}</p>
-                <button onClick={openCamera} className="text-sm text-white/60 underline">Try again</button>
+                <button onClick={() => openCamera()} className="text-sm text-white/60 underline">Try again</button>
               </div>
             )}
 
@@ -175,7 +221,6 @@ function QuickRecord({ token, exercises, onComplete, onCancel }) {
                   </svg>
                 </button>
 
-                {/* Recording timer */}
                 {step === STEPS.RECORDING && (
                   <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full px-4 py-2">
                     <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
@@ -183,7 +228,16 @@ function QuickRecord({ token, exercises, onComplete, onCancel }) {
                   </div>
                 )}
 
-                <div className="w-10" />
+                {/* Flip camera button */}
+                <button
+                  onClick={flipCamera}
+                  className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform"
+                  aria-label="Flip camera"
+                >
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M20.016 4.656v4.992" />
+                  </svg>
+                </button>
               </div>
             </div>
           </div>
@@ -220,7 +274,6 @@ function QuickRecord({ token, exercises, onComplete, onCancel }) {
       {/* ── REVIEW & SAVE ── */}
       {(step === STEPS.REVIEW || step === STEPS.SAVE) && (
         <div className="flex-1 flex flex-col">
-          {/* Video preview */}
           <div className="flex-1 relative bg-black">
             <video
               ref={playbackRef}
@@ -228,13 +281,11 @@ function QuickRecord({ token, exercises, onComplete, onCancel }) {
               controls playsInline
               className="absolute inset-0 w-full h-full object-contain"
             />
-            {/* Duration badge */}
             <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm text-white text-xs font-mono px-3 py-1.5 rounded-full">
               {fmtTimer(elapsed)}
             </div>
           </div>
 
-          {/* Save form */}
           <div className="bg-white px-4 pt-5 pb-8 safe-bottom space-y-4">
             <div>
               <input
