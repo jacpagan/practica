@@ -48,7 +48,7 @@ function Thumbnail({ src, className = '' }) {
 }
 
 function SessionList({ sessions, exercises, user, spaces, activeSpace, onSessionSelect, onExerciseSelect, onUploadClick, onDeleteSession }) {
-  const isTeacher = user?.role === 'teacher'
+  
   const [tab, setTab] = useState('sessions')
 
   const groupedSessions = useMemo(() => {
@@ -136,7 +136,7 @@ function SessionList({ sessions, exercises, user, spaces, activeSpace, onSession
                                 {session.comment_count} fb
                               </span>
                             )}
-                            {isTeacher && session.owner_name && (
+                            {session.owner_name && (
                               <span className="text-xs text-gray-400">{session.owner_name}</span>
                             )}
                           </div>

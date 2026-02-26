@@ -35,11 +35,14 @@ export function AuthProvider({ children }) {
     return data.user
   }
 
-  const register = async ({ username, password, role, display_name, invite_code }) => {
+  const register = async ({ username, password, display_name, invite_code, invite_slug }) => {
+    const body = { username, password, display_name }
+    if (invite_code) body.invite_code = invite_code
+    if (invite_slug) body.invite_slug = invite_slug
     const res = await fetch('/api/auth/register/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password, role, display_name, invite_code }),
+      body: JSON.stringify(body),
     })
     if (!res.ok) {
       const err = await res.json()

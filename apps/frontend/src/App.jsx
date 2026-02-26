@@ -118,7 +118,7 @@ function AppContent() {
   if (loading) return <div className="min-h-screen bg-white flex items-center justify-center"><p className="text-sm text-gray-400">Loading...</p></div>
   if (!user) return <AuthForm />
 
-  const isTeacher = user.role === 'teacher'
+  // No roles — everyone can own spaces and follow spaces
 
   if (view === 'quickRecord') {
     return (
@@ -148,7 +148,7 @@ function AppContent() {
           <div className="flex items-center gap-3">
             {view === 'sessions' && (
               <>
-                {!isTeacher && (
+                {(
                   <button onClick={() => setView('upload')}
                     className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors hidden sm:block">
                     + Upload
@@ -198,7 +198,7 @@ function AppContent() {
                   {space.session_count > 0 && <span className="ml-1 opacity-60">{space.session_count}</span>}
                 </button>
               ))}
-              {!isTeacher && (
+              {(
                 <button
                   onClick={() => setShowCreateSpace(true)}
                   className="text-xs px-2 py-1.5 text-gray-400 hover:text-gray-600 transition-colors whitespace-nowrap"
@@ -226,7 +226,7 @@ function AppContent() {
         )}
 
         {/* Prompt to create first space */}
-        {view === 'sessions' && spaces.length === 0 && !isTeacher && !showCreateSpace && (
+        {view === 'sessions' && spaces.length === 0  && !showCreateSpace && (
           <div className="px-4 sm:px-6 pt-4">
             <button
               onClick={() => setShowCreateSpace(true)}
@@ -269,7 +269,7 @@ function AppContent() {
         )}
       </main>
 
-      {view === 'sessions' && !isTeacher && (
+      {view === 'sessions' && (
         <div className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-40 flex flex-col items-center gap-3">
           {/* Screen record button — desktop only */}
           <button

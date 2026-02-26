@@ -25,12 +25,11 @@ from .serializers import (
 
 
 def _visible_sessions_qs(user):
-    """Return a queryset of sessions visible to this user."""
-    if hasattr(user, 'profile') and user.profile.role == 'teacher':
-        space_ids = SpaceMember.objects.filter(user=user).values_list('space_id', flat=True)
-        return Session.objects.filter(space_id__in=space_ids)
-    else:
-        return Session.objects.filter(user=user)
+    """Sessions you can see: your own + sessions in spaces you follow."""
+    own = Session.objects.filter(user=user)
+    following_space_ids = SpaceMember.objects.filter(user=user).values_list('space_id', flat=True)
+    following = Session.objects.filter(space_id__in=following_space_ids)
+    return own.union(following)
 
 
 def _can_view_session(user, session):
@@ -38,7 +37,7 @@ def _can_view_session(user, session):
         return False
     if session.user_id == user.id:
         return True
-    if hasattr(user, 'profile') and user.profile.role == 'teacher':
+    if session.space_id:
         return SpaceMember.objects.filter(user=user, space_id=session.space_id).exists()
     return False
 
@@ -48,7 +47,7 @@ def _can_modify_session(user, session):
         return False
     if session.user_id == user.id:
         return True
-    if hasattr(user, 'profile') and user.profile.role == 'teacher':
+    if session.space_id:
         return SpaceMember.objects.filter(user=user, space_id=session.space_id).exists()
     return False
 
@@ -114,11 +113,17 @@ class SpaceViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        """Spaces you own + spaces you follow."""
         user = self.request.user
-        if hasattr(user, 'profile') and user.profile.role == 'teacher':
-            space_ids = SpaceMember.objects.filter(user=user).values_list('space_id', flat=True)
-            return Space.objects.filter(id__in=space_ids).prefetch_related('members', 'members__user', 'members__user__profile')
-        return Space.objects.filter(owner=user).prefetch_related('members', 'members__user', 'members__user__profile')
+        owned = Space.objects.filter(owner=user)
+        following_ids = SpaceMember.objects.filter(user=user).values_list('space_id', flat=True)
+        following = Space.objects.filter(id__in=following_ids)
+        return (owned | following).distinct().prefetch_related('members', 'members__user', 'members__user__profile')
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['request'] = self.request
+        return ctx
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
@@ -143,6 +148,44 @@ class SpaceViewSet(viewsets.ModelViewSet):
         if deleted[0] == 0:
             return Response({'error': 'Member not found'}, status=status.HTTP_404_NOT_FOUND)
         return Response(SpaceSerializer(space).data)
+
+
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def join_space(request, slug):
+    """Join a space by its permanent invite slug."""
+    try:
+        space = Space.objects.get(invite_slug=slug)
+    except Space.DoesNotExist:
+        return Response({'error': 'Space not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    if space.owner == request.user:
+        return Response({'error': 'You own this space'}, status=status.HTTP_400_BAD_REQUEST)
+
+    _, created = SpaceMember.objects.get_or_create(space=space, user=request.user)
+    return Response({
+        'message': f'Joined {space.name}' if created else f'Already in {space.name}',
+        'space': SpaceSerializer(space, context={'request': request}).data,
+    })
+
+
+@csrf_exempt
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def space_info(request, slug):
+    """Get basic info about a space from its invite slug (for signup page)."""
+    try:
+        space = Space.objects.get(invite_slug=slug)
+    except Space.DoesNotExist:
+        return Response({'error': 'Space not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    owner_name = space.owner.profile.display_name if hasattr(space.owner, 'profile') and space.owner.profile.display_name else space.owner.username
+    return Response({
+        'name': space.name,
+        'owner': owner_name,
+        'invite_slug': space.invite_slug,
+    })
 
 
 # ── Invite views (legacy support + space-scoped) ────────────────────
