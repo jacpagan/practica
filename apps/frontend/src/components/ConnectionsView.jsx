@@ -5,7 +5,8 @@ import { useToast } from './Toast'
 function ConnectionsView({ spaces = [], token, onBack, onSpacesChange }) {
   const { user } = useAuth()
   const toast = useToast()
-  const [inviteCodes, setInviteCodes] = useState({}) // spaceId -> code
+  const [inviteCodes, setInviteCodes] = useState({})
+  const [renamingSpace, setRenamingSpace] = useState(null) // { id, name }
   const [enterCode, setEnterCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [showCreateSpace, setShowCreateSpace] = useState(false)
@@ -71,6 +72,26 @@ function ConnectionsView({ spaces = [], token, onBack, onSpacesChange }) {
     } catch { toast.error('Error creating space') }
   }
 
+  const renameSpace = async (spaceId, newName) => {
+    if (!newName.trim()) return
+    try {
+      const res = await fetch(`/api/spaces/${spaceId}/`, {
+        method: 'PATCH', headers,
+        body: JSON.stringify({ name: newName.trim() }),
+      })
+      if (res.ok) { onSpacesChange(); toast.success('Space renamed') }
+    } catch { toast.error('Error renaming') }
+  }
+
+  const deleteSpace = async (spaceId, name) => {
+    if (!confirm(`Delete "${name}"? Sessions in this space will become unassigned.`)) return
+    try {
+      const res = await fetch(`/api/spaces/${spaceId}/`, { method: 'DELETE', headers: authHeaders(token) })
+      if (res.ok) { onSpacesChange(); toast.success(`"${name}" deleted`) }
+      else toast.error('Could not delete space')
+    } catch { toast.error('Error deleting') }
+  }
+
   const copyCode = (code) => {
     navigator.clipboard?.writeText(code)
     toast('Copied')
@@ -90,8 +111,33 @@ function ConnectionsView({ spaces = [], token, onBack, onSpacesChange }) {
         {spaces.map(space => (
           <div key={space.id} className="mb-4 p-4 rounded-xl border border-gray-200">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-gray-900">{space.name}</h3>
-              <span className="text-xs text-gray-400">{space.session_count} sessions</span>
+              {renamingSpace?.id === space.id ? (
+                <div className="flex items-center gap-2 flex-1">
+                  <input type="text" value={renamingSpace.name}
+                    onChange={(e) => setRenamingSpace(prev => ({ ...prev, name: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { renameSpace(space.id, renamingSpace.name); setRenamingSpace(null) } }}
+                    className="flex-1 px-2 py-1 text-sm font-semibold border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                    autoFocus />
+                  <button onClick={() => { renameSpace(space.id, renamingSpace.name); setRenamingSpace(null) }}
+                    className="text-xs font-medium text-white bg-gray-900 px-2 py-1 rounded-md">Save</button>
+                  <button onClick={() => setRenamingSpace(null)} className="text-xs text-gray-400">Cancel</button>
+                </div>
+              ) : (
+                <>
+                  <h3 className="text-sm font-semibold text-gray-900">{space.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400">{space.session_count} sessions</span>
+                    {!isTeacher && (
+                      <>
+                        <button onClick={() => setRenamingSpace({ id: space.id, name: space.name })}
+                          className="text-xs text-gray-400 hover:text-gray-600">Rename</button>
+                        <button onClick={() => deleteSpace(space.id, space.name)}
+                          className="text-xs text-gray-400 hover:text-red-500">Delete</button>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Members */}
