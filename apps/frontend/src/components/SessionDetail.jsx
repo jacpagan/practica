@@ -4,7 +4,7 @@ import TagInput from './TagInput'
 import { useToast } from './Toast'
 import { fmtTime, fmtDate, videoUrl, parseTimeInput, fmtDuration } from '../utils'
 
-function SessionDetail({ session: initialSession, exercises, token, user, onBack, onSessionUpdate }) {
+function SessionDetail({ session: initialSession, exercises, spaces = [], token, user, onBack, onSessionUpdate }) {
   const toast = useToast()
   const [session, setSession] = useState(initialSession)
   const [currentTime, setCurrentTime] = useState(0)
@@ -14,6 +14,7 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
   const [editTitle, setEditTitle] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [editTags, setEditTags] = useState([])
+  const [editSpace, setEditSpace] = useState('')
   const [saving, setSaving] = useState(false)
 
   // Chapter state
@@ -202,6 +203,7 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
     setEditTitle(session.title)
     setEditDescription(session.description || '')
     setEditTags(session.tag_names || [])
+    setEditSpace(session.space_id || '')
     setEditing(true)
   }
 
@@ -213,11 +215,11 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
     if (!editTitle.trim()) return toast.error('Title is required')
     setSaving(true)
     try {
-      // Update title + description via PATCH
+      // Update title + description + space via PATCH
       const res = await fetch(`/api/sessions/${session.id}/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({ title: editTitle.trim(), description: editDescription.trim() }),
+        body: JSON.stringify({ title: editTitle.trim(), description: editDescription.trim(), space: editSpace || null }),
       })
 
       // Update tags via set_tags
@@ -258,6 +260,23 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
               rows={2} placeholder="Description"
               className="w-full text-sm text-gray-600 border-b border-gray-200 focus:border-gray-400 focus:outline-none resize-none"
             />
+            {spaces.length > 0 && (
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Space</label>
+                <div className="flex flex-wrap gap-1.5">
+                  <button type="button" onClick={() => setEditSpace('')}
+                    className={`text-xs px-2.5 py-1 rounded-md transition-colors ${
+                      !editSpace ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    }`}>None</button>
+                  {spaces.map(s => (
+                    <button key={s.id} type="button" onClick={() => setEditSpace(s.id)}
+                      className={`text-xs px-2.5 py-1 rounded-md transition-colors ${
+                        editSpace === s.id ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}>{s.name}</button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div>
               <label className="block text-xs text-gray-500 mb-1">Tags</label>
               <TagInput value={editTags} onChange={setEditTags} token={token} />

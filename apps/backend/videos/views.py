@@ -267,6 +267,17 @@ class SessionViewSet(viewsets.ModelViewSet):
             tag, _ = Tag.objects.get_or_create(name__iexact=name, defaults={'name': name})
             session.tags.add(tag)
 
+    def perform_update(self, serializer):
+        space_id = self.request.data.get('space')
+        space = None
+        if space_id:
+            space = get_object_or_404(Space, pk=space_id, owner=self.request.user)
+        elif space_id == '' or space_id is None and 'space' in self.request.data:
+            space = None
+        else:
+            space = serializer.instance.space
+        serializer.save(space=space)
+
     def perform_destroy(self, instance):
         if instance.user_id != self.request.user.id:
             from rest_framework.exceptions import PermissionDenied

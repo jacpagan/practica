@@ -256,8 +256,8 @@ function AppContent() {
             onCancel={() => setView('sessions')} />
         )}
         {view === 'detail' && selectedSession && (
-          <SessionDetail session={selectedSession} exercises={exercises} token={token} user={user}
-            onBack={goHome} onSessionUpdate={(s) => { setSelectedSession(s); fetchExercises() }} />
+          <SessionDetail session={selectedSession} exercises={exercises} spaces={spaces} token={token} user={user}
+            onBack={goHome} onSessionUpdate={(s) => { setSelectedSession(s); fetchExercises(); fetchSpaces() }} />
         )}
         {view === 'progress' && selectedExercise && (
           <ErrorBoundary onBack={goHome}>
