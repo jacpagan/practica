@@ -133,7 +133,7 @@ function ProgressView({ exercise, token, onBack }) {
               <div className="flex-1 min-w-0 py-0.5">
                 <h4 className="text-sm font-medium text-gray-900 truncate">{chapter.session_title}</h4>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs text-gray-400">{fmtDate(chapter.session_date)}</span>
+                  <span className="text-xs text-gray-400">{fmtDateLong(chapter.session_date)}</span>
                   <span className="text-xs text-gray-300 font-mono">
                     {fmtTime(chapter.timestamp_seconds)}
                     {chapter.end_seconds && ` – ${fmtTime(chapter.end_seconds)}`}
