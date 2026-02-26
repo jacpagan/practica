@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.utils import timezone
 from rest_framework import serializers
-from .models import Profile, Exercise, Session, Chapter, Comment, TeacherStudent, InviteCode, SessionLastSeen, Tag
+from .models import Profile, Exercise, Session, Chapter, Comment, InviteCode, SessionLastSeen, Tag, Space, SpaceMember
 
 
 class ProfileSerializer(serializers.ModelSerializer):
@@ -10,17 +10,35 @@ class ProfileSerializer(serializers.ModelSerializer):
         fields = ['role', 'display_name']
 
 
+class SpaceSerializer(serializers.ModelSerializer):
+    session_count = serializers.SerializerMethodField()
+    members = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Space
+        fields = ['id', 'name', 'session_count', 'members', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+    def get_session_count(self, obj):
+        return obj.sessions.count()
+
+    def get_members(self, obj):
+        return [{
+            'id': m.user.id,
+            'display_name': m.user.profile.display_name if hasattr(m.user, 'profile') and m.user.profile.display_name else m.user.username,
+            'role': m.user.profile.role if hasattr(m.user, 'profile') else 'student',
+        } for m in obj.members.select_related('user', 'user__profile').all()]
+
+
 class UserSerializer(serializers.ModelSerializer):
     profile = ProfileSerializer(read_only=True)
     role = serializers.CharField(source='profile.role', read_only=True)
     display_name = serializers.SerializerMethodField()
-    linked_teachers = serializers.SerializerMethodField()
-    linked_students = serializers.SerializerMethodField()
+    spaces = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'profile', 'role', 'display_name',
-                  'linked_teachers', 'linked_students']
+        fields = ['id', 'username', 'email', 'profile', 'role', 'display_name', 'spaces']
         read_only_fields = ['id']
 
     def get_display_name(self, obj):
@@ -28,21 +46,12 @@ class UserSerializer(serializers.ModelSerializer):
             return obj.profile.display_name
         return obj.username
 
-    def get_linked_teachers(self, obj):
-        links = TeacherStudent.objects.filter(student=obj).select_related('teacher', 'teacher__profile')
-        return [_linked_user_data(link.teacher) for link in links]
-
-    def get_linked_students(self, obj):
-        links = TeacherStudent.objects.filter(teacher=obj).select_related('student', 'student__profile')
-        return [_linked_user_data(link.student) for link in links]
-
-
-def _linked_user_data(user):
-    name = user.username
-    if hasattr(user, 'profile') and user.profile.display_name:
-        name = user.profile.display_name
-    role = user.profile.role if hasattr(user, 'profile') else 'student'
-    return {'id': user.id, 'username': user.username, 'display_name': name, 'role': role}
+    def get_spaces(self, obj):
+        if hasattr(obj, 'profile') and obj.profile.role == 'teacher':
+            memberships = SpaceMember.objects.filter(user=obj).select_related('space')
+            return [{'id': m.space.id, 'name': m.space.name} for m in memberships]
+        else:
+            return [{'id': s.id, 'name': s.name} for s in obj.owned_spaces.all()]
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -61,7 +70,7 @@ class RegisterSerializer(serializers.Serializer):
     def validate_invite_code(self, value):
         code = value.strip().upper()
         try:
-            invite = InviteCode.objects.get(code=code, used_by__isnull=True)
+            InviteCode.objects.get(code=code, used_by__isnull=True)
         except InviteCode.DoesNotExist:
             raise serializers.ValidationError("Invalid or already used invite code.")
         return code
@@ -79,20 +88,14 @@ class RegisterSerializer(serializers.Serializer):
             display_name=validated_data.get('display_name', ''),
         )
 
-        # Mark invite as used and auto-link teacher/student
         invite = InviteCode.objects.get(code=code, used_by__isnull=True)
         invite.used_by = user
         invite.used_at = timezone.now()
         invite.save()
 
-        creator = invite.created_by
-        creator_role = creator.profile.role if hasattr(creator, 'profile') else 'student'
-        new_role = validated_data.get('role', 'student')
-
-        if creator_role != new_role:
-            teacher = creator if creator_role == 'teacher' else user
-            student = user if creator_role == 'teacher' else creator
-            TeacherStudent.objects.get_or_create(teacher=teacher, student=student)
+        # Auto-add teacher to the invite's space
+        if invite.space and validated_data.get('role') == 'teacher':
+            SpaceMember.objects.get_or_create(space=invite.space, user=user)
 
         return user
 
@@ -161,6 +164,8 @@ class SessionSerializer(serializers.ModelSerializer):
     chapters = ChapterSerializer(many=True, read_only=True)
     comments = CommentSerializer(many=True, read_only=True)
     tag_names = serializers.SerializerMethodField()
+    space_name = serializers.CharField(source='space.name', read_only=True, default=None)
+    space_id = serializers.IntegerField(source='space.id', read_only=True, default=None)
     chapter_count = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
     owner = serializers.SerializerMethodField()
@@ -170,7 +175,8 @@ class SessionSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'description', 'video_file',
             'duration_seconds', 'recorded_at', 'created_at', 'updated_at',
-            'tag_names', 'chapters', 'comments', 'chapter_count', 'comment_count', 'owner',
+            'space_id', 'space_name', 'tag_names',
+            'chapters', 'comments', 'chapter_count', 'comment_count', 'owner',
         ]
         read_only_fields = ['id', 'recorded_at', 'created_at', 'updated_at']
 
@@ -185,25 +191,26 @@ class SessionSerializer(serializers.ModelSerializer):
 
     def get_owner(self, obj):
         if obj.user:
-            return UserSerializer(obj.user).data
+            return {'id': obj.user.id, 'display_name': obj.user.profile.display_name if hasattr(obj.user, 'profile') and obj.user.profile.display_name else obj.user.username}
         return None
 
 
 class SessionListSerializer(serializers.ModelSerializer):
     tag_names = serializers.SerializerMethodField()
+    space_name = serializers.CharField(source='space.name', read_only=True, default=None)
+    space_id = serializers.IntegerField(source='space.id', read_only=True, default=None)
     chapter_count = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
     owner_name = serializers.SerializerMethodField()
     has_unread = serializers.SerializerMethodField()
-    last_comment_at = serializers.SerializerMethodField()
 
     class Meta:
         model = Session
         fields = [
             'id', 'title', 'description', 'video_file',
             'duration_seconds', 'recorded_at', 'created_at',
-            'tag_names', 'chapter_count', 'comment_count', 'owner_name',
-            'has_unread', 'last_comment_at',
+            'space_id', 'space_name', 'tag_names',
+            'chapter_count', 'comment_count', 'owner_name', 'has_unread',
         ]
         read_only_fields = ['id', 'recorded_at', 'created_at']
 
@@ -234,12 +241,6 @@ class SessionListSerializer(serializers.ModelSerializer):
             return latest_comment > last_seen.seen_at
         except SessionLastSeen.DoesNotExist:
             return True
-
-    def get_last_comment_at(self, obj):
-        comments = obj.comments.all()
-        if not comments:
-            return None
-        return max(c.created_at for c in comments).isoformat()
 
 
 class ProgressChapterSerializer(serializers.ModelSerializer):

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Profile, Exercise, Session, Chapter, Comment, TeacherStudent, InviteCode, Tag
+from .models import Profile, Exercise, Session, Chapter, Comment, InviteCode, Tag, Space, SpaceMember
 
 
 class ChapterInline(admin.TabularInline):
@@ -14,10 +14,23 @@ class CommentInline(admin.TabularInline):
     raw_id_fields = ['user']
 
 
+class SpaceMemberInline(admin.TabularInline):
+    model = SpaceMember
+    extra = 0
+    raw_id_fields = ['user']
+
+
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
     list_display = ['user', 'role', 'display_name']
     list_filter = ['role']
+
+
+@admin.register(Space)
+class SpaceAdmin(admin.ModelAdmin):
+    list_display = ['name', 'owner', 'created_at']
+    list_filter = ['owner']
+    inlines = [SpaceMemberInline]
 
 
 @admin.register(Exercise)
@@ -28,14 +41,10 @@ class ExerciseAdmin(admin.ModelAdmin):
 
 @admin.register(Session)
 class SessionAdmin(admin.ModelAdmin):
-    list_display = ['title', 'user', 'recorded_at', 'chapter_count']
+    list_display = ['title', 'user', 'space', 'recorded_at']
     search_fields = ['title', 'description']
-    list_filter = ['user']
+    list_filter = ['user', 'space']
     inlines = [ChapterInline, CommentInline]
-
-    def chapter_count(self, obj):
-        return obj.chapters.count()
-    chapter_count.short_description = 'Chapters'
 
 
 @admin.register(Chapter)
@@ -52,15 +61,9 @@ class CommentAdmin(admin.ModelAdmin):
     raw_id_fields = ['session', 'user']
 
 
-@admin.register(TeacherStudent)
-class TeacherStudentAdmin(admin.ModelAdmin):
-    list_display = ['teacher', 'student', 'created_at']
-    raw_id_fields = ['teacher', 'student']
-
-
 @admin.register(InviteCode)
 class InviteCodeAdmin(admin.ModelAdmin):
-    list_display = ['code', 'created_by', 'used_by', 'created_at']
+    list_display = ['code', 'created_by', 'space', 'used_by', 'created_at']
     list_filter = ['created_at']
 
 

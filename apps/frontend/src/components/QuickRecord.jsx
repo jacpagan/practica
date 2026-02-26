@@ -6,7 +6,7 @@ import { fmtTimer } from '../utils'
 
 const STEPS = { CAMERA: 'camera', RECORDING: 'recording', REVIEW: 'review', SAVE: 'save' }
 
-function QuickRecord({ token, exercises, onComplete, onCancel }) {
+function QuickRecord({ token, exercises, spaces = [], onComplete, onCancel }) {
   const toast = useToast()
   const [step, setStep] = useState(STEPS.CAMERA)
   const [elapsed, setElapsed] = useState(0)
@@ -14,6 +14,7 @@ function QuickRecord({ token, exercises, onComplete, onCancel }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [tags, setTags] = useState([])
+  const [selectedSpace, setSelectedSpace] = useState('')
   const [saving, setSaving] = useState(false)
   const [recordedFile, setRecordedFile] = useState(null)
   const [facing, setFacing] = useState('environment') // 'environment' (back) or 'user' (front)
@@ -171,6 +172,7 @@ function QuickRecord({ token, exercises, onComplete, onCancel }) {
       fd.append('video_file', recordedFile)
       fd.append('duration_seconds', elapsed)
       if (tags.length > 0) fd.append('tags', tags.join(','))
+      if (selectedSpace) fd.append('space', selectedSpace)
 
       const res = await fetch('/api/sessions/', { method: 'POST', body: fd, headers })
       if (res.ok) {
@@ -314,8 +316,18 @@ function QuickRecord({ token, exercises, onComplete, onCancel }) {
               />
             </div>
 
+            {spaces.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {spaces.map(s => (
+                  <button key={s.id} type="button" onClick={() => setSelectedSpace(selectedSpace === s.id ? '' : s.id)}
+                    className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                      selectedSpace === s.id ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}>{s.name}</button>
+                ))}
+              </div>
+            )}
             <div>
-              <TagInput value={tags} onChange={setTags} token={token} placeholder="e.g. Drumming, Production" />
+              <TagInput value={tags} onChange={setTags} token={token} placeholder="e.g. Rudiments, Warm-up" />
             </div>
 
             {recordedFile && (

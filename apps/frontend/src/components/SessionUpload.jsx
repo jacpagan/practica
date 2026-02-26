@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useToast } from './Toast'
 import TagInput from './TagInput'
 
-function SessionUpload({ token, onComplete, onCancel }) {
+function SessionUpload({ token, spaces = [], activeSpace, onComplete, onCancel }) {
+  const [selectedSpace, setSelectedSpace] = useState(activeSpace || '')
   const toast = useToast()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -75,6 +76,7 @@ function SessionUpload({ token, onComplete, onCancel }) {
       fd.append('description', description.trim())
       fd.append('video_file', videoFile)
       if (tags.length > 0) fd.append('tags', tags.join(','))
+      if (selectedSpace) fd.append('space', selectedSpace)
       const res = await fetch('/api/sessions/', {
         method: 'POST', body: fd,
         headers: token ? { 'Authorization': `Token ${token}` } : {},
@@ -102,9 +104,22 @@ function SessionUpload({ token, onComplete, onCancel }) {
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
               placeholder="What did you work on?" />
           </div>
+          {spaces.length > 0 && (
+            <div>
+              <label className="block text-sm text-gray-600 mb-1.5">Space</label>
+              <div className="flex flex-wrap gap-1.5">
+                {spaces.map(s => (
+                  <button key={s.id} type="button" onClick={() => setSelectedSpace(selectedSpace === s.id ? '' : s.id)}
+                    className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                      selectedSpace === s.id ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}>{s.name}</button>
+                ))}
+              </div>
+            </div>
+          )}
           <div>
             <label className="block text-sm text-gray-600 mb-1.5">Tags</label>
-            <TagInput value={tags} onChange={setTags} token={token} placeholder="e.g. Drumming, Rudiments, Brando" />
+            <TagInput value={tags} onChange={setTags} token={token} placeholder="e.g. Rudiments, Warm-up" />
           </div>
           <div>
             <label className="block text-sm text-gray-600 mb-2">Video</label>

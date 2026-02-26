@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { AuthProvider, useAuth, authHeaders } from './auth'
 import { ToastProvider } from './components/Toast'
+import { useToast } from './components/Toast'
 import AuthForm from './components/AuthForm'
 import SessionList from './components/SessionList'
 import SessionUpload from './components/SessionUpload'
@@ -11,15 +12,22 @@ import QuickRecord from './components/QuickRecord'
 
 function AppContent() {
   const { user, token, loading, logout, refreshUser } = useAuth()
+  const toast = useToast()
   const [sessions, setSessions] = useState([])
   const [exercises, setExercises] = useState([])
+  const [spaces, setSpaces] = useState([])
+  const [activeSpace, setActiveSpace] = useState(null) // null = all
   const [view, setView] = useState('sessions')
   const [selectedSession, setSelectedSession] = useState(null)
   const [selectedExercise, setSelectedExercise] = useState(null)
+  const [showCreateSpace, setShowCreateSpace] = useState(false)
+  const [newSpaceName, setNewSpaceName] = useState('')
 
   useEffect(() => {
-    if (user) { fetchSessions(); fetchExercises() }
+    if (user) { fetchSpaces(); fetchSessions(); fetchExercises() }
   }, [user])
+
+  useEffect(() => { fetchSessions() }, [activeSpace])
 
   useEffect(() => {
     const handler = () => refreshUser()
@@ -29,9 +37,18 @@ function AppContent() {
 
   const headers = authHeaders(token)
 
+  const fetchSpaces = async () => {
+    try {
+      const res = await fetch('/api/spaces/', { headers })
+      const data = await res.json()
+      setSpaces(data.results || data)
+    } catch (e) { console.error(e) }
+  }
+
   const fetchSessions = async () => {
     try {
-      const res = await fetch('/api/sessions/', { headers })
+      const url = activeSpace ? `/api/sessions/?space=${activeSpace}` : '/api/sessions/'
+      const res = await fetch(url, { headers })
       const data = await res.json()
       setSessions(data.results || data)
     } catch (e) { console.error(e) }
@@ -45,6 +62,22 @@ function AppContent() {
     } catch (e) { console.error(e) }
   }
 
+  const createSpace = async () => {
+    if (!newSpaceName.trim()) return
+    try {
+      const res = await fetch('/api/spaces/', {
+        method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newSpaceName.trim() }),
+      })
+      if (res.ok) {
+        setNewSpaceName('')
+        setShowCreateSpace(false)
+        fetchSpaces()
+        toast.success(`Space "${newSpaceName.trim()}" created`)
+      }
+    } catch { toast.error('Error creating space') }
+  }
+
   const openSession = (session) => { setSelectedSession(session); setView('detail') }
   const openProgress = (exercise) => { setSelectedExercise(exercise); setView('progress') }
 
@@ -54,6 +87,7 @@ function AppContent() {
     setSelectedExercise(null)
     fetchSessions()
     fetchExercises()
+    fetchSpaces()
   }
 
   const handleQuickRecordComplete = (session) => {
@@ -67,17 +101,12 @@ function AppContent() {
   if (!user) return <AuthForm />
 
   const isTeacher = user.role === 'teacher'
-  const linked = isTeacher ? (user.linked_students || []) : (user.linked_teachers || [])
-  const hasConnections = linked.length > 0
 
-  // QuickRecord is full-screen overlay — renders on top of everything
   if (view === 'quickRecord') {
     return (
       <QuickRecord
-        token={token}
-        exercises={exercises}
-        onComplete={handleQuickRecordComplete}
-        onCancel={goHome}
+        token={token} exercises={exercises} spaces={spaces}
+        onComplete={handleQuickRecordComplete} onCancel={goHome}
       />
     )
   }
@@ -99,11 +128,8 @@ function AppContent() {
                   </button>
                 )}
                 <button onClick={() => setView('connections')}
-                  className="relative text-sm text-gray-500 hover:text-gray-900 transition-colors">
-                  Connections
-                  {!hasConnections && (
-                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-400 rounded-full" />
-                  )}
+                  className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
+                  Spaces
                 </button>
               </>
             )}
@@ -113,10 +139,7 @@ function AppContent() {
               </button>
             )}
             <div className="flex items-center gap-2 border-l border-gray-100 pl-3">
-              <span className="text-xs text-gray-400">
-                {user.display_name}
-                <span className="ml-1 text-gray-300">({user.role})</span>
-              </span>
+              <span className="text-xs text-gray-400">{user.display_name}</span>
               <button onClick={logout} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
                 Log out
               </button>
@@ -126,9 +149,71 @@ function AppContent() {
       </header>
 
       <main className="max-w-5xl mx-auto pb-24">
+        {/* Space selector — shown on sessions view */}
+        {view === 'sessions' && spaces.length > 0 && (
+          <div className="px-4 sm:px-6 pt-3">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+              <button
+                onClick={() => setActiveSpace(null)}
+                className={`text-xs px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
+                  !activeSpace ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >All</button>
+              {spaces.map(space => (
+                <button
+                  key={space.id}
+                  onClick={() => setActiveSpace(activeSpace === space.id ? null : space.id)}
+                  className={`text-xs px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
+                    activeSpace === space.id ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {space.name}
+                  {space.session_count > 0 && <span className="ml-1 opacity-60">{space.session_count}</span>}
+                </button>
+              ))}
+              {!isTeacher && (
+                <button
+                  onClick={() => setShowCreateSpace(true)}
+                  className="text-xs px-2 py-1.5 text-gray-400 hover:text-gray-600 transition-colors whitespace-nowrap"
+                >+</button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Create space inline form */}
+        {showCreateSpace && (
+          <div className="px-4 sm:px-6 pt-2 pb-1">
+            <div className="flex gap-2">
+              <input
+                type="text" value={newSpaceName} onChange={(e) => setNewSpaceName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && createSpace()}
+                placeholder="e.g. Drumming, Production, Qigong"
+                className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                autoFocus
+              />
+              <button onClick={createSpace} className="text-xs font-medium text-white bg-gray-900 px-3 py-1.5 rounded-lg">Create</button>
+              <button onClick={() => { setShowCreateSpace(false); setNewSpaceName('') }} className="text-xs text-gray-400 px-2">Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {/* Prompt to create first space */}
+        {view === 'sessions' && spaces.length === 0 && !isTeacher && !showCreateSpace && (
+          <div className="px-4 sm:px-6 pt-4">
+            <button
+              onClick={() => setShowCreateSpace(true)}
+              className="w-full text-left p-3 rounded-xl border border-dashed border-gray-200 hover:border-gray-400 transition-colors"
+            >
+              <p className="text-sm font-medium text-gray-700">Create your first Space</p>
+              <p className="text-xs text-gray-400 mt-0.5">Spaces organize your practice — Drumming, Production, Qigong, etc.</p>
+            </button>
+          </div>
+        )}
+
         {view === 'sessions' && (
           <SessionList
-            sessions={sessions} exercises={exercises} user={user}
+            sessions={sessions} exercises={exercises} user={user} spaces={spaces} activeSpace={activeSpace}
             onSessionSelect={openSession} onExerciseSelect={openProgress}
             onUploadClick={() => setView('upload')}
             onDeleteSession={async (id) => {
@@ -138,8 +223,9 @@ function AppContent() {
           />
         )}
         {view === 'upload' && (
-          <SessionUpload token={token}
-            onComplete={() => { fetchSessions(); setView('sessions') }}
+          <SessionUpload token={token} spaces={spaces}
+            activeSpace={activeSpace}
+            onComplete={() => { fetchSessions(); fetchSpaces(); setView('sessions') }}
             onCancel={() => setView('sessions')} />
         )}
         {view === 'detail' && selectedSession && (
@@ -150,11 +236,10 @@ function AppContent() {
           <ProgressView exercise={selectedExercise} token={token} onBack={goHome} />
         )}
         {view === 'connections' && (
-          <ConnectionsView onBack={goHome} />
+          <ConnectionsView spaces={spaces} token={token} onBack={goHome} onSpacesChange={fetchSpaces} />
         )}
       </main>
 
-      {/* Floating record button — students only, on home screen */}
       {view === 'sessions' && !isTeacher && (
         <div className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-40">
           <button

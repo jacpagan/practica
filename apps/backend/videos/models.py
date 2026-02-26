@@ -16,6 +16,33 @@ class Profile(models.Model):
         return f"{self.user.username} ({self.role})"
 
 
+class Space(models.Model):
+    """A practice area — e.g. Drumming, Production, Qigong."""
+    name = models.CharField(max_length=100)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='owned_spaces')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+        unique_together = ['name', 'owner']
+
+    def __str__(self):
+        return self.name
+
+
+class SpaceMember(models.Model):
+    """A teacher who has access to a space."""
+    space = models.ForeignKey(Space, on_delete=models.CASCADE, related_name='members')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='space_memberships')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['space', 'user']
+
+    def __str__(self):
+        return f"{self.user.username} in {self.space.name}"
+
+
 class Exercise(models.Model):
     """A named exercise in the user's personal library."""
     name = models.CharField(max_length=200, unique=True)
@@ -45,6 +72,7 @@ class Tag(models.Model):
 class Session(models.Model):
     """A practice session — typically one long recording."""
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sessions', null=True, blank=True)
+    space = models.ForeignKey(Space, on_delete=models.SET_NULL, null=True, blank=True, related_name='sessions')
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     video_file = models.FileField(upload_to='sessions/')
@@ -80,24 +108,11 @@ class Chapter(models.Model):
         return f"{label} @ {mins}:{secs:02d}"
 
 
-class TeacherStudent(models.Model):
-    """A link between a teacher and a student."""
-    teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name='students')
-    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='teachers')
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        unique_together = ['teacher', 'student']
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f"{self.teacher.username} → {self.student.username}"
-
-
 class InviteCode(models.Model):
-    """A short-lived code for linking a teacher and student."""
+    """A code for inviting a teacher to a specific space."""
     code = models.CharField(max_length=8, unique=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='invite_codes')
+    space = models.ForeignKey(Space, on_delete=models.CASCADE, null=True, blank=True, related_name='invite_codes')
     used_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='used_invites')
     used_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -107,8 +122,9 @@ class InviteCode(models.Model):
         return self.used_by is not None
 
     def __str__(self):
+        space_name = self.space.name if self.space else 'general'
         status = f"used by {self.used_by.username}" if self.used_by else "pending"
-        return f"{self.code} ({self.created_by.username}) — {status}"
+        return f"{self.code} ({space_name}) — {status}"
 
 
 class SessionLastSeen(models.Model):

@@ -16,39 +16,40 @@ from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
-from .models import Profile, Exercise, Session, Chapter, Comment, TeacherStudent, InviteCode, SessionLastSeen, Tag
+from .models import Profile, Exercise, Session, Chapter, Comment, InviteCode, SessionLastSeen, Tag, Space, SpaceMember
 from .serializers import (
-    UserSerializer, RegisterSerializer,
+    UserSerializer, RegisterSerializer, SpaceSerializer,
     ExerciseSerializer, SessionSerializer, SessionListSerializer,
     ChapterSerializer, CommentSerializer, ProgressChapterSerializer, TagSerializer,
 )
 
 
-def _visible_user_ids(user):
-    """Return the set of user IDs whose sessions this user can see."""
-    ids = {user.id}
+def _visible_sessions_qs(user):
+    """Return a queryset of sessions visible to this user."""
     if hasattr(user, 'profile') and user.profile.role == 'teacher':
-        ids |= set(TeacherStudent.objects.filter(teacher=user).values_list('student_id', flat=True))
+        space_ids = SpaceMember.objects.filter(user=user).values_list('space_id', flat=True)
+        return Session.objects.filter(space_id__in=space_ids)
     else:
-        ids |= set(TeacherStudent.objects.filter(student=user).values_list('teacher_id', flat=True))
-    return ids
+        return Session.objects.filter(user=user)
 
 
 def _can_view_session(user, session):
-    """Check if user can view a specific session."""
-    if not user.is_authenticated:
-        return False
-    return session.user_id in _visible_user_ids(user)
-
-
-def _can_modify_session(user, session):
-    """Check if user can modify a session (owner or linked teacher)."""
     if not user.is_authenticated:
         return False
     if session.user_id == user.id:
         return True
     if hasattr(user, 'profile') and user.profile.role == 'teacher':
-        return TeacherStudent.objects.filter(teacher=user, student_id=session.user_id).exists()
+        return SpaceMember.objects.filter(user=user, space_id=session.space_id).exists()
+    return False
+
+
+def _can_modify_session(user, session):
+    if not user.is_authenticated:
+        return False
+    if session.user_id == user.id:
+        return True
+    if hasattr(user, 'profile') and user.profile.role == 'teacher':
+        return SpaceMember.objects.filter(user=user, space_id=session.space_id).exists()
     return False
 
 
@@ -98,7 +99,6 @@ def me_view(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def tag_list(request):
-    """List all tags, optionally filtered by search query."""
     q = request.query_params.get('q', '').strip()
     tags = Tag.objects.all()
     if q:
@@ -106,15 +106,59 @@ def tag_list(request):
     return Response(TagSerializer(tags[:20], many=True).data)
 
 
-# ── Invite views ────────────────────────────────────────────────────
+# ── Space views ─────────────────────────────────────────────────────
+
+@method_decorator(csrf_exempt, name='dispatch')
+class SpaceViewSet(viewsets.ModelViewSet):
+    serializer_class = SpaceSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if hasattr(user, 'profile') and user.profile.role == 'teacher':
+            space_ids = SpaceMember.objects.filter(user=user).values_list('space_id', flat=True)
+            return Space.objects.filter(id__in=space_ids).prefetch_related('members', 'members__user', 'members__user__profile')
+        return Space.objects.filter(owner=user).prefetch_related('members', 'members__user', 'members__user__profile')
+
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def invite(self, request, pk=None):
+        """Generate an invite code for this space."""
+        space = self.get_object()
+        if space.owner != request.user:
+            return Response({'error': 'Only the space owner can invite'}, status=status.HTTP_403_FORBIDDEN)
+        code = secrets.token_hex(4).upper()
+        InviteCode.objects.create(code=code, created_by=request.user, space=space)
+        return Response({'code': code, 'space': space.name}, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['delete'], url_path='members/(?P<user_id>[0-9]+)')
+    def remove_member(self, request, pk=None, user_id=None):
+        """Remove a teacher from this space."""
+        space = self.get_object()
+        if space.owner != request.user:
+            return Response({'error': 'Only the space owner can remove members'}, status=status.HTTP_403_FORBIDDEN)
+        deleted = SpaceMember.objects.filter(space=space, user_id=user_id).delete()
+        if deleted[0] == 0:
+            return Response({'error': 'Member not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(SpaceSerializer(space).data)
+
+
+# ── Invite views (legacy support + space-scoped) ────────────────────
 
 @csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_invite(request):
+    """Generate a general invite code (for backward compatibility)."""
+    space_id = request.data.get('space_id')
+    space = None
+    if space_id:
+        space = get_object_or_404(Space, pk=space_id, owner=request.user)
     code = secrets.token_hex(4).upper()
-    InviteCode.objects.create(code=code, created_by=request.user)
-    return Response({'code': code}, status=status.HTTP_201_CREATED)
+    InviteCode.objects.create(code=code, created_by=request.user, space=space)
+    return Response({'code': code, 'space': space.name if space else None}, status=status.HTTP_201_CREATED)
 
 
 @csrf_exempt
@@ -131,52 +175,21 @@ def accept_invite(request):
         except InviteCode.DoesNotExist:
             return Response({'error': 'Invalid or already used code'}, status=status.HTTP_404_NOT_FOUND)
 
-        creator = invite.created_by
-        acceptor = request.user
-
-        if creator == acceptor:
+        if invite.created_by == request.user:
             return Response({'error': 'Cannot use your own invite code'}, status=status.HTTP_400_BAD_REQUEST)
 
-        creator_role = creator.profile.role if hasattr(creator, 'profile') else 'student'
-        acceptor_role = acceptor.profile.role if hasattr(acceptor, 'profile') else 'student'
-
-        if creator_role == acceptor_role:
-            return Response(
-                {'error': f'Both users are {creator_role}s. One must be a teacher and the other a student.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if creator_role == 'teacher':
-            teacher, student = creator, acceptor
-        else:
-            teacher, student = acceptor, creator
-
-        link, created = TeacherStudent.objects.get_or_create(teacher=teacher, student=student)
-
-        invite.used_by = acceptor
+        invite.used_by = request.user
         invite.used_at = timezone.now()
         invite.save()
 
+        if invite.space:
+            SpaceMember.objects.get_or_create(space=invite.space, user=request.user)
+
     return Response({
         'message': 'Linked successfully',
-        'teacher': UserSerializer(teacher).data.get('display_name'),
-        'student': UserSerializer(student).data.get('display_name'),
-        'already_linked': not created,
-        'user': UserSerializer(acceptor).data,
+        'space': invite.space.name if invite.space else None,
+        'user': UserSerializer(request.user).data,
     })
-
-
-@csrf_exempt
-@api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
-def remove_link(request, user_id):
-    other = get_object_or_404(User, pk=user_id)
-    deleted = TeacherStudent.objects.filter(
-        Q(teacher=request.user, student=other) | Q(teacher=other, student=request.user)
-    ).delete()
-    if deleted[0] == 0:
-        return Response({'error': 'No link found'}, status=status.HTTP_404_NOT_FOUND)
-    return Response({'message': 'Unlinked', 'user': UserSerializer(request.user).data})
 
 
 # ── Exercise views ──────────────────────────────────────────────────
@@ -190,11 +203,11 @@ class ExerciseViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def progress(self, request, pk=None):
         exercise = self.get_object()
-        visible = _visible_user_ids(request.user)
+        visible_qs = _visible_sessions_qs(request.user)
         qs = (
             exercise.chapters
             .select_related('session')
-            .filter(session__user_id__in=visible)
+            .filter(session__in=visible_qs)
             .order_by('session__recorded_at')
         )
         serializer = ProgressChapterSerializer(qs, many=True)
@@ -211,14 +224,15 @@ class SessionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        qs = Session.objects.prefetch_related(
+        qs = _visible_sessions_qs(self.request.user).prefetch_related(
             'chapters', 'chapters__exercise',
             'comments', 'comments__user', 'comments__user__profile',
             'last_seen_by', 'tags',
-        ).select_related('user', 'user__profile')
+        ).select_related('user', 'user__profile', 'space')
 
-        visible = _visible_user_ids(self.request.user)
-        qs = qs.filter(user_id__in=visible)
+        space_id = self.request.query_params.get('space')
+        if space_id:
+            qs = qs.filter(space_id=space_id)
 
         tag = self.request.query_params.get('tag')
         if tag:
@@ -237,7 +251,13 @@ class SessionViewSet(viewsets.ModelViewSet):
         return SessionSerializer
 
     def perform_create(self, serializer):
-        session = serializer.save(user=self.request.user)
+        space_id = self.request.data.get('space')
+        space = None
+        if space_id:
+            space = get_object_or_404(Space, pk=space_id, owner=self.request.user)
+
+        session = serializer.save(user=self.request.user, space=space)
+
         tag_names = self.request.data.get('tags', '')
         if isinstance(tag_names, str):
             tag_names = [t.strip() for t in tag_names.split(',') if t.strip()]
@@ -247,25 +267,6 @@ class SessionViewSet(viewsets.ModelViewSet):
             tag, _ = Tag.objects.get_or_create(name__iexact=name, defaults={'name': name})
             session.tags.add(tag)
 
-    @action(detail=True, methods=['post'])
-    def set_tags(self, request, pk=None):
-        """Set tags on a session. Accepts {"tags": ["Drumming", "Rudiments"]}"""
-        session = self.get_object()
-        if not _can_modify_session(request.user, session):
-            return Response({'error': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
-
-        tag_names = request.data.get('tags', [])
-        if isinstance(tag_names, str):
-            tag_names = [t.strip() for t in tag_names.split(',') if t.strip()]
-
-        session.tags.clear()
-        for name in tag_names:
-            tag, _ = Tag.objects.get_or_create(name__iexact=name, defaults={'name': name})
-            session.tags.add(tag)
-
-        session.refresh_from_db()
-        return Response(SessionSerializer(session).data)
-
     def perform_destroy(self, instance):
         if instance.user_id != self.request.user.id:
             from rest_framework.exceptions import PermissionDenied
@@ -273,31 +274,38 @@ class SessionViewSet(viewsets.ModelViewSet):
         instance.delete()
 
     @action(detail=True, methods=['post'])
+    def set_tags(self, request, pk=None):
+        session = self.get_object()
+        if not _can_modify_session(request.user, session):
+            return Response({'error': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
+        tag_names = request.data.get('tags', [])
+        if isinstance(tag_names, str):
+            tag_names = [t.strip() for t in tag_names.split(',') if t.strip()]
+        session.tags.clear()
+        for name in tag_names:
+            tag, _ = Tag.objects.get_or_create(name__iexact=name, defaults={'name': name})
+            session.tags.add(tag)
+        session.refresh_from_db()
+        return Response(SessionSerializer(session).data)
+
+    @action(detail=True, methods=['post'])
     def add_chapter(self, request, pk=None):
         session = self.get_object()
         if not _can_modify_session(request.user, session):
             return Response({'error': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
-
         exercise_name = request.data.get('exercise_name', '').strip()
         exercise_id = request.data.get('exercise')
         exercise = None
-
         if exercise_id:
             exercise = get_object_or_404(Exercise, pk=exercise_id)
         elif exercise_name:
-            exercise, _ = Exercise.objects.get_or_create(
-                name__iexact=exercise_name,
-                defaults={'name': exercise_name},
-            )
-
+            exercise, _ = Exercise.objects.get_or_create(name__iexact=exercise_name, defaults={'name': exercise_name})
         ts = request.data.get('timestamp_seconds', 0)
         end = request.data.get('end_seconds')
-
         try:
             ts = max(0, int(ts))
         except (ValueError, TypeError):
             ts = 0
-
         if end is not None and str(end).strip():
             try:
                 end = int(end)
@@ -307,16 +315,11 @@ class SessionViewSet(viewsets.ModelViewSet):
                 end = None
         else:
             end = None
-
         serializer = ChapterSerializer(data={
-            'session': session.id,
-            'exercise': exercise.id if exercise else None,
-            'title': request.data.get('title', ''),
-            'timestamp_seconds': ts,
-            'end_seconds': end,
-            'notes': request.data.get('notes', ''),
+            'session': session.id, 'exercise': exercise.id if exercise else None,
+            'title': request.data.get('title', ''), 'timestamp_seconds': ts,
+            'end_seconds': end, 'notes': request.data.get('notes', ''),
         })
-
         if serializer.is_valid():
             serializer.save()
             session.refresh_from_db()
@@ -338,11 +341,9 @@ class SessionViewSet(viewsets.ModelViewSet):
         session = self.get_object()
         if not _can_view_session(request.user, session):
             return Response({'error': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
-
         text = request.data.get('text', '').strip()
         if not text:
             return Response({'error': 'Comment text required'}, status=status.HTTP_400_BAD_REQUEST)
-
         ts = request.data.get('timestamp_seconds')
         timestamp = None
         if ts is not None and str(ts).strip():
@@ -350,22 +351,18 @@ class SessionViewSet(viewsets.ModelViewSet):
                 timestamp = max(0, int(ts))
             except (ValueError, TypeError):
                 pass
-
         video_file = request.FILES.get('video_reply')
         if video_file and not video_file.content_type.startswith('video/'):
             return Response({'error': 'Only video files allowed'}, status=status.HTTP_400_BAD_REQUEST)
-
         Comment.objects.create(
             session=session, user=request.user,
-            timestamp_seconds=timestamp, text=text,
-            video_reply=video_file,
+            timestamp_seconds=timestamp, text=text, video_reply=video_file,
         )
         session.refresh_from_db()
         return Response(SessionSerializer(session).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'])
     def mark_seen(self, request, pk=None):
-        """Mark feedback on this session as seen by the current user."""
         session = self.get_object()
         SessionLastSeen.objects.update_or_create(
             user=request.user, session=session,
@@ -393,7 +390,7 @@ def health_check(request):
         'status': 'healthy',
         'timestamp': timezone.now().isoformat(),
         'services': {},
-        'version': '2.0.0',
+        'version': '3.0.0',
         'environment': 'development' if settings.DEBUG else 'production',
     }
     try:
@@ -403,6 +400,5 @@ def health_check(request):
     except Exception as e:
         health_status['services']['database'] = f'unhealthy: {e}'
         health_status['status'] = 'unhealthy'
-
     status_code = 200 if health_status['status'] == 'healthy' else 503
     return JsonResponse(health_status, status=status_code)

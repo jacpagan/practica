@@ -1,36 +1,32 @@
 import React, { useState } from 'react'
 import { useAuth, authHeaders } from '../auth'
+import { useToast } from './Toast'
 
-function ConnectionsView({ onBack }) {
-  const { user, token, login, logout } = useAuth()
-  const [inviteCode, setInviteCode] = useState(null)
+function ConnectionsView({ spaces = [], token, onBack, onSpacesChange }) {
+  const { user } = useAuth()
+  const toast = useToast()
+  const [inviteCodes, setInviteCodes] = useState({}) // spaceId -> code
   const [enterCode, setEnterCode] = useState('')
-  const [message, setMessage] = useState(null)
-  const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [showCreateSpace, setShowCreateSpace] = useState(false)
+  const [newSpaceName, setNewSpaceName] = useState('')
 
   const headers = { ...authHeaders(token), 'Content-Type': 'application/json' }
-
   const isTeacher = user?.role === 'teacher'
-  const linked = isTeacher ? (user?.linked_students || []) : (user?.linked_teachers || [])
 
-  const generateCode = async () => {
-    setError(null)
-    setMessage(null)
+  const generateCode = async (spaceId) => {
     try {
-      const res = await fetch('/api/invite/create/', { method: 'POST', headers })
+      const res = await fetch(`/api/spaces/${spaceId}/invite/`, { method: 'POST', headers })
       if (res.ok) {
         const data = await res.json()
-        setInviteCode(data.code)
+        setInviteCodes(prev => ({ ...prev, [spaceId]: data.code }))
       }
-    } catch { setError('Failed to generate code') }
+    } catch { toast.error('Failed to generate code') }
   }
 
-  const submitCode = async () => {
+  const acceptCode = async () => {
     if (!enterCode.trim()) return
     setLoading(true)
-    setError(null)
-    setMessage(null)
     try {
       const res = await fetch('/api/invite/accept/', {
         method: 'POST', headers,
@@ -38,146 +34,152 @@ function ConnectionsView({ onBack }) {
       })
       const data = await res.json()
       if (res.ok) {
-        setMessage(`Linked with ${data.teacher || data.student}!`)
+        toast.success(data.space ? `Joined ${data.space}` : 'Linked successfully')
         setEnterCode('')
-        refreshUser()
+        onSpacesChange()
+        window.dispatchEvent(new CustomEvent('user-updated'))
       } else {
-        setError(data.error || 'Invalid code')
+        toast.error(data.error || 'Invalid code')
       }
-    } catch { setError('Connection error') }
+    } catch { toast.error('Connection error') }
     finally { setLoading(false) }
   }
 
-  const unlinkUser = async (userId) => {
-    if (!confirm('Remove this connection?')) return
+  const removeMember = async (spaceId, userId) => {
+    if (!confirm('Remove this teacher from the space?')) return
     try {
-      const res = await fetch(`/api/link/${userId}/remove/`, { method: 'DELETE', headers })
-      if (res.ok) refreshUser()
-    } catch { setError('Failed to remove link') }
+      const res = await fetch(`/api/spaces/${spaceId}/members/${userId}/`, {
+        method: 'DELETE', headers: authHeaders(token),
+      })
+      if (res.ok) { onSpacesChange(); toast.success('Removed') }
+    } catch { toast.error('Error removing') }
   }
 
-  const refreshUser = async () => {
+  const createSpace = async () => {
+    if (!newSpaceName.trim()) return
     try {
-      const res = await fetch('/api/auth/me/', { headers: authHeaders(token) })
+      const res = await fetch('/api/spaces/', {
+        method: 'POST', headers,
+        body: JSON.stringify({ name: newSpaceName.trim() }),
+      })
       if (res.ok) {
-        const data = await res.json()
-        window.dispatchEvent(new CustomEvent('user-updated', { detail: data }))
+        setNewSpaceName('')
+        setShowCreateSpace(false)
+        onSpacesChange()
+        toast.success(`Space "${newSpaceName.trim()}" created`)
       }
-    } catch {}
+    } catch { toast.error('Error creating space') }
   }
 
-  const copyCode = () => {
-    navigator.clipboard?.writeText(inviteCode)
-    setMessage('Copied to clipboard')
-    setTimeout(() => setMessage(null), 2000)
+  const copyCode = (code) => {
+    navigator.clipboard?.writeText(code)
+    toast('Copied')
   }
 
   return (
     <div className="px-4 sm:px-6 py-6">
-      <div className="max-w-md mx-auto">
-        <h2 className="text-lg font-semibold text-gray-900 mb-1">Connections</h2>
+      <div className="max-w-lg mx-auto">
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">Spaces</h2>
         <p className="text-sm text-gray-500 mb-6">
           {isTeacher
-            ? 'Link with students to see their practice sessions and give feedback.'
-            : 'Link with your teacher so they can see your sessions and give feedback.'}
+            ? 'Spaces you have access to.'
+            : 'Organize your practice and invite teachers to specific spaces.'}
         </p>
 
-        {/* Current connections */}
-        {linked.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
-              {isTeacher ? 'Your students' : 'Your teachers'}
-            </h3>
-            <div className="space-y-2">
-              {linked.map(person => (
-                <div key={person.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${
-                      person.role === 'teacher' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'
-                    }`}>
-                      {person.display_name[0].toUpperCase()}
+        {/* Spaces list */}
+        {spaces.map(space => (
+          <div key={space.id} className="mb-4 p-4 rounded-xl border border-gray-200">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-900">{space.name}</h3>
+              <span className="text-xs text-gray-400">{space.session_count} sessions</span>
+            </div>
+
+            {/* Members */}
+            {space.members.length > 0 && (
+              <div className="mb-3">
+                <p className="text-xs text-gray-500 mb-1.5">Teachers</p>
+                <div className="space-y-1.5">
+                  {space.members.map(member => (
+                    <div key={member.id} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-[10px] font-semibold flex items-center justify-center">
+                          {member.display_name[0].toUpperCase()}
+                        </div>
+                        <span className="text-sm text-gray-700">{member.display_name}</span>
+                      </div>
+                      {!isTeacher && (
+                        <button onClick={() => removeMember(space.id, member.id)}
+                          className="text-xs text-gray-400 hover:text-red-500">Remove</button>
+                      )}
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{person.display_name}</p>
-                      <p className="text-xs text-gray-400">{person.role}</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => unlinkUser(person.id)}
-                    className="text-xs text-gray-400 hover:text-red-500 transition-colors"
-                  >
-                    Remove
-                  </button>
+                  ))}
                 </div>
-              ))}
+              </div>
+            )}
+
+            {/* Invite code for this space */}
+            {!isTeacher && (
+              <div>
+                {inviteCodes[space.id] ? (
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 bg-gray-50 rounded-lg px-3 py-2 text-center">
+                      <span className="text-sm font-mono font-bold tracking-widest">{inviteCodes[space.id]}</span>
+                    </div>
+                    <button onClick={() => copyCode(inviteCodes[space.id])}
+                      className="text-xs text-gray-500 hover:text-gray-900 px-2">Copy</button>
+                  </div>
+                ) : (
+                  <button onClick={() => generateCode(space.id)}
+                    className="w-full text-xs font-medium text-gray-600 border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors">
+                    Generate invite code for {space.name}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+
+        {/* Create space */}
+        {!isTeacher && (
+          <div className="mb-4">
+            {showCreateSpace ? (
+              <div className="flex gap-2">
+                <input type="text" value={newSpaceName} onChange={(e) => setNewSpaceName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && createSpace()}
+                  placeholder="e.g. Guitar, Cooking"
+                  className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" autoFocus />
+                <button onClick={createSpace} className="text-xs font-medium text-white bg-gray-900 px-3 py-2 rounded-lg">Create</button>
+                <button onClick={() => { setShowCreateSpace(false); setNewSpaceName('') }} className="text-xs text-gray-400 px-2">Cancel</button>
+              </div>
+            ) : (
+              <button onClick={() => setShowCreateSpace(true)}
+                className="w-full text-sm text-gray-500 border border-dashed border-gray-200 rounded-xl py-3 hover:border-gray-400 transition-colors">
+                + Create new space
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Enter invite code (for teachers) */}
+        {isTeacher && (
+          <div className="p-4 rounded-xl border border-gray-200">
+            <h3 className="text-sm font-medium text-gray-900 mb-1">Enter invite code</h3>
+            <p className="text-xs text-gray-500 mb-3">Enter a code from a student to join their space.</p>
+            <div className="flex gap-2">
+              <input type="text" value={enterCode} onChange={(e) => setEnterCode(e.target.value.toUpperCase())}
+                placeholder="ABCD1234" maxLength={8}
+                className="flex-1 px-3 py-2 text-sm font-mono text-center uppercase tracking-widest border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
+              <button onClick={acceptCode} disabled={!enterCode.trim() || loading}
+                className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2 hover:bg-gray-800 disabled:opacity-40 transition-colors">
+                {loading ? '...' : 'Join'}
+              </button>
             </div>
           </div>
         )}
 
-        {/* Generate invite code */}
-        <div className="mb-6 p-4 rounded-xl border border-gray-200">
-          <h3 className="text-sm font-medium text-gray-900 mb-1">Share your invite code</h3>
-          <p className="text-xs text-gray-500 mb-3">
-            {isTeacher
-              ? 'Give this code to a student to link with you.'
-              : 'Give this code to your teacher to link with you.'}
-          </p>
-
-          {inviteCode ? (
-            <div className="flex items-center gap-2">
-              <div className="flex-1 bg-gray-50 rounded-lg px-4 py-3 text-center">
-                <span className="text-lg font-mono font-bold text-gray-900 tracking-widest">{inviteCode}</span>
-              </div>
-              <button onClick={copyCode}
-                className="text-xs text-gray-500 hover:text-gray-900 px-3 py-3 rounded-lg hover:bg-gray-50 transition-colors">
-                Copy
-              </button>
-            </div>
-          ) : (
-            <button onClick={generateCode}
-              className="w-full text-sm font-medium text-white bg-gray-900 rounded-lg py-2.5 hover:bg-gray-800 transition-colors">
-              Generate code
-            </button>
-          )}
-        </div>
-
-        {/* Enter invite code */}
-        <div className="p-4 rounded-xl border border-gray-200">
-          <h3 className="text-sm font-medium text-gray-900 mb-1">Enter an invite code</h3>
-          <p className="text-xs text-gray-500 mb-3">
-            {isTeacher
-              ? 'Enter a code from a student to link with them.'
-              : 'Enter a code from your teacher to link with them.'}
-          </p>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={enterCode}
-              onChange={(e) => setEnterCode(e.target.value.toUpperCase())}
-              placeholder="ABCD1234"
-              maxLength={8}
-              className="flex-1 px-3 py-2 text-sm font-mono text-center uppercase tracking-widest border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
-            />
-            <button
-              onClick={submitCode}
-              disabled={!enterCode.trim() || loading}
-              className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2 hover:bg-gray-800 disabled:opacity-40 transition-colors"
-            >
-              {loading ? '...' : 'Link'}
-            </button>
-          </div>
-        </div>
-
-        {/* Messages */}
-        {message && <p className="text-xs text-green-600 mt-3 text-center">{message}</p>}
-        {error && <p className="text-xs text-red-500 mt-3 text-center">{error}</p>}
-
-        {/* Empty state */}
-        {linked.length === 0 && (
-          <div className="text-center py-6">
-            <p className="text-xs text-gray-400">
-              No connections yet. Generate a code or enter one to get started.
-            </p>
+        {spaces.length === 0 && isTeacher && (
+          <div className="text-center py-8">
+            <p className="text-xs text-gray-400">No spaces yet. Enter an invite code from a student to join their space.</p>
           </div>
         )}
       </div>
