@@ -5,14 +5,15 @@ from django.conf.urls.static import static
 from django.views.generic import TemplateView
 from rest_framework.routers import DefaultRouter
 from videos.views import (
-    SessionViewSet, ExerciseViewSet, health_check,
+    SessionViewSet, ExerciseViewSet, SpaceViewSet, health_check,
     register_view, login_view, me_view,
-    create_invite, accept_invite, remove_link, tag_list,
+    create_invite, accept_invite, tag_list,
 )
 
 router = DefaultRouter()
 router.register(r'sessions', SessionViewSet, basename='session')
 router.register(r'exercises', ExerciseViewSet, basename='exercise')
+router.register(r'spaces', SpaceViewSet, basename='space')
 
 urlpatterns = [
     path(settings.ADMIN_URL, admin.site.urls),
@@ -22,7 +23,6 @@ urlpatterns = [
     path('api/auth/me/', me_view, name='me'),
     path('api/invite/create/', create_invite, name='create_invite'),
     path('api/invite/accept/', accept_invite, name='accept_invite'),
-    path('api/link/<int:user_id>/remove/', remove_link, name='remove_link'),
     path('api/tags/', tag_list, name='tag_list'),
     path('health/', health_check, name='health_check'),
 ]
@@ -30,7 +30,6 @@ urlpatterns = [
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
-# SPA catch-all: serve React index.html for any non-API route
 if settings.FRONTEND_DIR.exists():
     urlpatterns += [
         re_path(r'^(?!api/|admin/|health/|static/|media/|assets/).*$',
