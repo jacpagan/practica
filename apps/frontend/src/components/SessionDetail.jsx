@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import VideoRecorder from './VideoRecorder'
+import TagInput from './TagInput'
 import { useToast } from './Toast'
 import { fmtTime, fmtDate, videoUrl, parseTimeInput, fmtDuration } from '../utils'
 
@@ -7,6 +8,13 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
   const toast = useToast()
   const [session, setSession] = useState(initialSession)
   const [currentTime, setCurrentTime] = useState(0)
+
+  // Edit state
+  const [editing, setEditing] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editTags, setEditTags] = useState([])
+  const [saving, setSaving] = useState(false)
 
   // Chapter state
   const [showAddChapter, setShowAddChapter] = useState(false)
@@ -153,6 +161,48 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
     setCommentVideoPreview(null)
   }
 
+  // ── Edit actions ──
+
+  const startEditing = () => {
+    setEditTitle(session.title)
+    setEditDescription(session.description || '')
+    setEditTags(session.tag_names || [])
+    setEditing(true)
+  }
+
+  const cancelEditing = () => {
+    setEditing(false)
+  }
+
+  const saveEdits = async () => {
+    if (!editTitle.trim()) return toast.error('Title is required')
+    setSaving(true)
+    try {
+      // Update title + description via PATCH
+      const res = await fetch(`/api/sessions/${session.id}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ title: editTitle.trim(), description: editDescription.trim() }),
+      })
+
+      // Update tags via set_tags
+      await fetch(`/api/sessions/${session.id}/set_tags/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ tags: editTags }),
+      })
+
+      if (res.ok) {
+        await refreshSession()
+        setEditing(false)
+        toast.success('Session updated')
+      } else {
+        toast.error('Failed to save')
+      }
+    } catch { toast.error('Error saving') }
+    finally { setSaving(false) }
+  }
+
   const chapters = session.chapters || []
   const comments = session.comments || []
   const activeChapter = [...chapters].reverse().find(c => currentTime >= c.timestamp_seconds)
@@ -161,9 +211,47 @@ function SessionDetail({ session: initialSession, exercises, token, user, onBack
     <div className="px-4 sm:px-6 py-4">
       {/* Title */}
       <div className="mb-4">
-        <h1 className="text-lg font-semibold text-gray-900">{session.title}</h1>
-        {session.description && <p className="text-sm text-gray-500 mt-0.5">{session.description}</p>}
-        {session.owner && <p className="text-xs text-gray-400 mt-1">by {session.owner.display_name}</p>}
+        {editing ? (
+          <div className="space-y-3">
+            <input
+              type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
+              className="w-full text-lg font-semibold text-gray-900 border-b border-gray-200 focus:border-gray-400 focus:outline-none pb-1"
+              autoFocus
+            />
+            <textarea
+              value={editDescription} onChange={(e) => setEditDescription(e.target.value)}
+              rows={2} placeholder="Description"
+              className="w-full text-sm text-gray-600 border-b border-gray-200 focus:border-gray-400 focus:outline-none resize-none"
+            />
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Tags</label>
+              <TagInput value={editTags} onChange={setEditTags} token={token} />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={saveEdits} disabled={saving}
+                className="text-xs font-medium text-white bg-gray-900 px-3 py-1.5 rounded-md disabled:opacity-40">
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+              <button onClick={cancelEditing} className="text-xs text-gray-500 px-3 py-1.5">Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className="flex items-start justify-between gap-2">
+              <h1 className="text-lg font-semibold text-gray-900">{session.title}</h1>
+              <button onClick={startEditing} className="text-xs text-gray-400 hover:text-gray-600 flex-shrink-0 pt-1">Edit</button>
+            </div>
+            {session.description && <p className="text-sm text-gray-500 mt-0.5">{session.description}</p>}
+            {(session.tag_names || []).length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {session.tag_names.map(tag => (
+                  <span key={tag} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-md">{tag}</span>
+                ))}
+              </div>
+            )}
+            {session.owner && <p className="text-xs text-gray-400 mt-2">by {session.owner.display_name}</p>}
+          </div>
+        )}
       </div>
 
       {/* Video player */}
