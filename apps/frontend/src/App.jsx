@@ -1,4 +1,21 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Component } from 'react'
+
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(error) { return { error: error.message } }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="px-4 py-12 text-center">
+          <p className="text-sm text-red-500 mb-2">Something went wrong</p>
+          <p className="text-xs text-gray-400 mb-4">{this.state.error}</p>
+          <button onClick={this.props.onBack} className="text-sm text-gray-500 underline">Go back</button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 import { AuthProvider, useAuth, authHeaders } from './auth'
 import { ToastProvider } from './components/Toast'
 import { useToast } from './components/Toast'
@@ -243,7 +260,9 @@ function AppContent() {
             onBack={goHome} onSessionUpdate={(s) => { setSelectedSession(s); fetchExercises() }} />
         )}
         {view === 'progress' && selectedExercise && (
-          <ProgressView exercise={selectedExercise} token={token} onBack={goHome} />
+          <ErrorBoundary onBack={goHome}>
+            <ProgressView exercise={selectedExercise} token={token} onBack={goHome} />
+          </ErrorBoundary>
         )}
         {view === 'connections' && (
           <ConnectionsView spaces={spaces} token={token} onBack={goHome} onSpacesChange={fetchSpaces} />
