@@ -7,7 +7,8 @@ function AuthForm() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
-  const [role, setRole] = useState('student')
+  const [role, setRole] = useState('teacher')
+  const [inviteCode, setInviteCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -19,7 +20,11 @@ function AuthForm() {
       if (mode === 'login') {
         await login(username, password)
       } else {
-        await register({ username, password, role, display_name: displayName || username })
+        await register({
+          username, password, role,
+          display_name: displayName || username,
+          invite_code: inviteCode,
+        })
       }
     } catch (err) {
       setError(err.message)
@@ -51,11 +56,22 @@ function AuthForm() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {mode === 'register' && (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Invite code</label>
+              <input type="text" value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                placeholder="Enter your invite code"
+                className="w-full px-3 py-2 text-sm font-mono text-center uppercase tracking-widest border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                required maxLength={8} autoFocus />
+              <p className="text-xs text-gray-400 mt-1">Ask the person who invited you for this code</p>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs text-gray-500 mb-1">Username</label>
             <input type="text" value={username} onChange={(e) => setUsername(e.target.value)}
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
-              required autoFocus />
+              required autoFocus={mode === 'login'} />
           </div>
 
           <div>
