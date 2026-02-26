@@ -8,12 +8,26 @@ function ProgressView({ exercise, token, onBack }) {
   const [compareLeft, setCompareLeft] = useState(null)
   const [compareRight, setCompareRight] = useState(null)
 
+  const [error, setError] = useState(null)
+
   useEffect(() => {
+    setData(null)
+    setError(null)
     fetch(`/api/exercises/${exercise.id}/progress/`, { headers: authHeaders(token) })
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`${r.status}`)
+        return r.json()
+      })
       .then(setData)
-      .catch(() => {})
+      .catch(e => setError(e.message))
   }, [exercise.id])
+
+  if (error) return (
+    <div className="px-4 py-12 text-center">
+      <p className="text-sm text-gray-400 mb-3">Could not load progress</p>
+      <button onClick={onBack} className="text-sm text-gray-500 underline">Go back</button>
+    </div>
+  )
 
   if (!data) return <div className="px-4 py-8 text-center text-sm text-gray-400">Loading...</div>
 
