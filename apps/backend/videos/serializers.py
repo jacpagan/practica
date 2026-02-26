@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import Profile, Exercise, Session, Chapter, Comment, TeacherStudent, InviteCode, SessionLastSeen
+from .models import Profile, Exercise, Session, Chapter, Comment, TeacherStudent, InviteCode, SessionLastSeen, Tag
 
 
 class ProfileSerializer(serializers.ModelSerializer):
@@ -118,9 +118,22 @@ class ChapterSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
 
 
+class TagSerializer(serializers.ModelSerializer):
+    session_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Tag
+        fields = ['id', 'name', 'session_count']
+        read_only_fields = ['id']
+
+    def get_session_count(self, obj):
+        return obj.sessions.count()
+
+
 class SessionSerializer(serializers.ModelSerializer):
     chapters = ChapterSerializer(many=True, read_only=True)
     comments = CommentSerializer(many=True, read_only=True)
+    tag_names = serializers.SerializerMethodField()
     chapter_count = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
     owner = serializers.SerializerMethodField()
@@ -130,9 +143,12 @@ class SessionSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'description', 'video_file',
             'duration_seconds', 'recorded_at', 'created_at', 'updated_at',
-            'chapters', 'comments', 'chapter_count', 'comment_count', 'owner',
+            'tag_names', 'chapters', 'comments', 'chapter_count', 'comment_count', 'owner',
         ]
         read_only_fields = ['id', 'recorded_at', 'created_at', 'updated_at']
+
+    def get_tag_names(self, obj):
+        return [t.name for t in obj.tags.all()]
 
     def get_chapter_count(self, obj):
         return obj.chapters.count()
@@ -147,6 +163,7 @@ class SessionSerializer(serializers.ModelSerializer):
 
 
 class SessionListSerializer(serializers.ModelSerializer):
+    tag_names = serializers.SerializerMethodField()
     chapter_count = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
     owner_name = serializers.SerializerMethodField()
@@ -158,10 +175,13 @@ class SessionListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'description', 'video_file',
             'duration_seconds', 'recorded_at', 'created_at',
-            'chapter_count', 'comment_count', 'owner_name',
+            'tag_names', 'chapter_count', 'comment_count', 'owner_name',
             'has_unread', 'last_comment_at',
         ]
         read_only_fields = ['id', 'recorded_at', 'created_at']
+
+    def get_tag_names(self, obj):
+        return [t.name for t in obj.tags.all()]
 
     def get_chapter_count(self, obj):
         return obj.chapters.count()

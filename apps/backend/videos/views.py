@@ -15,11 +15,11 @@ from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
-from .models import Profile, Exercise, Session, Chapter, Comment, TeacherStudent, InviteCode, SessionLastSeen
+from .models import Profile, Exercise, Session, Chapter, Comment, TeacherStudent, InviteCode, SessionLastSeen, Tag
 from .serializers import (
     UserSerializer, RegisterSerializer,
     ExerciseSerializer, SessionSerializer, SessionListSerializer,
-    ChapterSerializer, CommentSerializer, ProgressChapterSerializer,
+    ChapterSerializer, CommentSerializer, ProgressChapterSerializer, TagSerializer,
 )
 
 
@@ -88,6 +88,19 @@ def login_view(request):
 @permission_classes([IsAuthenticated])
 def me_view(request):
     return Response(UserSerializer(request.user).data)
+
+
+# ── Tag views ───────────────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def tag_list(request):
+    """List all tags, optionally filtered by search query."""
+    q = request.query_params.get('q', '').strip()
+    tags = Tag.objects.all()
+    if q:
+        tags = tags.filter(name__icontains=q)
+    return Response(TagSerializer(tags[:20], many=True).data)
 
 
 # ── Invite views ────────────────────────────────────────────────────
@@ -198,11 +211,17 @@ class SessionViewSet(viewsets.ModelViewSet):
         qs = Session.objects.prefetch_related(
             'chapters', 'chapters__exercise',
             'comments', 'comments__user', 'comments__user__profile',
-            'last_seen_by',
+            'last_seen_by', 'tags',
         ).select_related('user', 'user__profile')
 
         visible = _visible_user_ids(self.request.user)
-        return qs.filter(user_id__in=visible)
+        qs = qs.filter(user_id__in=visible)
+
+        tag = self.request.query_params.get('tag')
+        if tag:
+            qs = qs.filter(tags__name__iexact=tag)
+
+        return qs.distinct()
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
@@ -215,7 +234,34 @@ class SessionViewSet(viewsets.ModelViewSet):
         return SessionSerializer
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        session = serializer.save(user=self.request.user)
+        tag_names = self.request.data.get('tags', '')
+        if isinstance(tag_names, str):
+            tag_names = [t.strip() for t in tag_names.split(',') if t.strip()]
+        elif isinstance(tag_names, list):
+            tag_names = [t.strip() for t in tag_names if t.strip()]
+        for name in tag_names:
+            tag, _ = Tag.objects.get_or_create(name__iexact=name, defaults={'name': name})
+            session.tags.add(tag)
+
+    @action(detail=True, methods=['post'])
+    def set_tags(self, request, pk=None):
+        """Set tags on a session. Accepts {"tags": ["Drumming", "Rudiments"]}"""
+        session = self.get_object()
+        if not _can_modify_session(request.user, session):
+            return Response({'error': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
+
+        tag_names = request.data.get('tags', [])
+        if isinstance(tag_names, str):
+            tag_names = [t.strip() for t in tag_names.split(',') if t.strip()]
+
+        session.tags.clear()
+        for name in tag_names:
+            tag, _ = Tag.objects.get_or_create(name__iexact=name, defaults={'name': name})
+            session.tags.add(tag)
+
+        session.refresh_from_db()
+        return Response(SessionSerializer(session).data)
 
     def perform_destroy(self, instance):
         if instance.user_id != self.request.user.id:

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { authHeaders } from '../auth'
 import { useToast } from './Toast'
+import TagInput from './TagInput'
 import { fmtTimer } from '../utils'
 
 const STEPS = { CAMERA: 'camera', RECORDING: 'recording', REVIEW: 'review', SAVE: 'save' }
@@ -12,6 +13,7 @@ function QuickRecord({ token, exercises, onComplete, onCancel }) {
   const [error, setError] = useState(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [tags, setTags] = useState([])
   const [saving, setSaving] = useState(false)
   const [recordedFile, setRecordedFile] = useState(null)
   const [facing, setFacing] = useState('environment') // 'environment' (back) or 'user' (front)
@@ -168,6 +170,7 @@ function QuickRecord({ token, exercises, onComplete, onCancel }) {
       fd.append('description', description.trim())
       fd.append('video_file', recordedFile)
       fd.append('duration_seconds', elapsed)
+      if (tags.length > 0) fd.append('tags', tags.join(','))
 
       const res = await fetch('/api/sessions/', { method: 'POST', body: fd, headers })
       if (res.ok) {
@@ -309,6 +312,10 @@ function QuickRecord({ token, exercises, onComplete, onCancel }) {
                 rows={2}
                 className="w-full px-0 py-1 text-sm text-gray-700 placeholder-gray-300 border-b border-gray-100 focus:border-gray-400 focus:outline-none resize-none transition-colors"
               />
+            </div>
+
+            <div>
+              <TagInput value={tags} onChange={setTags} token={token} placeholder="e.g. Drumming, Production" />
             </div>
 
             {recordedFile && (
