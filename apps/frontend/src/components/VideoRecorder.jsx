@@ -27,7 +27,6 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach(t => t.stop())
     streamRef.current = null
-    if (liveRef.current) liveRef.current.srcObject = null
   }, [])
 
   const stopTimer = useCallback(() => {
@@ -42,6 +41,23 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
 
   useEffect(() => cleanup, [cleanup])
 
+  // Attach stream to video element whenever the ref or stream changes
+  const attachStream = useCallback(() => {
+    if (liveRef.current && streamRef.current) {
+      liveRef.current.srcObject = streamRef.current
+      liveRef.current.play().catch(() => {})
+    }
+  }, [])
+
+  // Use callback ref for the live video — attach stream as soon as element mounts
+  const setLiveRef = useCallback((el) => {
+    liveRef.current = el
+    if (el && streamRef.current) {
+      el.srcObject = streamRef.current
+      el.play().catch(() => {})
+    }
+  }, [])
+
   // ── Camera ──
 
   const openCamera = async () => {
@@ -54,11 +70,9 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
         audio: true,
       })
       streamRef.current = stream
-      if (liveRef.current) {
-        liveRef.current.srcObject = stream
-        await liveRef.current.play()
-      }
       setState(STATES.PREVIEWING)
+      // Attach after state change triggers re-render with video element
+      requestAnimationFrame(() => attachStream())
     } catch (e) {
       setError(e.name === 'NotAllowedError'
         ? 'Camera permission denied. Please allow access in your browser settings.'
@@ -192,7 +206,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
       {(state === STATES.PREVIEWING || state === STATES.RECORDING) && (
         <div className="relative">
           <video
-            ref={liveRef}
+            ref={setLiveRef}
             autoPlay
             muted
             playsInline
@@ -232,7 +246,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
                   className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-90 shadow-lg shadow-red-500/30">
                   <div className="w-6 h-6 bg-white rounded-full" />
                 </button>
-                <div className="w-10" /> {/* spacer for centering */}
+                <div className="w-10" />
               </>
             )}
 
