@@ -8,6 +8,7 @@ from videos.views import (
     SessionViewSet, ExerciseViewSet, SpaceViewSet, health_check,
     register_view, login_view, me_view,
     create_invite, accept_invite, tag_list,
+    join_space, space_info,
 )
 
 router = DefaultRouter()
@@ -24,6 +25,8 @@ urlpatterns = [
     path('api/invite/create/', create_invite, name='create_invite'),
     path('api/invite/accept/', accept_invite, name='accept_invite'),
     path('api/tags/', tag_list, name='tag_list'),
+    path('api/join/<slug:slug>/', join_space, name='join_space'),
+    path('api/space-info/<slug:slug>/', space_info, name='space_info'),
     path('health/', health_check, name='health_check'),
 ]
 

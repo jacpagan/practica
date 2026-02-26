@@ -1,37 +1,39 @@
+import secrets
 from django.db import models
 from django.contrib.auth.models import User
 
 
 class Profile(models.Model):
-    """Extended user profile with role."""
-    ROLE_CHOICES = [
-        ('student', 'Student'),
-        ('teacher', 'Teacher'),
-    ]
+    """Extended user profile."""
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='student')
     display_name = models.CharField(max_length=100, blank=True)
 
     def __str__(self):
-        return f"{self.user.username} ({self.role})"
+        return self.display_name or self.user.username
 
 
 class Space(models.Model):
-    """A practice area — e.g. Drumming, Production, Qigong."""
+    """A practice area. Owner shows their work, members watch and give feedback."""
     name = models.CharField(max_length=100)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='owned_spaces')
+    invite_slug = models.CharField(max_length=20, unique=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['name']
         unique_together = ['name', 'owner']
 
+    def save(self, *args, **kwargs):
+        if not self.invite_slug:
+            self.invite_slug = secrets.token_urlsafe(10)
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.owner})"
 
 
 class SpaceMember(models.Model):
-    """A teacher who has access to a space."""
+    """A person who follows a space (watches + gives feedback)."""
     space = models.ForeignKey(Space, on_delete=models.CASCADE, related_name='members')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='space_memberships')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -40,11 +42,11 @@ class SpaceMember(models.Model):
         unique_together = ['space', 'user']
 
     def __str__(self):
-        return f"{self.user.username} in {self.space.name}"
+        return f"{self.user} in {self.space.name}"
 
 
 class Exercise(models.Model):
-    """A named exercise in the user's personal library."""
+    """A named exercise in the library."""
     name = models.CharField(max_length=200, unique=True)
     category = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True)
@@ -109,7 +111,7 @@ class Chapter(models.Model):
 
 
 class InviteCode(models.Model):
-    """A code for inviting a teacher to a specific space."""
+    """A code for inviting someone — used for initial signup gating."""
     code = models.CharField(max_length=8, unique=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='invite_codes')
     space = models.ForeignKey(Space, on_delete=models.CASCADE, null=True, blank=True, related_name='invite_codes')
@@ -122,9 +124,7 @@ class InviteCode(models.Model):
         return self.used_by is not None
 
     def __str__(self):
-        space_name = self.space.name if self.space else 'general'
-        status = f"used by {self.used_by.username}" if self.used_by else "pending"
-        return f"{self.code} ({space_name}) — {status}"
+        return f"{self.code} ({self.created_by})"
 
 
 class SessionLastSeen(models.Model):
@@ -136,18 +136,12 @@ class SessionLastSeen(models.Model):
     class Meta:
         unique_together = ['user', 'session']
 
-    def __str__(self):
-        return f"{self.user.username} saw {self.session.title} at {self.seen_at}"
-
 
 class Comment(models.Model):
     """A timestamped comment on a session, optionally with a video reply."""
     session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='comments')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='comments')
-    timestamp_seconds = models.IntegerField(
-        null=True, blank=True,
-        help_text="Video timestamp this comment refers to (seconds)",
-    )
+    timestamp_seconds = models.IntegerField(null=True, blank=True)
     text = models.TextField()
     video_reply = models.FileField(upload_to='comment_videos/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -157,4 +151,4 @@ class Comment(models.Model):
 
     def __str__(self):
         prefix = f"@{self.timestamp_seconds}s " if self.timestamp_seconds is not None else ""
-        return f"{prefix}{self.user.username}: {self.text[:50]}"
+        return f"{prefix}{self.user}: {self.text[:50]}"

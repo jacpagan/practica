@@ -22,13 +22,12 @@ class SpaceMemberInline(admin.TabularInline):
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    list_display = ['user', 'role', 'display_name']
-    list_filter = ['role']
+    list_display = ['user', 'display_name']
 
 
 @admin.register(Space)
 class SpaceAdmin(admin.ModelAdmin):
-    list_display = ['name', 'owner', 'created_at']
+    list_display = ['name', 'owner', 'invite_slug', 'created_at']
     list_filter = ['owner']
     inlines = [SpaceMemberInline]
 

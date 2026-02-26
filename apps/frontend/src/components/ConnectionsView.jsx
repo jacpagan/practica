@@ -6,14 +6,13 @@ function ConnectionsView({ spaces = [], token, onBack, onSpacesChange }) {
   const { user } = useAuth()
   const toast = useToast()
   const [inviteCodes, setInviteCodes] = useState({})
-  const [renamingSpace, setRenamingSpace] = useState(null) // { id, name }
+  const [renamingSpace, setRenamingSpace] = useState(null)
   const [enterCode, setEnterCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [showCreateSpace, setShowCreateSpace] = useState(false)
   const [newSpaceName, setNewSpaceName] = useState('')
 
   const headers = { ...authHeaders(token), 'Content-Type': 'application/json' }
-  const isTeacher = user?.role === 'teacher'
 
   const generateCode = async (spaceId) => {
     try {
@@ -102,7 +101,7 @@ function ConnectionsView({ spaces = [], token, onBack, onSpacesChange }) {
       <div className="max-w-lg mx-auto">
         <h2 className="text-lg font-semibold text-gray-900 mb-1">Spaces</h2>
         <p className="text-sm text-gray-500 mb-6">
-          {isTeacher
+          
             ? 'Spaces you have access to.'
             : 'Organize your practice and invite teachers to specific spaces.'}
         </p>
@@ -127,7 +126,7 @@ function ConnectionsView({ spaces = [], token, onBack, onSpacesChange }) {
                   <h3 className="text-sm font-semibold text-gray-900">{space.name}</h3>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-400">{space.session_count} sessions</span>
-                    {!isTeacher && (
+                    (
                       <>
                         <button onClick={() => setRenamingSpace({ id: space.id, name: space.name })}
                           className="text-xs text-gray-400 hover:text-gray-600">Rename</button>
@@ -153,7 +152,7 @@ function ConnectionsView({ spaces = [], token, onBack, onSpacesChange }) {
                         </div>
                         <span className="text-sm text-gray-700">{member.display_name}</span>
                       </div>
-                      {!isTeacher && (
+                      (
                         <button onClick={() => removeMember(space.id, member.id)}
                           className="text-xs text-gray-400 hover:text-red-500">Remove</button>
                       )}
@@ -164,7 +163,7 @@ function ConnectionsView({ spaces = [], token, onBack, onSpacesChange }) {
             )}
 
             {/* Invite code for this space */}
-            {!isTeacher && (
+            (
               <div>
                 {inviteCodes[space.id] ? (
                   <div className="flex items-center gap-2">
@@ -186,7 +185,7 @@ function ConnectionsView({ spaces = [], token, onBack, onSpacesChange }) {
         ))}
 
         {/* Create space */}
-        {!isTeacher && (
+        (
           <div className="mb-4">
             {showCreateSpace ? (
               <div className="flex gap-2">
@@ -207,7 +206,7 @@ function ConnectionsView({ spaces = [], token, onBack, onSpacesChange }) {
         )}
 
         {/* Enter invite code (for teachers) */}
-        {isTeacher && (
+        {false && (
           <div className="p-4 rounded-xl border border-gray-200">
             <h3 className="text-sm font-medium text-gray-900 mb-1">Enter invite code</h3>
             <p className="text-xs text-gray-500 mb-3">Enter a code from a student to join their space.</p>
@@ -223,7 +222,7 @@ function ConnectionsView({ spaces = [], token, onBack, onSpacesChange }) {
           </div>
         )}
 
-        {spaces.length === 0 && isTeacher && (
+        {spaces.length === 0 && false && (
           <div className="text-center py-8">
             <p className="text-xs text-gray-400">No spaces yet. Enter an invite code from a student to join their space.</p>
           </div>
