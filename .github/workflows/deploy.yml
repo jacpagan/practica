@@ -1,0 +1,58 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (for context only)
+        uses: actions/checkout@v4
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            PROJECT_DIR=${{ secrets.SSH_PROJECT_DIR }}
+            REPO_URL=${{ secrets.REPO_URL || github.server_url .. '/' .. github.repository }}
+            if [ -z "${PROJECT_DIR:-}" ]; then echo "SSH_PROJECT_DIR not set"; exit 1; fi
+
+            mkdir -p "$PROJECT_DIR"
+            if [ ! -d "$PROJECT_DIR/.git" ]; then
+              git clone "$REPO_URL" "$PROJECT_DIR"
+            fi
+
+            cd "$PROJECT_DIR"
+            git fetch --all --prune
+            git checkout main
+            git pull --ff-only origin main
+
+            if [ -n "${{ secrets.ENV_PRODUCTION || '' }}" ]; then
+              cat > .env.production << 'EOF_ENV'
+${{ secrets.ENV_PRODUCTION }}
+EOF_ENV
+            fi
+
+            docker-compose -f docker-compose.prod.yml up -d --build
+
+            set +e
+            for i in $(seq 1 30); do
+              curl -fsSL https://practica.jpagan.com/health/ && ok=1 && break || sleep 2
+            done
+            set -e
+            if [ "${ok:-}" != "1" ]; then
+              echo "Health check failed" >&2
+              docker-compose -f docker-compose.prod.yml ps
+              docker-compose -f docker-compose.prod.yml logs --tail=200 backend || true
+              exit 1
+            fi
+
