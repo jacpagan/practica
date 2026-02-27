@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database for Staging
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: practica_staging
+      POSTGRES_USER: practica
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-staging-password-123}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_staging_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U practica"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Caching (Staging)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_staging_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Django Backend (Staging)
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    environment:
+      - DEBUG=0
+      - DATABASE_URL=postgresql://practica:${POSTGRES_PASSWORD:-staging-password-123}@db:5432/practica_staging
+      - REDIS_URL=redis://redis:6379/0
+      - ALLOWED_HOSTS=localhost,127.0.0.1,staging.yourdomain.com
+      - SECRET_KEY=${SECRET_KEY:-staging-secret-key}
+    volumes:
+      - ./apps/backend:/app
+      - staging_media_volume:/app/media
+      - staging_static_volume:/app/staticfiles
+    ports:
+      - "8001:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+
+  # React Frontend (Staging)
+  frontend:
+    build:
+      context: ./apps/frontend
+      dockerfile: Dockerfile
+    environment:
+      - VITE_API_URL=http://localhost:8001
+    volumes:
+      - ./apps/frontend:/app
+      - /app/node_modules
+    ports:
+      - "3001:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_staging_data:
+  redis_staging_data:
+  staging_media_volume:
+  staging_static_volume:

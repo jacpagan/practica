@@ -1,0 +1,34 @@
+# Practica - Personal Practice Tracking System
+
+# Django Framework
+Django
+djangorestframework
+django-cors-headers
+dj-database-url
+
+# Database
+psycopg2-binary
+
+# AWS Integration
+boto3
+django-storages
+
+# Media Processing
+Pillow
+
+# Caching
+redis
+django-redis
+
+# Environment Management
+python-decouple
+
+# Production Server
+gunicorn
+whitenoise
+django-ratelimit
+
+# Development Tools
+pytest
+pytest-django
+ruff
