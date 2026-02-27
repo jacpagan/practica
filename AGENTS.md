@@ -91,3 +91,35 @@ Note: The EC2 instance uses SQLite, so database state is lost on instance recrea
 ### User Rules
 
 - Never pin Python module versions in `requirements.txt`.
+
+## Delivery Agents (Roles)
+
+- Release Agent: Owns merging to `main` and versioning. Checks that CI is green and the PR includes migration notes.
+- Deploy Agent (CI): On push to `main`, SSHes into the server and runs `docker-compose -f docker-compose.prod.yml up -d --build`. Performs a health check on `/health/`.
+- Infra Agent: Maintains DNS, TLS, and reverse proxy. Ensures `ALLOWED_HOSTS`, `CORS_ORIGINS`, and `CSRF_TRUSTED_ORIGINS` include `practica.jpagan.com`. Manages S3 bucket policy/CORS when used.
+- Dev Agent (Local): Runs `make up`, `make migrate`, `make createsuperuser`. Verifies new features locally at `localhost:3000` before pushing.
+- Observability Agent: Monitors container logs, sets alarms, and checks `/health/` and key API endpoints.
+
+### Rules of Engagement
+
+- Local-first: All features are verified locally (Docker Compose) before PR.
+- Main = Production: Merging to `main` triggers the deploy workflow to the production server.
+- Idempotent deploys: Production compose commands can be run multiple times safely.
+- Health gate: Deployment considered successful only if `/health/` returns 200 over HTTPS.
+- Media storage: Production uses S3 (recommended). If not, reverse proxy must serve `/media/` with range requests enabled.
+
+### Required Secrets (GitHub → Settings → Secrets and variables → Actions)
+
+- `SSH_HOST`: Server public hostname/IP
+- `SSH_USER`: SSH username
+- `SSH_PORT` (optional, default 22)
+- `SSH_KEY`: Private key (PEM). Ensure the public key is on the server.
+- `SSH_PROJECT_DIR`: Absolute path on server where the repo lives (e.g., `/opt/practica`)
+- `ENV_PRODUCTION` (optional): Contents of `.env.production` with env vars (DEBUG=0, ALLOWED_HOSTS, API_URL, SECRET_KEY, POSTGRES_PASSWORD, AWS_* if using S3)
+
+### Server Prereqs
+
+- Docker and docker-compose installed
+- Nginx reverse proxy terminating TLS for `practica.jpagan.com`
+- If using S3: bucket CORS allows GET/HEAD with range requests and origins set to site domain
+
