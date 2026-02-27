@@ -204,6 +204,7 @@ function QuickRecord({ token, exercises, spaces = [], onComplete, onCancel }) {
       {/* ── CAMERA / RECORDING ── */}
       {(step === STEPS.CAMERA || step === STEPS.RECORDING) && (
         <>
+          {/* Camera fills entire screen */}
           <div className="flex-1 relative overflow-hidden">
             <video
               ref={liveRef}
@@ -219,62 +220,53 @@ function QuickRecord({ token, exercises, spaces = [], onComplete, onCancel }) {
               </div>
             )}
 
-            {/* Top bar */}
-            <div className="absolute top-0 left-0 right-0 safe-top">
-              <div className="flex items-center justify-between px-4 pt-4">
-                <button onClick={step === STEPS.RECORDING ? stopRecording : onCancel}
-                  className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-
-                {step === STEPS.RECORDING && (
-                  <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full px-4 py-2">
-                    <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
-                    <span className="text-white font-mono text-sm font-medium">{fmtTimer(elapsed)}</span>
-                  </div>
-                )}
-
-                {/* Flip camera button */}
-                <button
-                  onClick={flipCamera}
-                  className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center active:scale-90 transition-transform"
-                  aria-label="Flip camera"
-                >
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M20.016 4.656v4.992" />
-                  </svg>
-                </button>
+            {/* Recording timer — top center, just informational */}
+            {step === STEPS.RECORDING && (
+              <div className="absolute top-4 left-0 right-0 flex justify-center safe-top">
+                <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full px-4 py-2">
+                  <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                  <span className="text-white font-mono text-sm font-medium">{fmtTimer(elapsed)}</span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Bottom controls */}
-          <div className="bg-black px-4 pb-8 pt-6 safe-bottom">
-            <div className="flex items-center justify-center">
+          {/* ALL controls at bottom — thumb reachable */}
+          <div className="bg-black px-6 pb-8 pt-5 safe-bottom">
+            <div className="flex items-center justify-between">
+              {/* Close — bottom left */}
+              <button onClick={step === STEPS.RECORDING ? stopRecording : onCancel}
+                className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center active:scale-90 transition-transform"
+                aria-label="Close">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              {/* Record / Stop — bottom center */}
               {step === STEPS.CAMERA && !error && (
-                <button
-                  onClick={startRecording}
-                  className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center active:scale-90 transition-transform"
-                >
+                <button onClick={startRecording}
+                  className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center active:scale-90 transition-transform">
                   <div className="w-14 h-14 bg-red-500 rounded-full" />
                 </button>
               )}
-
               {step === STEPS.RECORDING && (
-                <button
-                  onClick={stopRecording}
-                  className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center active:scale-90 transition-transform"
-                >
+                <button onClick={stopRecording}
+                  className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center active:scale-90 transition-transform">
                   <div className="w-8 h-8 bg-red-500 rounded-md" />
                 </button>
               )}
-            </div>
+              {error && <div className="w-20" />}
 
-            {step === STEPS.CAMERA && !error && (
-              <p className="text-center text-xs text-white/40 mt-3">Tap to start recording</p>
-            )}
+              {/* Flip camera — bottom right */}
+              <button onClick={flipCamera}
+                className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center active:scale-90 transition-transform"
+                aria-label="Flip camera">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M20.016 4.656v4.992" />
+                </svg>
+              </button>
+            </div>
           </div>
         </>
       )}
