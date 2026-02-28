@@ -48,6 +48,12 @@ set -a; source .env.production; set +a
 # Remove stale unix socket from previous runs before building context.
 rm -f apps/backend/gunicorn.ctl
 
+# Stop legacy host-level service if present; Docker backend owns :8000 now.
+if systemctl list-unit-files | grep -q '^practica.service'; then
+  systemctl stop practica.service || true
+  systemctl disable practica.service || true
+fi
+
 # Ensure old containers do not keep host ports (especially :8000) allocated.
 compose -f docker-compose.prod.yml down --remove-orphans || true
 docker ps --filter publish=8000 -q | xargs -r docker rm -f
