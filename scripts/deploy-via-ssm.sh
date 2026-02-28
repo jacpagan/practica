@@ -12,8 +12,6 @@ cd /opt/practica
 export HOME=/root
 git config --global --add safe.directory /opt/practica
 
-printf '%s' "__ENV_B64__" | base64 -d > .env.production
-
 if ! command -v git >/dev/null 2>&1; then apt-get update && apt-get install -y git; fi
 if ! command -v docker >/dev/null 2>&1; then echo 'Docker not found. Please install Docker.' && exit 1; fi
 if ! command -v nginx >/dev/null 2>&1; then echo 'nginx not found. Please install and configure TLS once.' && exit 1; fi
@@ -39,9 +37,12 @@ if ! git remote get-url origin >/dev/null 2>&1; then
 fi
 git fetch --all --prune
 REF="__GIT_REF__"
-git checkout "$REF"
+git clean -fd
+git checkout -f "$REF" || git checkout -f -B "$REF" "origin/$REF"
+git clean -fd
 git pull --ff-only origin "$REF" || true
 
+printf '%s' "__ENV_B64__" | base64 -d > .env.production
 set -a; source .env.production; set +a
 compose -f docker-compose.prod.yml up -d --build
 
