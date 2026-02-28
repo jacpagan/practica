@@ -1,5 +1,8 @@
 from django.contrib import admin
-from .models import Profile, Exercise, Session, Chapter, Comment, InviteCode, Tag, Space, SpaceMember
+from .models import (
+    Profile, Exercise, Session, Chapter, Comment, InviteCode, Tag, Space,
+    SpaceMember, FeedbackRequest, FeedbackAssignment,
+)
 
 
 class ChapterInline(admin.TabularInline):
@@ -70,3 +73,18 @@ class InviteCodeAdmin(admin.ModelAdmin):
 class TagAdmin(admin.ModelAdmin):
     list_display = ['name', 'created_at']
     search_fields = ['name']
+
+
+@admin.register(FeedbackRequest)
+class FeedbackRequestAdmin(admin.ModelAdmin):
+    list_display = ['id', 'session', 'requester', 'space', 'status', 'due_at', 'created_at']
+    list_filter = ['status', 'space']
+    search_fields = ['session__title', 'requester__username', 'focus_prompt']
+    raw_id_fields = ['session', 'requester', 'space']
+
+
+@admin.register(FeedbackAssignment)
+class FeedbackAssignmentAdmin(admin.ModelAdmin):
+    list_display = ['id', 'feedback_request', 'reviewer', 'status', 'is_video_review', 'claimed_at', 'completed_at']
+    list_filter = ['status', 'is_video_review']
+    raw_id_fields = ['feedback_request', 'reviewer', 'comment']

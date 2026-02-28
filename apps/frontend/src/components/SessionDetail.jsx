@@ -33,6 +33,10 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
   const [commentVideoPreview, setCommentVideoPreview] = useState(null)
   const [showRecorder, setShowRecorder] = useState(false)
   const [submittingComment, setSubmittingComment] = useState(false)
+  const [showRequestModal, setShowRequestModal] = useState(false)
+  const [requestFocusPrompt, setRequestFocusPrompt] = useState('')
+  const [requestSlaHours, setRequestSlaHours] = useState(48)
+  const [submittingRequest, setSubmittingRequest] = useState(false)
 
   // Tab
   const [tab, setTab] = useState('chapters')
@@ -177,6 +181,40 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
     finally { setSubmittingComment(false) }
   }
 
+  const createFeedbackRequest = async () => {
+    const focusPrompt = requestFocusPrompt.trim()
+    if (!focusPrompt) return toast.error('Focus prompt is required')
+
+    setSubmittingRequest(true)
+    try {
+      const res = await fetch(`/api/sessions/${session.id}/feedback-request/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({
+          focus_prompt: focusPrompt,
+          sla_hours: requestSlaHours,
+          required_reviews: 1,
+          video_required_count: 1,
+        }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return toast.error(err.error || 'Could not create feedback request')
+      }
+
+      setShowRequestModal(false)
+      setRequestFocusPrompt('')
+      setRequestSlaHours(48)
+      await refreshSession()
+      toast.success('Feedback request created')
+    } catch {
+      toast.error('Could not create feedback request')
+    } finally {
+      setSubmittingRequest(false)
+    }
+  }
+
   const removeComment = async (commentId) => {
     if (!confirm('Delete this comment?')) return
     try {
@@ -242,7 +280,16 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
 
   const chapters = session.chapters || []
   const comments = session.comments || []
+  const openFeedbackRequests = session.open_feedback_requests || []
   const activeChapter = [...chapters].reverse().find(c => currentTime >= c.timestamp_seconds)
+  const canEditSession = session.owner?.id === user?.id
+  const canRequestFeedback = session.owner?.id === user?.id
+  const formatDueAt = (value) => new Date(value).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 
   return (
     <div className="px-4 sm:px-6 py-4">
@@ -293,7 +340,9 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
           <div>
             <div className="flex items-start justify-between gap-2">
               <h1 className="text-lg font-semibold text-gray-900">{session.title}</h1>
-              <button onClick={startEditing} className="text-xs text-gray-400 hover:text-gray-600 flex-shrink-0 pt-1">Edit</button>
+              {canEditSession && (
+                <button onClick={startEditing} className="text-xs text-gray-400 hover:text-gray-600 flex-shrink-0 pt-1">Edit</button>
+              )}
             </div>
             {session.description && <p className="text-sm text-gray-500 mt-0.5">{session.description}</p>}
             {(session.tag_names || []).length > 0 && (
@@ -343,12 +392,14 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
         <>
           <div className="flex items-center justify-between mb-3">
             <span />
-            <button onClick={openAddChapter} className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
-              + Add at {fmtTime(currentTime)}
-            </button>
+            {canEditSession && (
+              <button onClick={openAddChapter} className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+                + Add at {fmtTime(currentTime)}
+              </button>
+            )}
           </div>
 
-          {showAddChapter && (
+          {showAddChapter && canEditSession && (
             <div className="mb-4 p-4 bg-gray-50 rounded-xl space-y-3">
               {/* Time range */}
               <div className="flex items-end gap-2">
@@ -489,20 +540,24 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
                     <span className="text-xs text-gray-300 flex-shrink-0">{fmtDuration(chapter.timestamp_seconds, chapter.end_seconds)}</span>
                   )}
                   {isActive && <span className="w-1.5 h-1.5 bg-gray-900 rounded-full flex-shrink-0" />}
-                  <button onClick={(e) => { e.stopPropagation(); startEditChapter(chapter) }}
-                    className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-gray-600 transition-all flex-shrink-0"
-                    aria-label="Edit chapter">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
-                    </svg>
-                  </button>
-                  <button onClick={(e) => { e.stopPropagation(); removeChapter(chapter.id) }}
-                    className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-red-400 transition-all flex-shrink-0"
-                    aria-label="Delete chapter">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                  {canEditSession && (
+                    <button onClick={(e) => { e.stopPropagation(); startEditChapter(chapter) }}
+                      className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-gray-600 transition-all flex-shrink-0"
+                      aria-label="Edit chapter">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                      </svg>
+                    </button>
+                  )}
+                  {canEditSession && (
+                    <button onClick={(e) => { e.stopPropagation(); removeChapter(chapter.id) }}
+                      className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-red-400 transition-all flex-shrink-0"
+                      aria-label="Delete chapter">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               )
             })}
@@ -511,7 +566,7 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
           {chapters.length === 0 && !showAddChapter && (
             <div className="text-center py-10">
               <p className="text-sm text-gray-400 mb-3">No chapters yet</p>
-              <p className="text-xs text-gray-400">Play the video and tap "+ Add" to mark exercises</p>
+              {canEditSession && <p className="text-xs text-gray-400">Play the video and tap "+ Add" to mark exercises</p>}
             </div>
           )}
         </>
@@ -520,16 +575,43 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
       {/* ── FEEDBACK TAB ── */}
       {tab === 'comments' && (
         <>
+          {/* Request status + create request */}
+          <div className="mb-4 rounded-xl border border-gray-200 p-3">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h3 className="text-sm font-medium text-gray-900">Feedback requests</h3>
+              {canRequestFeedback && (
+                <button
+                  onClick={() => setShowRequestModal(true)}
+                  className="text-xs font-medium text-white bg-gray-900 rounded-md px-2.5 py-1.5"
+                >
+                  Request feedback
+                </button>
+              )}
+            </div>
+
+            {openFeedbackRequests.length === 0 ? (
+              <p className="text-xs text-gray-500">No open requests for this session.</p>
+            ) : (
+              <div className="space-y-2">
+                {openFeedbackRequests.map(req => (
+                  <div key={req.id} className="rounded-lg bg-gray-50 px-3 py-2">
+                    <p className="text-xs text-gray-500">Due {formatDueAt(req.due_at)}</p>
+                    <p className="text-sm text-gray-700 mt-1">{req.focus_prompt}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* ── Compose ── */}
           <div className="mb-6">
             <div className="rounded-2xl border border-gray-200 overflow-hidden transition-all">
-              {/* Text input */}
               <textarea
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
                 className="w-full px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none resize-none border-0"
                 rows={2}
-                placeholder={user?.role === 'teacher' ? 'Leave feedback for your student...' : 'Add a note...'}
+                placeholder="Add feedback or a timestamped note..."
               />
 
               {/* Attached video preview */}
@@ -624,17 +706,62 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
             </div>
           </div>
 
+          {showRequestModal && (
+            <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
+              <div className="w-full max-w-md rounded-2xl bg-white shadow-xl p-4 space-y-3">
+                <h4 className="text-sm font-semibold text-gray-900">Request feedback</h4>
+                <p className="text-xs text-gray-500">
+                  Ask for focused feedback and set a due window.
+                </p>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Focus prompt</label>
+                  <textarea
+                    value={requestFocusPrompt}
+                    onChange={(e) => setRequestFocusPrompt(e.target.value)}
+                    rows={3}
+                    className="w-full text-sm border border-gray-200 rounded-lg p-2.5 focus:outline-none focus:border-gray-400"
+                    placeholder="What exactly should reviewers look for?"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">SLA window</label>
+                  <select
+                    value={requestSlaHours}
+                    onChange={(e) => setRequestSlaHours(Number(e.target.value))}
+                    className="w-full text-sm border border-gray-200 rounded-lg p-2.5 focus:outline-none focus:border-gray-400 bg-white"
+                  >
+                    <option value={24}>24 hours</option>
+                    <option value={48}>48 hours</option>
+                    <option value={72}>72 hours</option>
+                  </select>
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    onClick={() => setShowRequestModal(false)}
+                    className="text-xs text-gray-500 px-3 py-2"
+                    disabled={submittingRequest}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={createFeedbackRequest}
+                    disabled={submittingRequest}
+                    className="text-xs font-medium text-white bg-gray-900 rounded-lg px-3 py-2 disabled:opacity-50"
+                  >
+                    {submittingRequest ? 'Creating...' : 'Create request'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ── Comment thread ── */}
           <div className="space-y-1">
             {comments.map(comment => (
               <div key={comment.id} className="group">
                 <div className="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50/80 transition-colors">
                   {/* Avatar */}
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 ${
-                    comment.role === 'teacher'
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-gray-100 text-gray-600'
-                  }`}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 bg-blue-100 text-blue-700">
                     {(comment.display_name || comment.username)[0].toUpperCase()}
                   </div>
 
@@ -644,11 +771,6 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
                       <span className="text-sm font-medium text-gray-900">
                         {comment.display_name || comment.username}
                       </span>
-                      {comment.role === 'teacher' && (
-                        <span className="text-[10px] font-medium uppercase tracking-wider bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">
-                          Teacher
-                        </span>
-                      )}
                       {comment.timestamp_seconds !== null && (
                         <button
                           onClick={() => seekTo(comment.timestamp_seconds)}
@@ -696,11 +818,7 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
           {comments.length === 0 && (
             <div className="text-center py-12">
               <p className="text-sm text-gray-400">No feedback yet</p>
-              <p className="text-xs text-gray-400 mt-1">
-                {user?.role === 'teacher'
-                  ? 'Watch the video and leave feedback for your student'
-                  : 'Your teacher can leave feedback here'}
-              </p>
+              <p className="text-xs text-gray-400 mt-1">Watch the video and share helpful observations.</p>
             </div>
           )}
         </>

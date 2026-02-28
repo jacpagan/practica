@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useToast } from './Toast'
 import TagInput from './TagInput'
+import { uploadFormData } from '../utils'
 
 function SessionUpload({ token, spaces = [], activeSpace, onComplete, onCancel }) {
   const [selectedSpace, setSelectedSpace] = useState(activeSpace || '')
@@ -10,6 +11,7 @@ function SessionUpload({ token, spaces = [], activeSpace, onComplete, onCancel }
   const [tags, setTags] = useState([])
   const [videoFile, setVideoFile] = useState(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(null)
   const [recordingMode, setRecordingMode] = useState('file')
   const [isRecording, setIsRecording] = useState(false)
   const [recordedVideo, setRecordedVideo] = useState(null)
@@ -70,6 +72,8 @@ function SessionUpload({ token, spaces = [], activeSpace, onComplete, onCancel }
     if (!title.trim()) return toast.error('Please enter a title')
     if (!videoFile) return toast.error('Please select or record a video')
     setIsUploading(true)
+    setUploadProgress(0)
+    let success = false
     try {
       const fd = new FormData()
       fd.append('title', title.trim())
@@ -77,14 +81,19 @@ function SessionUpload({ token, spaces = [], activeSpace, onComplete, onCancel }
       fd.append('video_file', videoFile)
       if (tags.length > 0) fd.append('tags', tags.join(','))
       if (selectedSpace) fd.append('space', selectedSpace)
-      const res = await fetch('/api/sessions/', {
-        method: 'POST', body: fd,
-        headers: token ? { 'Authorization': `Token ${token}` } : {},
+      const res = await uploadFormData({
+        url: '/api/sessions/',
+        formData: fd,
+        token,
+        onProgress: (percent) => setUploadProgress(percent),
       })
-      if (res.ok) { toast.success('Session uploaded'); onComplete() }
-      else toast.error('Upload failed')
+      if (res.ok) { success = true; toast.success('Session uploaded'); onComplete() }
+      else toast.error(res.data?.error || 'Upload failed')
     } catch { toast.error('Error uploading') }
-    finally { setIsUploading(false) }
+    finally {
+      setIsUploading(false)
+      if (!success) setUploadProgress(null)
+    }
   }
 
   return (
@@ -160,9 +169,22 @@ function SessionUpload({ token, spaces = [], activeSpace, onComplete, onCancel }
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onCancel} className="flex-1 text-sm text-gray-600 border border-gray-200 rounded-lg py-2.5 hover:bg-gray-50 transition-colors">Cancel</button>
             <button type="submit" disabled={isUploading} className="flex-1 text-sm font-medium text-white bg-gray-900 rounded-lg py-2.5 hover:bg-gray-800 disabled:opacity-40 transition-colors">
-              {isUploading ? 'Uploading...' : 'Save'}
+              {isUploading ? `Uploading${uploadProgress !== null ? ` ${uploadProgress}%` : '...'}` : 'Save'}
             </button>
           </div>
+          {isUploading && (
+            <div>
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gray-900 transition-all"
+                  style={{ width: `${Math.max(uploadProgress ?? 5, 5)}%` }}
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Upload in progress{uploadProgress !== null ? ` (${uploadProgress}%)` : ''}. Max file size is 2GB.
+              </p>
+            </div>
+          )}
         </form>
       </div>
     </div>

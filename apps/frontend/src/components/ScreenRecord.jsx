@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { authHeaders } from '../auth'
 import { useToast } from './Toast'
 import TagInput from './TagInput'
-import { fmtTimer } from '../utils'
+import { fmtTimer, uploadFormData } from '../utils'
 
 const STEPS = { IDLE: 'idle', PREVIEWING: 'previewing', RECORDING: 'recording', REVIEW: 'review' }
 
@@ -16,6 +15,7 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
   const [tags, setTags] = useState([])
   const [selectedSpace, setSelectedSpace] = useState('')
   const [saving, setSaving] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(null)
   const [recordedFile, setRecordedFile] = useState(null)
   const [showCamera, setShowCamera] = useState(true)
 
@@ -31,8 +31,6 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
   const timerRef = useRef(null)
   const animFrameRef = useRef(null)
   const blobUrlRef = useRef(null)
-
-  const headers = authHeaders(token)
 
   // ── Cleanup ──
   const stopStreams = useCallback(() => {
@@ -247,6 +245,8 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
     const sessionTitle = title.trim() || `${timeOfDay} Screen Recording — ${dateStr}`
 
     setSaving(true)
+    setUploadProgress(0)
+    let success = false
     try {
       const fd = new FormData()
       fd.append('title', sessionTitle)
@@ -256,16 +256,25 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
       if (tags.length > 0) fd.append('tags', tags.join(','))
       if (selectedSpace) fd.append('space', selectedSpace)
 
-      const res = await fetch('/api/sessions/', { method: 'POST', body: fd, headers })
+      const res = await uploadFormData({
+        url: '/api/sessions/',
+        formData: fd,
+        token,
+        onProgress: (percent) => setUploadProgress(percent),
+      })
       if (res.ok) {
-        const session = await res.json()
+        success = true
+        const session = res.data
         toast.success('Session saved')
         onComplete(session)
       } else {
-        toast.error('Failed to save')
+        toast.error(res.data?.error || 'Failed to save')
       }
     } catch { toast.error('Error saving') }
-    finally { setSaving(false) }
+    finally {
+      setSaving(false)
+      if (!success) setUploadProgress(null)
+    }
   }
 
   const handleDiscard = () => {
@@ -405,12 +414,25 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
             {recordedFile && (
               <p className="text-xs text-gray-400">{fmtTimer(elapsed)} · {(recordedFile.size / 1024 / 1024).toFixed(1)} MB</p>
             )}
+            {saving && (
+              <div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gray-900 transition-all"
+                    style={{ width: `${Math.max(uploadProgress ?? 5, 5)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Uploading{uploadProgress !== null ? ` ${uploadProgress}%` : '...'} · Max 2GB
+                </p>
+              </div>
+            )}
             <div className="flex gap-3 pt-1">
               <button onClick={handleDiscard}
                 className="flex-1 text-sm text-gray-500 border border-gray-200 rounded-xl py-3 hover:bg-gray-50 transition-colors">Discard</button>
               <button onClick={saveSession} disabled={saving}
                 className="flex-1 text-sm font-medium text-white bg-gray-900 rounded-xl py-3 hover:bg-gray-800 disabled:opacity-40 transition-colors active:scale-[0.98]">
-                {saving ? 'Saving...' : 'Save & add chapters'}
+                {saving ? `Uploading${uploadProgress !== null ? ` ${uploadProgress}%` : '...'}` : 'Save & add chapters'}
               </button>
             </div>
           </div>
