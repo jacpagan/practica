@@ -9,6 +9,7 @@ set -euo pipefail
 
 mkdir -p /opt/practica
 cd /opt/practica
+export HOME=/root
 git config --global --add safe.directory /opt/practica
 
 printf '%s' "__ENV_B64__" | base64 -d > .env.production
