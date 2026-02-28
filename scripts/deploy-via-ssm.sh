@@ -65,34 +65,10 @@ for i in $(seq 1 60); do
 done
 if [ "${ok:-}" != "1" ]; then echo 'Backend failed health check' >&2; compose -f docker-compose.prod.yml logs --tail=200 backend || true; exit 1; fi
 
-SITE=$(grep -RIl "server_name[[:space:]]\+practica.jpagan.com" /etc/nginx/sites-enabled /etc/nginx/sites-available 2>/dev/null | head -n1 || true)
-if [ -z "$SITE" ]; then SITE=/etc/nginx/sites-available/practica; fi
-CERT_LINE=$(grep -E "^\s*ssl_certificate\s" "$SITE" | head -n1 || true)
-KEY_LINE=$(grep -E "^\s*ssl_certificate_key\s" "$SITE" | head -n1 || true)
-cp -a "$SITE" "$SITE.bak" 2>/dev/null || true
-cat > "$SITE" <<NGINXCONF
-server {
-    listen 443 ssl http2;
-    server_name practica.jpagan.com;
-    ${CERT_LINE}
-    ${KEY_LINE}
-    client_max_body_size 2G;
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-}
-server {
-    listen 80;
-    server_name practica.jpagan.com;
-    return 301 https://$host$request_uri;
-}
-NGINXCONF
-if [ ! -e /etc/nginx/sites-enabled/practica ]; then ln -sf "$SITE" /etc/nginx/sites-enabled/practica; fi
-nginx -t
-systemctl reload nginx
+# Keep nginx reload best-effort; avoid rewriting site config during app deploy.
+if ! nginx -t || ! systemctl reload nginx; then
+  echo "Nginx reload skipped (existing config may be unmanaged)." >&2
+fi
 
 for i in $(seq 1 30); do
   curl -fsS https://practica.jpagan.com/health/ && ok=1 && break || sleep 2
