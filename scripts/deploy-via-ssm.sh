@@ -14,8 +14,18 @@ printf '%s' "__ENV_B64__" | base64 -d > .env.production
 
 if ! command -v git >/dev/null 2>&1; then apt-get update && apt-get install -y git; fi
 if ! command -v docker >/dev/null 2>&1; then echo 'Docker not found. Please install Docker.' && exit 1; fi
-if ! docker compose version >/dev/null 2>&1; then echo 'docker compose plugin not found. Please install docker-compose-plugin.' && exit 1; fi
 if ! command -v nginx >/dev/null 2>&1; then echo 'nginx not found. Please install and configure TLS once.' && exit 1; fi
+
+compose() {
+  if docker compose version >/dev/null 2>&1; then
+    docker compose "$@"
+  elif command -v docker-compose >/dev/null 2>&1; then
+    docker-compose "$@"
+  else
+    echo 'Neither docker compose nor docker-compose is available.' >&2
+    exit 1
+  fi
+}
 
 REPO_URL='https://github.com/jacpagan/practica.git'
 if [ ! -d .git ]; then
@@ -27,12 +37,12 @@ git checkout "$REF"
 git pull --ff-only origin "$REF" || true
 
 set -a; source .env.production; set +a
-docker compose -f docker-compose.prod.yml up -d --build
+compose -f docker-compose.prod.yml up -d --build
 
 for i in $(seq 1 60); do
   curl -fsS http://127.0.0.1:8000/health && ok=1 && break || sleep 2
 done
-if [ "${ok:-}" != "1" ]; then echo 'Backend failed health check' >&2; docker compose -f docker-compose.prod.yml logs --tail=200 backend || true; exit 1; fi
+if [ "${ok:-}" != "1" ]; then echo 'Backend failed health check' >&2; compose -f docker-compose.prod.yml logs --tail=200 backend || true; exit 1; fi
 
 SITE=$(grep -RIl "server_name[[:space:]]\+practica.jpagan.com" /etc/nginx/sites-enabled /etc/nginx/sites-available 2>/dev/null | head -n1 || true)
 if [ -z "$SITE" ]; then SITE=/etc/nginx/sites-available/practica; fi
