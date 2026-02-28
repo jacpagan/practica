@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { authHeaders } from '../auth'
 import { useToast } from './Toast'
 import TagInput from './TagInput'
-import { fmtTimer } from '../utils'
+import { fmtTimer, uploadFormData } from '../utils'
 
 const STEPS = { CAMERA: 'camera', RECORDING: 'recording', REVIEW: 'review', SAVE: 'save' }
 
@@ -16,6 +15,7 @@ function QuickRecord({ token, exercises, spaces = [], onComplete, onCancel }) {
   const [tags, setTags] = useState([])
   const [selectedSpace, setSelectedSpace] = useState('')
   const [saving, setSaving] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(null)
   const [recordedFile, setRecordedFile] = useState(null)
   const [facing, setFacing] = useState('environment') // 'environment' (back) or 'user' (front)
 
@@ -27,8 +27,6 @@ function QuickRecord({ token, exercises, spaces = [], onComplete, onCancel }) {
   const timerRef = useRef(null)
   const blobUrlRef = useRef(null)
   const facingRef = useRef('environment')
-
-  const headers = authHeaders(token)
 
   // ── Cleanup ──
   const stopStream = useCallback(() => {
@@ -165,6 +163,8 @@ function QuickRecord({ token, exercises, spaces = [], onComplete, onCancel }) {
     const sessionTitle = title.trim() || `${timeOfDay} Practice — ${dateStr}`
 
     setSaving(true)
+    setUploadProgress(0)
+    let success = false
     try {
       const fd = new FormData()
       fd.append('title', sessionTitle)
@@ -174,16 +174,25 @@ function QuickRecord({ token, exercises, spaces = [], onComplete, onCancel }) {
       if (tags.length > 0) fd.append('tags', tags.join(','))
       if (selectedSpace) fd.append('space', selectedSpace)
 
-      const res = await fetch('/api/sessions/', { method: 'POST', body: fd, headers })
+      const res = await uploadFormData({
+        url: '/api/sessions/',
+        formData: fd,
+        token,
+        onProgress: (percent) => setUploadProgress(percent),
+      })
       if (res.ok) {
-        const session = await res.json()
+        success = true
+        const session = res.data
         toast.success('Session saved')
         onComplete(session)
       } else {
-        toast.error('Failed to save session')
+        toast.error(res.data?.error || 'Failed to save session')
       }
     } catch { toast.error('Error saving') }
-    finally { setSaving(false) }
+    finally {
+      setSaving(false)
+      if (!success) setUploadProgress(null)
+    }
   }
 
   const handleDiscard = () => {
@@ -327,6 +336,19 @@ function QuickRecord({ token, exercises, spaces = [], onComplete, onCancel }) {
                 {fmtTimer(elapsed)} · {(recordedFile.size / 1024 / 1024).toFixed(1)} MB
               </p>
             )}
+            {saving && (
+              <div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gray-900 transition-all"
+                    style={{ width: `${Math.max(uploadProgress ?? 5, 5)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Uploading{uploadProgress !== null ? ` ${uploadProgress}%` : '...'} · Max 2GB
+                </p>
+              </div>
+            )}
 
             <div className="flex gap-3 pt-1">
               <button
@@ -340,7 +362,7 @@ function QuickRecord({ token, exercises, spaces = [], onComplete, onCancel }) {
                 disabled={saving}
                 className="flex-1 text-sm font-medium text-white bg-gray-900 rounded-xl py-3 hover:bg-gray-800 disabled:opacity-40 transition-colors active:scale-[0.98]"
               >
-                {saving ? 'Saving...' : 'Save & add chapters'}
+                {saving ? `Uploading${uploadProgress !== null ? ` ${uploadProgress}%` : '...'}` : 'Save & add chapters'}
               </button>
             </div>
           </div>

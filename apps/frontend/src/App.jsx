@@ -27,6 +27,7 @@ import ProgressView from './components/ProgressView'
 import ConnectionsView from './components/ConnectionsView'
 import QuickRecord from './components/QuickRecord'
 import ScreenRecord from './components/ScreenRecord'
+import FeedbackRequestsView from './components/FeedbackRequestsView'
 
 function AppContent() {
   const { user, token, loading, logout, refreshUser } = useAuth()
@@ -97,6 +98,17 @@ function AppContent() {
   }
 
   const openSession = (session) => { setSelectedSession(session); setView('detail') }
+  const openSessionById = async (sessionId) => {
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/`, { headers })
+      if (!res.ok) return toast.error('Could not load session')
+      const data = await res.json()
+      setSelectedSession(data)
+      setView('detail')
+    } catch {
+      toast.error('Could not load session')
+    }
+  }
   const openProgress = (exercise) => { setSelectedExercise(exercise); setView('progress') }
 
   const goHome = () => {
@@ -157,6 +169,10 @@ function AppContent() {
                 <button onClick={() => setView('connections')}
                   className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
                   Spaces
+                </button>
+                <button onClick={() => setView('feedback')}
+                  className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
+                  Feedback
                 </button>
               </>
             )}
@@ -244,8 +260,9 @@ function AppContent() {
             onSessionSelect={openSession} onExerciseSelect={openProgress}
             onUploadClick={() => setView('upload')}
             onDeleteSession={async (id) => {
-              await fetch(`/api/sessions/${id}/`, { method: 'DELETE', headers })
-              fetchSessions()
+              const res = await fetch(`/api/sessions/${id}/`, { method: 'DELETE', headers })
+              if (res.ok) fetchSessions()
+              else toast.error('You can only delete your own sessions')
             }}
           />
         )}
@@ -266,6 +283,9 @@ function AppContent() {
         )}
         {view === 'connections' && (
           <ConnectionsView spaces={spaces} token={token} onBack={goHome} onSpacesChange={fetchSpaces} />
+        )}
+        {view === 'feedback' && (
+          <FeedbackRequestsView token={token} user={user} onOpenSession={openSessionById} />
         )}
       </main>
 
