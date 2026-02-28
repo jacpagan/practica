@@ -27,6 +27,19 @@ compose() {
   fi
 }
 
+count_records() {
+  compose -f docker-compose.prod.yml exec -T backend \
+    python /app/apps/backend/manage.py shell -c \
+    "from django.contrib.auth import get_user_model; from videos.models import Session; U=get_user_model(); print(f'users={U.objects.count()} sessions={Session.objects.count()}')" 2>/dev/null \
+    | tail -n 1 || true
+}
+
+extract_metric() {
+  key="$1"
+  line="$2"
+  printf '%s\n' "$line" | sed -n "s/.*${key}=\\([0-9][0-9]*\\).*/\\1/p" | tail -n 1
+}
+
 REPO_URL='https://github.com/jacpagan/practica.git'
 if [ ! -d .git ]; then
   git init
@@ -54,6 +67,28 @@ systemctl disable practica.service || true
 systemctl mask practica.service || true
 pkill -f '/opt/practica/.venv/bin/gunicorn' || true
 
+# Capture current DB counts when previous stack is healthy (used for reset protection).
+PRE_COUNTS=$(count_records)
+PRE_USERS=$(extract_metric users "$PRE_COUNTS")
+PRE_SESSIONS=$(extract_metric sessions "$PRE_COUNTS")
+echo "Pre-deploy counts: ${PRE_COUNTS:-unavailable}"
+
+# Best-effort DB snapshot before recycling containers.
+mkdir -p /opt/practica/backups
+TS=$(date -u +%Y%m%dT%H%M%SZ)
+BACKUP_FILE="/opt/practica/backups/practica_prod_${TS}.sql.gz"
+if PGPASSWORD="${POSTGRES_PASSWORD:-}" compose -f docker-compose.prod.yml exec -T db \
+  pg_dump -U "${POSTGRES_USER:-practica}" "${POSTGRES_DB:-practica_prod}" | gzip -1 > "$BACKUP_FILE"; then
+  echo "Wrote DB snapshot: $BACKUP_FILE"
+  ls -1dt /opt/practica/backups/practica_prod_*.sql.gz 2>/dev/null | tail -n +11 | xargs -r rm -f
+  if command -v aws >/dev/null 2>&1 && [ -n "${AWS_STORAGE_BUCKET_NAME:-}" ]; then
+    aws s3 cp "$BACKUP_FILE" "s3://${AWS_STORAGE_BUCKET_NAME}/db-backups/$(basename "$BACKUP_FILE")" >/dev/null 2>&1 || true
+  fi
+else
+  rm -f "$BACKUP_FILE" || true
+  echo "DB snapshot skipped (db not ready or db missing)." >&2
+fi
+
 # Ensure old containers do not keep host ports (especially :8000) allocated.
 compose -f docker-compose.prod.yml down --remove-orphans || true
 docker ps --filter publish=8000 -q | xargs -r docker rm -f
@@ -64,6 +99,21 @@ for i in $(seq 1 60); do
   curl -fsS -H "Host: practica.jpagan.com" http://127.0.0.1:8000/health/ && ok=1 && break || sleep 2
 done
 if [ "${ok:-}" != "1" ]; then echo 'Backend failed health check' >&2; compose -f docker-compose.prod.yml logs --tail=200 backend || true; exit 1; fi
+
+POST_COUNTS=$(count_records)
+POST_USERS=$(extract_metric users "$POST_COUNTS")
+POST_SESSIONS=$(extract_metric sessions "$POST_COUNTS")
+echo "Post-deploy counts: ${POST_COUNTS:-unavailable}"
+
+if [ "${ALLOW_EMPTY_DB_AFTER_DEPLOY:-0}" != "1" ] \
+  && [ -n "${PRE_USERS:-}" ] && [ -n "${PRE_SESSIONS:-}" ] \
+  && [ -n "${POST_USERS:-}" ] && [ -n "${POST_SESSIONS:-}" ] \
+  && [ $((PRE_USERS + PRE_SESSIONS)) -gt 0 ] \
+  && [ $((POST_USERS + POST_SESSIONS)) -eq 0 ]; then
+  echo "Safety check failed: DB looked populated before deploy and empty after deploy." >&2
+  echo "Set ALLOW_EMPTY_DB_AFTER_DEPLOY=1 in ENV_PRODUCTION only if this reset is intentional." >&2
+  exit 1
+fi
 
 # Keep nginx reload best-effort; avoid rewriting site config during app deploy.
 if ! nginx -t || ! systemctl reload nginx; then
