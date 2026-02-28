@@ -29,7 +29,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Django Backend (Production)
+  # Django Backend (Production) — serves API and built frontend via WhiteNoise
   backend:
     build:
       context: .
@@ -45,8 +45,8 @@ services:
       - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME}
       - AWS_S3_REGION_NAME=${AWS_S3_REGION_NAME:-us-east-1}
     volumes:
-      - prod_media_volume:/app/media
-      - prod_static_volume:/app/staticfiles
+      - prod_media_volume:/app/apps/backend/media
+      - prod_static_volume:/app/apps/backend/staticfiles
     ports:
       - "8000:8000"
     depends_on:
@@ -55,26 +55,7 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
-    command: >
-      sh -c "python manage.py migrate &&
-             python manage.py collectstatic --noinput &&
-             python manage.py runserver 0.0.0.0:8000"
-
-  # React Frontend (Production)
-  frontend:
-    build:
-      context: ./apps/frontend
-      dockerfile: Dockerfile
-    environment:
-      - VITE_API_URL=${API_URL:-http://localhost:8000}
-    volumes:
-      - ./apps/frontend:/app
-      - /app/node_modules
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
-    restart: unless-stopped
+    # Command defined in Dockerfile: migrate, collectstatic, gunicorn
 
 volumes:
   postgres_prod_data:
