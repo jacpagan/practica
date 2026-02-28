@@ -7,7 +7,6 @@ on:
 
 jobs:
   deploy:
-    if: ${{ secrets.SSH_HOST != '' && secrets.SSH_USER != '' && secrets.SSH_KEY != '' && secrets.SSH_PROJECT_DIR != '' }}
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -20,6 +19,7 @@ jobs:
           echo "REPO_URL=${{ format('{0}/{1}', github.server_url, github.repository) }}" >> $GITHUB_OUTPUT
 
       - name: Deploy over SSH
+        if: ${{ secrets.SSH_HOST != '' && secrets.SSH_USER != '' && secrets.SSH_KEY != '' && secrets.SSH_PROJECT_DIR != '' }}
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
