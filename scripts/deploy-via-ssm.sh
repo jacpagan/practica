@@ -29,7 +29,11 @@ compose() {
 
 REPO_URL='https://github.com/jacpagan/practica.git'
 if [ ! -d .git ]; then
-  git clone "$REPO_URL" .
+  git init
+  git remote add origin "$REPO_URL"
+fi
+if ! git remote get-url origin >/dev/null 2>&1; then
+  git remote add origin "$REPO_URL"
 fi
 git fetch --all --prune
 REF="__GIT_REF__"
