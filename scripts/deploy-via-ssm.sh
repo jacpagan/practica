@@ -44,6 +44,14 @@ git pull --ff-only origin "$REF" || true
 
 printf '%s' "__ENV_B64__" | base64 -d > .env.production
 set -a; source .env.production; set +a
+
+# Remove stale unix socket from previous runs before building context.
+rm -f apps/backend/gunicorn.ctl
+
+# Ensure old containers do not keep host ports (especially :8000) allocated.
+compose -f docker-compose.prod.yml down --remove-orphans || true
+docker ps --filter publish=8000 -q | xargs -r docker rm -f
+
 compose -f docker-compose.prod.yml up -d --build
 
 for i in $(seq 1 60); do
