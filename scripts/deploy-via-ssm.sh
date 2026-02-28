@@ -61,7 +61,7 @@ docker ps --filter publish=8000 -q | xargs -r docker rm -f
 compose -f docker-compose.prod.yml up -d --build
 
 for i in $(seq 1 60); do
-  curl -fsS http://127.0.0.1:8000/health && ok=1 && break || sleep 2
+  curl -fsS -H "Host: practica.jpagan.com" http://127.0.0.1:8000/health/ && ok=1 && break || sleep 2
 done
 if [ "${ok:-}" != "1" ]; then echo 'Backend failed health check' >&2; compose -f docker-compose.prod.yml logs --tail=200 backend || true; exit 1; fi
 
@@ -95,7 +95,7 @@ nginx -t
 systemctl reload nginx
 
 for i in $(seq 1 30); do
-  curl -fsS https://practica.jpagan.com/health && ok=1 && break || sleep 2
+  curl -fsS https://practica.jpagan.com/health/ && ok=1 && break || sleep 2
 done
 if [ "${ok:-}" != "1" ]; then echo 'Public health check failed (check TLS/DNS).'; fi
 EOS
