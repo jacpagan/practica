@@ -25,7 +25,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || '22' }}
-          host_key: ${{ secrets.SSH_HOST_KEY }}
+          fingerprint: ${{ secrets.SSH_HOST_KEY }}
           envs: REPO_URL
           script_stop: true
           script: |
