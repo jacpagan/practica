@@ -9,6 +9,11 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
+    env:
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SSH_KEY: ${{ secrets.SSH_KEY }}
+      SSH_PROJECT_DIR: ${{ secrets.SSH_PROJECT_DIR }}
     steps:
       - name: Checkout (for context only)
         uses: actions/checkout@v4
@@ -19,7 +24,7 @@ jobs:
           echo "REPO_URL=${{ format('{0}/{1}', github.server_url, github.repository) }}" >> $GITHUB_OUTPUT
 
       - name: Deploy over SSH
-        if: ${{ secrets.SSH_HOST != '' && secrets.SSH_USER != '' && secrets.SSH_KEY != '' && secrets.SSH_PROJECT_DIR != '' }}
+        if: ${{ env.SSH_HOST != '' && env.SSH_USER != '' && env.SSH_KEY != '' && env.SSH_PROJECT_DIR != '' }}
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
