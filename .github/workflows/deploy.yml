@@ -55,6 +55,15 @@ jobs:
             fi
 
             docker-compose -f docker-compose.prod.yml up -d --build
+            docker-compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py migrate
+
+            cat >/etc/cron.d/practica-feedback-expiry <<CRON
+            SHELL=/bin/bash
+            PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+            */10 * * * * root cd $PROJECT_DIR && docker-compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py expire_feedback_requests >> /var/log/practica-feedback-expiry.log 2>&1
+            CRON
+            chmod 0644 /etc/cron.d/practica-feedback-expiry
+            systemctl reload cron || service cron reload || true
 
             set +e
             for i in $(seq 1 30); do

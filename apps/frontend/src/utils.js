@@ -55,3 +55,38 @@ export const parseTimeInput = (str) => {
   if (parts.length === 1) return Math.max(0, parseInt(parts[0] || 0))
   return null
 }
+
+export const uploadFormData = ({ url, formData, token, onProgress }) =>
+  new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', url)
+    if (token) xhr.setRequestHeader('Authorization', `Token ${token}`)
+
+    xhr.upload.onprogress = (event) => {
+      if (!onProgress) return
+      if (event.lengthComputable) {
+        const percent = Math.round((event.loaded / event.total) * 100)
+        onProgress(percent, event.loaded, event.total)
+      } else {
+        onProgress(null, event.loaded, event.total)
+      }
+    }
+
+    xhr.onload = () => {
+      const text = xhr.responseText || ''
+      let data = null
+      if (text) {
+        try { data = JSON.parse(text) } catch { data = text }
+      }
+      resolve({
+        ok: xhr.status >= 200 && xhr.status < 300,
+        status: xhr.status,
+        data,
+        text,
+      })
+    }
+
+    xhr.onerror = () => reject(new Error('Network error during upload'))
+    xhr.onabort = () => reject(new Error('Upload aborted'))
+    xhr.send(formData)
+  })

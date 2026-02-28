@@ -9,6 +9,9 @@ from videos.views import (
     register_view, login_view, me_view,
     create_invite, accept_invite, tag_list,
     join_space, space_info,
+    feedback_requests_open, feedback_requests_assigned,
+    feedback_request_claim, feedback_request_release,
+    feedback_request_cancel, feedback_request_complete,
 )
 
 router = DefaultRouter()
@@ -25,6 +28,12 @@ urlpatterns = [
     path('api/invite/create/', create_invite, name='create_invite'),
     path('api/invite/accept/', accept_invite, name='accept_invite'),
     path('api/tags/', tag_list, name='tag_list'),
+    path('api/feedback-requests/open/', feedback_requests_open, name='feedback_requests_open'),
+    path('api/feedback-requests/assigned/', feedback_requests_assigned, name='feedback_requests_assigned'),
+    path('api/feedback-requests/<int:request_id>/claim/', feedback_request_claim, name='feedback_request_claim'),
+    path('api/feedback-requests/<int:request_id>/release/', feedback_request_release, name='feedback_request_release'),
+    path('api/feedback-requests/<int:request_id>/cancel/', feedback_request_cancel, name='feedback_request_cancel'),
+    path('api/feedback-requests/<int:request_id>/complete/', feedback_request_complete, name='feedback_request_complete'),
     path('api/join/<slug:slug>/', join_space, name='join_space'),
     path('api/space-info/<slug:slug>/', space_info, name='space_info'),
     path('health/', health_check, name='health_check'),
