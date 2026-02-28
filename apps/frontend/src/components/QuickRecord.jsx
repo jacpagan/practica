@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useToast } from './Toast'
 import TagInput from './TagInput'
-import { fmtTimer, uploadFormData } from '../utils'
+import { fmtTimer, uploadErrorMessage, uploadFormData } from '../utils'
 
 const STEPS = { CAMERA: 'camera', RECORDING: 'recording', REVIEW: 'review', SAVE: 'save' }
 
@@ -186,7 +186,7 @@ function QuickRecord({ token, exercises, spaces = [], onComplete, onCancel }) {
         toast.success('Session saved')
         onComplete(session)
       } else {
-        toast.error(res.data?.error || 'Failed to save session')
+        toast.error(uploadErrorMessage(res))
       }
     } catch { toast.error('Error saving') }
     finally {

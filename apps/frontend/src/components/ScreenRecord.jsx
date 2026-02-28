@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useToast } from './Toast'
 import TagInput from './TagInput'
-import { fmtTimer, uploadFormData } from '../utils'
+import { fmtTimer, uploadErrorMessage, uploadFormData } from '../utils'
 
 const STEPS = { IDLE: 'idle', PREVIEWING: 'previewing', RECORDING: 'recording', REVIEW: 'review' }
 
@@ -268,7 +268,7 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
         toast.success('Session saved')
         onComplete(session)
       } else {
-        toast.error(res.data?.error || 'Failed to save')
+        toast.error(uploadErrorMessage(res))
       }
     } catch { toast.error('Error saving') }
     finally {

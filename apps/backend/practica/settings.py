@@ -136,9 +136,12 @@ WHITENOISE_ROOT = str(FRONTEND_DIR) if FRONTEND_DIR.exists() else None
 
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# Max upload size: 2GB for long practice recordings
-DATA_UPLOAD_MAX_MEMORY_SIZE = 2147483648
-FILE_UPLOAD_MAX_MEMORY_SIZE = 2147483648
+# Upload sizing
+# Keep request acceptance at 2GB by default, but spool large file bodies to disk
+# instead of RAM to avoid OOM on small instances.
+UPLOAD_MAX_BYTES = int(os.environ.get('UPLOAD_MAX_BYTES', 2147483648))
+DATA_UPLOAD_MAX_MEMORY_SIZE = UPLOAD_MAX_BYTES
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get('FILE_UPLOAD_MAX_MEMORY_SIZE', 5242880))
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

@@ -105,6 +105,16 @@ CRON
 chmod 0644 /etc/cron.d/practica-feedback-expiry
 systemctl reload cron || service cron reload || true
 
+# Apply upload-safe nginx defaults globally (http context).
+cat > /etc/nginx/conf.d/practica-upload.conf <<NGINXUPLOAD
+client_max_body_size 2G;
+client_body_timeout 3600s;
+proxy_request_buffering off;
+proxy_read_timeout 3600s;
+proxy_send_timeout 3600s;
+send_timeout 3600s;
+NGINXUPLOAD
+
 for i in $(seq 1 60); do
   curl -fsS -H "Host: practica.jpagan.com" http://127.0.0.1:8000/health/ && ok=1 && break || sleep 2
 done

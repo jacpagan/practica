@@ -90,3 +90,14 @@ export const uploadFormData = ({ url, formData, token, onProgress }) =>
     xhr.onabort = () => reject(new Error('Upload aborted'))
     xhr.send(formData)
   })
+
+export const uploadErrorMessage = (res) => {
+  if (!res) return 'Upload failed'
+  if (res.status === 0) return 'Network interrupted during upload. Please retry.'
+  if (res.status === 413) return 'File too large for server limits. Current max is 2GB.'
+  if (res.status === 408 || res.status === 499 || res.status === 504) {
+    return 'Upload timed out. Please retry on a stable connection.'
+  }
+  if (typeof res.data === 'string' && res.data.trim()) return res.data
+  return res.data?.error || `Upload failed (${res.status})`
+}

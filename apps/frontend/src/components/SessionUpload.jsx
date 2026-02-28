@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useToast } from './Toast'
 import TagInput from './TagInput'
-import { uploadFormData } from '../utils'
+import { uploadFormData, uploadErrorMessage } from '../utils'
 
 function SessionUpload({ token, spaces = [], activeSpace, onComplete, onCancel }) {
   const [selectedSpace, setSelectedSpace] = useState(activeSpace || '')
@@ -88,7 +88,7 @@ function SessionUpload({ token, spaces = [], activeSpace, onComplete, onCancel }
         onProgress: (percent) => setUploadProgress(percent),
       })
       if (res.ok) { success = true; toast.success('Session uploaded'); onComplete() }
-      else toast.error(res.data?.error || 'Upload failed')
+      else toast.error(uploadErrorMessage(res))
     } catch { toast.error('Error uploading') }
     finally {
       setIsUploading(false)
