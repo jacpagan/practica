@@ -41,4 +41,4 @@ RUN mkdir -p /app/apps/backend/media
 EXPOSE 8000
 
 # Use gunicorn in production; migrations + collectstatic on start
-CMD ["/bin/sh", "-c", "python /app/apps/backend/manage.py migrate && python /app/apps/backend/manage.py collectstatic --noinput && gunicorn practica.wsgi:application -b 0.0.0.0:8000 --workers 3"]
+CMD ["/bin/sh", "-c", "python /app/apps/backend/manage.py migrate && python /app/apps/backend/manage.py collectstatic --noinput && gunicorn --chdir /app/apps/backend practica.wsgi:application -b 0.0.0.0:8000 --workers 3"]
