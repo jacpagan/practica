@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useToast } from './Toast'
 import TagInput from './TagInput'
-import { fmtTimer, uploadFormData } from '../utils'
+import { createSessionUpload, fmtTimer, uploadErrorMessage } from '../utils'
 
 const STEPS = { IDLE: 'idle', PREVIEWING: 'previewing', RECORDING: 'recording', REVIEW: 'review' }
 
@@ -248,18 +248,16 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
     setUploadProgress(0)
     let success = false
     try {
-      const fd = new FormData()
-      fd.append('title', sessionTitle)
-      fd.append('description', description.trim())
-      fd.append('video_file', recordedFile)
-      fd.append('duration_seconds', elapsed)
-      if (tags.length > 0) fd.append('tags', tags.join(','))
-      if (selectedSpace) fd.append('space', selectedSpace)
-
-      const res = await uploadFormData({
-        url: '/api/sessions/',
-        formData: fd,
+      const res = await createSessionUpload({
         token,
+        payload: {
+          title: sessionTitle,
+          description: description.trim(),
+          duration_seconds: elapsed,
+          tags,
+          space: selectedSpace || null,
+        },
+        videoFile: recordedFile,
         onProgress: (percent) => setUploadProgress(percent),
       })
       if (res.ok) {
@@ -268,7 +266,7 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
         toast.success('Session saved')
         onComplete(session)
       } else {
-        toast.error(res.data?.error || 'Failed to save')
+        toast.error(uploadErrorMessage(res))
       }
     } catch { toast.error('Error saving') }
     finally {

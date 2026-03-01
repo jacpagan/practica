@@ -93,6 +93,52 @@ class Session(models.Model):
         return self.title
 
 
+class MultipartSessionUpload(models.Model):
+    """Tracks direct-to-S3 multipart uploads before session creation."""
+
+    STATUS_INITIATED = 'initiated'
+    STATUS_COMPLETED = 'completed'
+    STATUS_ABORTED = 'aborted'
+    STATUS_EXPIRED = 'expired'
+    STATUS_CHOICES = [
+        (STATUS_INITIATED, 'Initiated'),
+        (STATUS_COMPLETED, 'Completed'),
+        (STATUS_ABORTED, 'Aborted'),
+        (STATUS_EXPIRED, 'Expired'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='multipart_uploads')
+    space = models.ForeignKey(Space, on_delete=models.SET_NULL, null=True, blank=True, related_name='multipart_uploads')
+    session = models.ForeignKey(Session, on_delete=models.SET_NULL, null=True, blank=True, related_name='multipart_upload_records')
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_INITIATED)
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    tags_csv = models.TextField(blank=True)
+    duration_seconds = models.IntegerField(null=True, blank=True)
+    original_filename = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=100, blank=True)
+    size_bytes = models.BigIntegerField()
+    s3_key = models.CharField(max_length=512)
+    s3_upload_id = models.CharField(max_length=256)
+    expires_at = models.DateTimeField()
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'status']),
+            models.Index(fields=['expires_at']),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=['s3_key', 's3_upload_id'], name='multipart_upload_s3_key_upload_id_uniq'),
+        ]
+
+    def __str__(self):
+        return f"MultipartUpload #{self.id} user={self.user_id} status={self.status}"
+
+
 class Chapter(models.Model):
     """A timestamped marker within a session, linked to an exercise."""
     session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='chapters')

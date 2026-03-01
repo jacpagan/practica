@@ -66,11 +66,16 @@ server {
     ${CERT_LINE}
     ${KEY_LINE}
     client_max_body_size 2G;
+    client_body_timeout 3600s;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+    send_timeout 3600s;
     location / {
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_request_buffering off;
     }
 }
 server {
