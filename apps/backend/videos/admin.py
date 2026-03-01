@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     Profile, Exercise, Session, Chapter, Comment, InviteCode, Tag, Space,
-    SpaceMember, FeedbackRequest, FeedbackAssignment,
+    SpaceMember, FeedbackRequest, FeedbackAssignment, MultipartSessionUpload,
 )
 
 
@@ -88,3 +88,11 @@ class FeedbackAssignmentAdmin(admin.ModelAdmin):
     list_display = ['id', 'feedback_request', 'reviewer', 'status', 'is_video_review', 'claimed_at', 'completed_at']
     list_filter = ['status', 'is_video_review']
     raw_id_fields = ['feedback_request', 'reviewer', 'comment']
+
+
+@admin.register(MultipartSessionUpload)
+class MultipartSessionUploadAdmin(admin.ModelAdmin):
+    list_display = ['id', 'user', 'status', 'size_bytes', 'original_filename', 'created_at', 'expires_at', 'completed_at']
+    list_filter = ['status']
+    search_fields = ['user__username', 'original_filename', 's3_key', 's3_upload_id']
+    raw_id_fields = ['user', 'space', 'session']

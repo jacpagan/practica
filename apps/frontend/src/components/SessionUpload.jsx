@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useToast } from './Toast'
 import TagInput from './TagInput'
-import { uploadFormData, uploadErrorMessage } from '../utils'
+import { createSessionUpload, uploadErrorMessage } from '../utils'
 
 function SessionUpload({ token, spaces = [], activeSpace, onComplete, onCancel }) {
   const [selectedSpace, setSelectedSpace] = useState(activeSpace || '')
@@ -75,16 +75,15 @@ function SessionUpload({ token, spaces = [], activeSpace, onComplete, onCancel }
     setUploadProgress(0)
     let success = false
     try {
-      const fd = new FormData()
-      fd.append('title', title.trim())
-      fd.append('description', description.trim())
-      fd.append('video_file', videoFile)
-      if (tags.length > 0) fd.append('tags', tags.join(','))
-      if (selectedSpace) fd.append('space', selectedSpace)
-      const res = await uploadFormData({
-        url: '/api/sessions/',
-        formData: fd,
+      const res = await createSessionUpload({
         token,
+        payload: {
+          title: title.trim(),
+          description: description.trim(),
+          tags,
+          space: selectedSpace || null,
+        },
+        videoFile,
         onProgress: (percent) => setUploadProgress(percent),
       })
       if (res.ok) { success = true; toast.success('Session uploaded'); onComplete() }

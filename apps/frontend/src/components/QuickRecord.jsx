@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useToast } from './Toast'
 import TagInput from './TagInput'
-import { fmtTimer, uploadErrorMessage, uploadFormData } from '../utils'
+import { createSessionUpload, fmtTimer, uploadErrorMessage } from '../utils'
 
 const STEPS = { CAMERA: 'camera', RECORDING: 'recording', REVIEW: 'review', SAVE: 'save' }
 
@@ -166,18 +166,16 @@ function QuickRecord({ token, exercises, spaces = [], onComplete, onCancel }) {
     setUploadProgress(0)
     let success = false
     try {
-      const fd = new FormData()
-      fd.append('title', sessionTitle)
-      fd.append('description', description.trim())
-      fd.append('video_file', recordedFile)
-      fd.append('duration_seconds', elapsed)
-      if (tags.length > 0) fd.append('tags', tags.join(','))
-      if (selectedSpace) fd.append('space', selectedSpace)
-
-      const res = await uploadFormData({
-        url: '/api/sessions/',
-        formData: fd,
+      const res = await createSessionUpload({
         token,
+        payload: {
+          title: sessionTitle,
+          description: description.trim(),
+          duration_seconds: elapsed,
+          tags,
+          space: selectedSpace || null,
+        },
+        videoFile: recordedFile,
         onProgress: (percent) => setUploadProgress(percent),
       })
       if (res.ok) {
