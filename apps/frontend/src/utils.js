@@ -3,6 +3,10 @@ const API_BASE = window.location.hostname === 'localhost'
   : ''
 const MULTIPART_THRESHOLD_BYTES = 64 * 1024 * 1024
 const MAX_PART_RETRIES = 3
+const MULTIPART_CONCURRENCY = 4
+const RETRY_BASE_DELAY_MS = 500
+const RETRY_MAX_DELAY_MS = 4000
+const MULTIPART_RESUME_PREFIX = 'practica.multipart.resume.v1'
 
 export const videoUrl = (path) => {
   if (!path) return null
@@ -56,6 +60,63 @@ export const parseTimeInput = (str) => {
   if (parts.length === 2) return Math.max(0, parseInt(parts[0] || 0) * 60 + parseInt(parts[1] || 0))
   if (parts.length === 1) return Math.max(0, parseInt(parts[0] || 0))
   return null
+}
+
+const localStore = () => {
+  try {
+    return window.localStorage
+  } catch {
+    return null
+  }
+}
+
+const multipartFingerprint = ({ payload, videoFile }) => {
+  const tags = Array.isArray(payload?.tags) ? [...payload.tags].map((t) => String(t)).sort().join(',') : ''
+  return [
+    videoFile?.name || '',
+    videoFile?.size || 0,
+    videoFile?.lastModified || 0,
+    payload?.title || '',
+    payload?.space || '',
+    payload?.duration_seconds || '',
+    tags,
+  ].join('|')
+}
+
+const multipartResumeKey = (fingerprint) => `${MULTIPART_RESUME_PREFIX}:${fingerprint}`
+
+const readResumeRecord = (storageKey) => {
+  const store = localStore()
+  if (!store) return null
+  try {
+    const raw = store.getItem(storageKey)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+const writeResumeRecord = (storageKey, record) => {
+  const store = localStore()
+  if (!store) return
+  try {
+    store.setItem(storageKey, JSON.stringify(record))
+  } catch {
+    // Ignore quota/storage errors; upload can continue without persistence.
+  }
+}
+
+const clearResumeRecord = (storageKey) => {
+  const store = localStore()
+  if (!store) return
+  try {
+    store.removeItem(storageKey)
+  } catch {
+    // Ignore storage errors.
+  }
 }
 
 export const uploadFormData = ({ url, formData, token, onProgress }) =>
@@ -140,111 +201,247 @@ const putBlobToSignedUrl = ({ signedUrl, blob, onProgress }) =>
     xhr.send(blob)
   })
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
 const retry = async (fn, maxAttempts = MAX_PART_RETRIES) => {
   let lastErr = null
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try { return await fn() } catch (err) { lastErr = err }
+    try {
+      return await fn()
+    } catch (err) {
+      lastErr = err
+      if (attempt >= maxAttempts) break
+      const jitter = Math.floor(Math.random() * 250)
+      const backoff = Math.min(RETRY_MAX_DELAY_MS, RETRY_BASE_DELAY_MS * (2 ** (attempt - 1)))
+      await sleep(backoff + jitter)
+    }
   }
   throw lastErr || new Error('Unknown retry failure')
 }
 
-const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress }) => {
-  const initRes = await authedJsonPost({
-    url: '/api/sessions/multipart/initiate/',
-    token,
-    body: {
-      ...payload,
-      filename: videoFile.name,
-      content_type: videoFile.type,
-      size_bytes: videoFile.size,
-    },
-  })
-  if (!initRes.ok) return initRes
+const asApiError = (res) => {
+  const err = new Error(res?.data?.error || `Request failed (${res?.status || 'unknown'})`)
+  err.apiResponse = res
+  return err
+}
 
-  const uploadId = initRes.data?.multipart_upload_id
-  const partSize = initRes.data?.part_size
-  const totalParts = initRes.data?.total_parts
-  if (!uploadId || !partSize || !totalParts) {
-    return { ok: false, status: 500, data: { error: 'Invalid multipart init response' } }
+const parseUploadedParts = (rawParts, totalParts) => {
+  const partsByNumber = new Map()
+  if (!Array.isArray(rawParts)) return partsByNumber
+  for (const part of rawParts) {
+    const partNumber = parseInt(part?.part_number, 10)
+    const etag = String(part?.etag || '').trim()
+    if (!partNumber || partNumber < 1 || partNumber > totalParts) continue
+    if (!etag || partsByNumber.has(partNumber)) continue
+    partsByNumber.set(partNumber, etag)
+  }
+  return partsByNumber
+}
+
+const partByteLength = (partNumber, partSize, totalBytes) => {
+  const start = (partNumber - 1) * partSize
+  return Math.max(0, Math.min(partSize, totalBytes - start))
+}
+
+const buildPartsPayload = (partsByNumber) =>
+  Array.from(partsByNumber.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([partNumber, etag]) => ({ part_number: partNumber, etag }))
+
+const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress }) => {
+  const fingerprint = multipartFingerprint({ payload, videoFile })
+  const storageKey = multipartResumeKey(fingerprint)
+
+  let uploadId = null
+  let partSize = null
+  let totalParts = null
+  let uploadedParts = []
+
+  const resumeRecord = readResumeRecord(storageKey)
+  if (resumeRecord?.upload_id && Number(resumeRecord?.size_bytes) === Number(videoFile.size)) {
+    const statusRes = await authedJsonPost({
+      url: '/api/sessions/multipart/status/',
+      token,
+      body: { multipart_upload_id: resumeRecord.upload_id },
+    })
+    if (statusRes.ok && statusRes.data?.status === 'initiated') {
+      uploadId = statusRes.data?.multipart_upload_id
+      partSize = statusRes.data?.part_size
+      totalParts = statusRes.data?.total_parts
+      uploadedParts = statusRes.data?.uploaded_parts || []
+    } else if (statusRes.ok || [400, 404, 410].includes(statusRes.status)) {
+      clearResumeRecord(storageKey)
+    } else {
+      return statusRes
+    }
   }
 
-  const parts = []
-  let uploadedBytes = 0
-  try {
-    for (let partNumber = 1; partNumber <= totalParts; partNumber += 1) {
-      const start = (partNumber - 1) * partSize
-      const end = Math.min(start + partSize, videoFile.size)
-      const chunk = videoFile.slice(start, end)
+  if (!uploadId) {
+    const initRes = await authedJsonPost({
+      url: '/api/sessions/multipart/initiate/',
+      token,
+      body: {
+        ...payload,
+        filename: videoFile.name,
+        content_type: videoFile.type,
+        size_bytes: videoFile.size,
+      },
+    })
+    if (!initRes.ok) return initRes
 
+    uploadId = initRes.data?.multipart_upload_id
+    partSize = initRes.data?.part_size
+    totalParts = initRes.data?.total_parts
+    uploadedParts = []
+  }
+
+  if (!uploadId || !partSize || !totalParts) {
+    clearResumeRecord(storageKey)
+    return { ok: false, status: 500, data: { error: 'Invalid multipart upload state' } }
+  }
+
+  writeResumeRecord(storageKey, {
+    upload_id: uploadId,
+    size_bytes: videoFile.size,
+    filename: videoFile.name,
+    last_modified: videoFile.lastModified || 0,
+  })
+
+  const partsByNumber = parseUploadedParts(uploadedParts, totalParts)
+  let completedBytes = 0
+  for (const partNumber of partsByNumber.keys()) {
+    completedBytes += partByteLength(partNumber, partSize, videoFile.size)
+  }
+
+  const inflightLoaded = new Map()
+  const reportProgress = () => {
+    if (!onProgress) return
+    let inFlightBytes = 0
+    for (const loaded of inflightLoaded.values()) {
+      inFlightBytes += Math.max(0, Number(loaded || 0))
+    }
+    const done = Math.min(videoFile.size, completedBytes + inFlightBytes)
+    let percent = Math.round((done / videoFile.size) * 100)
+    if (done > 0 && done < videoFile.size) percent = Math.max(1, Math.min(99, percent))
+    onProgress(percent, done, videoFile.size)
+  }
+  reportProgress()
+
+  const missingParts = []
+  for (let partNumber = 1; partNumber <= totalParts; partNumber += 1) {
+    if (!partsByNumber.has(partNumber)) missingParts.push(partNumber)
+  }
+
+  const uploadOnePart = async (partNumber) => {
+    const start = (partNumber - 1) * partSize
+    const end = Math.min(start + partSize, videoFile.size)
+    const chunk = videoFile.slice(start, end)
+    inflightLoaded.set(partNumber, 0)
+    reportProgress()
+
+    try {
       const signRes = await retry(() => authedJsonPost({
         url: '/api/sessions/multipart/sign-part/',
         token,
         body: { multipart_upload_id: uploadId, part_number: partNumber },
       }))
-      if (!signRes.ok || !signRes.data?.signed_url) return signRes
+      if (!signRes.ok || !signRes.data?.signed_url) throw asApiError(signRes)
 
-      const partResult = await retry(() => putBlobToSignedUrl({
-        signedUrl: signRes.data.signed_url,
-        blob: chunk,
-        onProgress: (loaded) => {
-          if (!onProgress) return
-          const done = uploadedBytes + loaded
-          const percent = Math.max(1, Math.min(99, Math.round((done / videoFile.size) * 100)))
-          onProgress(percent, done, videoFile.size)
-        },
-      }))
+      const partResult = await retry(async () => {
+        const result = await putBlobToSignedUrl({
+          signedUrl: signRes.data.signed_url,
+          blob: chunk,
+          onProgress: (loaded) => {
+            inflightLoaded.set(partNumber, loaded)
+            reportProgress()
+          },
+        })
+        if (!result.etag) throw new Error('S3 did not return an ETag for uploaded part')
+        return result
+      })
 
-      uploadedBytes += chunk.size
-      parts.push({ part_number: partNumber, etag: partResult.etag })
-      if (onProgress) {
-        const percent = Math.max(1, Math.min(99, Math.round((uploadedBytes / videoFile.size) * 100)))
-        onProgress(percent, uploadedBytes, videoFile.size)
+      partsByNumber.set(partNumber, partResult.etag)
+      completedBytes += chunk.size
+    } finally {
+      inflightLoaded.delete(partNumber)
+      reportProgress()
+    }
+  }
+
+  if (missingParts.length) {
+    let cursor = 0
+    const worker = async () => {
+      while (true) {
+        const index = cursor
+        cursor += 1
+        if (index >= missingParts.length) return
+        await uploadOnePart(missingParts[index])
       }
     }
-
-    const completeRes = await authedJsonPost({
-      url: '/api/sessions/multipart/complete/',
-      token,
-      body: {
-        multipart_upload_id: uploadId,
-        parts,
-      },
-    })
-    if (completeRes.ok && onProgress) onProgress(100, videoFile.size, videoFile.size)
-    return completeRes
-  } catch (err) {
-    await authedJsonPost({
-      url: '/api/sessions/multipart/abort/',
-      token,
-      body: { multipart_upload_id: uploadId },
-    }).catch(() => {})
-    throw err
+    const workerCount = Math.min(MULTIPART_CONCURRENCY, missingParts.length)
+    try {
+      await Promise.all(Array.from({ length: workerCount }, () => worker()))
+    } catch (err) {
+      if (err?.apiResponse) return err.apiResponse
+      throw err
+    }
   }
+
+  const completeRes = await authedJsonPost({
+    url: '/api/sessions/multipart/complete/',
+    token,
+    body: {
+      multipart_upload_id: uploadId,
+      parts: buildPartsPayload(partsByNumber),
+    },
+  })
+
+  if (completeRes.ok) {
+    clearResumeRecord(storageKey)
+    if (onProgress) onProgress(100, videoFile.size, videoFile.size)
+    return completeRes
+  }
+
+  if ([400, 404, 410].includes(completeRes.status)) clearResumeRecord(storageKey)
+  return completeRes
 }
 
 export const createSessionUpload = async ({ token, payload, videoFile, onProgress }) => {
-  if (videoFile && videoFile.size >= MULTIPART_THRESHOLD_BYTES) {
-    const multipartRes = await createSessionViaMultipart({ token, payload, videoFile, onProgress })
-    if (multipartRes.ok || ![400, 404, 405].includes(multipartRes.status)) return multipartRes
-  }
+  try {
+    if (videoFile && videoFile.size >= MULTIPART_THRESHOLD_BYTES) {
+      const multipartRes = await createSessionViaMultipart({ token, payload, videoFile, onProgress })
+      if (multipartRes.ok || ![400, 404, 405].includes(multipartRes.status)) return multipartRes
+    }
 
-  const fd = new FormData()
-  fd.append('title', payload.title || '')
-  fd.append('description', payload.description || '')
-  fd.append('video_file', videoFile)
-  if (payload.duration_seconds !== undefined && payload.duration_seconds !== null && payload.duration_seconds !== '') {
-    fd.append('duration_seconds', payload.duration_seconds)
+    const fd = new FormData()
+    fd.append('title', payload.title || '')
+    fd.append('description', payload.description || '')
+    fd.append('video_file', videoFile)
+    if (payload.duration_seconds !== undefined && payload.duration_seconds !== null && payload.duration_seconds !== '') {
+      fd.append('duration_seconds', payload.duration_seconds)
+    }
+    if (payload.space) fd.append('space', payload.space)
+    if (payload.tags?.length) fd.append('tags', payload.tags.join(','))
+    return uploadFormData({ url: '/api/sessions/', formData: fd, token, onProgress })
+  } catch {
+    return {
+      ok: false,
+      status: 0,
+      data: { error: 'Network interrupted during upload. Please retry.' },
+      text: '',
+    }
   }
-  if (payload.space) fd.append('space', payload.space)
-  if (payload.tags?.length) fd.append('tags', payload.tags.join(','))
-  return uploadFormData({ url: '/api/sessions/', formData: fd, token, onProgress })
 }
 export const uploadErrorMessage = (res) => {
   if (!res) return 'Upload failed'
   if (res.status === 0) return 'Network interrupted during upload. Please retry.'
+  if (res.status === 410) return 'Upload session expired. Please retry.'
   if (res.status === 413) return 'File too large for server limits. Current max is 2GB.'
   if (res.status === 408 || res.status === 499 || res.status === 504) {
     return 'Upload timed out. Please retry on a stable connection.'
+  }
+  if (String(res?.data?.error || '').toLowerCase().includes('expired')) {
+    return 'Upload session expired. Please retry.'
   }
   if (typeof res.data === 'string' && res.data.trim()) return res.data
   return res.data?.error || `Upload failed (${res.status})`

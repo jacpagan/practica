@@ -130,6 +130,34 @@ def _sanitize_filename(name):
     return safe or 'session-video.mp4'
 
 
+def _list_uploaded_parts(upload, client=None):
+    client = client or _s3_client()
+    parts = []
+    marker = None
+    while True:
+        params = {
+            'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
+            'Key': upload.s3_key,
+            'UploadId': upload.s3_upload_id,
+            'MaxParts': 1000,
+        }
+        if marker:
+            params['PartNumberMarker'] = marker
+        resp = client.list_parts(**params)
+        for part in resp.get('Parts', []):
+            parts.append({
+                'part_number': part.get('PartNumber'),
+                'etag': str(part.get('ETag', '')).strip(),
+                'size': part.get('Size'),
+            })
+        if not resp.get('IsTruncated'):
+            break
+        marker = resp.get('NextPartNumberMarker')
+        if not marker:
+            break
+    return parts
+
+
 def _parse_tag_names(raw_tags):
     if isinstance(raw_tags, str):
         return [t.strip() for t in raw_tags.split(',') if t.strip()]
@@ -482,7 +510,7 @@ class SessionViewSet(viewsets.ModelViewSet):
             return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
 
         tags_csv = ','.join(_parse_tag_names(request.data.get('tags', [])))
-        expires_at = timezone.now() + timedelta(hours=6)
+        expires_at = timezone.now() + timedelta(hours=24)
 
         try:
             create_kwargs = {
@@ -517,6 +545,48 @@ class SessionViewSet(viewsets.ModelViewSet):
             'total_parts': total_parts,
             'expires_at': upload.expires_at,
         }, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['post'], url_path='multipart/status')
+    def multipart_status(self, request):
+        if not _direct_uploads_enabled():
+            return Response({'error': 'Direct uploads are not configured'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            upload_id = int(request.data.get('multipart_upload_id'))
+        except (TypeError, ValueError):
+            return Response({'error': 'Invalid multipart upload'}, status=status.HTTP_400_BAD_REQUEST)
+
+        upload = get_object_or_404(MultipartSessionUpload, pk=upload_id, user=request.user)
+        if upload.status == MultipartSessionUpload.STATUS_INITIATED and upload.expires_at < timezone.now():
+            upload.status = MultipartSessionUpload.STATUS_EXPIRED
+            upload.save(update_fields=['status'])
+
+        part_size = _recommended_part_size(upload.size_bytes)
+        total_parts = math.ceil(upload.size_bytes / part_size)
+        uploaded_parts = []
+
+        if upload.status == MultipartSessionUpload.STATUS_INITIATED:
+            try:
+                uploaded_parts = _list_uploaded_parts(upload)
+            except ClientError as exc:
+                code = str(exc.response.get('Error', {}).get('Code', ''))
+                if code == 'NoSuchUpload':
+                    upload.status = MultipartSessionUpload.STATUS_EXPIRED
+                    upload.save(update_fields=['status'])
+                    return Response({'error': 'Upload session no longer exists'}, status=status.HTTP_410_GONE)
+                return Response({'error': 'Could not fetch multipart upload status'}, status=status.HTTP_502_BAD_GATEWAY)
+            except BotoCoreError:
+                return Response({'error': 'Could not fetch multipart upload status'}, status=status.HTTP_502_BAD_GATEWAY)
+
+        return Response({
+            'multipart_upload_id': upload.id,
+            'status': upload.status,
+            'expires_at': upload.expires_at,
+            'size_bytes': upload.size_bytes,
+            'part_size': part_size,
+            'total_parts': total_parts,
+            'uploaded_parts': uploaded_parts,
+        })
 
     @action(detail=False, methods=['post'], url_path='multipart/sign-part')
     def multipart_sign_part(self, request):
