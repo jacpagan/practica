@@ -17,11 +17,13 @@ class FeedbackRequestsApiTests(APITestCase):
         self.member = User.objects.create_user(username='member', password='pass1234')
         self.member_two = User.objects.create_user(username='member-two', password='pass1234')
         self.outsider = User.objects.create_user(username='outsider', password='pass1234')
+        self.staff = User.objects.create_user(username='staff-moderator', password='pass1234', is_staff=True)
 
         Profile.objects.create(user=self.owner, display_name='Owner')
         Profile.objects.create(user=self.member, display_name='Member')
         Profile.objects.create(user=self.member_two, display_name='Member Two')
         Profile.objects.create(user=self.outsider, display_name='Outsider')
+        Profile.objects.create(user=self.staff, display_name='Staff Moderator')
 
         self.space = Space.objects.create(name='Drumming', owner=self.owner)
         SpaceMember.objects.create(space=self.space, user=self.member)
@@ -158,3 +160,28 @@ class FeedbackRequestsApiTests(APITestCase):
             format='json',
         )
         self.assertEqual(create_response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_staff_can_patch_non_owned_session_and_delete_non_owned_comment(self):
+        self.client.force_authenticate(user=self.owner)
+        comment_response = self.client.post(
+            f'/api/sessions/{self.owner_session.id}/add_comment/',
+            {'text': 'Owner comment for moderation smoke'},
+            format='multipart',
+        )
+        self.assertEqual(comment_response.status_code, status.HTTP_201_CREATED)
+        comment_id = comment_response.data['comments'][-1]['id']
+
+        self.client.force_authenticate(user=self.staff)
+        patch_response = self.client.patch(
+            f'/api/sessions/{self.owner_session.id}/',
+            {'description': 'Updated by staff'},
+            format='json',
+        )
+        self.assertEqual(patch_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(patch_response.data['description'], 'Updated by staff')
+
+        delete_response = self.client.delete(
+            f'/api/sessions/{self.owner_session.id}/comments/{comment_id}/',
+        )
+        self.assertEqual(delete_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(delete_response.data['comments']), 0)

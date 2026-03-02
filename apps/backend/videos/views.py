@@ -41,6 +41,8 @@ def _visible_sessions_qs(user):
     """Sessions visible in spaces you belong to/own, plus your own sessions."""
     if not user.is_authenticated:
         return Session.objects.none()
+    if user.is_staff:
+        return Session.objects.all()
     return Session.objects.filter(
         Q(user=user) |
         Q(space__owner=user) |
