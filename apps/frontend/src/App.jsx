@@ -323,10 +323,14 @@ function AppContent() {
               onLoadMoreExercises={loadMoreExercises}
               onSessionSelect={openSession} onExerciseSelect={openProgress}
               onUploadClick={() => setView('upload')}
+              onRefreshSessions={() => fetchSessions()}
               onDeleteSession={async (id) => {
                 const res = await fetch(`/api/sessions/${id}/`, { method: 'DELETE', headers })
                 if (res.ok) fetchSessions()
-                else toast.error('You can only delete your own sessions')
+                else {
+                  const data = await res.json().catch(() => ({}))
+                  toast.error(data.error || 'You do not have permission to delete this session')
+                }
               }}
             />
           </>

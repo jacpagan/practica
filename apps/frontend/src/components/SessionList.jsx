@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef } from 'react'
 import { fmtDateLong, videoUrl } from '../utils'
 
 const dateKey = (dateStr) => {
@@ -24,7 +24,7 @@ const timeLabel = (dateStr) => {
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
 }
 
-function Thumbnail({ src, className = '' }) {
+function Thumbnail({ src, className = '', onMediaError = null }) {
   const [failed, setFailed] = useState(false)
   return (
     <div className={`bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 ${className}`}>
@@ -34,7 +34,10 @@ function Thumbnail({ src, className = '' }) {
           className="w-full h-full object-cover"
           muted preload="metadata"
           onLoadedMetadata={(e) => { e.target.currentTime = 1 }}
-          onError={() => setFailed(true)}
+          onError={() => {
+            setFailed(true)
+            if (onMediaError) onMediaError()
+          }}
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center">
@@ -65,9 +68,25 @@ function SessionList({
   onExerciseSelect,
   onUploadClick,
   onDeleteSession,
+  onRefreshSessions,
 }) {
   
   const [tab, setTab] = useState('sessions')
+  const refreshInFlightRef = useRef(false)
+  const lastRefreshAtRef = useRef(0)
+
+  const requestSessionRefresh = async () => {
+    if (!onRefreshSessions) return
+    const now = Date.now()
+    if (refreshInFlightRef.current || now - lastRefreshAtRef.current < 5000) return
+    refreshInFlightRef.current = true
+    lastRefreshAtRef.current = now
+    try {
+      await onRefreshSessions()
+    } finally {
+      refreshInFlightRef.current = false
+    }
+  }
 
   const groupedSessions = useMemo(() => {
     const groups = []
@@ -144,7 +163,11 @@ function SessionList({
                       <div key={session.id} onClick={() => onSessionSelect(session)}
                         className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer group">
 
-                        <Thumbnail src={session.video_file} className="w-16 h-11 sm:w-24 sm:h-16" />
+                        <Thumbnail
+                          src={session.video_file}
+                          className="w-16 h-11 sm:w-24 sm:h-16"
+                          onMediaError={requestSessionRefresh}
+                        />
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
@@ -188,7 +211,7 @@ function SessionList({
                           </div>
                         </div>
 
-                        {session.owner_id === user?.id && (
+                        {(session.owner_id === user?.id || user?.is_staff) && (
                           <button
                             onClick={(e) => { e.stopPropagation(); if (confirm(`Delete "${session.title}"?`)) onDeleteSession(session.id) }}
                             className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-300 hover:text-red-400 transition-all flex-shrink-0"
