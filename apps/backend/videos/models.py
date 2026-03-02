@@ -277,3 +277,68 @@ class FeedbackAssignment(models.Model):
 
     def __str__(self):
         return f"FeedbackAssignment #{self.id} request={self.feedback_request_id} reviewer={self.reviewer_id} status={self.status}"
+
+
+class CoachEvent(models.Model):
+    """Internal telemetry events for coach ROI metrics."""
+
+    EVENT_SESSION_UPLOADED = 'session_uploaded'
+    EVENT_FEEDBACK_REQUESTED = 'feedback_requested'
+    EVENT_FEEDBACK_CLAIMED = 'feedback_claimed'
+    EVENT_FEEDBACK_COMPLETED = 'feedback_completed'
+    EVENT_VIDEO_FEEDBACK_COMPLETED = 'video_feedback_completed'
+    EVENT_TYPE_CHOICES = [
+        (EVENT_SESSION_UPLOADED, 'Session Uploaded'),
+        (EVENT_FEEDBACK_REQUESTED, 'Feedback Requested'),
+        (EVENT_FEEDBACK_CLAIMED, 'Feedback Claimed'),
+        (EVENT_FEEDBACK_COMPLETED, 'Feedback Completed'),
+        (EVENT_VIDEO_FEEDBACK_COMPLETED, 'Video Feedback Completed'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='coach_events')
+    event_type = models.CharField(max_length=32, choices=EVENT_TYPE_CHOICES)
+    occurred_at = models.DateTimeField(default=timezone.now)
+    session = models.ForeignKey(Session, on_delete=models.SET_NULL, null=True, blank=True, related_name='coach_events')
+    space = models.ForeignKey(Space, on_delete=models.SET_NULL, null=True, blank=True, related_name='coach_events')
+    feedback_request = models.ForeignKey(
+        FeedbackRequest,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='coach_events',
+    )
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ['-occurred_at']
+        indexes = [
+            models.Index(fields=['user', 'event_type', 'occurred_at'], name='coach_event_user_type_time_idx'),
+        ]
+
+    def __str__(self):
+        return f"CoachEvent #{self.id} user={self.user_id} type={self.event_type}"
+
+
+class CoachDailyMetric(models.Model):
+    """Daily aggregate ROI metrics per coach."""
+
+    coach = models.ForeignKey(User, on_delete=models.CASCADE, related_name='coach_daily_metrics')
+    date = models.DateField()
+    active_students_30d = models.PositiveIntegerField(default=0)
+    feedback_completions_7d = models.PositiveIntegerField(default=0)
+    feedback_completions_30d = models.PositiveIntegerField(default=0)
+    median_time_to_feedback_hours_30d = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    estimated_time_saved_hours_30d = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['date']
+        constraints = [
+            models.UniqueConstraint(fields=['coach', 'date'], name='coach_daily_metric_cd_uniq'),
+        ]
+        indexes = [
+            models.Index(fields=['coach', 'date'], name='coach_daily_metric_cd_idx'),
+        ]
+
+    def __str__(self):
+        return f"CoachDailyMetric coach={self.coach_id} date={self.date}"

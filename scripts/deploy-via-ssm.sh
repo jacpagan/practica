@@ -101,6 +101,7 @@ cat > /etc/cron.d/practica-feedback-expiry <<CRON
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 */10 * * * * root cd /opt/practica && if docker compose version >/dev/null 2>&1; then docker compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py expire_feedback_requests; elif command -v docker-compose >/dev/null 2>&1; then docker-compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py expire_feedback_requests; fi >> /var/log/practica-feedback-expiry.log 2>&1
+0 * * * * root cd /opt/practica && if docker compose version >/dev/null 2>&1; then docker compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py build_coach_metrics --days 35; elif command -v docker-compose >/dev/null 2>&1; then docker-compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py build_coach_metrics --days 35; fi >> /var/log/practica-coach-metrics.log 2>&1
 CRON
 chmod 0644 /etc/cron.d/practica-feedback-expiry
 systemctl reload cron || service cron reload || true
