@@ -44,6 +44,9 @@ services:
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_STORAGE_BUCKET_NAME=${AWS_STORAGE_BUCKET_NAME}
       - AWS_S3_REGION_NAME=${AWS_S3_REGION_NAME:-us-east-1}
+      - COACH_METRICS_ENABLED=${COACH_METRICS_ENABLED:-False}
+      - COACH_METRICS_INTERNAL_USER_IDS=${COACH_METRICS_INTERNAL_USER_IDS:-}
+      - COACH_METRICS_MINUTES_SAVED_PER_COMPLETION=${COACH_METRICS_MINUTES_SAVED_PER_COMPLETION:-20}
     volumes:
       - prod_media_volume:/app/apps/backend/media
       - prod_static_volume:/app/apps/backend/staticfiles
