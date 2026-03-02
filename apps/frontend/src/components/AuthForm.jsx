@@ -1,8 +1,9 @@
 import React, { useState } from 'react'
 import { useAuth } from '../auth'
+import { useEffect } from 'react'
 
 function AuthForm() {
-  const { login, register } = useAuth()
+  const { login, loginWithInvite, register } = useAuth()
   const [mode, setMode] = useState('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -17,14 +18,14 @@ function AuthForm() {
   const [spaceInfo, setSpaceInfo] = useState(null)
 
   // Fetch space info if we have a slug
-  useState(() => {
+  useEffect(() => {
     if (inviteSlug) {
       fetch(`/api/space-info/${inviteSlug}/`)
         .then(r => r.ok ? r.json() : null)
         .then(data => { if (data) { setSpaceInfo(data); setMode('register') } })
         .catch(() => {})
     }
-  })
+  }, [inviteSlug])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -32,15 +33,8 @@ function AuthForm() {
     setLoading(true)
     try {
       if (mode === 'login') {
-        await login(username, password)
-        if (inviteSlug) {
-          // After login, join the space
-          const token = localStorage.getItem('token')
-          await fetch(`/api/join/${inviteSlug}/`, {
-            method: 'POST',
-            headers: { 'Authorization': `Token ${token}` },
-          })
-        }
+        if (inviteSlug) await loginWithInvite(username, password, inviteSlug)
+        else await login(username, password)
       } else {
         await register({
           username, password,

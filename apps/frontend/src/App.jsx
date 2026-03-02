@@ -36,6 +36,12 @@ function AppContent() {
   const [sessions, setSessions] = useState([])
   const [exercises, setExercises] = useState([])
   const [spaces, setSpaces] = useState([])
+  const [sessionsLoading, setSessionsLoading] = useState(false)
+  const [exercisesLoading, setExercisesLoading] = useState(false)
+  const [sessionsLoaded, setSessionsLoaded] = useState(false)
+  const [exercisesLoaded, setExercisesLoaded] = useState(false)
+  const [sessionsNext, setSessionsNext] = useState(null)
+  const [exercisesNext, setExercisesNext] = useState(null)
   const [activeSpace, setActiveSpace] = useState(null) // null = all
   const [view, setView] = useState('sessions')
   const [selectedSession, setSelectedSession] = useState(null)
@@ -44,10 +50,15 @@ function AppContent() {
   const [newSpaceName, setNewSpaceName] = useState('')
 
   useEffect(() => {
-    if (user) { fetchSpaces(); fetchSessions(); fetchExercises() }
+    if (user) {
+      fetchSpaces()
+      fetchExercises()
+    }
   }, [user])
 
-  useEffect(() => { fetchSessions() }, [activeSpace])
+  useEffect(() => {
+    if (user) fetchSessions()
+  }, [user, activeSpace])
 
   useEffect(() => {
     const handler = () => refreshUser()
@@ -57,6 +68,26 @@ function AppContent() {
 
   const headers = authHeaders(token)
 
+  const normalizeApiUrl = (url) => {
+    if (!url) return null
+    try {
+      const parsed = new URL(url, window.location.origin)
+      return `${parsed.pathname}${parsed.search}`
+    } catch {
+      return url
+    }
+  }
+
+  const parseCollectionPayload = (data) => {
+    if (Array.isArray(data)) {
+      return { items: data, next: null }
+    }
+    if (data && Array.isArray(data.results)) {
+      return { items: data.results, next: normalizeApiUrl(data.next) }
+    }
+    return { items: [], next: null }
+  }
+
   const fetchSpaces = async () => {
     try {
       const res = await fetch('/api/spaces/', { headers })
@@ -65,21 +96,43 @@ function AppContent() {
     } catch (e) { console.error(e) }
   }
 
-  const fetchSessions = async () => {
+  const fetchSessions = async ({ append = false, url = null } = {}) => {
+    if (!append) setSessionsLoaded(false)
+    setSessionsLoading(true)
     try {
-      const url = activeSpace ? `/api/sessions/?space=${activeSpace}` : '/api/sessions/'
-      const res = await fetch(url, { headers })
+      const targetUrl = url || (activeSpace ? `/api/sessions/?space=${activeSpace}` : '/api/sessions/')
+      const res = await fetch(targetUrl, { headers })
       const data = await res.json()
-      setSessions(data.results || data)
+      const parsed = parseCollectionPayload(data)
+      setSessions(prev => append ? [...prev, ...parsed.items] : parsed.items)
+      setSessionsNext(parsed.next)
+      setSessionsLoaded(true)
     } catch (e) { console.error(e) }
+    finally { setSessionsLoading(false) }
   }
 
-  const fetchExercises = async () => {
+  const fetchExercises = async ({ append = false, url = null } = {}) => {
+    if (!append) setExercisesLoaded(false)
+    setExercisesLoading(true)
     try {
-      const res = await fetch('/api/exercises/', { headers })
+      const res = await fetch(url || '/api/exercises/', { headers })
       const data = await res.json()
-      setExercises(data.results || data)
+      const parsed = parseCollectionPayload(data)
+      setExercises(prev => append ? [...prev, ...parsed.items] : parsed.items)
+      setExercisesNext(parsed.next)
+      setExercisesLoaded(true)
     } catch (e) { console.error(e) }
+    finally { setExercisesLoading(false) }
+  }
+
+  const loadMoreSessions = async () => {
+    if (!sessionsNext || sessionsLoading) return
+    await fetchSessions({ append: true, url: sessionsNext })
+  }
+
+  const loadMoreExercises = async () => {
+    if (!exercisesNext || exercisesLoading) return
+    await fetchExercises({ append: true, url: exercisesNext })
   }
 
   const createSpace = async () => {
@@ -260,6 +313,14 @@ function AppContent() {
             <CoachMetricsPanel token={token} />
             <SessionList
               sessions={sessions} exercises={exercises} user={user} spaces={spaces} activeSpace={activeSpace}
+              sessionsLoading={sessionsLoading}
+              exercisesLoading={exercisesLoading}
+              sessionsLoaded={sessionsLoaded}
+              exercisesLoaded={exercisesLoaded}
+              sessionsHasMore={Boolean(sessionsNext)}
+              exercisesHasMore={Boolean(exercisesNext)}
+              onLoadMoreSessions={loadMoreSessions}
+              onLoadMoreExercises={loadMoreExercises}
               onSessionSelect={openSession} onExerciseSelect={openProgress}
               onUploadClick={() => setView('upload')}
               onDeleteSession={async (id) => {
