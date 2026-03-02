@@ -11,6 +11,9 @@ from videos.models import MultipartSessionUpload, Profile, Session, Space, Space
 
 
 class FakeS3Client:
+    def __init__(self):
+        self.parts_by_upload_id = {}
+
     def create_multipart_upload(self, **kwargs):
         self.created = kwargs
         return {'UploadId': 'upload-123'}
@@ -31,6 +34,13 @@ class FakeS3Client:
     def abort_multipart_upload(self, **kwargs):
         self.aborted = kwargs
         return {}
+
+    def list_parts(self, **kwargs):
+        upload_id = kwargs.get('UploadId')
+        return {
+            'Parts': self.parts_by_upload_id.get(upload_id, []),
+            'IsTruncated': False,
+        }
 
 
 @override_settings(
@@ -68,6 +78,8 @@ class MultipartUploadApiTests(APITestCase):
             )
             self.assertEqual(init_res.status_code, status.HTTP_201_CREATED)
             upload_id = init_res.data['multipart_upload_id']
+            upload = MultipartSessionUpload.objects.get(pk=upload_id)
+            self.assertGreater(upload.expires_at, timezone.now() + timedelta(hours=23))
 
             sign_res = self.client.post(
                 '/api/sessions/multipart/sign-part/',
@@ -121,3 +133,68 @@ class MultipartUploadApiTests(APITestCase):
                 format='json',
             )
             self.assertEqual(sign_res.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_status_returns_uploaded_parts(self):
+        fake_s3 = FakeS3Client()
+        fake_s3.parts_by_upload_id['upload-status-1'] = [
+            {'PartNumber': 1, 'ETag': '"etag-part-1"', 'Size': 5242880},
+            {'PartNumber': 2, 'ETag': '"etag-part-2"', 'Size': 5242880},
+        ]
+
+        upload = MultipartSessionUpload.objects.create(
+            user=self.member,
+            space=self.space,
+            status=MultipartSessionUpload.STATUS_INITIATED,
+            title='Resume me',
+            description='',
+            tags_csv='',
+            duration_seconds=None,
+            original_filename='resume.mp4',
+            content_type='video/mp4',
+            size_bytes=20 * 1024 * 1024,
+            s3_key='sessions/member/resume.mp4',
+            s3_upload_id='upload-status-1',
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        self.client.force_authenticate(user=self.member)
+        with patch('videos.views._s3_client', return_value=fake_s3):
+            status_res = self.client.post(
+                '/api/sessions/multipart/status/',
+                {'multipart_upload_id': upload.id},
+                format='json',
+            )
+        self.assertEqual(status_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(status_res.data['status'], MultipartSessionUpload.STATUS_INITIATED)
+        self.assertEqual(status_res.data['part_size'], 5 * 1024 * 1024)
+        self.assertEqual(status_res.data['total_parts'], 4)
+        self.assertEqual(len(status_res.data['uploaded_parts']), 2)
+        self.assertEqual(status_res.data['uploaded_parts'][0]['part_number'], 1)
+
+    def test_status_marks_expired_upload(self):
+        fake_s3 = FakeS3Client()
+        upload = MultipartSessionUpload.objects.create(
+            user=self.member,
+            space=self.space,
+            status=MultipartSessionUpload.STATUS_INITIATED,
+            title='Old upload',
+            description='',
+            tags_csv='',
+            duration_seconds=None,
+            original_filename='old.mp4',
+            content_type='video/mp4',
+            size_bytes=10 * 1024 * 1024,
+            s3_key='sessions/member/old.mp4',
+            s3_upload_id='upload-old-1',
+            expires_at=timezone.now() - timedelta(minutes=1),
+        )
+
+        self.client.force_authenticate(user=self.member)
+        with patch('videos.views._s3_client', return_value=fake_s3):
+            status_res = self.client.post(
+                '/api/sessions/multipart/status/',
+                {'multipart_upload_id': upload.id},
+                format='json',
+            )
+        self.assertEqual(status_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(status_res.data['status'], MultipartSessionUpload.STATUS_EXPIRED)
