@@ -28,6 +28,7 @@ import ConnectionsView from './components/ConnectionsView'
 import QuickRecord from './components/QuickRecord'
 import ScreenRecord from './components/ScreenRecord'
 import FeedbackRequestsView from './components/FeedbackRequestsView'
+import CoachMetricsPanel from './components/CoachMetricsPanel'
 
 function AppContent() {
   const { user, token, loading, logout, refreshUser } = useAuth()
@@ -255,16 +256,19 @@ function AppContent() {
         )}
 
         {view === 'sessions' && (
-          <SessionList
-            sessions={sessions} exercises={exercises} user={user} spaces={spaces} activeSpace={activeSpace}
-            onSessionSelect={openSession} onExerciseSelect={openProgress}
-            onUploadClick={() => setView('upload')}
-            onDeleteSession={async (id) => {
-              const res = await fetch(`/api/sessions/${id}/`, { method: 'DELETE', headers })
-              if (res.ok) fetchSessions()
-              else toast.error('You can only delete your own sessions')
-            }}
-          />
+          <>
+            <CoachMetricsPanel token={token} />
+            <SessionList
+              sessions={sessions} exercises={exercises} user={user} spaces={spaces} activeSpace={activeSpace}
+              onSessionSelect={openSession} onExerciseSelect={openProgress}
+              onUploadClick={() => setView('upload')}
+              onDeleteSession={async (id) => {
+                const res = await fetch(`/api/sessions/${id}/`, { method: 'DELETE', headers })
+                if (res.ok) fetchSessions()
+                else toast.error('You can only delete your own sessions')
+              }}
+            />
+          </>
         )}
         {view === 'upload' && (
           <SessionUpload token={token} spaces={spaces}

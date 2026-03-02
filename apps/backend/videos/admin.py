@@ -2,6 +2,7 @@ from django.contrib import admin
 from .models import (
     Profile, Exercise, Session, Chapter, Comment, InviteCode, Tag, Space,
     SpaceMember, FeedbackRequest, FeedbackAssignment, MultipartSessionUpload,
+    CoachEvent, CoachDailyMetric,
 )
 
 
@@ -96,3 +97,23 @@ class MultipartSessionUploadAdmin(admin.ModelAdmin):
     list_filter = ['status']
     search_fields = ['user__username', 'original_filename', 's3_key', 's3_upload_id']
     raw_id_fields = ['user', 'space', 'session']
+
+
+@admin.register(CoachEvent)
+class CoachEventAdmin(admin.ModelAdmin):
+    list_display = ['id', 'event_type', 'user', 'space', 'session', 'feedback_request', 'occurred_at']
+    list_filter = ['event_type', 'occurred_at']
+    search_fields = ['user__username', 'session__title', 'space__name']
+    raw_id_fields = ['user', 'session', 'space', 'feedback_request']
+
+
+@admin.register(CoachDailyMetric)
+class CoachDailyMetricAdmin(admin.ModelAdmin):
+    list_display = [
+        'coach', 'date', 'active_students_30d', 'feedback_completions_7d',
+        'feedback_completions_30d', 'median_time_to_feedback_hours_30d',
+        'estimated_time_saved_hours_30d', 'updated_at',
+    ]
+    list_filter = ['date']
+    search_fields = ['coach__username']
+    raw_id_fields = ['coach']
