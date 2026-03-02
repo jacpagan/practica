@@ -1,9 +1,15 @@
 #!/bin/bash
 
+# WARNING: Non-canonical helper script.
+# This script is NOT part of official CI/CD release strategy.
+# Official strategy is main -> production only.
+
 # Advanced Configuration Management System
 # Centralized configuration for all environments
 
 set -e
+
+echo "WARNING: scripts/config-manager.sh is non-canonical for deploy routing; official path is main -> production only."
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
