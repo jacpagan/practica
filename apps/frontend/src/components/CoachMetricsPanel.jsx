@@ -78,6 +78,7 @@ function CoachMetricsPanel({ token }) {
     const response = await fetchCoachMetricsSummary(token, targetWindowDays)
     if (response.status === 404) {
       setDisabled(true)
+      setPayload(null)
       setLoading(false)
       return
     }
@@ -108,7 +109,18 @@ function CoachMetricsPanel({ token }) {
     [payload]
   )
 
-  if (disabled) return null
+  if (disabled) {
+    return (
+      <section className="px-4 sm:px-6 pt-4">
+        <div className="border border-gray-200 rounded-2xl p-4 sm:p-5 bg-white">
+          <h2 className="text-sm font-semibold text-gray-900">Coach ROI Metrics</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            Metrics are not enabled for this account yet.
+          </p>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section className="px-4 sm:px-6 pt-4">
