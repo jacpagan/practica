@@ -168,6 +168,22 @@ const parseJsonResponse = async (res) => {
   }
 }
 
+export const fetchCoachMetricsSummary = async (token, windowDays = 30) => {
+  try {
+    const res = await fetch(`/api/coach-metrics/summary/?window_days=${windowDays}`, {
+      headers: token ? { Authorization: `Token ${token}` } : {},
+    })
+    return parseJsonResponse(res)
+  } catch {
+    return {
+      ok: false,
+      status: 0,
+      data: { error: 'Network error while fetching coach metrics' },
+      text: '',
+    }
+  }
+}
+
 const authedJsonPost = async ({ url, token, body }) => {
   const res = await fetch(url, {
     method: 'POST',

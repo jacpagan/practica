@@ -1,6 +1,7 @@
 import secrets
 import uuid
 import math
+import logging
 from datetime import timedelta
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
@@ -24,6 +25,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from .models import (
     Exercise, Session, Chapter, Comment, InviteCode, SessionLastSeen,
     Tag, Space, SpaceMember, FeedbackRequest, FeedbackAssignment, MultipartSessionUpload,
+    CoachEvent, CoachDailyMetric,
 )
 from .serializers import (
     UserSerializer, RegisterSerializer, SpaceSerializer,
@@ -31,6 +33,8 @@ from .serializers import (
     ChapterSerializer, ProgressChapterSerializer, TagSerializer,
     FeedbackRequestSerializer, FeedbackAssignmentSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _visible_sessions_qs(user):
@@ -104,6 +108,37 @@ def _refresh_feedback_request_status(feedback_request):
 
 def _feedback_requests_enabled():
     return bool(getattr(settings, 'FEEDBACK_REQUESTS_ENABLED', False))
+
+
+def _coach_metrics_enabled():
+    return bool(getattr(settings, 'COACH_METRICS_ENABLED', False))
+
+
+def _coach_metrics_user_allowed(user):
+    allowlist = set(getattr(settings, 'COACH_METRICS_INTERNAL_USER_IDS', []))
+    return not allowlist or user.is_staff or user.id in allowlist
+
+
+def record_coach_event(
+    *,
+    user_id,
+    event_type,
+    session_id=None,
+    space_id=None,
+    feedback_request_id=None,
+    metadata=None,
+):
+    try:
+        CoachEvent.objects.create(
+            user_id=user_id,
+            event_type=event_type,
+            session_id=session_id,
+            space_id=space_id,
+            feedback_request_id=feedback_request_id,
+            metadata=metadata or {},
+        )
+    except Exception:
+        logger.exception('Failed to persist coach telemetry event: %s', event_type)
 
 
 def _direct_uploads_enabled():
@@ -448,6 +483,14 @@ class SessionViewSet(viewsets.ModelViewSet):
         space = _resolve_space_for_create(self.request.user, space_id)
         session = serializer.save(user=self.request.user, space=space)
         _attach_tags_to_session(session, self.request.data.get('tags', ''))
+        transaction.on_commit(
+            lambda: record_coach_event(
+                user_id=self.request.user.id,
+                event_type=CoachEvent.EVENT_SESSION_UPLOADED,
+                session_id=session.id,
+                space_id=session.space_id,
+            )
+        )
 
     def perform_update(self, serializer):
         if not can_edit_session(self.request.user, serializer.instance):
@@ -695,6 +738,15 @@ class SessionViewSet(viewsets.ModelViewSet):
             upload.completed_at = timezone.now()
             upload.session = session
             upload.save(update_fields=['status', 'completed_at', 'session'])
+            transaction.on_commit(
+                lambda: record_coach_event(
+                    user_id=request.user.id,
+                    event_type=CoachEvent.EVENT_SESSION_UPLOADED,
+                    session_id=session.id,
+                    space_id=session.space_id,
+                    metadata={'upload_type': 'multipart'},
+                )
+            )
 
         serializer = SessionSerializer(session, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -903,6 +955,16 @@ class SessionViewSet(viewsets.ModelViewSet):
             video_required_count=video_required_count,
             focus_prompt=focus_prompt,
         )
+        transaction.on_commit(
+            lambda: record_coach_event(
+                user_id=request.user.id,
+                event_type=CoachEvent.EVENT_FEEDBACK_REQUESTED,
+                session_id=session.id,
+                space_id=session.space_id,
+                feedback_request_id=feedback_request.id,
+                metadata={'sla_hours': sla_hours},
+            )
+        )
         serializer = FeedbackRequestSerializer(feedback_request, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -992,6 +1054,7 @@ def feedback_request_claim(request, request_id):
     _expire_overdue_feedback_requests()
 
     with transaction.atomic():
+        emit_claim_event = False
         feedback_request = get_object_or_404(
             FeedbackRequest.objects.select_for_update().select_related('space'),
             pk=request_id,
@@ -1031,11 +1094,25 @@ def feedback_request_claim(request, request_id):
             existing.comment = None
             existing.save(update_fields=['status', 'claimed_at', 'completed_at', 'is_video_review', 'comment'])
             assignment = existing
+            emit_claim_event = True
         else:
             assignment = FeedbackAssignment.objects.create(
                 feedback_request=feedback_request,
                 reviewer=request.user,
                 status=FeedbackAssignment.STATUS_CLAIMED,
+            )
+            emit_claim_event = True
+
+        if emit_claim_event:
+            transaction.on_commit(
+                lambda: record_coach_event(
+                    user_id=request.user.id,
+                    event_type=CoachEvent.EVENT_FEEDBACK_CLAIMED,
+                    session_id=feedback_request.session_id,
+                    space_id=feedback_request.space_id,
+                    feedback_request_id=feedback_request.id,
+                    metadata={'assignment_id': assignment.id},
+                )
             )
 
     serializer = FeedbackAssignmentSerializer(assignment, context={'request': request})
@@ -1160,6 +1237,28 @@ def feedback_request_complete(request, request_id):
         assignment.save(update_fields=['status', 'completed_at', 'is_video_review', 'comment'])
 
         _refresh_feedback_request_status(feedback_request)
+        is_video_review = bool(video_file)
+        transaction.on_commit(
+            lambda: record_coach_event(
+                user_id=request.user.id,
+                event_type=CoachEvent.EVENT_FEEDBACK_COMPLETED,
+                session_id=feedback_request.session_id,
+                space_id=feedback_request.space_id,
+                feedback_request_id=feedback_request.id,
+                metadata={'assignment_id': assignment.id, 'is_video_review': is_video_review},
+            )
+        )
+        if is_video_review:
+            transaction.on_commit(
+                lambda: record_coach_event(
+                    user_id=request.user.id,
+                    event_type=CoachEvent.EVENT_VIDEO_FEEDBACK_COMPLETED,
+                    session_id=feedback_request.session_id,
+                    space_id=feedback_request.space_id,
+                    feedback_request_id=feedback_request.id,
+                    metadata={'assignment_id': assignment.id},
+                )
+            )
 
     feedback_request.refresh_from_db()
     assignment.refresh_from_db()
@@ -1167,6 +1266,90 @@ def feedback_request_complete(request, request_id):
         'feedback_request': FeedbackRequestSerializer(feedback_request, context={'request': request}).data,
         'assignment': FeedbackAssignmentSerializer(assignment, context={'request': request}).data,
     })
+
+
+# ── Coach metrics views ────────────────────────────────────────────
+
+def _metric_value(value):
+    if value is None:
+        return None
+    if hasattr(value, 'quantize'):
+        return float(value)
+    return value
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def coach_metrics_summary(request):
+    if not _coach_metrics_enabled():
+        return Response({'error': 'Coach metrics are disabled'}, status=status.HTTP_404_NOT_FOUND)
+    if not _coach_metrics_user_allowed(request.user):
+        return Response({'error': 'Coach metrics are disabled'}, status=status.HTTP_404_NOT_FOUND)
+
+    raw_window_days = request.query_params.get('window_days', '30')
+    try:
+        window_days = int(raw_window_days)
+    except (TypeError, ValueError):
+        return Response({'error': 'window_days must be 7 or 30'}, status=status.HTTP_400_BAD_REQUEST)
+    if window_days not in (7, 30):
+        return Response({'error': 'window_days must be 7 or 30'}, status=status.HTTP_400_BAD_REQUEST)
+
+    today = timezone.now().date()
+    latest_metric = (
+        CoachDailyMetric.objects
+        .filter(coach=request.user, date__lte=today)
+        .order_by('-date')
+        .first()
+    )
+
+    metric_rows = []
+    if latest_metric:
+        trend_start = latest_metric.date - timedelta(days=window_days - 1)
+        metric_rows = list(
+            CoachDailyMetric.objects.filter(
+                coach=request.user,
+                date__gte=trend_start,
+                date__lte=latest_metric.date,
+            ).order_by('date')
+        )
+
+    summary = {
+        'active_students_30d': latest_metric.active_students_30d if latest_metric else 0,
+        'feedback_completions_7d': latest_metric.feedback_completions_7d if latest_metric else 0,
+        'median_time_to_feedback_hours_30d': _metric_value(
+            latest_metric.median_time_to_feedback_hours_30d if latest_metric else None
+        ),
+        'estimated_time_saved_hours_30d': _metric_value(
+            latest_metric.estimated_time_saved_hours_30d if latest_metric else 0
+        ),
+    }
+
+    response = {
+        'coach_user_id': request.user.id,
+        'window_days': window_days,
+        'generated_at': timezone.now().isoformat(),
+        'summary': summary,
+        'trends': {
+            'active_students_30d': [{'date': str(m.date), 'value': m.active_students_30d} for m in metric_rows],
+            'feedback_completions_7d': [{'date': str(m.date), 'value': m.feedback_completions_7d} for m in metric_rows],
+            'median_time_to_feedback_hours_30d': [
+                {'date': str(m.date), 'value': _metric_value(m.median_time_to_feedback_hours_30d)}
+                for m in metric_rows
+            ],
+            'estimated_time_saved_hours_30d': [
+                {'date': str(m.date), 'value': _metric_value(m.estimated_time_saved_hours_30d)}
+                for m in metric_rows
+            ],
+        },
+        'definitions': {
+            'coach_identity': 'User who owns one or more spaces.',
+            'active_students_30d': 'Distinct non-owner users who uploaded sessions in coach-owned spaces.',
+            'feedback_completions_7d': 'Completed feedback assignments authored by this coach.',
+            'median_time_to_feedback_hours_30d': 'Median hours from request creation to first completion in coach-owned spaces.',
+            'estimated_time_saved_hours_30d': 'feedback_completions_30d * minutes_saved_per_completion / 60.',
+        },
+    }
+    return Response(response)
 
 
 # ── Health check ────────────────────────────────────────────────────

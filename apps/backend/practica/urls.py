@@ -12,6 +12,7 @@ from videos.views import (
     feedback_requests_open, feedback_requests_assigned,
     feedback_request_claim, feedback_request_release,
     feedback_request_cancel, feedback_request_complete,
+    coach_metrics_summary,
 )
 
 router = DefaultRouter()
@@ -34,6 +35,7 @@ urlpatterns = [
     path('api/feedback-requests/<int:request_id>/release/', feedback_request_release, name='feedback_request_release'),
     path('api/feedback-requests/<int:request_id>/cancel/', feedback_request_cancel, name='feedback_request_cancel'),
     path('api/feedback-requests/<int:request_id>/complete/', feedback_request_complete, name='feedback_request_complete'),
+    path('api/coach-metrics/summary/', coach_metrics_summary, name='coach_metrics_summary'),
     path('api/join/<slug:slug>/', join_space, name='join_space'),
     path('api/space-info/<slug:slug>/', space_info, name='space_info'),
     path('health/', health_check, name='health_check'),
