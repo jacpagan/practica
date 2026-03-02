@@ -1,9 +1,15 @@
 #!/bin/bash
 
+# WARNING: Non-canonical helper script.
+# This script is NOT part of official CI/CD release strategy.
+# Official strategy is main -> production only.
+
 # Advanced Workflow Orchestrator
 # Enhanced dev-to-staging-to-prod workflow with advanced features
 
 set -e  # Exit on any error
+
+echo "WARNING: scripts/workflow-orchestrator.sh is non-canonical; CI/CD deploy path is main -> production only."
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

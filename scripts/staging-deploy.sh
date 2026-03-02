@@ -1,10 +1,15 @@
 #!/bin/bash
 
+# WARNING: Non-canonical helper script.
+# This script is NOT part of official CI/CD release strategy.
+# Official strategy is main -> production only.
+
 # Staging Deployment Script
 # This script deploys the application to a production-like staging environment
 
 set -e  # Exit on any error
 
+echo "WARNING: scripts/staging-deploy.sh is local-only and not part of official release CI/CD."
 echo "🚀 Deploying to staging environment..."
 
 # Check if Docker is running

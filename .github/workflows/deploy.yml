@@ -1,5 +1,8 @@
 name: Deploy to Production
 
+# Solo mode release strategy:
+# - main -> production only
+# - no staging promotion path enabled
 on:
   push:
     branches: [ main ]
@@ -17,6 +20,9 @@ jobs:
     steps:
       - name: Checkout (for context only)
         uses: actions/checkout@v4
+
+      - name: Validate release strategy guardrails
+        run: bash scripts/check-release-strategy.sh
 
       - name: Set repository URL
         id: repo

@@ -92,6 +92,19 @@ Note: The EC2 instance uses SQLite, so database state is lost on instance recrea
 
 - Never pin Python module versions in `requirements.txt`.
 
+## Release Strategy (Solo Mode)
+
+- Canonical deployment path is `feature branch -> PR -> main -> production`.
+- `main` is the only deployment branch.
+- No active staging deployment path exists in CI by policy.
+- Staging scripts in `scripts/` are local experimentation helpers only and are non-canonical.
+
+### Required Pre-Merge / Post-Deploy Checks
+
+- Before merge: run local checks for changed areas (tests/build/lint as applicable).
+- After production deploy: verify `https://practica.jpagan.com/health/` returns `200`.
+- After production deploy: smoke check login and one upload/playback path.
+
 ## Delivery Agents (Roles)
 
 - Release Agent: Owns merging to `main` and versioning. Checks that CI is green and the PR includes migration notes.
@@ -122,4 +135,3 @@ Note: The EC2 instance uses SQLite, so database state is lost on instance recrea
 - Docker and docker-compose installed
 - Nginx reverse proxy terminating TLS for `practica.jpagan.com`
 - If using S3: bucket CORS allows GET/HEAD with range requests and origins set to site domain
-

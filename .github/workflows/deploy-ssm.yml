@@ -1,5 +1,8 @@
 name: Deploy via SSM
 
+# Solo mode release strategy:
+# - main -> production only
+# - no staging promotion path enabled
 on:
   push:
     branches: [ main ]
@@ -21,6 +24,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate release strategy guardrails
+        run: bash scripts/check-release-strategy.sh
 
       - name: Resolve ref
         id: ref
