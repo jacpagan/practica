@@ -63,7 +63,7 @@ function FeedbackRequestsView({ token, user, onOpenSession }) {
     () => openRequests.filter(req => req.requester === user?.id),
     [openRequests, user?.id]
   )
-  const claimableRequests = useMemo(
+  const queueRequests = useMemo(
     () => openRequests.filter(
       req => req.requester !== user?.id && req.my_assignment_status !== 'claimed' && req.my_assignment_status !== 'completed'
     ),
@@ -257,31 +257,42 @@ function FeedbackRequestsView({ token, user, onOpenSession }) {
 
       <section>
         <h3 className="text-sm font-semibold text-gray-900 mb-2">Open queue</h3>
-        {claimableRequests.length === 0 ? (
-          <p className="text-sm text-gray-500 p-4 border border-gray-200 rounded-xl">No claimable requests in your spaces.</p>
+        {queueRequests.length === 0 ? (
+          <p className="text-sm text-gray-500 p-4 border border-gray-200 rounded-xl">No open requests in your spaces.</p>
         ) : (
           <div className="space-y-2">
-            {claimableRequests.map(req => (
-              <div key={req.id} className="border border-gray-200 rounded-xl p-4 flex items-start justify-between gap-3">
-                <div>
+            {queueRequests.map(req => {
+              const isFull = req.is_claimable === false || (req.claim_slots_remaining ?? 0) <= 0
+              return (
+                <div key={req.id} className="border border-gray-200 rounded-xl p-4 flex items-start justify-between gap-3">
+                  <div>
+                    <button
+                      onClick={() => onOpenSession(req.session_id)}
+                      className="text-sm font-semibold text-gray-900 hover:underline text-left"
+                    >
+                      {req.session_title}
+                    </button>
+                    <p className="text-xs text-gray-500 mt-1">{req.space_name} · Requested by {req.requester_name}</p>
+                    <p className={`text-xs mt-1 ${dueTone(req.due_at)}`}>Due {fmtDue(req.due_at)}</p>
+                    <p className="text-sm text-gray-700 mt-2">{req.focus_prompt}</p>
+                    {isFull && (
+                      <p className="text-xs text-amber-600 mt-2">All review slots are currently claimed.</p>
+                    )}
+                  </div>
                   <button
-                    onClick={() => onOpenSession(req.session_id)}
-                    className="text-sm font-semibold text-gray-900 hover:underline text-left"
+                    onClick={() => claimRequest(req.id)}
+                    disabled={isFull}
+                    className={`text-xs font-medium rounded-lg px-3 py-2 flex-shrink-0 transition-colors ${
+                      isFull
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'text-white bg-gray-900 hover:bg-gray-800'
+                    }`}
                   >
-                    {req.session_title}
+                    {isFull ? 'Full' : 'Claim'}
                   </button>
-                  <p className="text-xs text-gray-500 mt-1">{req.space_name} · Requested by {req.requester_name}</p>
-                  <p className={`text-xs mt-1 ${dueTone(req.due_at)}`}>Due {fmtDue(req.due_at)}</p>
-                  <p className="text-sm text-gray-700 mt-2">{req.focus_prompt}</p>
                 </div>
-                <button
-                  onClick={() => claimRequest(req.id)}
-                  className="text-xs font-medium text-white bg-gray-900 rounded-lg px-3 py-2 hover:bg-gray-800 flex-shrink-0"
-                >
-                  Claim
-                </button>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </section>

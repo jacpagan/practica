@@ -15,14 +15,17 @@ class FeedbackRequestsApiTests(APITestCase):
     def setUp(self):
         self.owner = User.objects.create_user(username='owner', password='pass1234')
         self.member = User.objects.create_user(username='member', password='pass1234')
+        self.member_two = User.objects.create_user(username='member-two', password='pass1234')
         self.outsider = User.objects.create_user(username='outsider', password='pass1234')
 
         Profile.objects.create(user=self.owner, display_name='Owner')
         Profile.objects.create(user=self.member, display_name='Member')
+        Profile.objects.create(user=self.member_two, display_name='Member Two')
         Profile.objects.create(user=self.outsider, display_name='Outsider')
 
         self.space = Space.objects.create(name='Drumming', owner=self.owner)
         SpaceMember.objects.create(space=self.space, user=self.member)
+        SpaceMember.objects.create(space=self.space, user=self.member_two)
 
         self.owner_session = Session.objects.create(
             user=self.owner,
@@ -120,6 +123,27 @@ class FeedbackRequestsApiTests(APITestCase):
         self.assertEqual(feedback_request.status, FeedbackRequest.STATUS_EXPIRED)
         assignment = feedback_request.assignments.get(reviewer=self.member)
         self.assertEqual(assignment.status, FeedbackAssignment.STATUS_EXPIRED)
+
+    def test_open_queue_includes_capacity_fields(self):
+        request_id = self._create_feedback_request()
+
+        self.client.force_authenticate(user=self.member_two)
+        open_response = self.client.get('/api/feedback-requests/open/')
+        self.assertEqual(open_response.status_code, status.HTTP_200_OK)
+        request_payload = next(item for item in open_response.data if item['id'] == request_id)
+        self.assertEqual(request_payload['claim_slots_remaining'], 1)
+        self.assertTrue(request_payload['is_claimable'])
+
+        self.client.force_authenticate(user=self.member)
+        claim_response = self.client.post(f'/api/feedback-requests/{request_id}/claim/')
+        self.assertEqual(claim_response.status_code, status.HTTP_201_CREATED)
+
+        self.client.force_authenticate(user=self.member_two)
+        open_response = self.client.get('/api/feedback-requests/open/')
+        self.assertEqual(open_response.status_code, status.HTTP_200_OK)
+        request_payload = next(item for item in open_response.data if item['id'] == request_id)
+        self.assertEqual(request_payload['claim_slots_remaining'], 0)
+        self.assertFalse(request_payload['is_claimable'])
 
     def test_membership_and_owner_guards(self):
         request_id = self._create_feedback_request()

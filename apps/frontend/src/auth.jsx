@@ -35,6 +35,30 @@ export function AuthProvider({ children }) {
     return data.user
   }
 
+  const loginWithInvite = async (username, password, inviteSlug) => {
+    const loginRes = await fetch('/api/auth/login/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    })
+    if (!loginRes.ok) throw new Error('Invalid credentials')
+    const loginData = await loginRes.json()
+
+    const joinRes = await fetch(`/api/join/${inviteSlug}/`, {
+      method: 'POST',
+      headers: { Authorization: `Token ${loginData.token}` },
+    })
+    if (!joinRes.ok) {
+      const joinError = await joinRes.json().catch(() => ({}))
+      throw new Error(joinError.error || 'Could not join this space')
+    }
+
+    localStorage.setItem('token', loginData.token)
+    setToken(loginData.token)
+    setUser(loginData.user)
+    return loginData.user
+  }
+
   const register = async ({ username, password, display_name, invite_code, invite_slug }) => {
     const body = { username, password, display_name }
     if (invite_code) body.invite_code = invite_code
@@ -70,7 +94,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, token, loading, login, loginWithInvite, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   )

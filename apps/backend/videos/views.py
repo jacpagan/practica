@@ -312,6 +312,18 @@ class SpaceViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
 
+    def _ensure_space_owner(self, space):
+        if space.owner_id != self.request.user.id:
+            raise PermissionDenied("Only the space owner can modify this space.")
+
+    def perform_update(self, serializer):
+        self._ensure_space_owner(serializer.instance)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._ensure_space_owner(instance)
+        instance.delete()
+
     @action(detail=True, methods=['post'])
     def invite(self, request, pk=None):
         """Generate an invite code for this space."""

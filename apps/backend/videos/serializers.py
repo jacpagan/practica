@@ -162,6 +162,8 @@ class FeedbackRequestSerializer(serializers.ModelSerializer):
     my_assignment_status = serializers.SerializerMethodField()
     my_assignment_id = serializers.SerializerMethodField()
     needs_video_for_final_completion = serializers.SerializerMethodField()
+    claim_slots_remaining = serializers.SerializerMethodField()
+    is_claimable = serializers.SerializerMethodField()
 
     class Meta:
         model = FeedbackRequest
@@ -172,11 +174,13 @@ class FeedbackRequestSerializer(serializers.ModelSerializer):
             'created_at', 'resolved_at',
             'claimed_count', 'completed_count', 'video_completed_count',
             'my_assignment_status', 'my_assignment_id', 'needs_video_for_final_completion',
+            'claim_slots_remaining', 'is_claimable',
         ]
         read_only_fields = [
             'id', 'requester', 'created_at', 'resolved_at',
             'claimed_count', 'completed_count', 'video_completed_count',
             'my_assignment_status', 'my_assignment_id', 'needs_video_for_final_completion',
+            'claim_slots_remaining', 'is_claimable',
         ]
 
     def get_requester_name(self, obj):
@@ -216,6 +220,16 @@ class FeedbackRequestSerializer(serializers.ModelSerializer):
         remaining_reviews = max(0, obj.required_reviews - completed_count)
         remaining_video_reviews = max(0, obj.video_required_count - video_count)
         return remaining_reviews <= 1 and remaining_video_reviews > 0
+
+    def get_claim_slots_remaining(self, obj):
+        claimed_count = self.get_claimed_count(obj)
+        return max(0, obj.required_reviews - claimed_count)
+
+    def get_is_claimable(self, obj):
+        assignment = self._my_assignment(obj)
+        if assignment and assignment.status in (FeedbackAssignment.STATUS_CLAIMED, FeedbackAssignment.STATUS_COMPLETED):
+            return False
+        return self.get_claim_slots_remaining(obj) > 0
 
 
 class FeedbackAssignmentSerializer(serializers.ModelSerializer):
