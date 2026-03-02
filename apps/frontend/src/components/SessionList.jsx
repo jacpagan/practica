@@ -47,7 +47,25 @@ function Thumbnail({ src, className = '' }) {
   )
 }
 
-function SessionList({ sessions, exercises, user, spaces, activeSpace, onSessionSelect, onExerciseSelect, onUploadClick, onDeleteSession }) {
+function SessionList({
+  sessions,
+  exercises,
+  user,
+  spaces,
+  activeSpace,
+  sessionsLoading = false,
+  exercisesLoading = false,
+  sessionsLoaded = false,
+  exercisesLoaded = false,
+  sessionsHasMore = false,
+  exercisesHasMore = false,
+  onLoadMoreSessions,
+  onLoadMoreExercises,
+  onSessionSelect,
+  onExerciseSelect,
+  onUploadClick,
+  onDeleteSession,
+}) {
   
   const [tab, setTab] = useState('sessions')
 
@@ -85,7 +103,19 @@ function SessionList({ sessions, exercises, user, spaces, activeSpace, onSession
       {/* ── Sessions tab ── */}
       {tab === 'sessions' && (
         <>
-          {sessions.length === 0 ? (
+          {sessionsLoading && !sessionsLoaded ? (
+            <div className="space-y-2 py-2 animate-pulse">
+              {[1, 2, 3, 4].map((item) => (
+                <div key={item} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100">
+                  <div className="w-16 h-11 sm:w-24 sm:h-16 rounded-lg bg-gray-100" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-48 bg-gray-100 rounded" />
+                    <div className="h-2.5 w-32 bg-gray-100 rounded" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : sessions.length === 0 ? (
             <div className="text-center py-16">
               <svg className="w-10 h-10 text-gray-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -174,6 +204,17 @@ function SessionList({ sessions, exercises, user, spaces, activeSpace, onSession
                   </div>
                 </div>
               ))}
+              {sessionsHasMore && (
+                <div className="pt-2">
+                  <button
+                    onClick={onLoadMoreSessions}
+                    disabled={sessionsLoading}
+                    className="w-full text-sm font-medium text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                  >
+                    {sessionsLoading ? 'Loading...' : 'Load more sessions'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </>
@@ -182,7 +223,22 @@ function SessionList({ sessions, exercises, user, spaces, activeSpace, onSession
       {/* ── Exercises tab ── */}
       {tab === 'exercises' && (
         <>
-          {exercises.length === 0 ? (
+          {exercisesLoading && !exercisesLoaded ? (
+            <div className="space-y-2 py-2 animate-pulse">
+              {[1, 2, 3, 4].map((item) => (
+                <div key={item} className="flex items-center justify-between p-3 rounded-xl border border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-gray-100" />
+                    <div className="space-y-2">
+                      <div className="h-3 w-40 bg-gray-100 rounded" />
+                      <div className="h-2.5 w-24 bg-gray-100 rounded" />
+                    </div>
+                  </div>
+                  <div className="w-4 h-4 rounded bg-gray-100" />
+                </div>
+              ))}
+            </div>
+          ) : exercises.length === 0 ? (
             <div className="text-center py-16">
               <svg className="w-10 h-10 text-gray-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
@@ -212,6 +268,17 @@ function SessionList({ sessions, exercises, user, spaces, activeSpace, onSession
                   </svg>
                 </div>
               ))}
+              {exercisesHasMore && (
+                <div className="pt-2">
+                  <button
+                    onClick={onLoadMoreExercises}
+                    disabled={exercisesLoading}
+                    className="w-full text-sm font-medium text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                  >
+                    {exercisesLoading ? 'Loading...' : 'Load more exercises'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </>
