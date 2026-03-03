@@ -77,3 +77,25 @@ jobs:
             echo "- SSM status: \`$SSM_STATUS\`"
             echo "- Health gate: \`backend + public health required\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Notify Slack on deploy failure
+        if: ${{ failure() && secrets.SLACK_WEBHOOK_URL != '' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DEPLOYED_REF: ${{ steps.ref.outputs.ref }}
+          SSM_COMMAND_ID: ${{ steps.send_ssm.outputs.command_id }}
+          SSM_STATUS: ${{ steps.send_ssm.outputs.ssm_status }}
+        run: |
+          REF_VALUE="${DEPLOYED_REF:-${GITHUB_REF_NAME:-main}}"
+          SSM_CMD_VALUE="${SSM_COMMAND_ID:-n/a}"
+          SSM_STATUS_VALUE="${SSM_STATUS:-n/a}"
+          MSG=":rotating_light: Practica production deploy failed\nRepo: ${GITHUB_REPOSITORY}\nRef: ${REF_VALUE}\nCommit: ${GITHUB_SHA}\nRun: ${RUN_URL}\nSSM Status: ${SSM_STATUS_VALUE}\nSSM Command ID: ${SSM_CMD_VALUE}"
+          ESCAPED_MSG=$(printf '%s' "$MSG" | sed 's/\\/\\\\/g; s/"/\\"/g; s/$/\\n/' | tr -d '\n')
+          PAYLOAD="{\"text\":\"${ESCAPED_MSG}\"}"
+          curl -fsS -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL"
+
+      - name: Slack webhook missing
+        if: ${{ failure() && secrets.SLACK_WEBHOOK_URL == '' }}
+        run: |
+          echo "::warning::SLACK_WEBHOOK_URL not configured; skipping Slack deploy-failure notification."
