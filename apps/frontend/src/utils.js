@@ -44,6 +44,21 @@ export const fmtDate = (d) => {
 export const fmtDateLong = (d) =>
   new Date(d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 
+const pad2 = (n) => String(n).padStart(2, '0')
+
+export const toDateTimeLocalValue = (value = new Date()) => {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`
+}
+
+export const dateTimeLocalToIso = (value) => {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toISOString()
+}
+
 export const fmtDuration = (start, end) => {
   if (end == null) return null
   const d = end - start

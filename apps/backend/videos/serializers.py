@@ -1,9 +1,11 @@
 from django.contrib.auth.models import User
 from django.utils import timezone
 from rest_framework import serializers
+from urllib.parse import parse_qs, urlencode, urlparse
+import re
 from .models import (
     Profile, Exercise, Session, Chapter, Comment, InviteCode, SessionLastSeen,
-    Tag, Space, SpaceMember, FeedbackRequest, FeedbackAssignment,
+    Tag, Space, SpaceMember, FeedbackRequest, FeedbackAssignment, ExerciseReferenceClip,
 )
 
 
@@ -133,6 +135,87 @@ class ExerciseSerializer(serializers.ModelSerializer):
 
     def get_chapter_count(self, obj):
         return obj.chapters.count()
+
+
+class ExerciseReferenceClipSerializer(serializers.ModelSerializer):
+    embed_url = serializers.SerializerMethodField()
+    watch_url_with_start = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ExerciseReferenceClip
+        fields = [
+            'id', 'exercise', 'title', 'youtube_url', 'youtube_video_id', 'youtube_playlist_id',
+            'start_seconds', 'end_seconds', 'notes', 'created_at', 'updated_at',
+            'embed_url', 'watch_url_with_start',
+        ]
+        read_only_fields = [
+            'id', 'exercise', 'youtube_video_id', 'youtube_playlist_id',
+            'created_at', 'updated_at', 'embed_url', 'watch_url_with_start',
+        ]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        current_start = self.instance.start_seconds if self.instance else 0
+        current_end = self.instance.end_seconds if self.instance else None
+
+        start_seconds = attrs.get('start_seconds', current_start)
+        end_seconds = attrs.get('end_seconds', current_end)
+        if start_seconds < 0:
+            raise serializers.ValidationError({'start_seconds': 'Start must be 0 or greater.'})
+        if end_seconds is not None and end_seconds <= start_seconds:
+            raise serializers.ValidationError({'end_seconds': 'End must be greater than start.'})
+
+        if 'youtube_url' in attrs:
+            parsed = self._parse_youtube_url(attrs['youtube_url'])
+            attrs['youtube_video_id'] = parsed['video_id']
+            attrs['youtube_playlist_id'] = parsed['playlist_id']
+            query = {'v': parsed['video_id']}
+            if parsed['playlist_id']:
+                query['list'] = parsed['playlist_id']
+            attrs['youtube_url'] = f"https://www.youtube.com/watch?{urlencode(query)}"
+
+        return attrs
+
+    def _parse_youtube_url(self, value):
+        raw = (value or '').strip()
+        if not raw:
+            raise serializers.ValidationError({'youtube_url': 'YouTube URL is required.'})
+        parsed = urlparse(raw)
+        if parsed.scheme not in ('http', 'https'):
+            raise serializers.ValidationError({'youtube_url': 'YouTube URL must include http:// or https://.'})
+        host = (parsed.netloc or '').lower()
+        path = parsed.path or ''
+        query = parse_qs(parsed.query or '')
+        video_id = None
+        playlist_id = ''
+
+        if host in ('youtube.com', 'www.youtube.com', 'm.youtube.com'):
+            if path != '/watch':
+                raise serializers.ValidationError({'youtube_url': 'Use a YouTube watch URL with v=VIDEO_ID.'})
+            video_id = (query.get('v') or [None])[0]
+            playlist_id = ((query.get('list') or [''])[0] or '').strip()
+        elif host == 'youtu.be':
+            video_id = path.lstrip('/').split('/')[0] if path else None
+            playlist_id = ((query.get('list') or [''])[0] or '').strip()
+        else:
+            raise serializers.ValidationError({'youtube_url': 'Only youtube.com or youtu.be URLs are supported.'})
+
+        if not video_id or not re.match(r'^[A-Za-z0-9_-]{11}$', video_id):
+            raise serializers.ValidationError({'youtube_url': 'Could not detect a valid YouTube video id.'})
+
+        return {'video_id': video_id, 'playlist_id': playlist_id}
+
+    def get_embed_url(self, obj):
+        params = {'start': int(obj.start_seconds or 0)}
+        if obj.end_seconds is not None:
+            params['end'] = int(obj.end_seconds)
+        return f"https://www.youtube.com/embed/{obj.youtube_video_id}?{urlencode(params)}"
+
+    def get_watch_url_with_start(self, obj):
+        params = {'v': obj.youtube_video_id, 't': f"{int(obj.start_seconds or 0)}s"}
+        if obj.youtube_playlist_id:
+            params['list'] = obj.youtube_playlist_id
+        return f"https://www.youtube.com/watch?{urlencode(params)}"
 
 
 class CommentSerializer(serializers.ModelSerializer):

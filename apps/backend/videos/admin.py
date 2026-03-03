@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     Profile, Exercise, Session, Chapter, Comment, InviteCode, Tag, Space,
-    SpaceMember, FeedbackRequest, FeedbackAssignment, MultipartSessionUpload,
+    SpaceMember, FeedbackRequest, FeedbackAssignment, MultipartSessionUpload, ExerciseReferenceClip,
     CoachEvent, CoachDailyMetric,
 )
 
@@ -40,6 +40,16 @@ class SpaceAdmin(admin.ModelAdmin):
 class ExerciseAdmin(admin.ModelAdmin):
     list_display = ['name', 'category', 'created_at']
     search_fields = ['name', 'category']
+
+
+@admin.register(ExerciseReferenceClip)
+class ExerciseReferenceClipAdmin(admin.ModelAdmin):
+    list_display = [
+        'id', 'title', 'user', 'exercise', 'youtube_video_id', 'start_seconds', 'end_seconds', 'created_at',
+    ]
+    list_filter = ['exercise']
+    search_fields = ['title', 'youtube_video_id', 'youtube_playlist_id', 'user__username', 'exercise__name']
+    raw_id_fields = ['user', 'exercise']
 
 
 @admin.register(Session)
