@@ -8,3 +8,8 @@ rules:
   - "Release strategy is main -> production only unless explicitly changed by product/infra decision."
   - "Do not add or revive staging CI/CD automation without explicit approval."
   - "Keep deployment docs and workflows aligned with AGENTS.md release policy."
+  - "Early-stage production policy: completed changes are pushed directly to main in the same session."
+  - "Do not batch completed work into release branches while early-stage policy is active."
+  - "Production deploy source of truth is .github/workflows/deploy-ssm.yml only."
+  - "After each push to main, verify deploy workflow success and HTTPS /health/ returns 200."
+  - "Deploy failures use fix-forward: push corrective commit to main immediately."

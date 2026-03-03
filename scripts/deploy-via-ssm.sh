@@ -116,10 +116,15 @@ proxy_send_timeout 3600s;
 send_timeout 3600s;
 NGINXUPLOAD
 
+backend_ok=0
 for i in $(seq 1 60); do
-  curl -fsS -H "Host: practica.jpagan.com" http://127.0.0.1:8000/health/ && ok=1 && break || sleep 2
+  curl -fsS -H "Host: practica.jpagan.com" http://127.0.0.1:8000/health/ && backend_ok=1 && break || sleep 2
 done
-if [ "${ok:-}" != "1" ]; then echo 'Backend failed health check' >&2; compose -f docker-compose.prod.yml logs --tail=200 backend || true; exit 1; fi
+if [ "$backend_ok" != "1" ]; then
+  echo 'Backend failed health check' >&2
+  compose -f docker-compose.prod.yml logs --tail=200 backend || true
+  exit 1
+fi
 
 POST_COUNTS=$(count_records)
 POST_USERS=$(extract_metric users "$POST_COUNTS")
@@ -141,10 +146,17 @@ if ! nginx -t || ! systemctl reload nginx; then
   echo "Nginx reload skipped (existing config may be unmanaged)." >&2
 fi
 
+public_ok=0
 for i in $(seq 1 30); do
-  curl -fsS https://practica.jpagan.com/health/ && ok=1 && break || sleep 2
+  curl -fsS https://practica.jpagan.com/health/ && public_ok=1 && break || sleep 2
 done
-if [ "${ok:-}" != "1" ]; then echo 'Public health check failed (check TLS/DNS).'; fi
+if [ "$public_ok" != "1" ]; then
+  echo 'Public health check failed' >&2
+  exit 1
+fi
+
+DEPLOYED_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
+echo "DEPLOY_SUMMARY ref=$REF sha=$DEPLOYED_SHA backend_health=pass public_health=pass"
 EOS
 )
 
@@ -163,15 +175,27 @@ CMD_ID=$(aws ssm send-command \
   --query "Command.CommandId" --output text)
 echo "SSM CommandId: $CMD_ID"
 
+FINAL_STATUS="PENDING"
 for i in $(seq 1 120); do
   STATUS=$(aws ssm list-command-invocations --command-id "$CMD_ID" --details --query 'CommandInvocations[0].Status' --output text 2>/dev/null || echo "PENDING")
   echo "SSM status: $STATUS"
-  if [ "$STATUS" = "Success" ]; then exit 0; fi
+  if [ "$STATUS" = "Success" ]; then
+    FINAL_STATUS="$STATUS"
+    break
+  fi
   if [ "$STATUS" = "Cancelled" ] || [ "$STATUS" = "Failed" ] || [ "$STATUS" = "TimedOut" ]; then
     aws ssm list-command-invocations --command-id "$CMD_ID" --details --output text || true
+    FINAL_STATUS="$STATUS"
     exit 1
   fi
   sleep 3
 done
-echo "SSM command timed out" >&2
-exit 1
+if [ "$FINAL_STATUS" != "Success" ]; then
+  echo "SSM command timed out" >&2
+  exit 1
+fi
+
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+  echo "command_id=$CMD_ID" >> "$GITHUB_OUTPUT"
+  echo "ssm_status=$FINAL_STATUS" >> "$GITHUB_OUTPUT"
+fi
