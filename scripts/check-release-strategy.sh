@@ -13,8 +13,11 @@ if [ -f ".github/workflows/deploy-staging-ssm.yml" ]; then
   fail "staging workflow reintroduced (.github/workflows/deploy-staging-ssm.yml exists)."
 fi
 
+if [ -f ".github/workflows/deploy.yml" ]; then
+  fail "legacy SSH production workflow reintroduced (.github/workflows/deploy.yml exists)."
+fi
+
 production_workflows=(
-  ".github/workflows/deploy.yml"
   ".github/workflows/deploy-ssm.yml"
 )
 
@@ -38,4 +41,4 @@ for wf in "${production_workflows[@]}"; do
   fi
 done
 
-echo "release-strategy-check: pass (main -> production only)."
+echo "release-strategy-check: pass (main -> deploy-ssm -> production only)."
