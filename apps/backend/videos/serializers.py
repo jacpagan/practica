@@ -3,7 +3,7 @@ from django.utils import timezone
 from rest_framework import serializers
 from .models import (
     Profile, Exercise, Session, Chapter, Comment, InviteCode, SessionLastSeen,
-    Tag, Space, SpaceMember, FeedbackRequest, FeedbackAssignment,
+    Tag, Space, SpaceMember, ExerciseReferenceClip,
 )
 
 
@@ -44,10 +44,21 @@ class SpaceSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     display_name = serializers.SerializerMethodField()
     spaces = serializers.SerializerMethodField()
+    has_spaces = serializers.SerializerMethodField()
+    joined_spaces_count = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'display_name', 'spaces', 'is_staff']
+        fields = [
+            'id',
+            'username',
+            'email',
+            'display_name',
+            'spaces',
+            'is_staff',
+            'has_spaces',
+            'joined_spaces_count',
+        ]
         read_only_fields = ['id']
 
     def get_display_name(self, obj):
@@ -60,6 +71,12 @@ class UserSerializer(serializers.ModelSerializer):
         following = [{'id': m.space.id, 'name': m.space.name, 'role': 'viewer'}
                      for m in obj.space_memberships.select_related('space').all()]
         return owned + following
+
+    def get_has_spaces(self, obj):
+        return obj.owned_spaces.exists() or obj.space_memberships.exists()
+
+    def get_joined_spaces_count(self, obj):
+        return obj.space_memberships.count()
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -77,8 +94,6 @@ class RegisterSerializer(serializers.Serializer):
     def validate(self, data):
         code = data.get('invite_code', '').strip().upper()
         slug = data.get('invite_slug', '').strip()
-        if not code and not slug:
-            raise serializers.ValidationError("An invite code or link is required to sign up.")
         if code:
             if not InviteCode.objects.filter(code=code, used_by__isnull=True).exists():
                 raise serializers.ValidationError({'invite_code': "Invalid or already used invite code."})
@@ -151,105 +166,6 @@ class CommentSerializer(serializers.ModelSerializer):
         return obj.user.username
 
 
-class FeedbackRequestSerializer(serializers.ModelSerializer):
-    session_id = serializers.IntegerField(source='session.id', read_only=True)
-    session_title = serializers.CharField(source='session.title', read_only=True)
-    requester_name = serializers.SerializerMethodField()
-    space_name = serializers.CharField(source='space.name', read_only=True)
-    claimed_count = serializers.SerializerMethodField()
-    completed_count = serializers.SerializerMethodField()
-    video_completed_count = serializers.SerializerMethodField()
-    my_assignment_status = serializers.SerializerMethodField()
-    my_assignment_id = serializers.SerializerMethodField()
-    needs_video_for_final_completion = serializers.SerializerMethodField()
-    claim_slots_remaining = serializers.SerializerMethodField()
-    is_claimable = serializers.SerializerMethodField()
-
-    class Meta:
-        model = FeedbackRequest
-        fields = [
-            'id', 'session_id', 'session_title', 'requester', 'requester_name',
-            'space', 'space_name', 'status', 'sla_hours', 'due_at',
-            'required_reviews', 'video_required_count', 'focus_prompt',
-            'created_at', 'resolved_at',
-            'claimed_count', 'completed_count', 'video_completed_count',
-            'my_assignment_status', 'my_assignment_id', 'needs_video_for_final_completion',
-            'claim_slots_remaining', 'is_claimable',
-        ]
-        read_only_fields = [
-            'id', 'requester', 'created_at', 'resolved_at',
-            'claimed_count', 'completed_count', 'video_completed_count',
-            'my_assignment_status', 'my_assignment_id', 'needs_video_for_final_completion',
-            'claim_slots_remaining', 'is_claimable',
-        ]
-
-    def get_requester_name(self, obj):
-        if hasattr(obj.requester, 'profile') and obj.requester.profile.display_name:
-            return obj.requester.profile.display_name
-        return obj.requester.username
-
-    def get_claimed_count(self, obj):
-        return obj.assignments.filter(status=FeedbackAssignment.STATUS_CLAIMED).count()
-
-    def get_completed_count(self, obj):
-        return obj.assignments.filter(status=FeedbackAssignment.STATUS_COMPLETED).count()
-
-    def get_video_completed_count(self, obj):
-        return obj.assignments.filter(
-            status=FeedbackAssignment.STATUS_COMPLETED,
-            is_video_review=True,
-        ).count()
-
-    def _my_assignment(self, obj):
-        request = self.context.get('request')
-        if not request or not request.user.is_authenticated:
-            return None
-        return obj.assignments.filter(reviewer=request.user).first()
-
-    def get_my_assignment_status(self, obj):
-        assignment = self._my_assignment(obj)
-        return assignment.status if assignment else None
-
-    def get_my_assignment_id(self, obj):
-        assignment = self._my_assignment(obj)
-        return assignment.id if assignment else None
-
-    def get_needs_video_for_final_completion(self, obj):
-        completed_count = self.get_completed_count(obj)
-        video_count = self.get_video_completed_count(obj)
-        remaining_reviews = max(0, obj.required_reviews - completed_count)
-        remaining_video_reviews = max(0, obj.video_required_count - video_count)
-        return remaining_reviews <= 1 and remaining_video_reviews > 0
-
-    def get_claim_slots_remaining(self, obj):
-        claimed_count = self.get_claimed_count(obj)
-        return max(0, obj.required_reviews - claimed_count)
-
-    def get_is_claimable(self, obj):
-        assignment = self._my_assignment(obj)
-        if assignment and assignment.status in (FeedbackAssignment.STATUS_CLAIMED, FeedbackAssignment.STATUS_COMPLETED):
-            return False
-        return self.get_claim_slots_remaining(obj) > 0
-
-
-class FeedbackAssignmentSerializer(serializers.ModelSerializer):
-    reviewer_name = serializers.SerializerMethodField()
-    feedback_request = FeedbackRequestSerializer(read_only=True)
-
-    class Meta:
-        model = FeedbackAssignment
-        fields = [
-            'id', 'feedback_request', 'reviewer', 'reviewer_name', 'status',
-            'claimed_at', 'completed_at', 'is_video_review',
-        ]
-        read_only_fields = fields
-
-    def get_reviewer_name(self, obj):
-        if hasattr(obj.reviewer, 'profile') and obj.reviewer.profile.display_name:
-            return obj.reviewer.profile.display_name
-        return obj.reviewer.username
-
-
 class ChapterSerializer(serializers.ModelSerializer):
     exercise_name = serializers.CharField(source='exercise.name', read_only=True, default=None)
 
@@ -281,7 +197,7 @@ class SessionSerializer(serializers.ModelSerializer):
     chapter_count = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
     owner = serializers.SerializerMethodField()
-    open_feedback_requests = serializers.SerializerMethodField()
+    can_edit = serializers.SerializerMethodField()
 
     class Meta:
         model = Session
@@ -289,7 +205,7 @@ class SessionSerializer(serializers.ModelSerializer):
                   'duration_seconds', 'recorded_at', 'created_at', 'updated_at',
                   'space_id', 'space_name', 'tag_names',
                   'chapters', 'comments', 'chapter_count', 'comment_count', 'owner',
-                  'open_feedback_requests']
+                  'can_edit']
         read_only_fields = ['id', 'recorded_at', 'created_at', 'updated_at']
 
     def get_tag_names(self, obj):
@@ -307,9 +223,17 @@ class SessionSerializer(serializers.ModelSerializer):
             return {'id': obj.user.id, 'display_name': name}
         return None
 
-    def get_open_feedback_requests(self, obj):
-        requests = obj.feedback_requests.filter(status=FeedbackRequest.STATUS_OPEN).order_by('due_at')
-        return FeedbackRequestSerializer(requests, many=True, context=self.context).data
+    def _request_user(self):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        return request.user
+
+    def get_can_edit(self, obj):
+        user = self._request_user()
+        if not user:
+            return False
+        return user.is_staff or obj.user_id == user.id
 
 
 class SessionListSerializer(serializers.ModelSerializer):
@@ -321,13 +245,15 @@ class SessionListSerializer(serializers.ModelSerializer):
     owner_name = serializers.SerializerMethodField()
     owner_id = serializers.IntegerField(source='user.id', read_only=True, default=None)
     has_unread = serializers.SerializerMethodField()
+    can_edit = serializers.SerializerMethodField()
 
     class Meta:
         model = Session
         fields = ['id', 'title', 'description', 'video_file',
                   'duration_seconds', 'recorded_at', 'created_at',
                   'space_id', 'space_name', 'tag_names',
-                  'chapter_count', 'comment_count', 'owner_name', 'owner_id', 'has_unread']
+                  'chapter_count', 'comment_count', 'owner_name', 'owner_id', 'has_unread',
+                  'can_edit']
         read_only_fields = ['id', 'recorded_at', 'created_at']
 
     def get_tag_names(self, obj):
@@ -357,6 +283,18 @@ class SessionListSerializer(serializers.ModelSerializer):
             return latest_comment > last_seen.seen_at
         except SessionLastSeen.DoesNotExist:
             return True
+
+    def _request_user(self):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return None
+        return request.user
+
+    def get_can_edit(self, obj):
+        user = self._request_user()
+        if not user:
+            return False
+        return user.is_staff or obj.user_id == user.id
 
 
 class ProgressChapterSerializer(serializers.ModelSerializer):

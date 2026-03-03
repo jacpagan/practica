@@ -21,7 +21,7 @@ class Command(BaseCommand):
             raise CommandError('--days must be a positive integer')
 
         anchor = self._parse_anchor_date(options.get('date'))
-        minutes_saved = getattr(settings, 'COACH_METRICS_MINUTES_SAVED_PER_COMPLETION', 20)
+        minutes_saved = getattr(settings, 'COACH_METRICS_MINUTES_SAVED_PER_COMMENT', 20)
 
         coach_ids = list(Space.objects.values_list('owner_id', flat=True).distinct())
         if not coach_ids:
@@ -36,7 +36,7 @@ class Command(BaseCommand):
                 metric_values = compute_daily_metric_for_coach(
                     coach_id=coach_id,
                     as_of_date=as_of_date,
-                    minutes_saved_per_completion=minutes_saved,
+                    minutes_saved_per_comment=minutes_saved,
                 )
                 upsert_daily_metric(coach_id=coach_id, as_of_date=as_of_date, metric_values=metric_values)
                 processed += 1

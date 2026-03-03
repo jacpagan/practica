@@ -10,16 +10,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from videos.models import (
-    CoachDailyMetric,
-    CoachEvent,
-    FeedbackAssignment,
-    FeedbackRequest,
-    Profile,
-    Session,
-    Space,
-    SpaceMember,
-)
+from videos.models import CoachDailyMetric, CoachEvent, Comment, Profile, Session, Space, SpaceMember
 from videos.services.coach_metrics import compute_daily_metric_for_coach
 
 
@@ -41,7 +32,7 @@ class CoachMetricModelTests(TestCase):
         self.assertIn(['coach', 'date'], coach_daily_metric_index_fields)
 
 
-@override_settings(FEEDBACK_REQUESTS_ENABLED=True, COACH_METRICS_ENABLED=True)
+@override_settings(COACH_METRICS_ENABLED=True)
 class CoachMetricsEventCaptureTests(APITestCase):
     def setUp(self):
         self.owner = User.objects.create_user(username='owner-events', password='pass1234')
@@ -50,13 +41,6 @@ class CoachMetricsEventCaptureTests(APITestCase):
         Profile.objects.create(user=self.member, display_name='Member')
         self.space = Space.objects.create(name='Drumming Events', owner=self.owner)
         SpaceMember.objects.create(space=self.space, user=self.member)
-        self.owner_session = Session.objects.create(
-            user=self.owner,
-            space=self.space,
-            title='Owner Session',
-            description='Seed',
-            video_file=self._video_file('seed.mp4'),
-        )
 
     def _video_file(self, name='clip.mp4'):
         return SimpleUploadedFile(name, b'video-data', content_type='video/mp4')
@@ -80,62 +64,32 @@ class CoachMetricsEventCaptureTests(APITestCase):
         self.assertEqual(events.count(), 1)
         self.assertEqual(events.first().space_id, self.space.id)
 
-    def test_claim_retry_does_not_duplicate_and_complete_emits_events(self):
+    def test_comment_flow_emits_no_legacy_feedback_events(self):
+        session = Session.objects.create(
+            user=self.member,
+            space=self.space,
+            title='Student Session',
+            description='',
+            video_file=self._video_file('student.mp4'),
+        )
         self.client.force_authenticate(user=self.owner)
-        with self.captureOnCommitCallbacks(execute=True):
-            req_response = self.client.post(
-                f'/api/sessions/{self.owner_session.id}/feedback-request/',
-                {'focus_prompt': 'Please review groove', 'sla_hours': 48},
-                format='json',
-            )
-        self.assertEqual(req_response.status_code, status.HTTP_201_CREATED)
-        request_id = req_response.data['id']
-        self.assertEqual(
-            CoachEvent.objects.filter(
-                user=self.owner,
-                event_type=CoachEvent.EVENT_FEEDBACK_REQUESTED,
-                feedback_request_id=request_id,
-            ).count(),
-            1,
+        response = self.client.post(
+            f'/api/sessions/{session.id}/add_comment/',
+            {'text': 'Nice control at 0:30.'},
+            format='multipart',
         )
-
-        self.client.force_authenticate(user=self.member)
-        with self.captureOnCommitCallbacks(execute=True):
-            claim_one = self.client.post(f'/api/feedback-requests/{request_id}/claim/')
-        claim_two = self.client.post(f'/api/feedback-requests/{request_id}/claim/')
-        self.assertEqual(claim_one.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(claim_two.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Comment.objects.filter(session=session, user=self.owner).count(), 1)
         self.assertEqual(
             CoachEvent.objects.filter(
-                user=self.member,
-                event_type=CoachEvent.EVENT_FEEDBACK_CLAIMED,
-                feedback_request_id=request_id,
+                event_type__in=[
+                    CoachEvent.EVENT_FEEDBACK_REQUESTED,
+                    CoachEvent.EVENT_FEEDBACK_CLAIMED,
+                    CoachEvent.EVENT_FEEDBACK_COMPLETED,
+                    CoachEvent.EVENT_VIDEO_FEEDBACK_COMPLETED,
+                ]
             ).count(),
-            1,
-        )
-
-        with self.captureOnCommitCallbacks(execute=True):
-            complete_response = self.client.post(
-                f'/api/feedback-requests/{request_id}/complete/',
-                {'text': 'Good time feel', 'video_reply': self._video_file('reply.mp4')},
-                format='multipart',
-            )
-        self.assertEqual(complete_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(
-            CoachEvent.objects.filter(
-                user=self.member,
-                event_type=CoachEvent.EVENT_FEEDBACK_COMPLETED,
-                feedback_request_id=request_id,
-            ).count(),
-            1,
-        )
-        self.assertEqual(
-            CoachEvent.objects.filter(
-                user=self.member,
-                event_type=CoachEvent.EVENT_VIDEO_FEEDBACK_COMPLETED,
-                feedback_request_id=request_id,
-            ).count(),
-            1,
+            0,
         )
 
 
@@ -151,120 +105,79 @@ class CoachMetricsAggregationTests(TestCase):
         SpaceMember.objects.create(space=self.space, user=self.student_b)
 
         self.anchor = timezone.now().date()
-        self._seed_sessions()
-        self._seed_feedback_requests()
+        self._seed_sessions_and_comments()
 
     def _video_file(self, name):
         return SimpleUploadedFile(name, b'video-data', content_type='video/mp4')
 
-    def _seed_sessions(self):
-        in_window_time = timezone.now() - timedelta(days=3)
-        old_time = timezone.now() - timedelta(days=40)
+    def _create_session(self, *, user, title, created_at):
+        session = Session.objects.create(
+            user=user,
+            space=self.space,
+            title=title,
+            description='',
+            video_file=self._video_file(f'{title}.mp4'),
+        )
+        Session.objects.filter(pk=session.pk).update(created_at=created_at, recorded_at=created_at)
+        session.refresh_from_db()
+        return session
 
-        session_a = Session.objects.create(
+    def _create_comment(self, *, session, user, created_at, text):
+        comment = Comment.objects.create(session=session, user=user, text=text)
+        Comment.objects.filter(pk=comment.pk).update(created_at=created_at)
+
+    def _seed_sessions_and_comments(self):
+        now = timezone.now()
+        recent_created = now - timedelta(days=3)
+        mid_created = now - timedelta(days=20)
+        old_created = now - timedelta(days=45)
+
+        recent_session = self._create_session(user=self.student_a, title='recent', created_at=recent_created)
+        mid_session = self._create_session(user=self.student_b, title='mid', created_at=mid_created)
+        old_session = self._create_session(user=self.other_user, title='old', created_at=old_created)
+        coach_own_session = self._create_session(user=self.coach, title='coach-own', created_at=now - timedelta(days=2))
+
+        self._create_comment(
+            session=recent_session,
+            user=self.coach,
+            created_at=recent_created + timedelta(hours=24),
+            text='Recent response',
+        )
+        self._create_comment(
+            session=mid_session,
+            user=self.coach,
+            created_at=mid_created + timedelta(hours=48),
+            text='Mid response',
+        )
+        self._create_comment(
+            session=old_session,
+            user=self.coach,
+            created_at=old_created + timedelta(hours=12),
+            text='Old response',
+        )
+        self._create_comment(
+            session=coach_own_session,
+            user=self.coach,
+            created_at=now - timedelta(days=1),
+            text='Own session comment',
+        )
+        self._create_comment(
+            session=recent_session,
             user=self.student_a,
-            space=self.space,
-            title='Student A',
-            description='',
-            video_file=self._video_file('a.mp4'),
-        )
-        Session.objects.filter(pk=session_a.pk).update(created_at=in_window_time, recorded_at=in_window_time)
-
-        session_b = Session.objects.create(
-            user=self.student_b,
-            space=self.space,
-            title='Student B',
-            description='',
-            video_file=self._video_file('b.mp4'),
-        )
-        Session.objects.filter(pk=session_b.pk).update(created_at=in_window_time, recorded_at=in_window_time)
-
-        old_session = Session.objects.create(
-            user=self.other_user,
-            space=self.space,
-            title='Old Outside Window',
-            description='',
-            video_file=self._video_file('old.mp4'),
-        )
-        Session.objects.filter(pk=old_session.pk).update(created_at=old_time, recorded_at=old_time)
-
-        self.feedback_session = session_a
-
-    def _seed_feedback_requests(self):
-        request_one_created = timezone.now() - timedelta(days=4)
-        request_two_created = timezone.now() - timedelta(days=25)
-        request_old_created = timezone.now() - timedelta(days=45)
-
-        fr_one = FeedbackRequest.objects.create(
-            session=self.feedback_session,
-            requester=self.student_a,
-            space=self.space,
-            status=FeedbackRequest.STATUS_OPEN,
-            sla_hours=48,
-            due_at=timezone.now() + timedelta(days=1),
-            required_reviews=1,
-            video_required_count=0,
-            focus_prompt='Request one',
-        )
-        FeedbackRequest.objects.filter(pk=fr_one.pk).update(created_at=request_one_created)
-        FeedbackAssignment.objects.create(
-            feedback_request=fr_one,
-            reviewer=self.coach,
-            status=FeedbackAssignment.STATUS_COMPLETED,
-            completed_at=request_one_created + timedelta(hours=24),
-            is_video_review=False,
-        )
-
-        fr_two = FeedbackRequest.objects.create(
-            session=self.feedback_session,
-            requester=self.student_b,
-            space=self.space,
-            status=FeedbackRequest.STATUS_OPEN,
-            sla_hours=48,
-            due_at=timezone.now() + timedelta(days=1),
-            required_reviews=1,
-            video_required_count=0,
-            focus_prompt='Request two',
-        )
-        FeedbackRequest.objects.filter(pk=fr_two.pk).update(created_at=request_two_created)
-        FeedbackAssignment.objects.create(
-            feedback_request=fr_two,
-            reviewer=self.coach,
-            status=FeedbackAssignment.STATUS_COMPLETED,
-            completed_at=request_two_created + timedelta(hours=48),
-            is_video_review=True,
-        )
-
-        fr_old = FeedbackRequest.objects.create(
-            session=self.feedback_session,
-            requester=self.student_b,
-            space=self.space,
-            status=FeedbackRequest.STATUS_OPEN,
-            sla_hours=48,
-            due_at=timezone.now() + timedelta(days=1),
-            required_reviews=1,
-            video_required_count=0,
-            focus_prompt='Old request',
-        )
-        FeedbackRequest.objects.filter(pk=fr_old.pk).update(created_at=request_old_created)
-        FeedbackAssignment.objects.create(
-            feedback_request=fr_old,
-            reviewer=self.coach,
-            status=FeedbackAssignment.STATUS_COMPLETED,
-            completed_at=request_old_created + timedelta(hours=12),
-            is_video_review=False,
+            created_at=now - timedelta(days=1),
+            text='Student note',
         )
 
     def test_compute_daily_metric_values(self):
         metrics = compute_daily_metric_for_coach(
             coach_id=self.coach.id,
             as_of_date=self.anchor,
-            minutes_saved_per_completion=20,
+            minutes_saved_per_comment=20,
         )
         self.assertEqual(metrics['active_students_30d'], 2)
-        self.assertEqual(metrics['feedback_completions_7d'], 1)
-        self.assertEqual(metrics['feedback_completions_30d'], 2)
-        self.assertEqual(metrics['median_time_to_feedback_hours_30d'], Decimal('36.00'))
+        self.assertEqual(metrics['coach_comments_7d'], 1)
+        self.assertEqual(metrics['coach_comments_30d'], 2)
+        self.assertEqual(metrics['median_time_to_first_coach_comment_hours_30d'], Decimal('36.00'))
         self.assertEqual(metrics['estimated_time_saved_hours_30d'], Decimal('0.67'))
 
     def test_compute_daily_metric_for_non_coach_returns_zeroes(self):
@@ -272,15 +185,15 @@ class CoachMetricsAggregationTests(TestCase):
         metrics = compute_daily_metric_for_coach(
             coach_id=non_coach.id,
             as_of_date=self.anchor,
-            minutes_saved_per_completion=20,
+            minutes_saved_per_comment=20,
         )
         self.assertEqual(metrics['active_students_30d'], 0)
-        self.assertEqual(metrics['feedback_completions_7d'], 0)
-        self.assertEqual(metrics['feedback_completions_30d'], 0)
-        self.assertIsNone(metrics['median_time_to_feedback_hours_30d'])
+        self.assertEqual(metrics['coach_comments_7d'], 0)
+        self.assertEqual(metrics['coach_comments_30d'], 0)
+        self.assertIsNone(metrics['median_time_to_first_coach_comment_hours_30d'])
         self.assertEqual(metrics['estimated_time_saved_hours_30d'], Decimal('0.00'))
 
-    @override_settings(COACH_METRICS_MINUTES_SAVED_PER_COMPLETION=20)
+    @override_settings(COACH_METRICS_MINUTES_SAVED_PER_COMMENT=20)
     def test_build_command_is_idempotent(self):
         call_command('build_coach_metrics', days=2, date=str(self.anchor))
         first_count = CoachDailyMetric.objects.filter(coach=self.coach).count()
@@ -304,18 +217,18 @@ class CoachMetricsSummaryApiTests(APITestCase):
                 coach=self.coach,
                 date=metric_date,
                 active_students_30d=3 + i,
-                feedback_completions_7d=5 + i,
-                feedback_completions_30d=7 + i,
-                median_time_to_feedback_hours_30d=Decimal('12.50') + Decimal(i),
+                coach_comments_7d=5 + i,
+                coach_comments_30d=7 + i,
+                median_time_to_first_coach_comment_hours_30d=Decimal('12.50') + Decimal(i),
                 estimated_time_saved_hours_30d=Decimal('2.00') + Decimal(i),
             )
         CoachDailyMetric.objects.create(
             coach=self.other,
             date=timezone.now().date(),
             active_students_30d=99,
-            feedback_completions_7d=99,
-            feedback_completions_30d=99,
-            median_time_to_feedback_hours_30d=Decimal('99.99'),
+            coach_comments_7d=99,
+            coach_comments_30d=99,
+            median_time_to_first_coach_comment_hours_30d=Decimal('99.99'),
             estimated_time_saved_hours_30d=Decimal('99.99'),
         )
 
@@ -350,8 +263,9 @@ class CoachMetricsSummaryApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['coach_user_id'], self.coach.id)
         self.assertEqual(response.data['summary']['active_students_30d'], 5)
-        self.assertEqual(response.data['summary']['feedback_completions_7d'], 7)
-        self.assertEqual(response.data['summary']['median_time_to_feedback_hours_30d'], 14.5)
+        self.assertEqual(response.data['summary']['coach_comments_7d'], 7)
+        self.assertEqual(response.data['summary']['coach_comments_30d'], 9)
+        self.assertEqual(response.data['summary']['median_time_to_first_coach_comment_hours_30d'], 14.5)
         self.assertEqual(response.data['summary']['estimated_time_saved_hours_30d'], 4.0)
 
         trend_dates = [row['date'] for row in response.data['trends']['active_students_30d']]

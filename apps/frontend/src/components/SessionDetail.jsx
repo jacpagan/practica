@@ -3,9 +3,11 @@ import VideoRecorder from './VideoRecorder'
 import TagInput from './TagInput'
 import { useToast } from './Toast'
 import { fmtTime, fmtDate, videoUrl, parseTimeInput, fmtDuration } from '../utils'
+import { useConfirm } from './ConfirmDialog'
 
 function SessionDetail({ session: initialSession, exercises, spaces = [], token, user, onBack, onSessionUpdate }) {
   const toast = useToast()
+  const confirm = useConfirm()
   const [session, setSession] = useState(initialSession)
   const [currentTime, setCurrentTime] = useState(0)
 
@@ -33,10 +35,6 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
   const [commentVideoPreview, setCommentVideoPreview] = useState(null)
   const [showRecorder, setShowRecorder] = useState(false)
   const [submittingComment, setSubmittingComment] = useState(false)
-  const [showRequestModal, setShowRequestModal] = useState(false)
-  const [requestFocusPrompt, setRequestFocusPrompt] = useState('')
-  const [requestSlaHours, setRequestSlaHours] = useState(48)
-  const [submittingRequest, setSubmittingRequest] = useState(false)
   const [recoveringPlayback, setRecoveringPlayback] = useState(false)
   const [pendingResumeSeconds, setPendingResumeSeconds] = useState(null)
 
@@ -57,6 +55,11 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
   const switchTab = (t) => {
     setTab(t)
     if (t === 'comments') markSeen(session.id)
+  }
+  const onRowKeyDown = (event, action) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    action()
   }
 
   const refreshSession = async () => {
@@ -141,7 +144,13 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
   }
 
   const removeChapter = async (chapterId) => {
-    if (!confirm('Remove this chapter?')) return
+    const approved = await confirm({
+      title: 'Remove chapter',
+      message: 'Remove this chapter?',
+      confirmLabel: 'Remove',
+      tone: 'danger',
+    })
+    if (!approved) return
     try {
       const res = await fetch(`/api/sessions/${session.id}/chapters/${chapterId}/`, { method: 'DELETE', headers: authHeaders })
       if (res.ok) { const d = await res.json(); setSession(d); onSessionUpdate(d); toast.success('Chapter removed') }
@@ -206,7 +215,7 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
         const data = await res.json()
         setSession(data); onSessionUpdate(data)
         resetCommentForm()
-        toast.success('Feedback posted')
+        toast.success('Comment posted')
       } else {
         const err = await res.json()
         toast.error(err.error || 'Failed to add comment')
@@ -215,42 +224,14 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
     finally { setSubmittingComment(false) }
   }
 
-  const createFeedbackRequest = async () => {
-    const focusPrompt = requestFocusPrompt.trim()
-    if (!focusPrompt) return toast.error('Focus prompt is required')
-
-    setSubmittingRequest(true)
-    try {
-      const res = await fetch(`/api/sessions/${session.id}/feedback-request/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({
-          focus_prompt: focusPrompt,
-          sla_hours: requestSlaHours,
-          required_reviews: 1,
-          video_required_count: 1,
-        }),
-      })
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        return toast.error(err.error || 'Could not create feedback request')
-      }
-
-      setShowRequestModal(false)
-      setRequestFocusPrompt('')
-      setRequestSlaHours(48)
-      await refreshSession()
-      toast.success('Feedback request created')
-    } catch {
-      toast.error('Could not create feedback request')
-    } finally {
-      setSubmittingRequest(false)
-    }
-  }
-
   const removeComment = async (commentId) => {
-    if (!confirm('Delete this comment?')) return
+    const approved = await confirm({
+      title: 'Delete comment',
+      message: 'Delete this comment?',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    })
+    if (!approved) return
     try {
       const res = await fetch(`/api/sessions/${session.id}/comments/${commentId}/`, { method: 'DELETE', headers: authHeaders })
       if (res.ok) { const d = await res.json(); setSession(d); onSessionUpdate(d); toast.success('Comment deleted') }
@@ -314,16 +295,10 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
 
   const chapters = session.chapters || []
   const comments = session.comments || []
-  const openFeedbackRequests = session.open_feedback_requests || []
   const activeChapter = [...chapters].reverse().find(c => currentTime >= c.timestamp_seconds)
-  const canEditSession = session.owner?.id === user?.id || user?.is_staff
-  const canRequestFeedback = session.owner?.id === user?.id
-  const formatDueAt = (value) => new Date(value).toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
+  const canEditSession = typeof session.can_edit === 'boolean'
+    ? session.can_edit
+    : session.owner?.id === user?.id || user?.is_staff
 
   return (
     <div className="px-4 sm:px-6 py-4">
@@ -413,29 +388,43 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
             {chapters.map(ch => {
               const left = (ch.timestamp_seconds / videoRef.current.duration) * 100
               const width = ch.end_seconds ? ((ch.end_seconds - ch.timestamp_seconds) / videoRef.current.duration) * 100 : 2
-              return <div key={ch.id} onClick={() => seekTo(ch.timestamp_seconds)}
-                className="absolute top-0 h-full bg-gray-400 hover:bg-gray-600 cursor-pointer rounded-full transition-colors"
-                style={{ left: `${left}%`, width: `${Math.max(width, 1)}%` }} title={ch.exercise_name || ch.title} />
+              return (
+                <button
+                  key={ch.id}
+                  type="button"
+                  onClick={() => seekTo(ch.timestamp_seconds)}
+                  className="absolute top-0 h-full bg-gray-400 hover:bg-gray-600 cursor-pointer rounded-full transition-colors"
+                  style={{ left: `${left}%`, width: `${Math.max(width, 1)}%` }}
+                  title={ch.exercise_name || ch.title}
+                  aria-label={`Jump to ${ch.exercise_name || ch.title || 'chapter'} at ${fmtTime(ch.timestamp_seconds)}`}
+                />
+              )
             })}
           </div>
         )}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 border-b border-gray-100">
+      <div className="flex gap-1 mb-4 border-b border-gray-100" role="tablist" aria-label="Session detail tabs">
         <button onClick={() => switchTab('chapters')}
+          role="tab"
+          aria-selected={tab === 'chapters'}
+          aria-controls="chapters-panel"
           className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === 'chapters' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
           Chapters{chapters.length > 0 && <span className="ml-1 text-gray-400 font-normal">{chapters.length}</span>}
         </button>
         <button onClick={() => switchTab('comments')}
+          role="tab"
+          aria-selected={tab === 'comments'}
+          aria-controls="comments-panel"
           className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === 'comments' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
-          Feedback{comments.length > 0 && <span className="ml-1 text-gray-400 font-normal">{comments.length}</span>}
+          Comments{comments.length > 0 && <span className="ml-1 text-gray-400 font-normal">{comments.length}</span>}
         </button>
       </div>
 
       {/* ── CHAPTERS TAB ── */}
       {tab === 'chapters' && (
-        <>
+        <div id="chapters-panel" role="tabpanel">
           <div className="flex items-center justify-between mb-3">
             <span />
             {canEditSession && (
@@ -570,7 +559,12 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
               }
 
               return (
-                <div key={chapter.id} onClick={() => seekTo(chapter.timestamp_seconds)}
+                <div key={chapter.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => seekTo(chapter.timestamp_seconds)}
+                  onKeyDown={(e) => onRowKeyDown(e, () => seekTo(chapter.timestamp_seconds))}
+                  aria-label={`Jump to chapter ${chapter.exercise_name || chapter.title || 'Untitled'} at ${fmtTime(chapter.timestamp_seconds)}`}
                   className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all group ${isActive ? 'bg-gray-100' : 'hover:bg-gray-50'}`}>
                   <div className="flex flex-col items-center flex-shrink-0 w-12">
                     <span className="text-xs text-gray-400 font-mono">{fmtTime(chapter.timestamp_seconds)}</span>
@@ -588,7 +582,7 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
                   {isActive && <span className="w-1.5 h-1.5 bg-gray-900 rounded-full flex-shrink-0" />}
                   {canEditSession && (
                     <button onClick={(e) => { e.stopPropagation(); startEditChapter(chapter) }}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-gray-600 transition-all flex-shrink-0"
+                      className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 p-2 text-gray-300 hover:text-gray-600 transition-all flex-shrink-0"
                       aria-label="Edit chapter">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
@@ -597,7 +591,7 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
                   )}
                   {canEditSession && (
                     <button onClick={(e) => { e.stopPropagation(); removeChapter(chapter.id) }}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-red-400 transition-all flex-shrink-0"
+                      className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 p-2 text-gray-300 hover:text-red-400 transition-all flex-shrink-0"
                       aria-label="Delete chapter">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
@@ -615,40 +609,12 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
               {canEditSession && <p className="text-xs text-gray-400">Play the video and tap "+ Add" to mark exercises</p>}
             </div>
           )}
-        </>
+        </div>
       )}
 
-      {/* ── FEEDBACK TAB ── */}
+      {/* ── COMMENTS TAB ── */}
       {tab === 'comments' && (
-        <>
-          {/* Request status + create request */}
-          <div className="mb-4 rounded-xl border border-gray-200 p-3">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <h3 className="text-sm font-medium text-gray-900">Feedback requests</h3>
-              {canRequestFeedback && (
-                <button
-                  onClick={() => setShowRequestModal(true)}
-                  className="text-xs font-medium text-white bg-gray-900 rounded-md px-2.5 py-1.5"
-                >
-                  Request feedback
-                </button>
-              )}
-            </div>
-
-            {openFeedbackRequests.length === 0 ? (
-              <p className="text-xs text-gray-500">No open requests for this session.</p>
-            ) : (
-              <div className="space-y-2">
-                {openFeedbackRequests.map(req => (
-                  <div key={req.id} className="rounded-lg bg-gray-50 px-3 py-2">
-                    <p className="text-xs text-gray-500">Due {formatDueAt(req.due_at)}</p>
-                    <p className="text-sm text-gray-700 mt-1">{req.focus_prompt}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
+        <div id="comments-panel" role="tabpanel">
           {/* ── Compose ── */}
           <div className="mb-6">
             <div className="rounded-2xl border border-gray-200 overflow-hidden transition-all">
@@ -657,7 +623,7 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
                 onChange={(e) => setCommentText(e.target.value)}
                 className="w-full px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none resize-none border-0"
                 rows={2}
-                placeholder="Add feedback or a timestamped note..."
+                placeholder="Add a comment or a timestamped note..."
               />
 
               {/* Attached video preview */}
@@ -752,55 +718,6 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
             </div>
           </div>
 
-          {showRequestModal && (
-            <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
-              <div className="w-full max-w-md rounded-2xl bg-white shadow-xl p-4 space-y-3">
-                <h4 className="text-sm font-semibold text-gray-900">Request feedback</h4>
-                <p className="text-xs text-gray-500">
-                  Ask for focused feedback and set a due window.
-                </p>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Focus prompt</label>
-                  <textarea
-                    value={requestFocusPrompt}
-                    onChange={(e) => setRequestFocusPrompt(e.target.value)}
-                    rows={3}
-                    className="w-full text-sm border border-gray-200 rounded-lg p-2.5 focus:outline-none focus:border-gray-400"
-                    placeholder="What exactly should reviewers look for?"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">SLA window</label>
-                  <select
-                    value={requestSlaHours}
-                    onChange={(e) => setRequestSlaHours(Number(e.target.value))}
-                    className="w-full text-sm border border-gray-200 rounded-lg p-2.5 focus:outline-none focus:border-gray-400 bg-white"
-                  >
-                    <option value={24}>24 hours</option>
-                    <option value={48}>48 hours</option>
-                    <option value={72}>72 hours</option>
-                  </select>
-                </div>
-                <div className="flex items-center justify-end gap-2 pt-1">
-                  <button
-                    onClick={() => setShowRequestModal(false)}
-                    className="text-xs text-gray-500 px-3 py-2"
-                    disabled={submittingRequest}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={createFeedbackRequest}
-                    disabled={submittingRequest}
-                    className="text-xs font-medium text-white bg-gray-900 rounded-lg px-3 py-2 disabled:opacity-50"
-                  >
-                    {submittingRequest ? 'Creating...' : 'Create request'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* ── Comment thread ── */}
           <div className="space-y-1">
             {comments.map(comment => (
@@ -851,7 +768,9 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
                   {/* Delete */}
                   {(comment.username === user?.username || user?.is_staff) && (
                     <button onClick={() => removeComment(comment.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-300 hover:text-red-400 transition-all flex-shrink-0 mt-0.5">
+                      className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 p-2 text-gray-300 hover:text-red-400 transition-all flex-shrink-0 mt-0.5"
+                      aria-label="Delete comment"
+                    >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
                       </svg>
@@ -864,11 +783,11 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
 
           {comments.length === 0 && (
             <div className="text-center py-12">
-              <p className="text-sm text-gray-400">No feedback yet</p>
+              <p className="text-sm text-gray-400">No comments yet</p>
               <p className="text-xs text-gray-400 mt-1">Watch the video and share helpful observations.</p>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   )
