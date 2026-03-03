@@ -61,6 +61,39 @@ class Exercise(models.Model):
         return self.name
 
 
+class ExerciseReferenceClip(models.Model):
+    """A user-specific YouTube reference slice for an exercise."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='exercise_reference_clips')
+    exercise = models.ForeignKey(Exercise, on_delete=models.CASCADE, related_name='reference_clips')
+    title = models.CharField(max_length=200)
+    youtube_url = models.URLField()
+    youtube_video_id = models.CharField(max_length=32)
+    youtube_playlist_id = models.CharField(max_length=64, blank=True, default='')
+    start_seconds = models.PositiveIntegerField(default=0)
+    end_seconds = models.PositiveIntegerField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'exercise', 'created_at'], name='exercise_clip_user_ex_time_idx'),
+            models.Index(fields=['youtube_video_id'], name='exercise_clip_video_id_idx'),
+            models.Index(fields=['youtube_playlist_id'], name='exercise_clip_playlist_id_idx'),
+        ]
+        constraints = [
+            models.CheckConstraint(check=models.Q(start_seconds__gte=0), name='exercise_clip_start_seconds_gte_0'),
+            models.CheckConstraint(
+                check=models.Q(end_seconds__isnull=True) | models.Q(end_seconds__gt=models.F('start_seconds')),
+                name='exercise_clip_end_seconds_gt_start_or_null',
+            ),
+        ]
+
+    def __str__(self):
+        return f"ExerciseReferenceClip #{self.id} user={self.user_id} exercise={self.exercise_id}"
+
+
 class Tag(models.Model):
     """A freeform label for organizing sessions."""
     name = models.CharField(max_length=100, unique=True)

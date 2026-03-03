@@ -24,14 +24,14 @@ from botocore.exceptions import BotoCoreError, ClientError
 
 from .models import (
     Exercise, Session, Chapter, Comment, InviteCode, SessionLastSeen,
-    Tag, Space, SpaceMember, FeedbackRequest, FeedbackAssignment, MultipartSessionUpload,
+    Tag, Space, SpaceMember, FeedbackRequest, FeedbackAssignment, MultipartSessionUpload, ExerciseReferenceClip,
     CoachEvent, CoachDailyMetric,
 )
 from .serializers import (
     UserSerializer, RegisterSerializer, SpaceSerializer,
     ExerciseSerializer, SessionSerializer, SessionListSerializer,
     ChapterSerializer, ProgressChapterSerializer, TagSerializer,
-    FeedbackRequestSerializer, FeedbackAssignmentSerializer,
+    FeedbackRequestSerializer, FeedbackAssignmentSerializer, ExerciseReferenceClipSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -450,10 +450,50 @@ class ExerciseViewSet(viewsets.ModelViewSet):
             .order_by('session__recorded_at')
         )
         serializer = ProgressChapterSerializer(qs, many=True)
+        reference_clips = ExerciseReferenceClip.objects.filter(
+            user=request.user,
+            exercise=exercise,
+        ).order_by('-created_at')
+        clip_serializer = ExerciseReferenceClipSerializer(reference_clips, many=True)
         return Response({
             'exercise': ExerciseSerializer(exercise).data,
             'chapters': serializer.data,
+            'reference_clips': clip_serializer.data,
         })
+
+    @action(detail=True, methods=['get', 'post'], url_path='reference-clips')
+    def reference_clips(self, request, pk=None):
+        exercise = self.get_object()
+        if request.method == 'GET':
+            clips = ExerciseReferenceClip.objects.filter(
+                user=request.user,
+                exercise=exercise,
+            ).order_by('-created_at')
+            return Response(ExerciseReferenceClipSerializer(clips, many=True).data)
+
+        serializer = ExerciseReferenceClipSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        clip = serializer.save(user=request.user, exercise=exercise)
+        return Response(ExerciseReferenceClipSerializer(clip).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['patch', 'delete'], url_path=r'reference-clips/(?P<clip_id>[0-9]+)')
+    def reference_clip_detail(self, request, pk=None, clip_id=None):
+        exercise = self.get_object()
+        clip = get_object_or_404(
+            ExerciseReferenceClip,
+            pk=clip_id,
+            exercise=exercise,
+            user=request.user,
+        )
+
+        if request.method == 'DELETE':
+            clip.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        serializer = ExerciseReferenceClipSerializer(clip, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        updated = serializer.save()
+        return Response(ExerciseReferenceClipSerializer(updated).data)
 
 
 # ── Session views ───────────────────────────────────────────────────
