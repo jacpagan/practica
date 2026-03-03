@@ -24,14 +24,13 @@ from botocore.exceptions import BotoCoreError, ClientError
 
 from .models import (
     Exercise, Session, Chapter, Comment, InviteCode, SessionLastSeen,
-    Tag, Space, SpaceMember, MultipartSessionUpload, ExerciseReferenceClip,
+    Tag, Space, SpaceMember, MultipartSessionUpload,
     CoachEvent, CoachDailyMetric,
 )
 from .serializers import (
     UserSerializer, RegisterSerializer, SpaceSerializer,
     ExerciseSerializer, SessionSerializer, SessionListSerializer,
     ChapterSerializer, ProgressChapterSerializer, TagSerializer,
-    ExerciseReferenceClipSerializer,
 )
 
 logger = logging.getLogger(__name__)

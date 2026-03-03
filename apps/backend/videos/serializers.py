@@ -3,7 +3,7 @@ from django.utils import timezone
 from rest_framework import serializers
 from .models import (
     Profile, Exercise, Session, Chapter, Comment, InviteCode, SessionLastSeen,
-    Tag, Space, SpaceMember, ExerciseReferenceClip,
+    Tag, Space, SpaceMember,
 )
 
 
