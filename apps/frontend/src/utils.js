@@ -62,6 +62,44 @@ export const parseTimeInput = (str) => {
   return null
 }
 
+export const canUseScreenRecording = () => {
+  if (typeof window === 'undefined') return false
+  return Boolean(
+    window.MediaRecorder &&
+    navigator?.mediaDevices &&
+    typeof navigator.mediaDevices.getDisplayMedia === 'function'
+  )
+}
+
+const trimLogValue = (value, maxChars) => String(value || '').slice(0, maxChars)
+
+export const reportClientError = ({ message = '', stack = '', source = 'ui', extra = {} } = {}) => {
+  if (typeof window === 'undefined') return
+  try {
+    const payload = {
+      message: trimLogValue(message, 1000),
+      stack: trimLogValue(stack, 6000),
+      source: trimLogValue(source, 64),
+      path: trimLogValue(`${window.location.pathname}${window.location.search}`, 512),
+      extra: extra && typeof extra === 'object' ? extra : {},
+    }
+    const body = JSON.stringify(payload)
+    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      const blob = new Blob([body], { type: 'application/json' })
+      navigator.sendBeacon('/api/client-errors/', blob)
+      return
+    }
+    fetch('/api/client-errors/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      keepalive: true,
+    }).catch(() => {})
+  } catch {
+    // Ignore telemetry transport failures.
+  }
+}
+
 const localStore = () => {
   try {
     return window.localStorage

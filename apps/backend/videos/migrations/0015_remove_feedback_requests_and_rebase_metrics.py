@@ -4,7 +4,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('videos', '0014_exercisereferenceclip'),
+        ('videos', '0013_coachevent_coachdailymetric'),
     ]
 
     operations = [
