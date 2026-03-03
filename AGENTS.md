@@ -92,43 +92,78 @@ Note: The EC2 instance uses SQLite, so database state is lost on instance recrea
 
 - Never pin Python module versions in `requirements.txt`.
 
-## Release Strategy (Solo Mode)
+## Release Strategy (Early Stage)
 
-- Canonical deployment path is `feature branch -> PR -> main -> production`.
+- Canonical deployment path is direct commit/push to `main` followed by automatic production deploy.
 - `main` is the only deployment branch.
 - No active staging deployment path exists in CI by policy.
 - Staging scripts in `scripts/` are local experimentation helpers only and are non-canonical.
 
-### Required Pre-Merge / Post-Deploy Checks
-
-- Before merge: run local checks for changed areas (tests/build/lint as applicable).
-- After production deploy: verify `https://practica.jpagan.com/health/` returns `200`.
-- After production deploy: smoke check login and one upload/playback path.
-
 ## Delivery Agents (Roles)
 
 - Release Agent: Owns merging to `main` and versioning. Checks that CI is green and the PR includes migration notes.
-- Deploy Agent (CI): On push to `main`, SSHes into the server and runs `docker-compose -f docker-compose.prod.yml up -d --build`. Performs a health check on `/health/`.
+- Deploy Agent (CI): On push to `main`, runs `.github/workflows/deploy-ssm.yml` to deploy via AWS SSM. Performs required backend and public health checks.
 - Infra Agent: Maintains DNS, TLS, and reverse proxy. Ensures `ALLOWED_HOSTS`, `CORS_ORIGINS`, and `CSRF_TRUSTED_ORIGINS` include `practica.jpagan.com`. Manages S3 bucket policy/CORS when used.
 - Dev Agent (Local): Runs `make up`, `make migrate`, `make createsuperuser`. Verifies new features locally at `localhost:3000` before pushing.
 - Observability Agent: Monitors container logs, sets alarms, and checks `/health/` and key API endpoints.
 
 ### Rules of Engagement
 
-- Local-first: All features are verified locally (Docker Compose) before PR.
-- Main = Production: Merging to `main` triggers the deploy workflow to the production server.
+- Local-first: All features are minimally verified locally (frontend build + backend check if env is available) before push.
+- Main = Production: Pushes to `main` trigger the production deploy workflow.
 - Idempotent deploys: Production compose commands can be run multiple times safely.
 - Health gate: Deployment considered successful only if `/health/` returns 200 over HTTPS.
 - Media storage: Production uses S3 (recommended). If not, reverse proxy must serve `/media/` with range requests enabled.
 
+### Early-Stage Production-First Policy
+
+Non-negotiable policy while Practica is in early stage:
+
+- Direct-to-main: completed changes are committed and pushed to `main` in the same work session.
+- No batching: do not hold completed changes for later release branches.
+- Production verification: after each push, the deploy workflow must succeed and `https://practica.jpagan.com/health/` must return `200`.
+- Fix-forward rule: if deploy fails, agents immediately push a fix to `main`; no long-lived rollback branches by default.
+
+When this policy changes:
+
+- Update this section, `.cursor/rules.yaml`, and `.cursor/rules/early-stage-production-first.mdc` in the same commit.
+- Replace these rules with the new explicit release model (for example PR approvals, staging promotion, or release branches).
+
+### Agent Runbook (Canonical Commands)
+
+Use this command sequence for every completed change:
+
+```bash
+# 1) Sync local main
+git checkout main
+git pull --ff-only origin main
+
+# 2) Minimum local validation gate
+cd apps/frontend && npm run build && cd ../..
+# Optional if backend env is available:
+# source .venv/bin/activate && cd apps/backend && python manage.py check && cd ../..
+
+# 3) Commit directly to main
+git add -A
+git commit -m "your change summary"
+git push origin main
+
+# 4) Watch production deploy to completion
+RUN_ID="$(gh run list --workflow 'Deploy via SSM' --branch main --limit 1 --json databaseId --jq '.[0].databaseId')"
+gh run watch "$RUN_ID"
+
+# 5) Verify production health
+curl -fsS https://practica.jpagan.com/health/
+```
+
 ### Required Secrets (GitHub → Settings → Secrets and variables → Actions)
 
-- `SSH_HOST`: Server public hostname/IP
-- `SSH_USER`: SSH username
-- `SSH_PORT` (optional, default 22)
-- `SSH_KEY`: Private key (PEM). Ensure the public key is on the server.
-- `SSH_PROJECT_DIR`: Absolute path on server where the repo lives (e.g., `/opt/practica`)
-- `ENV_PRODUCTION` (optional): Contents of `.env.production` with env vars (DEBUG=0, ALLOWED_HOSTS, API_URL, SECRET_KEY, POSTGRES_PASSWORD, AWS_* if using S3)
+- `AWS_ROLE_ARN`: OIDC-assumable IAM role for GitHub Actions deploy.
+- `AWS_REGION`: AWS region for SSM deploy commands.
+- `INSTANCE_ID`: Production EC2 instance ID targeted by SSM.
+- `ENV_PRODUCTION`: Full `.env.production` content used by production containers.
+
+Legacy SSH deploy secrets are deprecated for standard production deploy flow.
 
 ### Server Prereqs
 

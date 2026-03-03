@@ -13,6 +13,10 @@ on:
         required: false
         default: "main"
 
+concurrency:
+  group: production-deploy-main
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: Deploy to EC2 via SSM (no SSH)
@@ -41,8 +45,35 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Send SSM deploy command
+        id: send_ssm
         env:
           INSTANCE_ID: ${{ secrets.INSTANCE_ID }}
           ENV_PRODUCTION: ${{ secrets.ENV_PRODUCTION }}
           GIT_REF: ${{ steps.ref.outputs.ref }}
         run: bash scripts/deploy-via-ssm.sh
+
+      - name: Deployment summary
+        if: always()
+        run: |
+          COMMIT_SHA="${GITHUB_SHA}"
+          DEPLOYED_REF="${{ steps.ref.outputs.ref }}"
+          SSM_COMMAND_ID="${{ steps.send_ssm.outputs.command_id }}"
+          SSM_STATUS="${{ steps.send_ssm.outputs.ssm_status }}"
+          [ -z "$SSM_COMMAND_ID" ] && SSM_COMMAND_ID="n/a"
+          [ -z "$SSM_STATUS" ] && SSM_STATUS="n/a"
+
+          echo "Deploy summary:"
+          echo "commit_sha=$COMMIT_SHA"
+          echo "deployed_ref=$DEPLOYED_REF"
+          echo "ssm_command_id=$SSM_COMMAND_ID"
+          echo "ssm_status=$SSM_STATUS"
+          echo "health_gate=backend+public required"
+
+          {
+            echo "### Production Deploy Summary"
+            echo "- Commit SHA: \`$COMMIT_SHA\`"
+            echo "- Deployed ref: \`$DEPLOYED_REF\`"
+            echo "- SSM command id: \`$SSM_COMMAND_ID\`"
+            echo "- SSM status: \`$SSM_STATUS\`"
+            echo "- Health gate: \`backend + public health required\`"
+          } >> "$GITHUB_STEP_SUMMARY"

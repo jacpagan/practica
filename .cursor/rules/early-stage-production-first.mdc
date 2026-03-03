@@ -1,0 +1,16 @@
+---
+description: Early-stage production-first release policy
+alwaysApply: true
+---
+
+# Early-Stage Production-First Policy
+
+These requirements are mandatory while early-stage mode is active:
+
+- Direct-to-main: completed changes are committed and pushed to `main` in the same work session.
+- No batching: do not hold completed work for later release branches.
+- Single production deploy source of truth: `.github/workflows/deploy-ssm.yml`.
+- Immediate production verification after each push: deployment workflow must succeed and `https://practica.jpagan.com/health/` must return `200`.
+- Fix-forward: if deployment fails, push a corrective commit to `main` immediately instead of creating long-lived rollback branches.
+
+If release policy changes, update this file and `AGENTS.md` in the same commit with the new explicit process.
