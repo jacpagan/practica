@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     Profile, Exercise, Session, Chapter, Comment, InviteCode, Tag, Space,
-    SpaceMember, FeedbackRequest, FeedbackAssignment, MultipartSessionUpload,
+    SpaceMember, MultipartSessionUpload,
     CoachEvent, CoachDailyMetric,
 )
 
@@ -76,21 +76,6 @@ class TagAdmin(admin.ModelAdmin):
     search_fields = ['name']
 
 
-@admin.register(FeedbackRequest)
-class FeedbackRequestAdmin(admin.ModelAdmin):
-    list_display = ['id', 'session', 'requester', 'space', 'status', 'due_at', 'created_at']
-    list_filter = ['status', 'space']
-    search_fields = ['session__title', 'requester__username', 'focus_prompt']
-    raw_id_fields = ['session', 'requester', 'space']
-
-
-@admin.register(FeedbackAssignment)
-class FeedbackAssignmentAdmin(admin.ModelAdmin):
-    list_display = ['id', 'feedback_request', 'reviewer', 'status', 'is_video_review', 'claimed_at', 'completed_at']
-    list_filter = ['status', 'is_video_review']
-    raw_id_fields = ['feedback_request', 'reviewer', 'comment']
-
-
 @admin.register(MultipartSessionUpload)
 class MultipartSessionUploadAdmin(admin.ModelAdmin):
     list_display = ['id', 'user', 'status', 'size_bytes', 'original_filename', 'created_at', 'expires_at', 'completed_at']
@@ -101,17 +86,17 @@ class MultipartSessionUploadAdmin(admin.ModelAdmin):
 
 @admin.register(CoachEvent)
 class CoachEventAdmin(admin.ModelAdmin):
-    list_display = ['id', 'event_type', 'user', 'space', 'session', 'feedback_request', 'occurred_at']
+    list_display = ['id', 'event_type', 'user', 'space', 'session', 'occurred_at']
     list_filter = ['event_type', 'occurred_at']
     search_fields = ['user__username', 'session__title', 'space__name']
-    raw_id_fields = ['user', 'session', 'space', 'feedback_request']
+    raw_id_fields = ['user', 'session', 'space']
 
 
 @admin.register(CoachDailyMetric)
 class CoachDailyMetricAdmin(admin.ModelAdmin):
     list_display = [
-        'coach', 'date', 'active_students_30d', 'feedback_completions_7d',
-        'feedback_completions_30d', 'median_time_to_feedback_hours_30d',
+        'coach', 'date', 'active_students_30d', 'coach_comments_7d',
+        'coach_comments_30d', 'median_time_to_first_coach_comment_hours_30d',
         'estimated_time_saved_hours_30d', 'updated_at',
     ]
     list_filter = ['date']
