@@ -79,7 +79,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Notify Slack on deploy failure
-        if: ${{ failure() && secrets.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ failure() }}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -87,6 +87,10 @@ jobs:
           SSM_COMMAND_ID: ${{ steps.send_ssm.outputs.command_id }}
           SSM_STATUS: ${{ steps.send_ssm.outputs.ssm_status }}
         run: |
+          if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
+            echo "::warning::SLACK_WEBHOOK_URL not configured; skipping Slack deploy-failure notification."
+            exit 0
+          fi
           REF_VALUE="${DEPLOYED_REF:-${GITHUB_REF_NAME:-main}}"
           SSM_CMD_VALUE="${SSM_COMMAND_ID:-n/a}"
           SSM_STATUS_VALUE="${SSM_STATUS:-n/a}"
@@ -94,8 +98,3 @@ jobs:
           ESCAPED_MSG=$(printf '%s' "$MSG" | sed 's/\\/\\\\/g; s/"/\\"/g; s/$/\\n/' | tr -d '\n')
           PAYLOAD="{\"text\":\"${ESCAPED_MSG}\"}"
           curl -fsS -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL"
-
-      - name: Slack webhook missing
-        if: ${{ failure() && secrets.SLACK_WEBHOOK_URL == '' }}
-        run: |
-          echo "::warning::SLACK_WEBHOOK_URL not configured; skipping Slack deploy-failure notification."
