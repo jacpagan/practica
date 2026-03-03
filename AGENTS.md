@@ -162,6 +162,7 @@ curl -fsS https://practica.jpagan.com/health/
 - `AWS_REGION`: AWS region for SSM deploy commands.
 - `INSTANCE_ID`: Production EC2 instance ID targeted by SSM.
 - `ENV_PRODUCTION`: Full `.env.production` content used by production containers.
+- `SLACK_WEBHOOK_URL` (optional but recommended): Incoming webhook URL for deploy-failure notifications.
 
 Legacy SSH deploy secrets are deprecated for standard production deploy flow.
 
