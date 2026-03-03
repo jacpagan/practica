@@ -11,10 +11,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-insecure-change-in-production')
 
 DEBUG = os.environ.get('DEBUG', 'True').lower() in ['true', '1', 'yes']
-FEEDBACK_REQUESTS_ENABLED = os.environ.get('FEEDBACK_REQUESTS_ENABLED', 'False').lower() in ['true', '1', 'yes']
 COACH_METRICS_ENABLED = os.environ.get('COACH_METRICS_ENABLED', 'False').lower() in ['true', '1', 'yes']
-COACH_METRICS_MINUTES_SAVED_PER_COMPLETION = int(
-    os.environ.get('COACH_METRICS_MINUTES_SAVED_PER_COMPLETION', '20')
+COACH_METRICS_MINUTES_SAVED_PER_COMMENT = int(
+    os.environ.get(
+        'COACH_METRICS_MINUTES_SAVED_PER_COMMENT',
+        os.environ.get('COACH_METRICS_MINUTES_SAVED_PER_COMPLETION', '20'),
+    )
 )
 COACH_METRICS_INTERNAL_USER_IDS = [
     int(value.strip())

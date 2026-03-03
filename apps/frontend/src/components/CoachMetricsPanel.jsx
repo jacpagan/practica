@@ -10,13 +10,13 @@ const KPI_CONFIG = [
     format: (value) => String(value ?? 0),
   },
   {
-    key: 'feedback_completions_7d',
-    label: 'Feedback completions (7d)',
+    key: 'coach_comments_7d',
+    label: 'Coach comments (7d)',
     format: (value) => String(value ?? 0),
   },
   {
-    key: 'median_time_to_feedback_hours_30d',
-    label: 'Median time to feedback',
+    key: 'median_time_to_first_coach_comment_hours_30d',
+    label: 'Median time to first coach comment',
     format: (value) => (value == null ? '—' : `${Number(value).toFixed(1)}h`),
   },
   {
@@ -98,8 +98,8 @@ function CoachMetricsPanel({ token }) {
 
   const summary = payload?.summary || {
     active_students_30d: 0,
-    feedback_completions_7d: 0,
-    median_time_to_feedback_hours_30d: null,
+    coach_comments_7d: 0,
+    median_time_to_first_coach_comment_hours_30d: null,
     estimated_time_saved_hours_30d: 0,
   }
 
@@ -161,7 +161,7 @@ function CoachMetricsPanel({ token }) {
 
         {!loading && !error && !hasAnyTrend && (
           <div className="mt-4 border border-gray-200 rounded-xl p-4">
-            <p className="text-sm text-gray-600">No coach telemetry yet. Upload sessions and complete feedback to populate this panel.</p>
+            <p className="text-sm text-gray-600">No coach telemetry yet. Upload sessions and post comments to populate this panel.</p>
           </div>
         )}
 

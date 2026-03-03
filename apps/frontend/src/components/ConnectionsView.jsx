@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
 import { authHeaders } from '../auth'
 import { useToast } from './Toast'
+import { useConfirm } from './ConfirmDialog'
 
 function ConnectionsView({ spaces = [], token, onSpacesChange }) {
   const toast = useToast()
+  const confirm = useConfirm()
   const [inviteCodes, setInviteCodes] = useState({})
   const [renamingSpace, setRenamingSpace] = useState(null)
   const [enterCode, setEnterCode] = useState('')
@@ -53,7 +55,13 @@ function ConnectionsView({ spaces = [], token, onSpacesChange }) {
   }
 
   const removeMember = async (spaceId, userId) => {
-    if (!confirm('Remove this member from the space?')) return
+    const approved = await confirm({
+      title: 'Remove member',
+      message: 'Remove this member from the space?',
+      confirmLabel: 'Remove',
+      tone: 'danger',
+    })
+    if (!approved) return
     try {
       const res = await fetch(`/api/spaces/${spaceId}/members/${userId}/`, {
         method: 'DELETE',
@@ -112,7 +120,13 @@ function ConnectionsView({ spaces = [], token, onSpacesChange }) {
   }
 
   const deleteSpace = async (spaceId, name) => {
-    if (!confirm(`Delete "${name}"? Sessions in this space will become unassigned.`)) return
+    const approved = await confirm({
+      title: 'Delete space',
+      message: `Delete "${name}"? Sessions in this space will become unassigned.`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    })
+    if (!approved) return
     try {
       const res = await fetch(`/api/spaces/${spaceId}/`, {
         method: 'DELETE',
@@ -142,7 +156,7 @@ function ConnectionsView({ spaces = [], token, onSpacesChange }) {
     <div className="px-4 sm:px-6 py-6">
       <div className="max-w-lg mx-auto">
         <h2 className="text-lg font-semibold text-gray-900 mb-1">Spaces</h2>
-        <p className="text-sm text-gray-500 mb-6">Spaces organize practice and feedback with invited members.</p>
+        <p className="text-sm text-gray-500 mb-6">Spaces organize practice and comments with invited members.</p>
 
         {spaces.map(space => (
           <div key={space.id} className="mb-4 p-4 rounded-xl border border-gray-200">

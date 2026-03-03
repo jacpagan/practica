@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { fmtDateLong, videoUrl } from '../utils'
+import { useConfirm } from './ConfirmDialog'
 
 const dateKey = (dateStr) => {
   const d = new Date(dateStr)
@@ -66,8 +67,13 @@ function SessionList({
   onUploadClick,
   onDeleteSession,
 }) {
-  
+  const confirm = useConfirm()
   const [tab, setTab] = useState('sessions')
+  const onRowKeyDown = (event, action) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    action()
+  }
 
   const groupedSessions = useMemo(() => {
     const groups = []
@@ -86,12 +92,18 @@ function SessionList({
   return (
     <div className="px-4 sm:px-6 py-4">
       {/* Tabs */}
-      <div className="flex gap-1 mb-5 border-b border-gray-100">
+      <div className="flex gap-1 mb-5 border-b border-gray-100" role="tablist" aria-label="Session views">
         <button onClick={() => setTab('sessions')}
+          role="tab"
+          aria-selected={tab === 'sessions'}
+          aria-controls="sessions-panel"
           className={`px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
             tab === 'sessions' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}>Sessions</button>
         <button onClick={() => setTab('exercises')}
+          role="tab"
+          aria-selected={tab === 'exercises'}
+          aria-controls="exercises-panel"
           className={`px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
             tab === 'exercises' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}>
@@ -130,7 +142,7 @@ function SessionList({
               </button>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div id="sessions-panel" role="tabpanel" className="space-y-6">
               {groupedSessions.map(group => (
                 <div key={group.key}>
                   <div className="flex items-center gap-3 mb-2">
@@ -140,8 +152,17 @@ function SessionList({
                   </div>
 
                   <div className="space-y-1">
-                    {group.sessions.map(session => (
-                      <div key={session.id} onClick={() => onSessionSelect(session)}
+                    {group.sessions.map((session) => {
+                        const canEdit = typeof session.can_edit === 'boolean'
+                          ? session.can_edit
+                          : session.owner_id === user?.id
+                        return (
+                      <div key={session.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => onSessionSelect(session)}
+                        onKeyDown={(e) => onRowKeyDown(e, () => onSessionSelect(session))}
+                        aria-label={`Open session ${session.title}`}
                         className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer group">
 
                         <Thumbnail src={session.video_file} className="w-16 h-11 sm:w-24 sm:h-16" />
@@ -150,7 +171,7 @@ function SessionList({
                           <div className="flex items-center gap-1.5">
                             <h3 className="text-sm font-medium text-gray-900 truncate">{session.title}</h3>
                             {session.has_unread && (
-                              <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" title="New feedback" />
+                              <span className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" title="New comments" />
                             )}
                           </div>
                           {session.description && (
@@ -163,7 +184,7 @@ function SessionList({
                             )}
                             {session.comment_count > 0 && (
                               <span className={`text-xs ${session.has_unread ? 'text-blue-500 font-medium' : 'text-gray-400'}`}>
-                                {session.comment_count} fb
+                                {session.comment_count} comments
                               </span>
                             )}
                             {session.owner_name && (
@@ -188,10 +209,19 @@ function SessionList({
                           </div>
                         </div>
 
-                        {session.owner_id === user?.id && (
+                        {canEdit && (
                           <button
-                            onClick={(e) => { e.stopPropagation(); if (confirm(`Delete "${session.title}"?`)) onDeleteSession(session.id) }}
-                            className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-300 hover:text-red-400 transition-all flex-shrink-0"
+                            onClick={async (e) => {
+                              e.stopPropagation()
+                              const approved = await confirm({
+                                title: 'Delete session',
+                                message: `Delete "${session.title}"?`,
+                                confirmLabel: 'Delete',
+                                tone: 'danger',
+                              })
+                              if (approved) onDeleteSession(session.id)
+                            }}
+                            className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 p-2 text-gray-300 hover:text-red-400 transition-all flex-shrink-0"
                             aria-label="Delete session"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -200,7 +230,8 @@ function SessionList({
                           </button>
                         )}
                       </div>
-                    ))}
+                        )
+                    })}
                   </div>
                 </div>
               ))}
@@ -247,9 +278,14 @@ function SessionList({
               <p className="text-xs text-gray-300">Exercises appear as you add chapters to your sessions</p>
             </div>
           ) : (
-            <div className="space-y-1">
+            <div id="exercises-panel" role="tabpanel" className="space-y-1">
               {exercises.map(exercise => (
-                <div key={exercise.id} onClick={() => onExerciseSelect(exercise)}
+                <div key={exercise.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onExerciseSelect(exercise)}
+                  onKeyDown={(e) => onRowKeyDown(e, () => onExerciseSelect(exercise))}
+                  aria-label={`Open exercise ${exercise.name}`}
                   className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer group">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
