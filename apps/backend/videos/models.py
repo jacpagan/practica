@@ -1,5 +1,4 @@
 import secrets
-from datetime import timedelta
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -15,7 +14,7 @@ class Profile(models.Model):
 
 
 class Space(models.Model):
-    """A practice area. Owner shows their work, members watch and give feedback."""
+    """A practice area. Owner shows their work, members watch and comment."""
     name = models.CharField(max_length=100)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='owned_spaces')
     invite_slug = models.CharField(max_length=20, unique=True, blank=True)
@@ -35,7 +34,7 @@ class Space(models.Model):
 
 
 class SpaceMember(models.Model):
-    """A person who follows a space (watches + gives feedback)."""
+    """A person who follows a space (watches + comments)."""
     space = models.ForeignKey(Space, on_delete=models.CASCADE, related_name='members')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='space_memberships')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -209,7 +208,7 @@ class InviteCode(models.Model):
 
 
 class SessionLastSeen(models.Model):
-    """Tracks when a user last viewed a session's feedback."""
+    """Tracks when a user last viewed a session's comments."""
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='session_views')
     session = models.ForeignKey('Session', on_delete=models.CASCADE, related_name='last_seen_by')
     seen_at = models.DateTimeField(auto_now=True)
@@ -235,83 +234,6 @@ class Comment(models.Model):
         return f"{prefix}{self.user}: {self.text[:50]}"
 
 
-class FeedbackRequest(models.Model):
-    """Explicit request for time-bound feedback on a session."""
-
-    STATUS_OPEN = 'open'
-    STATUS_FULFILLED = 'fulfilled'
-    STATUS_EXPIRED = 'expired'
-    STATUS_CANCELLED = 'cancelled'
-    STATUS_CHOICES = [
-        (STATUS_OPEN, 'Open'),
-        (STATUS_FULFILLED, 'Fulfilled'),
-        (STATUS_EXPIRED, 'Expired'),
-        (STATUS_CANCELLED, 'Cancelled'),
-    ]
-
-    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='feedback_requests')
-    requester = models.ForeignKey(User, on_delete=models.CASCADE, related_name='feedback_requests')
-    space = models.ForeignKey(Space, on_delete=models.CASCADE, related_name='feedback_requests')
-    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_OPEN)
-    sla_hours = models.PositiveIntegerField(default=48)
-    due_at = models.DateTimeField()
-    required_reviews = models.PositiveIntegerField(default=1)
-    video_required_count = models.PositiveIntegerField(default=1)
-    focus_prompt = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-    resolved_at = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        ordering = ['due_at', '-created_at']
-        constraints = [
-            models.CheckConstraint(check=models.Q(sla_hours__gt=0), name='feedback_request_sla_hours_gt_0'),
-            models.CheckConstraint(check=models.Q(required_reviews__gt=0), name='feedback_request_required_reviews_gt_0'),
-            models.CheckConstraint(check=models.Q(video_required_count__gte=0), name='feedback_request_video_required_count_gte_0'),
-            models.CheckConstraint(
-                check=models.Q(video_required_count__lte=models.F('required_reviews')),
-                name='feedback_request_video_required_lte_required_reviews',
-            ),
-        ]
-
-    def save(self, *args, **kwargs):
-        if not self.due_at:
-            self.due_at = timezone.now() + timedelta(hours=self.sla_hours)
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"FeedbackRequest #{self.id} session={self.session_id} status={self.status}"
-
-
-class FeedbackAssignment(models.Model):
-    """Claim/completion state for members reviewing a feedback request."""
-
-    STATUS_CLAIMED = 'claimed'
-    STATUS_COMPLETED = 'completed'
-    STATUS_RELEASED = 'released'
-    STATUS_EXPIRED = 'expired'
-    STATUS_CHOICES = [
-        (STATUS_CLAIMED, 'Claimed'),
-        (STATUS_COMPLETED, 'Completed'),
-        (STATUS_RELEASED, 'Released'),
-        (STATUS_EXPIRED, 'Expired'),
-    ]
-
-    feedback_request = models.ForeignKey(FeedbackRequest, on_delete=models.CASCADE, related_name='assignments')
-    reviewer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='feedback_assignments')
-    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_CLAIMED)
-    claimed_at = models.DateTimeField(auto_now_add=True)
-    completed_at = models.DateTimeField(null=True, blank=True)
-    is_video_review = models.BooleanField(default=False)
-    comment = models.ForeignKey(Comment, on_delete=models.SET_NULL, null=True, blank=True, related_name='feedback_assignments')
-
-    class Meta:
-        ordering = ['-claimed_at']
-        unique_together = ['feedback_request', 'reviewer']
-
-    def __str__(self):
-        return f"FeedbackAssignment #{self.id} request={self.feedback_request_id} reviewer={self.reviewer_id} status={self.status}"
-
-
 class CoachEvent(models.Model):
     """Internal telemetry events for coach ROI metrics."""
 
@@ -333,13 +255,6 @@ class CoachEvent(models.Model):
     occurred_at = models.DateTimeField(default=timezone.now)
     session = models.ForeignKey(Session, on_delete=models.SET_NULL, null=True, blank=True, related_name='coach_events')
     space = models.ForeignKey(Space, on_delete=models.SET_NULL, null=True, blank=True, related_name='coach_events')
-    feedback_request = models.ForeignKey(
-        FeedbackRequest,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='coach_events',
-    )
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
@@ -358,9 +273,9 @@ class CoachDailyMetric(models.Model):
     coach = models.ForeignKey(User, on_delete=models.CASCADE, related_name='coach_daily_metrics')
     date = models.DateField()
     active_students_30d = models.PositiveIntegerField(default=0)
-    feedback_completions_7d = models.PositiveIntegerField(default=0)
-    feedback_completions_30d = models.PositiveIntegerField(default=0)
-    median_time_to_feedback_hours_30d = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    coach_comments_7d = models.PositiveIntegerField(default=0)
+    coach_comments_30d = models.PositiveIntegerField(default=0)
+    median_time_to_first_coach_comment_hours_30d = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     estimated_time_saved_hours_30d = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     updated_at = models.DateTimeField(auto_now=True)
 
