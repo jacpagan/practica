@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useToast } from './Toast'
 import TagInput from './TagInput'
-import { createSessionUpload, uploadErrorMessage } from '../utils'
+import { createSessionUpload, pickRecorderMimeType, uploadErrorMessage } from '../utils'
 
 function SessionUpload({ token, spaces = [], activeSpace, onComplete, onCancel }) {
   const [selectedSpace, setSelectedSpace] = useState(activeSpace || '')
@@ -40,16 +40,19 @@ function SessionUpload({ token, spaces = [], activeSpace, onComplete, onCancel }
 
   const startRecording = async () => {
     if (!streamRef.current) await startWebcam()
-    let mimeType = 'video/webm;codecs=vp9'
-    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm'
-    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/mp4'
-    const recorder = new MediaRecorder(streamRef.current, { mimeType })
+    if (!streamRef.current) return toast.error('Could not access camera')
+    const mimeType = pickRecorderMimeType()
+    const recorder = mimeType
+      ? new MediaRecorder(streamRef.current, { mimeType })
+      : new MediaRecorder(streamRef.current)
     setMediaRecorder(recorder)
     chunksRef.current = []
     recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data) }
     recorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: mimeType })
-      const file = new File([blob], `session-${Date.now()}.webm`, { type: mimeType })
+      const outputType = mimeType || recorder.mimeType || 'video/webm'
+      const ext = outputType.includes('mp4') ? 'mp4' : 'webm'
+      const blob = new Blob(chunksRef.current, { type: outputType })
+      const file = new File([blob], `session-${Date.now()}.${ext}`, { type: outputType })
       setRecordedVideo(file)
       setVideoFile(file)
       if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
@@ -140,7 +143,7 @@ function SessionUpload({ token, spaces = [], activeSpace, onComplete, onCancel }
                 Record</button>
             </div>
             {recordingMode === 'file' && (
-              <input type="file" accept="video/*" onChange={(e) => setVideoFile(e.target.files[0])}
+              <input type="file" accept="video/*" capture="environment" onChange={(e) => setVideoFile(e.target.files[0])}
                 className="w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-gray-100 file:text-gray-700" />
             )}
             {recordingMode === 'webcam' && (

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
+import { pickRecorderMimeType } from '../utils'
 
 const STATES = {
   IDLE: 'idle',
@@ -86,12 +87,10 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
   const startRecording = () => {
     if (!streamRef.current) return
 
-    let mimeType = 'video/webm;codecs=vp9'
-    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm;codecs=vp8'
-    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm'
-    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/mp4'
-
-    const recorder = new MediaRecorder(streamRef.current, { mimeType })
+    const mimeType = pickRecorderMimeType()
+    const recorder = mimeType
+      ? new MediaRecorder(streamRef.current, { mimeType })
+      : new MediaRecorder(streamRef.current)
     recorderRef.current = recorder
     chunksRef.current = []
     setElapsed(0)
@@ -101,9 +100,10 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
     }
 
     recorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: mimeType })
-      const ext = mimeType.includes('webm') ? 'webm' : 'mp4'
-      const file = new File([blob], `reply-${Date.now()}.${ext}`, { type: mimeType })
+      const outputType = mimeType || recorder.mimeType || 'video/webm'
+      const blob = new Blob(chunksRef.current, { type: outputType })
+      const ext = outputType.includes('mp4') ? 'mp4' : 'webm'
+      const file = new File([blob], `reply-${Date.now()}.${ext}`, { type: outputType })
 
       if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
       blobUrlRef.current = URL.createObjectURL(blob)

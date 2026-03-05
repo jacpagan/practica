@@ -24,8 +24,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 
 from .models import (
     Exercise, Session, Chapter, Comment, InviteCode, SessionLastSeen,
-    Tag, Space, SpaceMember, MultipartSessionUpload, ExerciseReferenceClip,
-    CoachEvent, CoachDailyMetric,
+    Tag, Space, SpaceMember, MultipartSessionUpload, ExerciseReferenceClip, SessionAsset,
 )
 from .serializers import (
     UserSerializer, RegisterSerializer, SpaceSerializer,
@@ -33,6 +32,7 @@ from .serializers import (
     ChapterSerializer, ProgressChapterSerializer, TagSerializer,
     ExerciseReferenceClipSerializer,
 )
+from .services.media_pipeline import enqueue_session_processing, apply_processing_update
 
 logger = logging.getLogger(__name__)
 
@@ -60,35 +60,6 @@ def can_edit_session(user, session):
     if not user.is_authenticated:
         return False
     return user.is_staff or session.user_id == user.id
-
-
-def _coach_metrics_enabled():
-    return bool(getattr(settings, 'COACH_METRICS_ENABLED', False))
-
-
-def _coach_metrics_user_allowed(user):
-    allowlist = set(getattr(settings, 'COACH_METRICS_INTERNAL_USER_IDS', []))
-    return not allowlist or user.is_staff or user.id in allowlist
-
-
-def record_coach_event(
-    *,
-    user_id,
-    event_type,
-    session_id=None,
-    space_id=None,
-    metadata=None,
-):
-    try:
-        CoachEvent.objects.create(
-            user_id=user_id,
-            event_type=event_type,
-            session_id=session_id,
-            space_id=space_id,
-            metadata=metadata or {},
-        )
-    except Exception:
-        logger.exception('Failed to persist coach telemetry event: %s', event_type)
 
 
 def _direct_uploads_enabled():
@@ -186,6 +157,42 @@ def _can_modify_session(user, session):
     return can_edit_session(user, session)
 
 
+def _start_processing_pipeline(session):
+    session.processing_status = Session.STATUS_PROCESSING
+    session.processing_error = ''
+    session.save(update_fields=['processing_status', 'processing_error', 'updated_at'])
+
+    queued, error, _job_id = enqueue_session_processing(session)
+    if queued:
+        return
+
+    # Local/dev fallback: no MediaConvert configured. Keep UX usable.
+    if 'not configured' in error.lower():
+        SessionAsset.objects.get_or_create(
+            session=session,
+            asset_type=SessionAsset.TYPE_PROXY_MP4,
+            defaults={
+                'object_key': session.video_file.name,
+                'content_type': 'video/mp4',
+                'metadata_json': {'source': 'original'},
+            },
+        )
+        session.processing_status = Session.STATUS_READY
+        session.processing_error = ''
+    else:
+        session.processing_status = Session.STATUS_FAILED
+        session.processing_error = (error or 'Failed to enqueue media processing')[:2000]
+    session.save(update_fields=['processing_status', 'processing_error', 'updated_at'])
+
+
+def _processing_callback_authorized(request):
+    shared_token = (getattr(settings, 'MEDIA_PROCESSING_CALLBACK_TOKEN', '') or '').strip()
+    if shared_token:
+        provided = str(request.headers.get('X-Processing-Token', '')).strip()
+        return provided and secrets.compare_digest(provided, shared_token)
+    return bool(request.user.is_authenticated and request.user.is_staff)
+
+
 # ── Auth views ──────────────────────────────────────────────────────
 
 @csrf_exempt
@@ -279,7 +286,9 @@ class SpaceViewSet(viewsets.ModelViewSet):
         owned = Space.objects.filter(owner=user)
         following_ids = SpaceMember.objects.filter(user=user).values_list('space_id', flat=True)
         following = Space.objects.filter(id__in=following_ids)
-        return (owned | following).distinct().prefetch_related('members', 'members__user', 'members__user__profile')
+        return (owned | following).distinct().select_related('main_session').prefetch_related(
+            'members', 'members__user', 'members__user__profile'
+        )
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()
@@ -321,6 +330,25 @@ class SpaceViewSet(viewsets.ModelViewSet):
         if deleted[0] == 0:
             return Response({'error': 'Member not found'}, status=status.HTTP_404_NOT_FOUND)
         return Response(SpaceSerializer(space).data)
+
+    @action(detail=True, methods=['post'], url_path='set-main-session')
+    def set_main_session(self, request, pk=None):
+        space = self.get_object()
+        if space.owner_id != request.user.id:
+            return Response({'error': 'Only the space owner can set MAIN video'}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            session_id = int(request.data.get('session_id'))
+        except (TypeError, ValueError):
+            return Response({'error': 'session_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        session = get_object_or_404(Session, pk=session_id)
+        if session.space_id != space.id:
+            return Response({'error': 'Session must belong to this space'}, status=status.HTTP_400_BAD_REQUEST)
+
+        space.main_session = session
+        space.save(update_fields=['main_session'])
+        return Response(SpaceSerializer(space, context={'request': request}).data)
 
 
 @csrf_exempt
@@ -483,8 +511,8 @@ class SessionViewSet(viewsets.ModelViewSet):
         qs = _visible_sessions_qs(self.request.user).prefetch_related(
             'chapters', 'chapters__exercise',
             'comments', 'comments__user', 'comments__user__profile',
-            'last_seen_by', 'tags',
-        ).select_related('user', 'user__profile', 'space')
+            'last_seen_by', 'tags', 'assets',
+        ).select_related('user', 'user__profile', 'space', 'space__main_session')
 
         space_id = self.request.query_params.get('space')
         if space_id:
@@ -511,14 +539,7 @@ class SessionViewSet(viewsets.ModelViewSet):
         space = _resolve_space_for_create(self.request.user, space_id)
         session = serializer.save(user=self.request.user, space=space)
         _attach_tags_to_session(session, self.request.data.get('tags', ''))
-        transaction.on_commit(
-            lambda: record_coach_event(
-                user_id=self.request.user.id,
-                event_type=CoachEvent.EVENT_SESSION_UPLOADED,
-                session_id=session.id,
-                space_id=session.space_id,
-            )
-        )
+        _start_processing_pipeline(session)
 
     def perform_update(self, serializer):
         if not can_edit_session(self.request.user, serializer.instance):
@@ -766,15 +787,8 @@ class SessionViewSet(viewsets.ModelViewSet):
             upload.completed_at = timezone.now()
             upload.session = session
             upload.save(update_fields=['status', 'completed_at', 'session'])
-            transaction.on_commit(
-                lambda: record_coach_event(
-                    user_id=request.user.id,
-                    event_type=CoachEvent.EVENT_SESSION_UPLOADED,
-                    session_id=session.id,
-                    space_id=session.space_id,
-                    metadata={'upload_type': 'multipart'},
-                )
-            )
+
+        _start_processing_pipeline(session)
 
         serializer = SessionSerializer(session, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -806,6 +820,33 @@ class SessionViewSet(viewsets.ModelViewSet):
         upload.status = MultipartSessionUpload.STATUS_ABORTED
         upload.save(update_fields=['status'])
         return Response({'status': 'aborted'})
+
+    @action(detail=True, methods=['post'], url_path='processing-update', permission_classes=[AllowAny])
+    def processing_update(self, request, pk=None):
+        if not _processing_callback_authorized(request):
+            return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
+
+        session = get_object_or_404(Session, pk=pk)
+        next_status = str(request.data.get('status', '')).strip().lower()
+        processing_error = str(request.data.get('processing_error', '')).strip()
+        assets = request.data.get('assets', [])
+        if not isinstance(assets, list):
+            return Response({'error': 'assets must be a list'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            apply_processing_update(
+                session=session,
+                status=next_status,
+                error=processing_error,
+                assets=assets,
+            )
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            logger.exception('Failed processing update for session_id=%s', session.id)
+            return Response({'error': 'Could not apply processing update'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response(SessionSerializer(session, context={'request': request}).data)
 
     @action(detail=True, methods=['post'])
     def set_tags(self, request, pk=None):
@@ -910,9 +951,7 @@ class SessionViewSet(viewsets.ModelViewSet):
         session = self.get_object()
         if not _can_view_session(request.user, session):
             return Response({'error': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
-        text = request.data.get('text', '').strip()
-        if not text:
-            return Response({'error': 'Comment text required'}, status=status.HTTP_400_BAD_REQUEST)
+        text = str(request.data.get('text', '')).strip()
         ts = request.data.get('timestamp_seconds')
         timestamp = None
         if ts is not None and str(ts).strip():
@@ -921,11 +960,13 @@ class SessionViewSet(viewsets.ModelViewSet):
             except (ValueError, TypeError):
                 pass
         video_file = request.FILES.get('video_reply')
+        if not video_file:
+            return Response({'error': 'Comment video is required'}, status=status.HTTP_400_BAD_REQUEST)
         if video_file and not video_file.content_type.startswith('video/'):
             return Response({'error': 'Only video files allowed'}, status=status.HTTP_400_BAD_REQUEST)
         Comment.objects.create(
             session=session, user=request.user,
-            timestamp_seconds=timestamp, text=text, video_reply=video_file,
+            timestamp_seconds=timestamp, text=text, video_reply=video_file, legacy_text_only=False,
         )
         session.refresh_from_db()
         return Response(SessionSerializer(session).data, status=status.HTTP_201_CREATED)
@@ -950,93 +991,6 @@ class SessionViewSet(viewsets.ModelViewSet):
         comment.delete()
         session.refresh_from_db()
         return Response(SessionSerializer(session).data)
-
-
-# ── Coach metrics views ────────────────────────────────────────────
-
-def _metric_value(value):
-    if value is None:
-        return None
-    if hasattr(value, 'quantize'):
-        return float(value)
-    return value
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def coach_metrics_summary(request):
-    if not _coach_metrics_enabled():
-        return Response({'error': 'Coach metrics are disabled'}, status=status.HTTP_404_NOT_FOUND)
-    if not _coach_metrics_user_allowed(request.user):
-        return Response({'error': 'Coach metrics are disabled'}, status=status.HTTP_404_NOT_FOUND)
-
-    raw_window_days = request.query_params.get('window_days', '30')
-    try:
-        window_days = int(raw_window_days)
-    except (TypeError, ValueError):
-        return Response({'error': 'window_days must be 7 or 30'}, status=status.HTTP_400_BAD_REQUEST)
-    if window_days not in (7, 30):
-        return Response({'error': 'window_days must be 7 or 30'}, status=status.HTTP_400_BAD_REQUEST)
-
-    today = timezone.now().date()
-    latest_metric = (
-        CoachDailyMetric.objects
-        .filter(coach=request.user, date__lte=today)
-        .order_by('-date')
-        .first()
-    )
-
-    metric_rows = []
-    if latest_metric:
-        trend_start = latest_metric.date - timedelta(days=window_days - 1)
-        metric_rows = list(
-            CoachDailyMetric.objects.filter(
-                coach=request.user,
-                date__gte=trend_start,
-                date__lte=latest_metric.date,
-            ).order_by('date')
-        )
-
-    summary = {
-        'active_students_30d': latest_metric.active_students_30d if latest_metric else 0,
-        'coach_comments_7d': latest_metric.coach_comments_7d if latest_metric else 0,
-        'coach_comments_30d': latest_metric.coach_comments_30d if latest_metric else 0,
-        'median_time_to_first_coach_comment_hours_30d': _metric_value(
-            latest_metric.median_time_to_first_coach_comment_hours_30d if latest_metric else None
-        ),
-        'estimated_time_saved_hours_30d': _metric_value(
-            latest_metric.estimated_time_saved_hours_30d if latest_metric else 0
-        ),
-    }
-
-    response = {
-        'coach_user_id': request.user.id,
-        'window_days': window_days,
-        'generated_at': timezone.now().isoformat(),
-        'summary': summary,
-        'trends': {
-            'active_students_30d': [{'date': str(m.date), 'value': m.active_students_30d} for m in metric_rows],
-            'coach_comments_7d': [{'date': str(m.date), 'value': m.coach_comments_7d} for m in metric_rows],
-            'coach_comments_30d': [{'date': str(m.date), 'value': m.coach_comments_30d} for m in metric_rows],
-            'median_time_to_first_coach_comment_hours_30d': [
-                {'date': str(m.date), 'value': _metric_value(m.median_time_to_first_coach_comment_hours_30d)}
-                for m in metric_rows
-            ],
-            'estimated_time_saved_hours_30d': [
-                {'date': str(m.date), 'value': _metric_value(m.estimated_time_saved_hours_30d)}
-                for m in metric_rows
-            ],
-        },
-        'definitions': {
-            'coach_identity': 'User who owns one or more spaces.',
-            'active_students_30d': 'Distinct non-owner users who uploaded sessions in coach-owned spaces.',
-            'coach_comments_7d': 'Comments authored by this coach on student sessions in coach-owned spaces.',
-            'coach_comments_30d': 'Comments authored by this coach on student sessions in coach-owned spaces over 30 days.',
-            'median_time_to_first_coach_comment_hours_30d': 'Median hours from student session upload to first coach comment.',
-            'estimated_time_saved_hours_30d': 'coach_comments_30d * minutes_saved_per_comment / 60.',
-        },
-    }
-    return Response(response)
 
 
 # ── Health check ────────────────────────────────────────────────────

@@ -3,9 +3,9 @@ set -euo pipefail
 
 # Audits remote branches for app indicators and containment in a chosen base branch.
 # Usage: ./scripts/branch-audit.sh [base_branch]
-# Example: ./scripts/branch-audit.sh origin/cursor/development-environment-setup-2b36
+# Example: ./scripts/branch-audit.sh origin/main
 
-BASE_REF="${1:-origin/cursor/development-environment-setup-2b36}"
+BASE_REF="${1:-origin/main}"
 
 if ! git rev-parse --verify -q "$BASE_REF" >/dev/null; then
   echo "Base ref '$BASE_REF' not found. Pass a valid ref like 'origin/branch-name'." >&2
@@ -43,4 +43,3 @@ git for-each-ref --format='%(refname:short)' refs/remotes/origin \
       last=$(git log -1 --pretty=format:'%h %s' origin/$b 2>/dev/null)
       printf "%-50s | %-10s | %s\n" "$b" "$inbase" "$last"
     done
-

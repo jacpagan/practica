@@ -15,3 +15,8 @@ rules:
   - "Security: signed CloudFront URLs; least-privilege IAM (document)."
   - "Tests for upload-url, commit, and Celery transcode happy-path."
   - "Lint (ruff), type-check (mypy), format (black). CI must run."
+  - "Early-stage production policy: completed changes are pushed directly to main in the same session."
+  - "Do not batch completed work into release branches while early-stage policy is active."
+  - "Production deploy source of truth: .github/workflows/deploy-ssm.yml only."
+  - "After each push to main, verify deploy workflow success and HTTPS /health/ = 200."
+  - "Deploy failures use fix-forward: push corrective commit to main immediately."

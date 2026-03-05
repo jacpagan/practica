@@ -80,12 +80,12 @@ function AuthForm() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'register' && !inviteSlug && (
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Invite code</label>
+              <label className="block text-xs text-gray-500 mb-1">Invite code (optional)</label>
               <input type="text" value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                placeholder="Enter your invite code"
+                placeholder="ABCD1234"
                 className="w-full px-3 py-2 text-sm font-mono text-center uppercase tracking-widest border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
-                required={!inviteSlug} maxLength={8} />
-              <p className="text-xs text-gray-400 mt-1">Ask the person who invited you</p>
+                maxLength={8} />
+              <p className="text-xs text-gray-400 mt-1">Use this if you were invited to an existing space.</p>
             </div>
           )}
 

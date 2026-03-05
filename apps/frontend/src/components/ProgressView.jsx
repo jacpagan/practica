@@ -2,8 +2,10 @@ import React, { useCallback, useEffect, useState } from 'react'
 import SegmentPlayer from './SegmentPlayer'
 import { authHeaders } from '../auth'
 import { fmtTime, fmtDateLong, videoUrl, fmtDuration, parseTimeInput } from '../utils'
+import { useConfirm } from './ConfirmDialog'
 
 function ProgressView({ exercise, token, onBack }) {
+  const confirm = useConfirm()
   const [data, setData] = useState(null)
   const [compareLeft, setCompareLeft] = useState(null)
   const [compareRight, setCompareRight] = useState(null)
@@ -18,6 +20,11 @@ function ProgressView({ exercise, token, onBack }) {
   const [clipBusy, setClipBusy] = useState(false)
   const [clipError, setClipError] = useState('')
   const [error, setError] = useState(null)
+  const onRowKeyDown = (event, action) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    action()
+  }
 
   const loadProgress = useCallback(async () => {
     try {
@@ -123,7 +130,13 @@ function ProgressView({ exercise, token, onBack }) {
   }
 
   const deleteClip = async (clip) => {
-    if (!window.confirm(`Delete "${clip.title}"?`)) return
+    const approved = await confirm({
+      title: 'Delete reference clip',
+      message: `Delete "${clip.title}"?`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    })
+    if (!approved) return
     setClipBusy(true)
     setClipError('')
     try {
@@ -236,7 +249,11 @@ function ProgressView({ exercise, token, onBack }) {
               return (
                 <div
                   key={clip.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setSelectedClipId(clip.id)}
+                  onKeyDown={(e) => onRowKeyDown(e, () => setSelectedClipId(clip.id))}
+                  aria-label={`Select reference clip ${clip.title}`}
                   className={`rounded-lg px-3 py-2 border cursor-pointer transition-colors ${
                     active ? 'border-gray-300 bg-gray-50' : 'border-gray-100 hover:bg-gray-50'
                   }`}
@@ -382,7 +399,11 @@ function ProgressView({ exercise, token, onBack }) {
           return (
             <div
               key={chapter.id}
+              role="button"
+              tabIndex={0}
               onClick={() => handleChapterClick(chapter)}
+              onKeyDown={(e) => onRowKeyDown(e, () => handleChapterClick(chapter))}
+              aria-label={`Toggle comparison for ${chapter.session_title} at ${fmtTime(chapter.timestamp_seconds)}`}
               className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all group ${
                 isSelected ? 'bg-gray-100 ring-1 ring-gray-300' : 'hover:bg-gray-50'
               }`}

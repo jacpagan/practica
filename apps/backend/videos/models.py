@@ -1,7 +1,6 @@
 import secrets
 from django.db import models
 from django.contrib.auth.models import User
-from django.utils import timezone
 
 
 class Profile(models.Model):
@@ -17,6 +16,13 @@ class Space(models.Model):
     """A practice area. Owner shows their work, members watch and comment."""
     name = models.CharField(max_length=100)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='owned_spaces')
+    main_session = models.ForeignKey(
+        'Session',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='main_in_spaces',
+    )
     invite_slug = models.CharField(max_length=20, unique=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -107,11 +113,24 @@ class Tag(models.Model):
 
 class Session(models.Model):
     """A practice session — typically one long recording."""
+    STATUS_UPLOADED = 'uploaded'
+    STATUS_PROCESSING = 'processing'
+    STATUS_READY = 'ready'
+    STATUS_FAILED = 'failed'
+    STATUS_CHOICES = [
+        (STATUS_UPLOADED, 'Uploaded'),
+        (STATUS_PROCESSING, 'Processing'),
+        (STATUS_READY, 'Ready'),
+        (STATUS_FAILED, 'Failed'),
+    ]
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sessions', null=True, blank=True)
     space = models.ForeignKey(Space, on_delete=models.SET_NULL, null=True, blank=True, related_name='sessions')
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     video_file = models.FileField(upload_to='sessions/')
+    processing_status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_UPLOADED)
+    processing_error = models.TextField(blank=True)
     tags = models.ManyToManyField(Tag, blank=True, related_name='sessions')
     duration_seconds = models.IntegerField(null=True, blank=True)
     recorded_at = models.DateTimeField(auto_now_add=True)
@@ -123,6 +142,38 @@ class Session(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class SessionAsset(models.Model):
+    """Derived playback/scrubbing assets for a session."""
+
+    TYPE_PROXY_MP4 = 'proxy_mp4'
+    TYPE_HLS_MASTER = 'hls_master'
+    TYPE_THUMB_SPRITE = 'thumb_sprite'
+    TYPE_THUMB_VTT = 'thumb_vtt'
+    TYPE_CHOICES = [
+        (TYPE_PROXY_MP4, 'Proxy MP4'),
+        (TYPE_HLS_MASTER, 'HLS Master'),
+        (TYPE_THUMB_SPRITE, 'Thumbnail Sprite'),
+        (TYPE_THUMB_VTT, 'Thumbnail VTT'),
+    ]
+
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='assets')
+    asset_type = models.CharField(max_length=32, choices=TYPE_CHOICES)
+    object_key = models.CharField(max_length=512)
+    content_type = models.CharField(max_length=120, blank=True)
+    metadata_json = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['asset_type', '-created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['session', 'asset_type'], name='session_asset_session_type_uniq'),
+        ]
+
+    def __str__(self):
+        return f"SessionAsset session={self.session_id} type={self.asset_type}"
 
 
 class MultipartSessionUpload(models.Model):
@@ -218,75 +269,24 @@ class SessionLastSeen(models.Model):
 
 
 class Comment(models.Model):
-    """A timestamped comment on a session, optionally with a video reply."""
+    """A timestamped comment on a session, with required video reply for new rows."""
     session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='comments')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='comments')
     timestamp_seconds = models.IntegerField(null=True, blank=True)
     text = models.TextField()
     video_reply = models.FileField(upload_to='comment_videos/', null=True, blank=True)
+    legacy_text_only = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['timestamp_seconds', 'created_at']
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(legacy_text_only=True) | (models.Q(video_reply__isnull=False) & ~models.Q(video_reply='')),
+                name='comment_legacy_or_video_required',
+            ),
+        ]
 
     def __str__(self):
         prefix = f"@{self.timestamp_seconds}s " if self.timestamp_seconds is not None else ""
         return f"{prefix}{self.user}: {self.text[:50]}"
-
-
-class CoachEvent(models.Model):
-    """Internal telemetry events for coach ROI metrics."""
-
-    EVENT_SESSION_UPLOADED = 'session_uploaded'
-    EVENT_FEEDBACK_REQUESTED = 'feedback_requested'
-    EVENT_FEEDBACK_CLAIMED = 'feedback_claimed'
-    EVENT_FEEDBACK_COMPLETED = 'feedback_completed'
-    EVENT_VIDEO_FEEDBACK_COMPLETED = 'video_feedback_completed'
-    EVENT_TYPE_CHOICES = [
-        (EVENT_SESSION_UPLOADED, 'Session Uploaded'),
-        (EVENT_FEEDBACK_REQUESTED, 'Feedback Requested'),
-        (EVENT_FEEDBACK_CLAIMED, 'Feedback Claimed'),
-        (EVENT_FEEDBACK_COMPLETED, 'Feedback Completed'),
-        (EVENT_VIDEO_FEEDBACK_COMPLETED, 'Video Feedback Completed'),
-    ]
-
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='coach_events')
-    event_type = models.CharField(max_length=32, choices=EVENT_TYPE_CHOICES)
-    occurred_at = models.DateTimeField(default=timezone.now)
-    session = models.ForeignKey(Session, on_delete=models.SET_NULL, null=True, blank=True, related_name='coach_events')
-    space = models.ForeignKey(Space, on_delete=models.SET_NULL, null=True, blank=True, related_name='coach_events')
-    metadata = models.JSONField(default=dict, blank=True)
-
-    class Meta:
-        ordering = ['-occurred_at']
-        indexes = [
-            models.Index(fields=['user', 'event_type', 'occurred_at'], name='coach_event_user_type_time_idx'),
-        ]
-
-    def __str__(self):
-        return f"CoachEvent #{self.id} user={self.user_id} type={self.event_type}"
-
-
-class CoachDailyMetric(models.Model):
-    """Daily aggregate ROI metrics per coach."""
-
-    coach = models.ForeignKey(User, on_delete=models.CASCADE, related_name='coach_daily_metrics')
-    date = models.DateField()
-    active_students_30d = models.PositiveIntegerField(default=0)
-    coach_comments_7d = models.PositiveIntegerField(default=0)
-    coach_comments_30d = models.PositiveIntegerField(default=0)
-    median_time_to_first_coach_comment_hours_30d = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
-    estimated_time_saved_hours_30d = models.DecimalField(max_digits=8, decimal_places=2, default=0)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['date']
-        constraints = [
-            models.UniqueConstraint(fields=['coach', 'date'], name='coach_daily_metric_cd_uniq'),
-        ]
-        indexes = [
-            models.Index(fields=['coach', 'date'], name='coach_daily_metric_cd_idx'),
-        ]
-
-    def __str__(self):
-        return f"CoachDailyMetric coach={self.coach_id} date={self.date}"

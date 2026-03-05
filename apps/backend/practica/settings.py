@@ -11,18 +11,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-insecure-change-in-production')
 
 DEBUG = os.environ.get('DEBUG', 'True').lower() in ['true', '1', 'yes']
-COACH_METRICS_ENABLED = os.environ.get('COACH_METRICS_ENABLED', 'False').lower() in ['true', '1', 'yes']
-COACH_METRICS_MINUTES_SAVED_PER_COMMENT = int(
-    os.environ.get(
-        'COACH_METRICS_MINUTES_SAVED_PER_COMMENT',
-        os.environ.get('COACH_METRICS_MINUTES_SAVED_PER_COMPLETION', '20'),
-    )
-)
-COACH_METRICS_INTERNAL_USER_IDS = [
-    int(value.strip())
-    for value in os.environ.get('COACH_METRICS_INTERNAL_USER_IDS', '').split(',')
-    if value.strip().isdigit()
-]
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0').split(',')
 
@@ -113,6 +101,11 @@ AWS_S3_FILE_OVERWRITE = False
 AWS_DEFAULT_ACL = None
 AWS_QUERYSTRING_AUTH = True
 AWS_QUERYSTRING_EXPIRE = 3600
+AWS_MEDIA_CONVERT_ROLE_ARN = os.environ.get('AWS_MEDIA_CONVERT_ROLE_ARN', '')
+AWS_MEDIA_CONVERT_ENDPOINT_URL = os.environ.get('AWS_MEDIA_CONVERT_ENDPOINT_URL', '')
+AWS_MEDIA_CONVERT_QUEUE_ARN = os.environ.get('AWS_MEDIA_CONVERT_QUEUE_ARN', '')
+AWS_MEDIA_CONVERT_OUTPUT_PREFIX = os.environ.get('AWS_MEDIA_CONVERT_OUTPUT_PREFIX', '')
+MEDIA_PROCESSING_CALLBACK_TOKEN = os.environ.get('MEDIA_PROCESSING_CALLBACK_TOKEN', '')
 
 if AWS_STORAGE_BUCKET_NAME:
     STORAGES = {

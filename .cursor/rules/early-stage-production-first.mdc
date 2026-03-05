@@ -1,0 +1,33 @@
+---
+alwaysApply: true
+---
+
+## Early-Stage Production-First Policy
+
+This repository runs in early-stage shipping mode. Follow these rules unless explicitly superseded in `AGENTS.md`.
+
+1. Completed changes must be pushed directly to `main` in the same work session.
+2. Do not batch completed work into deferred release branches.
+3. Production deploy path is `.github/workflows/deploy-ssm.yml` only.
+4. After push to `main`, verify deploy workflow success and production health endpoint returns 200:
+   - `https://practica.jpagan.com/health/`
+5. If deployment fails, apply fix-forward immediately with a new commit to `main`.
+
+## Required Agent Behavior
+
+- Default delivery branch for completed work: `main`.
+- Default release strategy: continuous direct-to-production.
+- Verification is mandatory, not optional:
+  - local minimum validation (frontend build and backend check when environment exists),
+  - deploy workflow success,
+  - production health success.
+
+## Policy Change Protocol
+
+If release strategy changes (for example PR-only, staging gates, release branches), update:
+
+- `AGENTS.md` (policy + runbook),
+- `.cursor/rules.yaml`,
+- this file.
+
+All three must change in the same commit.

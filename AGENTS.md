@@ -83,7 +83,7 @@ tar czf /tmp/practica-deploy.tar.gz \
 aws s3 cp /tmp/practica-deploy.tar.gz s3://practica-media-jpagan/deploy/practica-code.tar.gz
 
 # 4. Instance must be recreated (no SSH access currently)
-#    See scripts/deploy.sh for the full flow
+#    See scripts/deploy-via-ssm.sh for a local SSM-driven deploy script
 ```
 
 Note: The EC2 instance uses SQLite, so database state is lost on instance recreation. For persistent data, migrate to RDS.
@@ -95,31 +95,71 @@ Note: The EC2 instance uses SQLite, so database state is lost on instance recrea
 ## Delivery Agents (Roles)
 
 - Release Agent: Owns merging to `main` and versioning. Checks that CI is green and the PR includes migration notes.
-- Deploy Agent (CI): On push to `main`, SSHes into the server and runs `docker-compose -f docker-compose.prod.yml up -d --build`. Performs a health check on `/health/`.
+- Deploy Agent (CI): On push to `main`, runs `.github/workflows/deploy-ssm.yml` to deploy via AWS SSM. Performs required backend + public health checks.
 - Infra Agent: Maintains DNS, TLS, and reverse proxy. Ensures `ALLOWED_HOSTS`, `CORS_ORIGINS`, and `CSRF_TRUSTED_ORIGINS` include `practica.jpagan.com`. Manages S3 bucket policy/CORS when used.
 - Dev Agent (Local): Runs `make up`, `make migrate`, `make createsuperuser`. Verifies new features locally at `localhost:3000` before pushing.
 - Observability Agent: Monitors container logs, sets alarms, and checks `/health/` and key API endpoints.
 
 ### Rules of Engagement
 
-- Local-first: All features are verified locally (Docker Compose) before PR.
-- Main = Production: Merging to `main` triggers the deploy workflow to the production server.
+- Local-first: All features are minimally verified locally (frontend build + backend check if env is available) before push.
+- Main = Production: Pushes to `main` trigger the production deploy workflow.
 - Idempotent deploys: Production compose commands can be run multiple times safely.
 - Health gate: Deployment considered successful only if `/health/` returns 200 over HTTPS.
 - Media storage: Production uses S3 (recommended). If not, reverse proxy must serve `/media/` with range requests enabled.
 
+### Early-Stage Production-First Policy
+
+Non-negotiable policy while Practica is in early stage:
+
+- Direct-to-main: Completed changes are committed and pushed to `main` in the same work session.
+- No batching: Do not hold completed changes for later release branches.
+- Production verification: After each push to `main`, deployment workflow success and `https://practica.jpagan.com/health/` = 200 must be verified.
+- Fix-forward rule: If a deploy fails, immediately push a fix to `main`. Avoid long-lived rollback branches by default.
+
+When this policy changes:
+
+- Update this section and `.cursor/rules/early-stage-production-first.mdc` in the same commit.
+- State the new release policy explicitly (for example: PR review required, staged rollouts, or release branches).
+
+### Agent Runbook (Canonical Commands)
+
+Use this exact sequence for day-to-day shipping:
+
+```bash
+# 1) Start from latest main
+git checkout main
+git pull --ff-only origin main
+
+# 2) Local validation (minimum gate)
+cd apps/frontend && npm run build && cd ../..
+# Optional when backend env exists:
+# source .venv/bin/activate && cd apps/backend && python manage.py check && cd ../..
+
+# 3) Commit and push directly to production branch
+git add -A
+git commit -m "your change summary"
+git push origin main
+
+# 4) Monitor production deployment workflow
+RUN_ID="$(gh run list --workflow 'Deploy via SSM' --branch main --limit 1 --json databaseId --jq '.[0].databaseId')"
+gh run watch "$RUN_ID"
+
+# 5) Verify production health gate
+curl -fsS https://practica.jpagan.com/health/
+```
+
 ### Required Secrets (GitHub → Settings → Secrets and variables → Actions)
 
-- `SSH_HOST`: Server public hostname/IP
-- `SSH_USER`: SSH username
-- `SSH_PORT` (optional, default 22)
-- `SSH_KEY`: Private key (PEM). Ensure the public key is on the server.
-- `SSH_PROJECT_DIR`: Absolute path on server where the repo lives (e.g., `/opt/practica`)
-- `ENV_PRODUCTION` (optional): Contents of `.env.production` with env vars (DEBUG=0, ALLOWED_HOSTS, API_URL, SECRET_KEY, POSTGRES_PASSWORD, AWS_* if using S3)
+- `AWS_ROLE_ARN`: OIDC assumable role for GitHub Actions deploy job.
+- `AWS_REGION`: Region for SSM deploy (for example, `us-east-1`).
+- `INSTANCE_ID`: Production EC2 instance target for SSM deploy command.
+- `ENV_PRODUCTION`: Contents of `.env.production` used by production containers.
+
+Legacy SSH deploy secrets are deprecated for normal deploy flow.
 
 ### Server Prereqs
 
 - Docker and docker-compose installed
 - Nginx reverse proxy terminating TLS for `practica.jpagan.com`
 - If using S3: bucket CORS allows GET/HEAD with range requests and origins set to site domain
-
