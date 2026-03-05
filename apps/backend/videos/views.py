@@ -36,6 +36,8 @@ from .services.media_pipeline import enqueue_session_processing, apply_processin
 
 logger = logging.getLogger(__name__)
 
+logger = logging.getLogger(__name__)
+
 
 def _visible_sessions_qs(user):
     """Sessions visible in spaces you belong to/own, plus your own sessions."""
@@ -991,6 +993,93 @@ class SessionViewSet(viewsets.ModelViewSet):
         comment.delete()
         session.refresh_from_db()
         return Response(SessionSerializer(session).data)
+
+
+# ── Coach metrics views ────────────────────────────────────────────
+
+def _metric_value(value):
+    if value is None:
+        return None
+    if hasattr(value, 'quantize'):
+        return float(value)
+    return value
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def coach_metrics_summary(request):
+    if not _coach_metrics_enabled():
+        return Response({'error': 'Coach metrics are disabled'}, status=status.HTTP_404_NOT_FOUND)
+    if not _coach_metrics_user_allowed(request.user):
+        return Response({'error': 'Coach metrics are disabled'}, status=status.HTTP_404_NOT_FOUND)
+
+    raw_window_days = request.query_params.get('window_days', '30')
+    try:
+        window_days = int(raw_window_days)
+    except (TypeError, ValueError):
+        return Response({'error': 'window_days must be 7 or 30'}, status=status.HTTP_400_BAD_REQUEST)
+    if window_days not in (7, 30):
+        return Response({'error': 'window_days must be 7 or 30'}, status=status.HTTP_400_BAD_REQUEST)
+
+    today = timezone.now().date()
+    latest_metric = (
+        CoachDailyMetric.objects
+        .filter(coach=request.user, date__lte=today)
+        .order_by('-date')
+        .first()
+    )
+
+    metric_rows = []
+    if latest_metric:
+        trend_start = latest_metric.date - timedelta(days=window_days - 1)
+        metric_rows = list(
+            CoachDailyMetric.objects.filter(
+                coach=request.user,
+                date__gte=trend_start,
+                date__lte=latest_metric.date,
+            ).order_by('date')
+        )
+
+    summary = {
+        'active_students_30d': latest_metric.active_students_30d if latest_metric else 0,
+        'coach_comments_7d': latest_metric.coach_comments_7d if latest_metric else 0,
+        'coach_comments_30d': latest_metric.coach_comments_30d if latest_metric else 0,
+        'median_time_to_first_coach_comment_hours_30d': _metric_value(
+            latest_metric.median_time_to_first_coach_comment_hours_30d if latest_metric else None
+        ),
+        'estimated_time_saved_hours_30d': _metric_value(
+            latest_metric.estimated_time_saved_hours_30d if latest_metric else 0
+        ),
+    }
+
+    response = {
+        'coach_user_id': request.user.id,
+        'window_days': window_days,
+        'generated_at': timezone.now().isoformat(),
+        'summary': summary,
+        'trends': {
+            'active_students_30d': [{'date': str(m.date), 'value': m.active_students_30d} for m in metric_rows],
+            'coach_comments_7d': [{'date': str(m.date), 'value': m.coach_comments_7d} for m in metric_rows],
+            'coach_comments_30d': [{'date': str(m.date), 'value': m.coach_comments_30d} for m in metric_rows],
+            'median_time_to_first_coach_comment_hours_30d': [
+                {'date': str(m.date), 'value': _metric_value(m.median_time_to_first_coach_comment_hours_30d)}
+                for m in metric_rows
+            ],
+            'estimated_time_saved_hours_30d': [
+                {'date': str(m.date), 'value': _metric_value(m.estimated_time_saved_hours_30d)}
+                for m in metric_rows
+            ],
+        },
+        'definitions': {
+            'coach_identity': 'User who owns one or more spaces.',
+            'active_students_30d': 'Distinct non-owner users who uploaded sessions in coach-owned spaces.',
+            'coach_comments_7d': 'Comments authored by this coach on student sessions in coach-owned spaces.',
+            'coach_comments_30d': 'Comments authored by this coach on student sessions in coach-owned spaces over 30 days.',
+            'median_time_to_first_coach_comment_hours_30d': 'Median hours from student session upload to first coach comment.',
+            'estimated_time_saved_hours_30d': 'coach_comments_30d * minutes_saved_per_comment / 60.',
+        },
+    }
+    return Response(response)
 
 
 # ── Health check ────────────────────────────────────────────────────

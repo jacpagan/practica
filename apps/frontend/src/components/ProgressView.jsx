@@ -191,6 +191,7 @@ function ProgressView({ exercise, token, onBack }) {
         <p className="text-sm text-gray-500 mt-0.5">
           {chapters.length} {chapters.length === 1 ? 'entry' : 'entries'} across sessions
         </p>
+        {refreshingMedia && <p className="text-xs text-gray-400 mt-1">Refreshing secure video links...</p>}
       </div>
 
       <section className="mb-6 border border-gray-100 rounded-xl p-4">
@@ -366,6 +367,7 @@ function ProgressView({ exercise, token, onBack }) {
                     start={ch.timestamp_seconds}
                     end={ch.end_seconds}
                     className="w-full h-full"
+                    onError={refreshMediaUrls}
                   />
                 </div>
                 <div className="mt-1.5">
@@ -413,6 +415,7 @@ function ProgressView({ exercise, token, onBack }) {
                   src={`${videoUrl(chapter.session_video)}#t=${chapter.timestamp_seconds}`}
                   className="w-full h-full object-cover"
                   muted preload="metadata"
+                  onError={refreshMediaUrls}
                 />
                 {chapter.end_seconds && (
                   <div className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[9px] font-mono px-1 py-0.5 rounded">

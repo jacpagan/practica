@@ -35,6 +35,8 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
   const [commentVideoPreview, setCommentVideoPreview] = useState(null)
   const [showRecorder, setShowRecorder] = useState(false)
   const [submittingComment, setSubmittingComment] = useState(false)
+  const [recoveringPlayback, setRecoveringPlayback] = useState(false)
+  const [pendingResumeSeconds, setPendingResumeSeconds] = useState(null)
 
   // Tab
   const [tab, setTab] = useState('chapters')
@@ -66,11 +68,41 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
         const data = await res.json()
         setSession(data)
         onSessionUpdate(data)
+        return data
       }
     } catch (e) { console.error(e) }
+    return null
   }
 
   useEffect(() => { refreshSession() }, [initialSession.id])
+
+  const recoverPlaybackUrls = async ({ silent = false } = {}) => {
+    const now = Date.now()
+    if (playbackRecoveryInFlightRef.current || now - lastPlaybackRecoveryAtRef.current < 3000) return false
+    playbackRecoveryInFlightRef.current = true
+    lastPlaybackRecoveryAtRef.current = now
+    setRecoveringPlayback(true)
+
+    const resumeAt = videoRef.current ? Math.floor(videoRef.current.currentTime || 0) : null
+    const refreshed = await refreshSession()
+
+    if (refreshed && resumeAt !== null) setPendingResumeSeconds(resumeAt)
+    if (!refreshed) {
+      toast.error('Could not refresh secure video link')
+    } else if (!silent) {
+      toast('Secure video link refreshed')
+    }
+
+    playbackRecoveryInFlightRef.current = false
+    setRecoveringPlayback(false)
+    return Boolean(refreshed)
+  }
+
+  const handleSessionVideoLoadedMetadata = () => {
+    if (pendingResumeSeconds === null || !videoRef.current) return
+    videoRef.current.currentTime = pendingResumeSeconds
+    setPendingResumeSeconds(null)
+  }
 
   const handleTimeUpdate = () => { if (videoRef.current) setCurrentTime(videoRef.current.currentTime) }
   const seekTo = (seconds) => { if (videoRef.current) { videoRef.current.currentTime = seconds; videoRef.current.play() } }
@@ -389,6 +421,9 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
         <div className="aspect-video bg-black rounded-lg overflow-hidden">
           <video ref={videoRef} src={preferredSessionVideoUrl(session)} controls className="w-full h-full" onTimeUpdate={handleTimeUpdate} />
         </div>
+        {recoveringPlayback && (
+          <p className="mt-1 text-xs text-gray-500">Refreshing secure video link...</p>
+        )}
         {chapters.length > 0 && videoRef.current?.duration > 0 && (
           <div className="mt-1 h-1 bg-gray-100 rounded-full relative overflow-hidden">
             {chapters.map(ch => {
@@ -789,6 +824,7 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
                             playsInline
                             className="w-full"
                             preload="metadata"
+                            onError={() => recoverPlaybackUrls({ silent: true })}
                           />
                         </div>
                       </div>
@@ -796,7 +832,7 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
                   </div>
 
                   {/* Delete */}
-                  {(comment.username === user?.username) && (
+                  {(comment.username === user?.username || user?.is_staff) && (
                     <button onClick={() => removeComment(comment.id)}
                       className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 p-2 text-gray-300 hover:text-red-400 transition-all flex-shrink-0 mt-0.5"
                       aria-label="Delete comment"

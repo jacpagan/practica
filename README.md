@@ -66,6 +66,13 @@ A containerized Django + React application for tracking personal practice sessio
 - `./status-aws.sh` - Check current infrastructure status  
 - `./cleanup-aws.sh` - Destroy all AWS resources
 
+### Deployment Strategy (Solo Mode)
+
+- `main` is the only production deployment branch.
+- Deployment contract: `feature branch -> PR -> main -> production`.
+- No active staging promotion path exists in CI.
+- Guardrails stay enabled: backup/smoke checks and fast rollback are part of the production flow.
+
 ## 🏗️ Architecture
 
 ### Backend (Django)
