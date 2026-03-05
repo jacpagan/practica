@@ -4,19 +4,49 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('videos', '0014_exercisereferenceclip'),
+        ('videos', '0013_coachevent_coachdailymetric'),
     ]
 
     operations = [
-        migrations.RemoveField(
-            model_name='coachevent',
-            name='feedback_request',
+        migrations.RunSQL(
+            sql="""
+                ALTER TABLE videos_coachevent
+                DROP COLUMN IF EXISTS feedback_request_id CASCADE;
+            """,
+            reverse_sql=migrations.RunSQL.noop,
         ),
-        migrations.DeleteModel(
-            name='FeedbackAssignment',
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.RemoveField(
+                    model_name='coachevent',
+                    name='feedback_request',
+                ),
+            ],
+            database_operations=[],
         ),
-        migrations.DeleteModel(
-            name='FeedbackRequest',
+        migrations.RunSQL(
+            sql="DROP TABLE IF EXISTS videos_feedbackassignment CASCADE;",
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.DeleteModel(
+                    name='FeedbackAssignment',
+                ),
+            ],
+            database_operations=[],
+        ),
+        migrations.RunSQL(
+            sql="DROP TABLE IF EXISTS videos_feedbackrequest CASCADE;",
+            reverse_sql=migrations.RunSQL.noop,
+        ),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.DeleteModel(
+                    name='FeedbackRequest',
+                ),
+            ],
+            database_operations=[],
         ),
         migrations.RenameField(
             model_name='coachdailymetric',
