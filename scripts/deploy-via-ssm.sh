@@ -170,6 +170,7 @@ CMD_ID=$(aws ssm send-command \
   --instance-ids "$INSTANCE_ID" \
   --document-name "AWS-RunShellScript" \
   --comment "Practica deploy via SSM" \
+  --timeout-seconds 3600 \
   --parameters "$PARAMS_JSON" \
   --query "Command.CommandId" --output text)
 echo "SSM CommandId: $CMD_ID"
