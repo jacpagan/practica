@@ -1,7 +1,6 @@
 # .cursor/rules.yaml
 description: >
-  Enforce Django+DRF architecture, short-clip policy (<=180s),
-  safe migrations (RunPython backfills), and production-ready defaults.
+  Enforce Practica coding standards and release strategy.
 globs:
   - "**/*"
 alwaysApply: true

@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react'
 import { fmtTime } from '../utils'
 
-function SegmentPlayer({ src, start = 0, end = null, className = '' }) {
+function SegmentPlayer({ src, start = 0, end = null, className = '', onError = null }) {
   const ref = useRef(null)
   const [ready, setReady] = useState(false)
   const [playing, setPlaying] = useState(false)
@@ -74,6 +74,7 @@ function SegmentPlayer({ src, start = 0, end = null, className = '' }) {
         playsInline
         preload="metadata"
         muted={false}
+        onError={onError || undefined}
       />
 
       {/* Play/pause overlay */}

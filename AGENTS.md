@@ -92,6 +92,13 @@ Note: The EC2 instance uses SQLite, so database state is lost on instance recrea
 
 - Never pin Python module versions in `requirements.txt`.
 
+## Release Strategy (Early Stage)
+
+- Canonical deployment path is direct commit/push to `main` followed by automatic production deploy.
+- `main` is the only deployment branch.
+- No active staging deployment path exists in CI by policy.
+- Staging scripts in `scripts/` are local experimentation helpers only and are non-canonical.
+
 ## Delivery Agents (Roles)
 
 - Release Agent: Owns merging to `main` and versioning. Checks that CI is green and the PR includes migration notes.

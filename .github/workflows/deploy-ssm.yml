@@ -1,5 +1,8 @@
 name: Deploy via SSM
 
+# Solo mode release strategy:
+# - main -> production only
+# - no staging promotion path enabled
 on:
   push:
     branches: [ main ]
@@ -23,6 +26,12 @@ jobs:
       id-token: write
       contents: read
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate release strategy guardrails
+        run: bash scripts/check-release-strategy.sh
+
       - name: Resolve ref
         id: ref
         run: |
@@ -41,30 +50,46 @@ jobs:
           INSTANCE_ID: ${{ secrets.INSTANCE_ID }}
           ENV_PRODUCTION: ${{ secrets.ENV_PRODUCTION }}
           GIT_REF: ${{ steps.ref.outputs.ref }}
+        run: bash scripts/deploy-via-ssm.sh
+
+      - name: Deployment summary
+        if: always()
         run: |
-          set -euo pipefail
-          COMMANDS=$(cat <<'EOS'
-          bash -lc "set -euo pipefail
+          COMMIT_SHA="${GITHUB_SHA}"
+          DEPLOYED_REF="${{ steps.ref.outputs.ref }}"
+          SSM_COMMAND_ID="${{ steps.send_ssm.outputs.command_id }}"
+          SSM_STATUS="${{ steps.send_ssm.outputs.ssm_status }}"
+          [ -z "$SSM_COMMAND_ID" ] && SSM_COMMAND_ID="n/a"
+          [ -z "$SSM_STATUS" ] && SSM_STATUS="n/a"
 
-          # 1) Ensure project dir
-          mkdir -p /opt/practica
-          cd /opt/practica
+          echo "Deploy summary:"
+          echo "commit_sha=$COMMIT_SHA"
+          echo "deployed_ref=$DEPLOYED_REF"
+          echo "ssm_command_id=$SSM_COMMAND_ID"
+          echo "ssm_status=$SSM_STATUS"
+          echo "health_gate=backend+public required"
 
-          # 2) Write .env.production from secret
-          cat > .env.production << 'ENVEOF'
-${ENV_PRODUCTION}
-ENVEOF
+          {
+            echo "### Production Deploy Summary"
+            echo "- Commit SHA: \`$COMMIT_SHA\`"
+            echo "- Deployed ref: \`$DEPLOYED_REF\`"
+            echo "- SSM command id: \`$SSM_COMMAND_ID\`"
+            echo "- SSM status: \`$SSM_STATUS\`"
+            echo "- Health gate: \`backend + public health required\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
-          # 3) Minimal deps checks
-          if ! command -v git >/dev/null 2>&1; then apt-get update && apt-get install -y git; fi
-          if ! command -v docker >/dev/null 2>&1; then echo 'Docker not found. Please install Docker.' && exit 1; fi
-          if ! docker compose version >/dev/null 2>&1; then echo 'docker compose plugin not found. Please install docker-compose-plugin.' && exit 1; fi
-          if ! command -v nginx >/dev/null 2>&1; then echo 'nginx not found. Please install and configure TLS once.' && exit 1; fi
-
-          # 4) Clone or update repo
-          REPO_URL='https://github.com/jacpagan/practica.git'
-          if [ ! -d .git ]; then
-            git clone "$REPO_URL" .
+      - name: Notify Slack on deploy failure
+        if: ${{ failure() }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DEPLOYED_REF: ${{ steps.ref.outputs.ref }}
+          SSM_COMMAND_ID: ${{ steps.send_ssm.outputs.command_id }}
+          SSM_STATUS: ${{ steps.send_ssm.outputs.ssm_status }}
+        run: |
+          if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
+            echo "::warning::SLACK_WEBHOOK_URL not configured; skipping Slack deploy-failure notification."
+            exit 0
           fi
           git fetch --all --prune
           REF="${GIT_REF}"
