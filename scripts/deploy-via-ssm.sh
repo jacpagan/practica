@@ -1,116 +1,200 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-COMMANDS=$(cat <<'EOS'
-bash -lc "set -euo pipefail
+ENV_B64=$(printf '%s' "${ENV_PRODUCTION:-}" | base64 | tr -d '\n')
 
-# 1) Ensure project dir
+REMOTE_SCRIPT=$(cat <<'EOS'
+#!/usr/bin/env bash
+set -euo pipefail
+
 mkdir -p /opt/practica
 cd /opt/practica
+export HOME=/root
+git config --global --add safe.directory /opt/practica
 
-# 2) Write .env.production from secret
-cat > .env.production << 'ENVEOF'
-${ENV_PRODUCTION}
-ENVEOF
-
-# 3) Minimal deps checks
 if ! command -v git >/dev/null 2>&1; then apt-get update && apt-get install -y git; fi
 if ! command -v docker >/dev/null 2>&1; then echo 'Docker not found. Please install Docker.' && exit 1; fi
-if ! docker compose version >/dev/null 2>&1; then echo 'docker compose plugin not found. Please install docker-compose-plugin.' && exit 1; fi
 if ! command -v nginx >/dev/null 2>&1; then echo 'nginx not found. Please install and configure TLS once.' && exit 1; fi
 
-# 4) Clone or update repo
+compose() {
+  if docker compose version >/dev/null 2>&1; then
+    docker compose "$@"
+  elif command -v docker-compose >/dev/null 2>&1; then
+    docker-compose "$@"
+  else
+    echo 'Neither docker compose nor docker-compose is available.' >&2
+    exit 1
+  fi
+}
+
+count_records() {
+  compose -f docker-compose.prod.yml exec -T backend \
+    python /app/apps/backend/manage.py shell -c \
+    "from django.contrib.auth import get_user_model; from videos.models import Session; U=get_user_model(); print(f'users={U.objects.count()} sessions={Session.objects.count()}')" 2>/dev/null \
+    | tail -n 1 || true
+}
+
+extract_metric() {
+  key="$1"
+  line="$2"
+  printf '%s\n' "$line" | sed -n "s/.*${key}=\\([0-9][0-9]*\\).*/\\1/p" | tail -n 1
+}
+
 REPO_URL='https://github.com/jacpagan/practica.git'
 if [ ! -d .git ]; then
-  git clone "$REPO_URL" .
+  git init
+  git remote add origin "$REPO_URL"
+fi
+if ! git remote get-url origin >/dev/null 2>&1; then
+  git remote add origin "$REPO_URL"
 fi
 git fetch --all --prune
-REF="${GIT_REF}"
-git checkout "$REF"
+REF="__GIT_REF__"
+git clean -fd
+git checkout -f "$REF" || git checkout -f -B "$REF" "origin/$REF"
+git clean -fd
 git pull --ff-only origin "$REF" || true
 
-# 5) Export env
+printf '%s' "__ENV_B64__" | base64 -d > .env.production
 set -a; source .env.production; set +a
 
-# 6) Build and run
-docker compose -f docker-compose.prod.yml up -d --build
+# Remove stale unix socket from previous runs before building context.
+rm -f apps/backend/gunicorn.ctl
 
-# 6.1) Ensure database schema is current
-docker compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py migrate
+# Stop legacy host-level service; Docker backend owns :8000 now.
+systemctl stop practica.service || true
+systemctl disable practica.service || true
+systemctl mask practica.service || true
+pkill -f '/opt/practica/.venv/bin/gunicorn' || true
 
-# 6.2) Remove legacy coach metrics cron if present
-if [ -f /etc/cron.d/practica-coach-metrics ]; then
-  rm -f /etc/cron.d/practica-coach-metrics
+# Capture current DB counts when previous stack is healthy (used for reset protection).
+PRE_COUNTS=$(count_records)
+PRE_USERS=$(extract_metric users "$PRE_COUNTS")
+PRE_SESSIONS=$(extract_metric sessions "$PRE_COUNTS")
+echo "Pre-deploy counts: ${PRE_COUNTS:-unavailable}"
+
+# Best-effort DB snapshot before recycling containers.
+mkdir -p /opt/practica/backups
+TS=$(date -u +%Y%m%dT%H%M%SZ)
+BACKUP_FILE="/opt/practica/backups/practica_prod_${TS}.sql.gz"
+if PGPASSWORD="${POSTGRES_PASSWORD:-}" compose -f docker-compose.prod.yml exec -T db \
+  pg_dump -U "${POSTGRES_USER:-practica}" "${POSTGRES_DB:-practica_prod}" | gzip -1 > "$BACKUP_FILE"; then
+  echo "Wrote DB snapshot: $BACKUP_FILE"
+  ls -1dt /opt/practica/backups/practica_prod_*.sql.gz 2>/dev/null | tail -n +11 | xargs -r rm -f
+  if command -v aws >/dev/null 2>&1 && [ -n "${AWS_STORAGE_BUCKET_NAME:-}" ]; then
+    aws s3 cp "$BACKUP_FILE" "s3://${AWS_STORAGE_BUCKET_NAME}/db-backups/$(basename "$BACKUP_FILE")" >/dev/null 2>&1 || true
+  fi
+else
+  rm -f "$BACKUP_FILE" || true
+  echo "DB snapshot skipped (db not ready or db missing)." >&2
 fi
+
+# Ensure old containers do not keep host ports (especially :8000) allocated.
+compose -f docker-compose.prod.yml down --remove-orphans || true
+docker ps --filter publish=8000 -q | xargs -r docker rm -f
+
+compose -f docker-compose.prod.yml up -d --build
+
+# Ensure DB schema and schedule periodic coach metrics aggregation.
+compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py migrate
+cat > /etc/cron.d/practica-coach-metrics <<CRON
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+0 * * * * root cd /opt/practica && if docker compose version >/dev/null 2>&1; then docker compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py build_coach_metrics --days 35; elif command -v docker-compose >/dev/null 2>&1; then docker-compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py build_coach_metrics --days 35; fi >> /var/log/practica-coach-metrics.log 2>&1
+CRON
+chmod 0644 /etc/cron.d/practica-coach-metrics
 systemctl reload cron || service cron reload || true
 
-# 7) Health check backend
+# Apply upload-safe nginx defaults globally (http context).
+cat > /etc/nginx/conf.d/practica-upload.conf <<NGINXUPLOAD
+client_max_body_size 2G;
+client_body_timeout 3600s;
+proxy_request_buffering off;
+proxy_read_timeout 3600s;
+proxy_send_timeout 3600s;
+send_timeout 3600s;
+NGINXUPLOAD
+
+backend_ok=0
 for i in $(seq 1 60); do
-  curl -fsS http://127.0.0.1:8000/health && ok=1 && break || sleep 2
+  curl -fsS -H "Host: practica.jpagan.com" http://127.0.0.1:8000/health/ && backend_ok=1 && break || sleep 2
 done
-if [ "${ok:-}" != "1" ]; then echo 'Backend failed health check' >&2; docker compose -f docker-compose.prod.yml logs --tail=200 backend || true; exit 1; fi
+if [ "$backend_ok" != "1" ]; then
+  echo 'Backend failed health check' >&2
+  compose -f docker-compose.prod.yml logs --tail=200 backend || true
+  exit 1
+fi
 
-# 8) Configure Nginx single-door proxy
-SITE=$(grep -RIl "server_name[[:space:]]\+practica.jpagan.com" /etc/nginx/sites-enabled /etc/nginx/sites-available 2>/dev/null | head -n1 || true)
-if [ -z "$SITE" ]; then SITE=/etc/nginx/sites-available/practica; fi
-CERT_LINE=$(grep -E "^\s*ssl_certificate\s" "$SITE" | head -n1 || true)
-KEY_LINE=$(grep -E "^\s*ssl_certificate_key\s" "$SITE" | head -n1 || true)
-cp -a "$SITE" "$SITE.bak" 2>/dev/null || true
-cat > "$SITE" <<NGINXCONF
-server {
-    listen 443 ssl http2;
-    server_name practica.jpagan.com;
-    ${CERT_LINE}
-    ${KEY_LINE}
-    client_max_body_size 2G;
-    client_body_timeout 3600s;
-    proxy_read_timeout 3600s;
-    proxy_send_timeout 3600s;
-    send_timeout 3600s;
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_request_buffering off;
-    }
-}
-server {
-    listen 80;
-    server_name practica.jpagan.com;
-    return 301 https://$host$request_uri;
-}
-NGINXCONF
-if [ ! -e /etc/nginx/sites-enabled/practica ]; then ln -sf "$SITE" /etc/nginx/sites-enabled/practica; fi
-nginx -t
-systemctl reload nginx
+POST_COUNTS=$(count_records)
+POST_USERS=$(extract_metric users "$POST_COUNTS")
+POST_SESSIONS=$(extract_metric sessions "$POST_COUNTS")
+echo "Post-deploy counts: ${POST_COUNTS:-unavailable}"
 
-# 9) Public health check (best-effort)
+if [ "${ALLOW_EMPTY_DB_AFTER_DEPLOY:-0}" != "1" ] \
+  && [ -n "${PRE_USERS:-}" ] && [ -n "${PRE_SESSIONS:-}" ] \
+  && [ -n "${POST_USERS:-}" ] && [ -n "${POST_SESSIONS:-}" ] \
+  && [ $((PRE_USERS + PRE_SESSIONS)) -gt 0 ] \
+  && [ $((POST_USERS + POST_SESSIONS)) -eq 0 ]; then
+  echo "Safety check failed: DB looked populated before deploy and empty after deploy." >&2
+  echo "Set ALLOW_EMPTY_DB_AFTER_DEPLOY=1 in ENV_PRODUCTION only if this reset is intentional." >&2
+  exit 1
+fi
+
+# Keep nginx reload best-effort; avoid rewriting site config during app deploy.
+if ! nginx -t || ! systemctl reload nginx; then
+  echo "Nginx reload skipped (existing config may be unmanaged)." >&2
+fi
+
+public_ok=0
 for i in $(seq 1 30); do
-  curl -fsS https://practica.jpagan.com/health && ok=1 && break || sleep 2
+  curl -fsS https://practica.jpagan.com/health/ && public_ok=1 && break || sleep 2
 done
-if [ "${ok:-}" != "1" ]; then echo 'Public health check failed (check TLS/DNS).'; fi
-"
+if [ "$public_ok" != "1" ]; then
+  echo 'Public health check failed' >&2
+  exit 1
+fi
+
+DEPLOYED_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
+echo "DEPLOY_SUMMARY ref=$REF sha=$DEPLOYED_SHA backend_health=pass public_health=pass"
 EOS
 )
+
+REMOTE_SCRIPT="${REMOTE_SCRIPT//__ENV_B64__/$ENV_B64}"
+REMOTE_SCRIPT="${REMOTE_SCRIPT//__GIT_REF__/${GIT_REF:-main}}"
+REMOTE_B64=$(printf '%s' "$REMOTE_SCRIPT" | base64 | tr -d '\n')
+COMMAND="echo '$REMOTE_B64' | base64 -d > /tmp/practica-deploy.sh && bash /tmp/practica-deploy.sh"
+COMMAND_ESCAPED=$(printf '%s' "$COMMAND" | sed 's/\\/\\\\/g; s/"/\\"/g')
+PARAMS_JSON="{\"commands\":[\"$COMMAND_ESCAPED\"]}"
 
 CMD_ID=$(aws ssm send-command \
   --instance-ids "$INSTANCE_ID" \
   --document-name "AWS-RunShellScript" \
   --comment "Practica deploy via SSM" \
-  --parameters commands="[$(printf %q "$COMMANDS")]" \
+  --parameters "$PARAMS_JSON" \
   --query "Command.CommandId" --output text)
 echo "SSM CommandId: $CMD_ID"
 
+FINAL_STATUS="PENDING"
 for i in $(seq 1 120); do
   STATUS=$(aws ssm list-command-invocations --command-id "$CMD_ID" --details --query 'CommandInvocations[0].Status' --output text 2>/dev/null || echo "PENDING")
   echo "SSM status: $STATUS"
-  if [ "$STATUS" = "Success" ]; then exit 0; fi
+  if [ "$STATUS" = "Success" ]; then
+    FINAL_STATUS="$STATUS"
+    break
+  fi
   if [ "$STATUS" = "Cancelled" ] || [ "$STATUS" = "Failed" ] || [ "$STATUS" = "TimedOut" ]; then
     aws ssm list-command-invocations --command-id "$CMD_ID" --details --output text || true
+    FINAL_STATUS="$STATUS"
     exit 1
   fi
   sleep 3
 done
-echo "SSM command timed out" >&2
-exit 1
+if [ "$FINAL_STATUS" != "Success" ]; then
+  echo "SSM command timed out" >&2
+  exit 1
+fi
+
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+  echo "command_id=$CMD_ID" >> "$GITHUB_OUTPUT"
+  echo "ssm_status=$FINAL_STATUS" >> "$GITHUB_OUTPUT"
+fi
