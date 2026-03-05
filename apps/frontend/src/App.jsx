@@ -11,33 +11,41 @@ import ProgressView from './components/ProgressView'
 import ConnectionsView from './components/ConnectionsView'
 import QuickRecord from './components/QuickRecord'
 import ScreenRecord from './components/ScreenRecord'
-import CoachMetricsPanel from './components/CoachMetricsPanel'
+import SpaceCompareView from './components/SpaceCompareView'
 import { canUseScreenRecording, reportClientError } from './utils'
 
 const parseRoute = (pathname) => {
-  if (pathname === '/upload') return { view: 'upload', sessionId: null, exerciseId: null }
-  if (pathname === '/spaces') return { view: 'connections', sessionId: null, exerciseId: null }
-  if (pathname === '/record') return { view: 'quickRecord', sessionId: null, exerciseId: null }
-  if (pathname === '/record-screen') return { view: 'screenRecord', sessionId: null, exerciseId: null }
+  const searchParams = new URLSearchParams(window.location.search)
+  if (pathname === '/upload') return { view: 'upload', sessionId: null, exerciseId: null, spaceId: null }
+  if (pathname === '/spaces') return { view: 'connections', sessionId: null, exerciseId: null, spaceId: null }
+  if (pathname === '/record') return { view: 'quickRecord', sessionId: null, exerciseId: null, spaceId: null }
+  if (pathname === '/record-screen') return { view: 'screenRecord', sessionId: null, exerciseId: null, spaceId: null }
+
+  const compareMatch = pathname.match(/^\/spaces\/(\d+)\/compare$/)
+  if (compareMatch) {
+    const sessionParam = Number(searchParams.get('session') || '') || null
+    return { view: 'compare', sessionId: sessionParam, exerciseId: null, spaceId: Number(compareMatch[1]) }
+  }
 
   const sessionMatch = pathname.match(/^\/sessions\/(\d+)$/)
   if (sessionMatch) {
-    return { view: 'detail', sessionId: Number(sessionMatch[1]), exerciseId: null }
+    return { view: 'detail', sessionId: Number(sessionMatch[1]), exerciseId: null, spaceId: null }
   }
 
   const exerciseMatch = pathname.match(/^\/exercises\/(\d+)$/)
   if (exerciseMatch) {
-    return { view: 'progress', sessionId: null, exerciseId: Number(exerciseMatch[1]) }
+    return { view: 'progress', sessionId: null, exerciseId: Number(exerciseMatch[1]), spaceId: null }
   }
 
-  return { view: 'sessions', sessionId: null, exerciseId: null }
+  return { view: 'sessions', sessionId: null, exerciseId: null, spaceId: null }
 }
 
-const routePath = ({ view, sessionId, exerciseId }) => {
+const routePath = ({ view, sessionId, exerciseId, spaceId }) => {
   if (view === 'upload') return '/upload'
   if (view === 'connections') return '/spaces'
   if (view === 'quickRecord') return '/record'
   if (view === 'screenRecord') return '/record-screen'
+  if (view === 'compare' && spaceId) return `/spaces/${spaceId}/compare${sessionId ? `?session=${sessionId}` : ''}`
   if (view === 'detail' && sessionId) return `/sessions/${sessionId}`
   if (view === 'progress' && exerciseId) return `/exercises/${exerciseId}`
   return '/'
@@ -92,6 +100,7 @@ function AppContent() {
   const [view, setView] = useState(initialRoute.view)
   const [routeSessionId, setRouteSessionId] = useState(initialRoute.sessionId)
   const [routeExerciseId, setRouteExerciseId] = useState(initialRoute.exerciseId)
+  const [routeSpaceId, setRouteSpaceId] = useState(initialRoute.spaceId)
   const [selectedSession, setSelectedSession] = useState(null)
   const [selectedExercise, setSelectedExercise] = useState(null)
   const [showCreateSpace, setShowCreateSpace] = useState(false)
@@ -104,6 +113,7 @@ function AppContent() {
     setView(nextRoute.view)
     setRouteSessionId(nextRoute.sessionId ?? null)
     setRouteExerciseId(nextRoute.exerciseId ?? null)
+    setRouteSpaceId(nextRoute.spaceId ?? null)
     const path = routePath(nextRoute)
     if (path !== window.location.pathname) {
       if (replace) window.history.replaceState(null, '', path)
@@ -117,6 +127,7 @@ function AppContent() {
       setView(route.view)
       setRouteSessionId(route.sessionId)
       setRouteExerciseId(route.exerciseId)
+      setRouteSpaceId(route.spaceId)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
@@ -211,6 +222,12 @@ function AppContent() {
     return () => window.removeEventListener('user-updated', handler)
   }, [refreshUser])
 
+  useEffect(() => {
+    const handler = () => fetchSpaces()
+    window.addEventListener('space-updated', handler)
+    return () => window.removeEventListener('space-updated', handler)
+  }, [fetchSpaces])
+
   const openSessionById = useCallback(async (sessionId, { updateUrl = true } = {}) => {
     try {
       const res = await fetch(`/api/sessions/${sessionId}/`, { headers })
@@ -296,7 +313,7 @@ function AppContent() {
   }
 
   const goHome = () => {
-    navigate({ view: 'sessions', sessionId: null, exerciseId: null })
+    navigate({ view: 'sessions', sessionId: null, exerciseId: null, spaceId: null })
     setSelectedSession(null)
     setSelectedExercise(null)
     fetchSessions()
@@ -351,13 +368,13 @@ function AppContent() {
             {view === 'sessions' && (
               <>
                 <button
-                  onClick={() => navigate({ view: 'upload', sessionId: null, exerciseId: null })}
+                  onClick={() => navigate({ view: 'upload', sessionId: null, exerciseId: null, spaceId: null })}
                   className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors hidden sm:block"
                 >
                   + Upload
                 </button>
                 <button
-                  onClick={() => navigate({ view: 'connections', sessionId: null, exerciseId: null })}
+                  onClick={() => navigate({ view: 'connections', sessionId: null, exerciseId: null, spaceId: null })}
                   className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
                 >
                   Spaces
@@ -431,7 +448,7 @@ function AppContent() {
           <div className="px-4 sm:px-6 pt-4">
             <div className="w-full p-4 rounded-xl border border-dashed border-gray-200">
               <p className="text-sm font-medium text-gray-700">Set up your first space</p>
-              <p className="text-xs text-gray-400 mt-1">Create your own space or join a coach space with an invite code.</p>
+              <p className="text-xs text-gray-400 mt-1">Create your own space or join a space with an invite code.</p>
               <div className="mt-3 flex gap-2">
                 <button
                   onClick={() => setShowCreateSpace(true)}
@@ -457,7 +474,6 @@ function AppContent() {
 
         {view === 'sessions' && (
           <>
-            <CoachMetricsPanel token={token} />
             <SessionList
               sessions={sessions}
               exercises={exercises}
@@ -493,7 +509,7 @@ function AppContent() {
               fetchSpaces()
               navigate({ view: 'sessions', sessionId: null, exerciseId: null })
             }}
-            onCancel={() => navigate({ view: 'sessions', sessionId: null, exerciseId: null })}
+            onCancel={() => navigate({ view: 'sessions', sessionId: null, exerciseId: null, spaceId: null })}
           />
         )}
         {view === 'detail' && selectedSession && (
@@ -509,6 +525,15 @@ function AppContent() {
               fetchExercises()
               fetchSpaces()
             }}
+            onOpenCompare={(spaceId, sessionId) => navigate({ view: 'compare', spaceId, sessionId, exerciseId: null })}
+          />
+        )}
+        {view === 'compare' && routeSpaceId && (
+          <SpaceCompareView
+            token={token}
+            spaceId={routeSpaceId}
+            initialSessionId={routeSessionId}
+            onBack={goHome}
           />
         )}
         {view === 'progress' && selectedExercise && (

@@ -1,11 +1,12 @@
 from django.contrib.auth.models import User
 from django.utils import timezone
+from django.core.files.storage import default_storage
 from rest_framework import serializers
 from urllib.parse import parse_qs, urlencode, urlparse
 import re
 from .models import (
     Profile, Exercise, Session, Chapter, Comment, InviteCode, SessionLastSeen,
-    Tag, Space, SpaceMember, ExerciseReferenceClip,
+    Tag, Space, SpaceMember, ExerciseReferenceClip, SessionAsset,
 )
 
 
@@ -20,10 +21,16 @@ class SpaceSerializer(serializers.ModelSerializer):
     members = serializers.SerializerMethodField()
     is_owner = serializers.SerializerMethodField()
     invite_link = serializers.SerializerMethodField()
+    main_session_id = serializers.IntegerField(source='main_session.id', read_only=True, default=None)
+    main_session_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = Space
-        fields = ['id', 'name', 'invite_slug', 'session_count', 'members', 'is_owner', 'invite_link', 'created_at']
+        fields = [
+            'id', 'name', 'invite_slug',
+            'main_session_id', 'main_session_summary',
+            'session_count', 'members', 'is_owner', 'invite_link', 'created_at',
+        ]
         read_only_fields = ['id', 'invite_slug', 'created_at']
 
     def get_session_count(self, obj):
@@ -41,6 +48,17 @@ class SpaceSerializer(serializers.ModelSerializer):
 
     def get_invite_link(self, obj):
         return f"/join/{obj.invite_slug}"
+
+    def get_main_session_summary(self, obj):
+        session = getattr(obj, 'main_session', None)
+        if not session:
+            return None
+        return {
+            'id': session.id,
+            'title': session.title,
+            'video_file': session.video_file.url if session.video_file else None,
+            'processing_status': session.processing_status,
+        }
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -232,6 +250,25 @@ class ExerciseReferenceClipSerializer(serializers.ModelSerializer):
         return f"https://www.youtube.com/watch?{urlencode(params)}"
 
 
+class SessionAssetSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SessionAsset
+        fields = ['asset_type', 'object_key', 'content_type', 'metadata_json', 'url']
+
+    def get_url(self, obj):
+        key = (obj.object_key or '').strip()
+        if not key:
+            return ''
+        if key.startswith('http://') or key.startswith('https://') or key.startswith('/'):
+            return key
+        try:
+            return default_storage.url(key)
+        except Exception:
+            return key
+
+
 class CommentSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     display_name = serializers.SerializerMethodField()
@@ -280,12 +317,18 @@ class SessionSerializer(serializers.ModelSerializer):
     comment_count = serializers.SerializerMethodField()
     owner = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
+    processing_status = serializers.CharField(read_only=True)
+    processing_error = serializers.CharField(read_only=True)
+    assets = SessionAssetSerializer(many=True, read_only=True)
+    is_space_main = serializers.SerializerMethodField()
 
     class Meta:
         model = Session
         fields = ['id', 'title', 'description', 'video_file',
                   'duration_seconds', 'recorded_at', 'created_at', 'updated_at',
+                  'processing_status', 'processing_error',
                   'space_id', 'space_name', 'tag_names',
+                  'assets', 'is_space_main',
                   'chapters', 'comments', 'chapter_count', 'comment_count', 'owner',
                   'can_edit']
         read_only_fields = ['id', 'recorded_at', 'created_at', 'updated_at']
@@ -317,6 +360,9 @@ class SessionSerializer(serializers.ModelSerializer):
             return False
         return user.is_staff or obj.user_id == user.id
 
+    def get_is_space_main(self, obj):
+        return bool(obj.space_id and getattr(obj.space, 'main_session_id', None) == obj.id)
+
 
 class SessionListSerializer(serializers.ModelSerializer):
     tag_names = serializers.SerializerMethodField()
@@ -328,12 +374,17 @@ class SessionListSerializer(serializers.ModelSerializer):
     owner_id = serializers.IntegerField(source='user.id', read_only=True, default=None)
     has_unread = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
+    processing_status = serializers.CharField(read_only=True)
+    assets = SessionAssetSerializer(many=True, read_only=True)
+    is_space_main = serializers.SerializerMethodField()
 
     class Meta:
         model = Session
         fields = ['id', 'title', 'description', 'video_file',
                   'duration_seconds', 'recorded_at', 'created_at',
+                  'processing_status',
                   'space_id', 'space_name', 'tag_names',
+                  'assets', 'is_space_main',
                   'chapter_count', 'comment_count', 'owner_name', 'owner_id', 'has_unread',
                   'can_edit']
         read_only_fields = ['id', 'recorded_at', 'created_at']
@@ -377,6 +428,9 @@ class SessionListSerializer(serializers.ModelSerializer):
         if not user:
             return False
         return user.is_staff or obj.user_id == user.id
+
+    def get_is_space_main(self, obj):
+        return bool(obj.space_id and getattr(obj.space, 'main_session_id', None) == obj.id)
 
 
 class ProgressChapterSerializer(serializers.ModelSerializer):

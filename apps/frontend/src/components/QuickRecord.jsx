@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useToast } from './Toast'
 import TagInput from './TagInput'
-import { createSessionUpload, fmtTimer, uploadErrorMessage } from '../utils'
+import { createSessionUpload, fmtTimer, uploadErrorMessage, pickRecorderMimeType } from '../utils'
+import { useConfirm } from './ConfirmDialog'
 
 const STEPS = { CAMERA: 'camera', RECORDING: 'recording', REVIEW: 'review', SAVE: 'save' }
 
 function QuickRecord({ token, exercises, spaces = [], onComplete, onCancel }) {
   const toast = useToast()
+  const confirm = useConfirm()
   const [step, setStep] = useState(STEPS.CAMERA)
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState(null)
@@ -47,26 +49,36 @@ function QuickRecord({ token, exercises, spaces = [], onComplete, onCancel }) {
 
   // ── Camera ──
   const openCamera = async (mode) => {
-    const facingMode = mode || facingRef.current
     setError(null)
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1920 }, height: { ideal: 1080 }, facingMode },
-        audio: true,
-      })
-      streamRef.current = stream
-      facingRef.current = facingMode
-      setFacing(facingMode)
-      if (liveRef.current) {
-        liveRef.current.srcObject = stream
-        await liveRef.current.play()
+    const requestedMode = mode || facingRef.current
+    const fallbackMode = requestedMode === 'environment' ? 'user' : 'environment'
+    const candidates = Array.from(new Set([requestedMode, fallbackMode]))
+
+    let lastError = null
+    for (const facingMode of candidates) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1920 }, height: { ideal: 1080 }, facingMode },
+          audio: true,
+        })
+        streamRef.current = stream
+        facingRef.current = facingMode
+        setFacing(facingMode)
+        if (liveRef.current) {
+          liveRef.current.srcObject = stream
+          await liveRef.current.play()
+        }
+        if (step !== STEPS.RECORDING) setStep(STEPS.CAMERA)
+        return
+      } catch (error) {
+        lastError = error
+        if (error?.name === 'NotAllowedError') {
+          setError('Camera permission denied. Please allow access.')
+          return
+        }
       }
-      if (step !== STEPS.RECORDING) setStep(STEPS.CAMERA)
-    } catch (e) {
-      setError(e.name === 'NotAllowedError'
-        ? 'Camera permission denied. Please allow access.'
-        : 'Could not access camera.')
     }
+    setError(lastError?.name === 'NotFoundError' ? 'No camera found on this device.' : 'Could not access camera.')
   }
 
   const flipCamera = async () => {
@@ -116,11 +128,10 @@ function QuickRecord({ token, exercises, spaces = [], onComplete, onCancel }) {
   const startRecording = () => {
     if (!streamRef.current) return
 
-    let mimeType = 'video/webm;codecs=vp9'
-    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm'
-    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/mp4'
-
-    const recorder = new MediaRecorder(streamRef.current, { mimeType })
+    const mimeType = pickRecorderMimeType()
+    const recorder = mimeType
+      ? new MediaRecorder(streamRef.current, { mimeType })
+      : new MediaRecorder(streamRef.current)
     recorderRef.current = recorder
     chunksRef.current = []
     setElapsed(0)
@@ -130,9 +141,10 @@ function QuickRecord({ token, exercises, spaces = [], onComplete, onCancel }) {
     }
 
     recorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: mimeType })
-      const ext = mimeType.includes('webm') ? 'webm' : 'mp4'
-      const file = new File([blob], `practice-${Date.now()}.${ext}`, { type: mimeType })
+      const outputType = mimeType || recorder.mimeType || 'video/webm'
+      const blob = new Blob(chunksRef.current, { type: outputType })
+      const ext = outputType.includes('mp4') ? 'mp4' : 'webm'
+      const file = new File([blob], `practice-${Date.now()}.${ext}`, { type: outputType })
       if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
       blobUrlRef.current = URL.createObjectURL(blob)
       setRecordedFile(file)
@@ -193,8 +205,14 @@ function QuickRecord({ token, exercises, spaces = [], onComplete, onCancel }) {
     }
   }
 
-  const handleDiscard = () => {
-    if (!confirm('Discard this recording?')) return
+  const handleDiscard = async () => {
+    const approved = await confirm({
+      title: 'Discard recording',
+      message: 'Discard this recording?',
+      confirmLabel: 'Discard',
+      tone: 'danger',
+    })
+    if (!approved) return
     stopTimer()
     stopStream()
     if (blobUrlRef.current) { URL.revokeObjectURL(blobUrlRef.current); blobUrlRef.current = null }

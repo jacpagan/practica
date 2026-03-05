@@ -1,8 +1,7 @@
 from django.contrib import admin
 from .models import (
     Profile, Exercise, Session, Chapter, Comment, InviteCode, Tag, Space,
-    SpaceMember, MultipartSessionUpload, ExerciseReferenceClip,
-    CoachEvent, CoachDailyMetric,
+    SpaceMember, MultipartSessionUpload, ExerciseReferenceClip, SessionAsset,
 )
 
 
@@ -31,7 +30,7 @@ class ProfileAdmin(admin.ModelAdmin):
 
 @admin.register(Space)
 class SpaceAdmin(admin.ModelAdmin):
-    list_display = ['name', 'owner', 'invite_slug', 'created_at']
+    list_display = ['name', 'owner', 'main_session', 'invite_slug', 'created_at']
     list_filter = ['owner']
     inlines = [SpaceMemberInline]
 
@@ -54,9 +53,9 @@ class ExerciseReferenceClipAdmin(admin.ModelAdmin):
 
 @admin.register(Session)
 class SessionAdmin(admin.ModelAdmin):
-    list_display = ['title', 'user', 'space', 'recorded_at']
+    list_display = ['title', 'user', 'space', 'processing_status', 'recorded_at']
     search_fields = ['title', 'description']
-    list_filter = ['user', 'space']
+    list_filter = ['user', 'space', 'processing_status']
     inlines = [ChapterInline, CommentInline]
 
 
@@ -69,9 +68,17 @@ class ChapterAdmin(admin.ModelAdmin):
 
 @admin.register(Comment)
 class CommentAdmin(admin.ModelAdmin):
-    list_display = ['__str__', 'session', 'user', 'timestamp_seconds', 'created_at']
-    list_filter = ['user']
+    list_display = ['__str__', 'session', 'user', 'timestamp_seconds', 'legacy_text_only', 'created_at']
+    list_filter = ['user', 'legacy_text_only']
     raw_id_fields = ['session', 'user']
+
+
+@admin.register(SessionAsset)
+class SessionAssetAdmin(admin.ModelAdmin):
+    list_display = ['id', 'session', 'asset_type', 'object_key', 'created_at']
+    list_filter = ['asset_type']
+    search_fields = ['object_key', 'session__title', 'session__user__username']
+    raw_id_fields = ['session']
 
 
 @admin.register(InviteCode)
@@ -92,23 +99,3 @@ class MultipartSessionUploadAdmin(admin.ModelAdmin):
     list_filter = ['status']
     search_fields = ['user__username', 'original_filename', 's3_key', 's3_upload_id']
     raw_id_fields = ['user', 'space', 'session']
-
-
-@admin.register(CoachEvent)
-class CoachEventAdmin(admin.ModelAdmin):
-    list_display = ['id', 'event_type', 'user', 'space', 'session', 'occurred_at']
-    list_filter = ['event_type', 'occurred_at']
-    search_fields = ['user__username', 'session__title', 'space__name']
-    raw_id_fields = ['user', 'session', 'space']
-
-
-@admin.register(CoachDailyMetric)
-class CoachDailyMetricAdmin(admin.ModelAdmin):
-    list_display = [
-        'coach', 'date', 'active_students_30d', 'coach_comments_7d',
-        'coach_comments_30d', 'median_time_to_first_coach_comment_hours_30d',
-        'estimated_time_saved_hours_30d', 'updated_at',
-    ]
-    list_filter = ['date']
-    search_fields = ['coach__username']
-    raw_id_fields = ['coach']

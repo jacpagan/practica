@@ -2,10 +2,10 @@ import React, { useState, useRef, useEffect } from 'react'
 import VideoRecorder from './VideoRecorder'
 import TagInput from './TagInput'
 import { useToast } from './Toast'
-import { fmtTime, fmtDate, videoUrl, parseTimeInput, fmtDuration } from '../utils'
+import { fmtTime, fmtDate, videoUrl, parseTimeInput, fmtDuration, preferredSessionVideoUrl } from '../utils'
 import { useConfirm } from './ConfirmDialog'
 
-function SessionDetail({ session: initialSession, exercises, spaces = [], token, user, onBack, onSessionUpdate }) {
+function SessionDetail({ session: initialSession, exercises, spaces = [], token, user, onBack, onSessionUpdate, onOpenCompare }) {
   const toast = useToast()
   const confirm = useConfirm()
   const [session, setSession] = useState(initialSession)
@@ -40,6 +40,7 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
   const [tab, setTab] = useState('chapters')
 
   const videoRef = useRef(null)
+  const commentVideoInputRef = useRef(null)
   const authHeaders = token ? { 'Authorization': `Token ${token}` } : {}
 
   const markSeen = async (sessionId) => {
@@ -168,7 +169,7 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
   }
 
   const addComment = async () => {
-    if (!commentText.trim()) return
+    if (!commentVideoFile) return toast.error('Attach a video reply before sending')
     setSubmittingComment(true)
     try {
       const fd = new FormData()
@@ -265,6 +266,30 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
   const canEditSession = typeof session.can_edit === 'boolean'
     ? session.can_edit
     : session.owner?.id === user?.id
+  const currentSpace = spaces.find((space) => space.id === session.space_id) || null
+  const canSetMain = Boolean(currentSpace?.is_owner && session.space_id)
+  const canOpenCompare = Boolean(session.space_id && currentSpace?.main_session_id)
+
+  const setAsMain = async () => {
+    if (!session.space_id) return
+    try {
+      const res = await fetch(`/api/spaces/${session.space_id}/set-main-session/`, {
+        method: 'POST',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: session.id }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to set MAIN video')
+      }
+      const updatedSpace = await res.json()
+      window.dispatchEvent(new CustomEvent('space-updated', { detail: updatedSpace }))
+      await refreshSession()
+      toast.success('Set as MAIN video')
+    } catch (e) {
+      toast.error(e.message || 'Failed to set MAIN video')
+    }
+  }
 
   return (
     <div className="px-4 sm:px-6 py-4">
@@ -314,10 +339,37 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
         ) : (
           <div>
             <div className="flex items-start justify-between gap-2">
-              <h1 className="text-lg font-semibold text-gray-900">{session.title}</h1>
-              {canEditSession && (
-                <button onClick={startEditing} className="text-xs text-gray-400 hover:text-gray-600 flex-shrink-0 pt-1">Edit</button>
-              )}
+              <div className="min-w-0">
+                <h1 className="text-lg font-semibold text-gray-900">{session.title}</h1>
+                <div className="flex items-center gap-2 mt-1">
+                  {session.is_space_main && (
+                    <span className="text-[10px] uppercase tracking-wide bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                      MAIN
+                    </span>
+                  )}
+                  {session.processing_status && session.processing_status !== 'ready' && (
+                    <span className="text-[10px] uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                      {session.processing_status}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0 pt-1">
+                {canOpenCompare && (
+                  <button
+                    onClick={() => onOpenCompare?.(session.space_id, session.id)}
+                    className="text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    Compare
+                  </button>
+                )}
+                {canSetMain && !session.is_space_main && (
+                  <button onClick={setAsMain} className="text-xs text-gray-500 hover:text-gray-700">Set MAIN</button>
+                )}
+                {canEditSession && (
+                  <button onClick={startEditing} className="text-xs text-gray-400 hover:text-gray-600">Edit</button>
+                )}
+              </div>
             </div>
             {session.description && <p className="text-sm text-gray-500 mt-0.5">{session.description}</p>}
             {(session.tag_names || []).length > 0 && (
@@ -335,7 +387,7 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
       {/* Video player */}
       <div className="mb-4">
         <div className="aspect-video bg-black rounded-lg overflow-hidden">
-          <video ref={videoRef} src={videoUrl(session.video_file)} controls className="w-full h-full" onTimeUpdate={handleTimeUpdate} />
+          <video ref={videoRef} src={preferredSessionVideoUrl(session)} controls className="w-full h-full" onTimeUpdate={handleTimeUpdate} />
         </div>
         {chapters.length > 0 && videoRef.current?.duration > 0 && (
           <div className="mt-1 h-1 bg-gray-100 rounded-full relative overflow-hidden">
@@ -577,7 +629,7 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
                 onChange={(e) => setCommentText(e.target.value)}
                 className="w-full px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none resize-none border-0"
                 rows={2}
-                placeholder="Add a comment or a timestamped note..."
+                placeholder="Optional text for your video reply..."
               />
 
               {/* Attached video preview */}
@@ -644,6 +696,31 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
                     </button>
                   )}
 
+                  {!showRecorder && !commentVideoFile && (
+                    <>
+                      <input
+                        ref={commentVideoInputRef}
+                        type="file"
+                        accept="video/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0]
+                          if (!file) return
+                          if (!file.type.startsWith('video/')) return toast.error('Only video files allowed')
+                          setCommentVideoFile(file)
+                          setCommentVideoPreview(URL.createObjectURL(file))
+                        }}
+                      />
+                      <button
+                        onClick={() => commentVideoInputRef.current?.click()}
+                        className="flex items-center gap-1.5 text-xs text-gray-500 hover:bg-gray-100 hover:text-gray-700 px-2.5 py-1.5 rounded-lg transition-all"
+                      >
+                        Upload video
+                      </button>
+                    </>
+                  )}
+
                   {/* Video attached indicator */}
                   {commentVideoFile && !showRecorder && (
                     <span className="flex items-center gap-1 text-xs text-green-600 px-2.5 py-1.5">
@@ -658,7 +735,7 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
                 {/* Send */}
                 <button
                   onClick={addComment}
-                  disabled={!commentText.trim() || submittingComment}
+                  disabled={!commentVideoFile || submittingComment}
                   className="text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 disabled:opacity-30 px-4 py-1.5 rounded-lg transition-all active:scale-95"
                 >
                   {submittingComment ? (

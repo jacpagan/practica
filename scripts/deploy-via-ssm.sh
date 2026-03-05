@@ -38,13 +38,10 @@ docker compose -f docker-compose.prod.yml up -d --build
 # 6.1) Ensure database schema is current
 docker compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py migrate
 
-# 6.2) Install periodic coach metrics aggregation job
-cat > /etc/cron.d/practica-coach-metrics <<CRON
-SHELL=/bin/bash
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-0 * * * * root cd /opt/practica && docker compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py build_coach_metrics --days 35 >> /var/log/practica-coach-metrics.log 2>&1
-CRON
-chmod 0644 /etc/cron.d/practica-coach-metrics
+# 6.2) Remove legacy coach metrics cron if present
+if [ -f /etc/cron.d/practica-coach-metrics ]; then
+  rm -f /etc/cron.d/practica-coach-metrics
+fi
 systemctl reload cron || service cron reload || true
 
 # 7) Health check backend

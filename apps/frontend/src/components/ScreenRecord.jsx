@@ -1,12 +1,20 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useToast } from './Toast'
 import TagInput from './TagInput'
-import { createSessionUpload, fmtTimer, uploadErrorMessage } from '../utils'
+import {
+  canUseScreenRecording,
+  createSessionUpload,
+  fmtTimer,
+  pickRecorderMimeType,
+  uploadErrorMessage,
+} from '../utils'
+import { useConfirm } from './ConfirmDialog'
 
 const STEPS = { IDLE: 'idle', PREVIEWING: 'previewing', RECORDING: 'recording', REVIEW: 'review' }
 
 function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
   const toast = useToast()
+  const confirm = useConfirm()
   const [step, setStep] = useState(STEPS.IDLE)
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState(null)
@@ -31,13 +39,26 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
   const timerRef = useRef(null)
   const animFrameRef = useRef(null)
   const blobUrlRef = useRef(null)
+  const stepRef = useRef(STEPS.IDLE)
+  const audioContextRef = useRef(null)
+  const screenSupported = canUseScreenRecording()
+
+  useEffect(() => {
+    stepRef.current = step
+  }, [step])
 
   // ── Cleanup ──
   const stopStreams = useCallback(() => {
     screenStreamRef.current?.getTracks().forEach(t => t.stop())
     cameraStreamRef.current?.getTracks().forEach(t => t.stop())
+    compositeStreamRef.current?.getTracks().forEach(t => t.stop())
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {})
+      audioContextRef.current = null
+    }
     screenStreamRef.current = null
     cameraStreamRef.current = null
+    compositeStreamRef.current = null
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
   }, [])
 
@@ -53,6 +74,10 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
 
   // ── Start screen + camera capture ──
   const startCapture = async () => {
+    if (!screenSupported) {
+      setError('Screen recording is not supported in this browser.')
+      return
+    }
     setError(null)
     try {
       // Request screen sharing
@@ -64,7 +89,7 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
 
       // When user stops sharing via browser UI, handle it
       screenStream.getVideoTracks()[0].onended = () => {
-        if (step === STEPS.RECORDING) stopRecording()
+        if (stepRef.current === STEPS.RECORDING) stopRecording()
         else { stopStreams(); setStep(STEPS.IDLE) }
       }
 
@@ -174,6 +199,7 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
 
     // Mix audio: mic (camera stream) + system (screen stream)
     const audioCtx = new AudioContext()
+    audioContextRef.current = audioCtx
     const dest = audioCtx.createMediaStreamDestination()
 
     if (cameraStreamRef.current?.getAudioTracks().length > 0) {
@@ -197,11 +223,11 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
 
     compositeStreamRef.current = compositeStream
 
-    let mimeType = 'video/webm;codecs=vp9'
-    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm'
-    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/mp4'
+    const mimeType = pickRecorderMimeType()
 
-    const recorder = new MediaRecorder(compositeStream, { mimeType })
+    const recorder = mimeType
+      ? new MediaRecorder(compositeStream, { mimeType })
+      : new MediaRecorder(compositeStream)
     recorderRef.current = recorder
     chunksRef.current = []
     setElapsed(0)
@@ -211,9 +237,10 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
     }
 
     recorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: mimeType })
-      const ext = mimeType.includes('webm') ? 'webm' : 'mp4'
-      const file = new File([blob], `screen-${Date.now()}.${ext}`, { type: mimeType })
+      const outputType = mimeType || recorder.mimeType || 'video/webm'
+      const blob = new Blob(chunksRef.current, { type: outputType })
+      const ext = outputType.includes('mp4') ? 'mp4' : 'webm'
+      const file = new File([blob], `screen-${Date.now()}.${ext}`, { type: outputType })
       if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
       blobUrlRef.current = URL.createObjectURL(blob)
       setRecordedFile(file)
@@ -275,8 +302,14 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
     }
   }
 
-  const handleDiscard = () => {
-    if (!confirm('Discard this recording?')) return
+  const handleDiscard = async () => {
+    const approved = await confirm({
+      title: 'Discard recording',
+      message: 'Discard this recording?',
+      confirmLabel: 'Discard',
+      tone: 'danger',
+    })
+    if (!approved) return
     stopTimer()
     stopStreams()
     if (blobUrlRef.current) { URL.revokeObjectURL(blobUrlRef.current); blobUrlRef.current = null }
@@ -295,7 +328,15 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
       {/* ── IDLE — start screen share ── */}
       {step === STEPS.IDLE && (
         <div className="flex-1 flex flex-col items-center justify-center px-6">
-          {error ? (
+          {!screenSupported ? (
+            <>
+              <p className="text-sm text-white/70 text-center mb-2">Screen recording is not available on this browser.</p>
+              <p className="text-xs text-white/40 text-center max-w-[280px]">
+                On iPhone/iPad Safari, use camera recording instead.
+              </p>
+              <button onClick={onCancel} className="text-sm text-white/40 mt-6">Back</button>
+            </>
+          ) : error ? (
             <>
               <p className="text-sm text-red-400 text-center mb-4">{error}</p>
               <button onClick={startCapture} className="text-sm text-white/60 underline">Try again</button>

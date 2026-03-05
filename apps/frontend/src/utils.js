@@ -7,12 +7,50 @@ const MULTIPART_CONCURRENCY = 4
 const RETRY_BASE_DELAY_MS = 500
 const RETRY_MAX_DELAY_MS = 4000
 const MULTIPART_RESUME_PREFIX = 'practica.multipart.resume.v1'
+const RECORDER_MIME_CANDIDATES = [
+  'video/webm;codecs=vp9',
+  'video/webm;codecs=vp8',
+  'video/webm',
+  'video/mp4',
+]
 
 export const videoUrl = (path) => {
   if (!path) return null
   if (path.startsWith('http')) return path
   if (path.startsWith('/media/')) return `${API_BASE}${path}`
   return path
+}
+
+export const assetUrl = (asset) => {
+  if (!asset) return null
+  const raw = asset.url || asset.object_key || ''
+  if (!raw) return null
+  return videoUrl(raw)
+}
+
+export const assetByType = (session, assetType) => {
+  const assets = Array.isArray(session?.assets) ? session.assets : []
+  return assets.find((asset) => asset.asset_type === assetType) || null
+}
+
+export const preferredSessionVideoUrl = (session) => {
+  const proxy = assetByType(session, 'proxy_mp4')
+  return assetUrl(proxy) || videoUrl(session?.video_file)
+}
+
+export const sessionHlsUrl = (session) => {
+  const hls = assetByType(session, 'hls_master')
+  return assetUrl(hls)
+}
+
+export const sessionThumbVttUrl = (session) => {
+  const vtt = assetByType(session, 'thumb_vtt')
+  return assetUrl(vtt)
+}
+
+export const sessionThumbSpriteUrl = (session) => {
+  const sprite = assetByType(session, 'thumb_sprite')
+  return assetUrl(sprite)
 }
 
 export const fmtTime = (s) => {
@@ -71,10 +109,44 @@ export const fmtDuration = (start, end) => {
 
 export const parseTimeInput = (str) => {
   if (!str || !str.trim()) return null
+  const parseIntToken = (value) => {
+    const parsed = Number.parseInt(String(value).trim(), 10)
+    return Number.isNaN(parsed) ? null : parsed
+  }
   const parts = str.split(':')
-  if (parts.length === 2) return Math.max(0, parseInt(parts[0] || 0) * 60 + parseInt(parts[1] || 0))
-  if (parts.length === 1) return Math.max(0, parseInt(parts[0] || 0))
+  if (parts.length === 2) {
+    const minutes = parseIntToken(parts[0])
+    const seconds = parseIntToken(parts[1])
+    if (minutes === null || seconds === null) return null
+    return Math.max(0, minutes * 60 + seconds)
+  }
+  if (parts.length === 1) {
+    const seconds = parseIntToken(parts[0])
+    if (seconds === null) return null
+    return Math.max(0, seconds)
+  }
   return null
+}
+
+export const pickRecorderMimeType = (preferred = []) => {
+  if (typeof window === 'undefined' || typeof window.MediaRecorder === 'undefined') return ''
+  if (typeof window.MediaRecorder.isTypeSupported !== 'function') return ''
+  const seen = new Set()
+  for (const candidate of [...preferred, ...RECORDER_MIME_CANDIDATES]) {
+    if (!candidate || seen.has(candidate)) continue
+    seen.add(candidate)
+    if (window.MediaRecorder.isTypeSupported(candidate)) return candidate
+  }
+  return ''
+}
+
+export const canUseScreenRecording = () => {
+  if (typeof window === 'undefined') return false
+  return Boolean(
+    window.MediaRecorder &&
+    navigator?.mediaDevices &&
+    typeof navigator.mediaDevices.getDisplayMedia === 'function'
+  )
 }
 
 const localStore = () => {
@@ -82,6 +154,35 @@ const localStore = () => {
     return window.localStorage
   } catch {
     return null
+  }
+}
+
+const trimLogValue = (value, maxChars) => String(value || '').slice(0, maxChars)
+
+export const reportClientError = ({ message = '', stack = '', source = 'ui', extra = {} } = {}) => {
+  if (typeof window === 'undefined') return
+  try {
+    const payload = {
+      message: trimLogValue(message, 1000),
+      stack: trimLogValue(stack, 6000),
+      source: trimLogValue(source, 64),
+      path: trimLogValue(`${window.location.pathname}${window.location.search}`, 512),
+      extra: extra && typeof extra === 'object' ? extra : {},
+    }
+    const body = JSON.stringify(payload)
+    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      const blob = new Blob([body], { type: 'application/json' })
+      navigator.sendBeacon('/api/client-errors/', blob)
+      return
+    }
+    fetch('/api/client-errors/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      keepalive: true,
+    }).catch(() => {})
+  } catch {
+    // Ignore telemetry transport failures.
   }
 }
 
@@ -180,22 +281,6 @@ const parseJsonResponse = async (res) => {
     status: res.status,
     data,
     text,
-  }
-}
-
-export const fetchCoachMetricsSummary = async (token, windowDays = 30) => {
-  try {
-    const res = await fetch(`/api/coach-metrics/summary/?window_days=${windowDays}`, {
-      headers: token ? { Authorization: `Token ${token}` } : {},
-    })
-    return parseJsonResponse(res)
-  } catch {
-    return {
-      ok: false,
-      status: 0,
-      data: { error: 'Network error while fetching coach metrics' },
-      text: '',
-    }
   }
 }
 
