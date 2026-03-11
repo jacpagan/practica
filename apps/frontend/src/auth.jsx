@@ -1,10 +1,41 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 
 const AuthContext = createContext(null)
+const TOKEN_KEY = 'token'
+
+const storage = () => {
+  if (typeof window === 'undefined') return null
+  try {
+    return window.localStorage
+  } catch {
+    return null
+  }
+}
+
+const readToken = () => {
+  const store = storage()
+  if (!store) return null
+  try {
+    return store.getItem(TOKEN_KEY)
+  } catch {
+    return null
+  }
+}
+
+const persistToken = (token) => {
+  const store = storage()
+  if (!store) return
+  try {
+    if (!token) store.removeItem(TOKEN_KEY)
+    else store.setItem(TOKEN_KEY, token)
+  } catch {
+    // Token still stays in memory for this session.
+  }
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
-  const [token, setToken] = useState(() => localStorage.getItem('token'))
+  const [token, setToken] = useState(readToken)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -14,7 +45,7 @@ export function AuthProvider({ children }) {
       })
         .then(r => r.ok ? r.json() : Promise.reject())
         .then(setUser)
-        .catch(() => { setToken(null); localStorage.removeItem('token') })
+        .catch(() => { setToken(null); persistToken(null) })
         .finally(() => setLoading(false))
     } else {
       setLoading(false)
@@ -29,7 +60,7 @@ export function AuthProvider({ children }) {
     })
     if (!res.ok) throw new Error('Invalid credentials')
     const data = await res.json()
-    localStorage.setItem('token', data.token)
+    persistToken(data.token)
     setToken(data.token)
     setUser(data.user)
     return data.user
@@ -53,7 +84,7 @@ export function AuthProvider({ children }) {
       throw new Error(joinError.error || 'Could not join this space')
     }
 
-    localStorage.setItem('token', loginData.token)
+    persistToken(loginData.token)
     setToken(loginData.token)
     setUser(loginData.user)
     return loginData.user
@@ -73,14 +104,14 @@ export function AuthProvider({ children }) {
       throw new Error(Object.values(err).flat().join(', '))
     }
     const data = await res.json()
-    localStorage.setItem('token', data.token)
+    persistToken(data.token)
     setToken(data.token)
     setUser(data.user)
     return data.user
   }
 
   const logout = () => {
-    localStorage.removeItem('token')
+    persistToken(null)
     setToken(null)
     setUser(null)
   }
