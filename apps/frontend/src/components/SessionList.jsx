@@ -171,7 +171,6 @@ function SessionList({
                         <Thumbnail
                           src={session.video_file}
                           className="w-16 h-11 sm:w-24 sm:h-16"
-                          onMediaError={requestSessionRefresh}
                         />
 
                         <div className="flex-1 min-w-0">
