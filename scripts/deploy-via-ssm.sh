@@ -57,6 +57,10 @@ git pull --ff-only origin "$REF" || true
 
 printf '%s' "__ENV_B64__" | base64 -d > .env.production
 set -a; source .env.production; set +a
+: "${POSTGRES_DB:=${DB_NAME:-practica_prod}}"
+: "${POSTGRES_USER:=practica}"
+: "${POSTGRES_PASSWORD:=${DB_PASSWORD:-}}"
+export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD
 
 # Remove stale unix socket from previous runs before building context.
 rm -f apps/backend/gunicorn.ctl
@@ -77,8 +81,8 @@ echo "Pre-deploy counts: ${PRE_COUNTS:-unavailable}"
 mkdir -p /opt/practica/backups
 TS=$(date -u +%Y%m%dT%H%M%SZ)
 BACKUP_FILE="/opt/practica/backups/practica_prod_${TS}.sql.gz"
-if PGPASSWORD="${DB_PASSWORD:-}" compose -f docker-compose.prod.yml exec -T db \
-  pg_dump -U "${DB_USER:-practica}" "${DB_NAME:-practica_prod}" | gzip -1 > "$BACKUP_FILE"; then
+if PGPASSWORD="${POSTGRES_PASSWORD:-}" compose -f docker-compose.prod.yml exec -T db \
+  pg_dump -U "${POSTGRES_USER:-practica}" "${POSTGRES_DB:-practica_prod}" | gzip -1 > "$BACKUP_FILE"; then
   echo "Wrote DB snapshot: $BACKUP_FILE"
   ls -1dt /opt/practica/backups/practica_prod_*.sql.gz 2>/dev/null | tail -n +11 | xargs -r rm -f
   if command -v aws >/dev/null 2>&1 && [ -n "${AWS_STORAGE_BUCKET_NAME:-}" ]; then
@@ -164,7 +168,7 @@ REMOTE_SCRIPT="${REMOTE_SCRIPT//__GIT_REF__/${GIT_REF:-main}}"
 REMOTE_B64=$(printf '%s' "$REMOTE_SCRIPT" | base64 | tr -d '\n')
 COMMAND="echo '$REMOTE_B64' | base64 -d > /tmp/practica-deploy.sh && bash /tmp/practica-deploy.sh"
 COMMAND_ESCAPED=$(printf '%s' "$COMMAND" | sed 's/\\/\\\\/g; s/"/\\"/g')
-PARAMS_JSON="{\"commands\":[\"$COMMAND_ESCAPED\"]}"
+PARAMS_JSON="{\"commands\":[\"$COMMAND_ESCAPED\"],\"executionTimeout\":[\"3600\"]}"
 
 CMD_ID=$(aws ssm send-command \
   --instance-ids "$INSTANCE_ID" \
