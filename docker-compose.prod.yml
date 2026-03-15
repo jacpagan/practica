@@ -5,14 +5,14 @@ services:
   db:
     image: postgres:15-alpine
     environment:
-      POSTGRES_DB: ${DB_NAME:-practica_prod}
-      POSTGRES_USER: ${DB_USER:-practica}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-practica_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-practica}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
     volumes:
       - postgres_prod_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-practica} -d ${DB_NAME:-practica_prod}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -36,9 +36,9 @@ services:
       dockerfile: apps/backend/Dockerfile
     environment:
       - DEBUG=0
-      - DB_NAME=${DB_NAME:-practica_prod}
-      - DB_USER=${DB_USER:-practica}
-      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${POSTGRES_DB:-practica_prod}
+      - DB_USER=${POSTGRES_USER:-practica}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-}
       - DB_HOST=db
       - DB_PORT=5432
       - REDIS_URL=redis://redis:6379/0
