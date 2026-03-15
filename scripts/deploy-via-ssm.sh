@@ -59,7 +59,7 @@ git pull --ff-only origin "$REF" || true
 
 printf '%s' "__ENV_B64__" | base64 -d > .env.production
 set -a; source .env.production; set +a
-: "${POSTGRES_DB:=${DB_NAME:-practica_prod}}"
+: "${POSTGRES_DB:=practica_prod}"
 : "${POSTGRES_USER:=practica}"
 : "${POSTGRES_PASSWORD:=${DB_PASSWORD:-}}"
 export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD
