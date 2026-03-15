@@ -77,8 +77,8 @@ echo "Pre-deploy counts: ${PRE_COUNTS:-unavailable}"
 mkdir -p /opt/practica/backups
 TS=$(date -u +%Y%m%dT%H%M%SZ)
 BACKUP_FILE="/opt/practica/backups/practica_prod_${TS}.sql.gz"
-if PGPASSWORD="${POSTGRES_PASSWORD:-}" compose -f docker-compose.prod.yml exec -T db \
-  pg_dump -U "${POSTGRES_USER:-practica}" "${POSTGRES_DB:-practica_prod}" | gzip -1 > "$BACKUP_FILE"; then
+if PGPASSWORD="${DB_PASSWORD:-}" compose -f docker-compose.prod.yml exec -T db \
+  pg_dump -U "${DB_USER:-practica}" "${DB_NAME:-practica_prod}" | gzip -1 > "$BACKUP_FILE"; then
   echo "Wrote DB snapshot: $BACKUP_FILE"
   ls -1dt /opt/practica/backups/practica_prod_*.sql.gz 2>/dev/null | tail -n +11 | xargs -r rm -f
   if command -v aws >/dev/null 2>&1 && [ -n "${AWS_STORAGE_BUCKET_NAME:-}" ]; then
