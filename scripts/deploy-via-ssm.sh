@@ -11,6 +11,8 @@ mkdir -p /opt/practica
 cd /opt/practica
 export HOME=/root
 git config --global --add safe.directory /opt/practica
+rm -f /opt/practica/.deploy-success /opt/practica/.deploy-failed
+trap 'touch /opt/practica/.deploy-failed' ERR
 
 if ! command -v git >/dev/null 2>&1; then apt-get update && apt-get install -y git; fi
 if ! command -v docker >/dev/null 2>&1; then echo 'Docker not found. Please install Docker.' && exit 1; fi
@@ -159,6 +161,7 @@ if [ "$public_ok" != "1" ]; then
 fi
 
 DEPLOYED_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
+touch /opt/practica/.deploy-success
 echo "DEPLOY_SUMMARY ref=$REF sha=$DEPLOYED_SHA backend_health=pass public_health=pass"
 EOS
 )
@@ -166,9 +169,47 @@ EOS
 REMOTE_SCRIPT="${REMOTE_SCRIPT//__ENV_B64__/$ENV_B64}"
 REMOTE_SCRIPT="${REMOTE_SCRIPT//__GIT_REF__/${GIT_REF:-main}}"
 REMOTE_B64=$(printf '%s' "$REMOTE_SCRIPT" | base64 | tr -d '\n')
-COMMAND="echo '$REMOTE_B64' | base64 -d > /tmp/practica-deploy.sh && bash /tmp/practica-deploy.sh"
+COMMAND="mkdir -p /opt/practica && rm -f /opt/practica/.deploy-success /opt/practica/.deploy-failed && : > /opt/practica/deploy.log && echo '$REMOTE_B64' | base64 -d > /tmp/practica-deploy.sh && nohup bash /tmp/practica-deploy.sh > /opt/practica/deploy.log 2>&1 < /dev/null &"
 COMMAND_ESCAPED=$(printf '%s' "$COMMAND" | sed 's/\\/\\\\/g; s/"/\\"/g')
-PARAMS_JSON="{\"commands\":[\"$COMMAND_ESCAPED\"],\"executionTimeout\":[\"3600\"]}"
+PARAMS_JSON="{\"commands\":[\"$COMMAND_ESCAPED\"]}"
+
+send_short_ssm() {
+  local inline_command="$1"
+  local comment="$2"
+  local escaped
+  local params
+  escaped=$(printf '%s' "$inline_command" | sed 's/\\/\\\\/g; s/"/\\"/g')
+  params="{\"commands\":[\"$escaped\"]}"
+  aws ssm send-command \
+    --instance-ids "$INSTANCE_ID" \
+    --document-name "AWS-RunShellScript" \
+    --comment "$comment" \
+    --timeout-seconds 120 \
+    --parameters "$params" \
+    --query "Command.CommandId" --output text
+}
+
+wait_for_ssm_output() {
+  local command_id="$1"
+  local final_status="PENDING"
+  for _ in $(seq 1 30); do
+    status=$(aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE_ID" --query 'Status' --output text 2>/dev/null || echo "PENDING")
+    if [ "$status" = "Success" ]; then
+      final_status="$status"
+      break
+    fi
+    if [ "$status" = "Cancelled" ] || [ "$status" = "Failed" ] || [ "$status" = "TimedOut" ]; then
+      aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE_ID" --output text || true
+      return 1
+    fi
+    sleep 1
+  done
+  if [ "$final_status" != "Success" ]; then
+    echo "SSM inline command timed out" >&2
+    return 1
+  fi
+  aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE_ID" --query 'StandardOutputContent' --output text 2>/dev/null || true
+}
 
 CMD_ID=$(aws ssm send-command \
   --instance-ids "$INSTANCE_ID" \
@@ -180,26 +221,57 @@ CMD_ID=$(aws ssm send-command \
 echo "SSM CommandId: $CMD_ID"
 
 FINAL_STATUS="PENDING"
-for i in $(seq 1 120); do
-  STATUS=$(aws ssm list-command-invocations --command-id "$CMD_ID" --details --query 'CommandInvocations[0].Status' --output text 2>/dev/null || echo "PENDING")
+for i in $(seq 1 30); do
+  STATUS=$(aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" --query 'Status' --output text 2>/dev/null || echo "PENDING")
   echo "SSM status: $STATUS"
   if [ "$STATUS" = "Success" ]; then
     FINAL_STATUS="$STATUS"
     break
   fi
   if [ "$STATUS" = "Cancelled" ] || [ "$STATUS" = "Failed" ] || [ "$STATUS" = "TimedOut" ]; then
-    aws ssm list-command-invocations --command-id "$CMD_ID" --details --output text || true
+    aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" --output text || true
     FINAL_STATUS="$STATUS"
     exit 1
   fi
-  sleep 3
+  sleep 1
 done
 if [ "$FINAL_STATUS" != "Success" ]; then
-  echo "SSM command timed out" >&2
+  echo "SSM launch command timed out" >&2
+  exit 1
+fi
+
+DEPLOY_STATUS="pending"
+for i in $(seq 1 120); do
+  STATUS_CMD_ID=$(send_short_ssm "if [ -f /opt/practica/.deploy-success ]; then echo success; elif [ -f /opt/practica/.deploy-failed ]; then echo failed; else echo pending; fi" "Practica deploy status")
+  DEPLOY_STATUS=$(wait_for_ssm_output "$STATUS_CMD_ID" | tr -d '\r' | tail -n 1)
+  echo "Remote deploy status: ${DEPLOY_STATUS:-pending}"
+  if [ "$DEPLOY_STATUS" = "success" ]; then
+    break
+  fi
+  if [ "$DEPLOY_STATUS" = "failed" ]; then
+    LOG_CMD_ID=$(send_short_ssm "tail -n 200 /opt/practica/deploy.log 2>/dev/null || true" "Practica deploy log tail")
+    wait_for_ssm_output "$LOG_CMD_ID" || true
+    exit 1
+  fi
+  sleep 5
+done
+if [ "$DEPLOY_STATUS" != "success" ]; then
+  echo "Background deploy did not finish in time" >&2
+  LOG_CMD_ID=$(send_short_ssm "tail -n 200 /opt/practica/deploy.log 2>/dev/null || true" "Practica deploy log tail")
+  wait_for_ssm_output "$LOG_CMD_ID" || true
+  exit 1
+fi
+
+PUBLIC_FINAL=0
+for i in $(seq 1 30); do
+  curl -fsS https://practica.jpagan.com/health/ && PUBLIC_FINAL=1 && break || sleep 2
+done
+if [ "$PUBLIC_FINAL" != "1" ]; then
+  echo "Public health check failed after background deploy" >&2
   exit 1
 fi
 
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
   echo "command_id=$CMD_ID" >> "$GITHUB_OUTPUT"
-  echo "ssm_status=$FINAL_STATUS" >> "$GITHUB_OUTPUT"
+  echo "ssm_status=Success" >> "$GITHUB_OUTPUT"
 fi
