@@ -15,6 +15,8 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState('')
   const [editDescription, setEditDescription] = useState('')
+  const [editReferenceTitle, setEditReferenceTitle] = useState('')
+  const [editReferenceUrl, setEditReferenceUrl] = useState('')
   const [editTags, setEditTags] = useState([])
   const [editSpace, setEditSpace] = useState('')
   const [saving, setSaving] = useState(false)
@@ -254,6 +256,8 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
   const startEditing = () => {
     setEditTitle(session.title)
     setEditDescription(session.description || '')
+    setEditReferenceTitle(session.reference_title || '')
+    setEditReferenceUrl(session.reference_url || '')
     setEditTags(session.tag_names || [])
     setEditSpace(session.space_id || '')
     setEditing(true)
@@ -271,7 +275,13 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
       const res = await fetch(`/api/sessions/${session.id}/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({ title: editTitle.trim(), description: editDescription.trim(), space: editSpace || null }),
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          description: editDescription.trim(),
+          reference_title: editReferenceTitle.trim(),
+          reference_url: editReferenceUrl.trim(),
+          space: editSpace || null,
+        }),
       })
 
       // Update tags via set_tags
@@ -300,7 +310,7 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
     : session.owner?.id === user?.id
   const currentSpace = spaces.find((space) => space.id === session.space_id) || null
   const canSetMain = Boolean(currentSpace?.is_owner && session.space_id)
-  const canOpenCompare = Boolean(session.space_id && currentSpace?.main_session_id)
+  const canOpenCompare = Boolean(onOpenCompare && session.space_id && currentSpace?.main_session_id)
 
   const setAsMain = async () => {
     if (!session.space_id) return
@@ -360,6 +370,26 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
               <label className="block text-xs text-gray-500 mb-1">Tags</label>
               <TagInput value={editTags} onChange={setEditTags} token={token} />
             </div>
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 space-y-3">
+              <div>
+                <p className="text-xs font-medium text-gray-700">Reference video</p>
+                <p className="text-xs text-gray-500 mt-1">Attach the teacher or YouTube video this attempt responds to.</p>
+              </div>
+              <input
+                type="text"
+                value={editReferenceTitle}
+                onChange={(e) => setEditReferenceTitle(e.target.value)}
+                placeholder="Dorothy Fitzer — Follow Along"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+              />
+              <input
+                type="url"
+                value={editReferenceUrl}
+                onChange={(e) => setEditReferenceUrl(e.target.value)}
+                placeholder="https://www.youtube.com/watch?..."
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+              />
+            </div>
             <div className="flex gap-2">
               <button onClick={saveEdits} disabled={saving}
                 className="text-xs font-medium text-white bg-gray-900 px-3 py-1.5 rounded-md disabled:opacity-40">
@@ -404,6 +434,22 @@ function SessionDetail({ session: initialSession, exercises, spaces = [], token,
               </div>
             </div>
             {session.description && <p className="text-sm text-gray-500 mt-0.5">{session.description}</p>}
+            {(session.reference_title || session.reference_url) && (
+              <div className="mt-3 rounded-xl bg-gray-50 px-3 py-3">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Reference video</p>
+                {session.reference_title && <p className="text-sm font-medium text-gray-900 mt-1">{session.reference_title}</p>}
+                {session.reference_url && (
+                  <a
+                    href={session.reference_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex mt-1 text-sm text-blue-600 hover:text-blue-700 break-all"
+                  >
+                    {session.reference_url}
+                  </a>
+                )}
+              </div>
+            )}
             {(session.tag_names || []).length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">
                 {session.tag_names.map(tag => (

@@ -535,6 +535,8 @@ export const createSessionUpload = async ({ token, payload, videoFile, onProgres
     const fd = new FormData()
     fd.append('title', payload.title || '')
     fd.append('description', payload.description || '')
+    fd.append('reference_title', payload.reference_title || '')
+    fd.append('reference_url', payload.reference_url || '')
     fd.append('video_file', videoFile)
     if (payload.duration_seconds !== undefined && payload.duration_seconds !== null && payload.duration_seconds !== '') {
       fd.append('duration_seconds', payload.duration_seconds)

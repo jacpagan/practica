@@ -283,6 +283,23 @@ function TodayView({
                 Set up a plan
               </button>
             ) : null}
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => onQuickRecordProof?.(selectedSpaceId)}
+                className="text-xs font-medium text-white bg-gray-900 rounded-lg px-3 py-2 hover:bg-gray-800 transition-colors"
+              >
+                Record attempt anyway
+              </button>
+              <button
+                type="button"
+                onClick={() => onUploadProof?.(selectedSpaceId)}
+                className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
+              >
+                Upload attempt
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-3">No plan is required — you can still record a practice attempt and attach a reference video when saving.</p>
           </div>
         ) : (
           <div className="mt-4 space-y-4">

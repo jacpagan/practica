@@ -1047,6 +1047,8 @@ class SessionViewSet(viewsets.ModelViewSet):
             status=MultipartSessionUpload.STATUS_INITIATED,
             title=title,
             description=str(request.data.get('description', '')).strip(),
+            reference_title=str(request.data.get('reference_title', '')).strip(),
+            reference_url=str(request.data.get('reference_url', '')).strip(),
             tags_csv=tags_csv,
             duration_seconds=duration_seconds,
             original_filename=filename,
@@ -1204,6 +1206,8 @@ class SessionViewSet(viewsets.ModelViewSet):
                 space=upload.space,
                 title=upload.title,
                 description=upload.description,
+                reference_title=upload.reference_title,
+                reference_url=upload.reference_url,
                 video_file=upload.s3_key,
                 duration_seconds=upload.duration_seconds,
             )
