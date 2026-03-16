@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { authHeaders } from '../auth'
 import { useToast } from './Toast'
+import PlanEditor from './PlanEditor'
 
 const STATUS_OPTIONS = [
   { value: 'complete', label: 'Complete' },
@@ -36,7 +37,7 @@ function TodayView({
   user,
   spaces = [],
   initialSpaceId = null,
-  onOpenDashboard,
+  exercises = [],
   onOpenSession,
   onUploadProof,
   onQuickRecordProof,
@@ -51,6 +52,9 @@ function TodayView({
   const [planItems, setPlanItems] = useState([])
   const [checkinState, setCheckinState] = useState(buildCheckinState([], null))
   const [recentSessions, setRecentSessions] = useState([])
+  const [showCoachTools, setShowCoachTools] = useState(false)
+  const [coachSummaryLoading, setCoachSummaryLoading] = useState(false)
+  const [coachSummary, setCoachSummary] = useState(null)
 
   useEffect(() => {
     if (!spaces.length) {
@@ -66,6 +70,7 @@ function TodayView({
     () => spaces.find((space) => space.id === selectedSpaceId) || null,
     [spaces, selectedSpaceId],
   )
+  const selectedSpaceIsOwner = Boolean(selectedSpace?.is_owner)
 
   const recentOwnSessions = useMemo(
     () => recentSessions.filter((session) => session.owner_id === user?.id),
@@ -101,6 +106,28 @@ function TodayView({
   useEffect(() => {
     if (selectedSpaceId) loadToday()
   }, [selectedSpaceId, loadToday])
+
+  const loadCoachSummary = useCallback(async () => {
+    if (!selectedSpaceId || !selectedSpaceIsOwner) {
+      setCoachSummary(null)
+      return
+    }
+    setCoachSummaryLoading(true)
+    try {
+      const res = await fetch(`/api/spaces/${selectedSpaceId}/adherence/?window_days=7`, { headers: authHeaders(token) })
+      if (!res.ok) throw new Error('adherence')
+      const data = await res.json()
+      setCoachSummary(data)
+    } catch {
+      toast.error('Could not load student accountability snapshot')
+    } finally {
+      setCoachSummaryLoading(false)
+    }
+  }, [selectedSpaceId, selectedSpaceIsOwner, token, toast])
+
+  useEffect(() => {
+    loadCoachSummary()
+  }, [loadCoachSummary])
 
   const updateItem = (itemId, field, value) => {
     setCheckinState((current) => ({
@@ -183,25 +210,74 @@ function TodayView({
               {bundle?.date ? `Check in for ${bundle.date}` : 'Your daily accountability checklist'}
             </p>
           </div>
-          {selectedSpace?.is_owner ? (
+          {selectedSpaceIsOwner ? (
             <button
-              onClick={() => onOpenDashboard?.(selectedSpace.id)}
+              onClick={() => setShowCoachTools((current) => !current)}
               className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
             >
-              Open coach dashboard
+              {showCoachTools ? 'Hide coach tools' : 'Coach tools'}
             </button>
           ) : null}
         </div>
+
+        {selectedSpaceIsOwner ? (
+          <div className="mt-4 rounded-2xl border border-gray-200 p-4 space-y-4 bg-white">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Coach view</p>
+                <p className="text-sm text-gray-500 mt-1">Set the plan and scan student follow-through without leaving Today.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCoachTools((current) => !current)}
+                className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
+              >
+                {showCoachTools ? 'Hide editor' : 'Edit active plan'}
+              </button>
+            </div>
+
+            {showCoachTools ? (
+              <PlanEditor token={token} space={selectedSpace} exercises={exercises} onPlanChange={() => { loadToday(); loadCoachSummary() }} />
+            ) : null}
+
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Student snapshot</p>
+              {coachSummaryLoading ? (
+                <p className="text-sm text-gray-400">Loading student check-ins…</p>
+              ) : (coachSummary?.members || []).length === 0 ? (
+                <p className="text-sm text-gray-500">Invite a student from Spaces to start the accountability loop.</p>
+              ) : (
+                <div className="space-y-2">
+                  {coachSummary.members.map((member) => (
+                    <div key={member.user_id} className="rounded-xl bg-gray-50 px-3 py-3 flex flex-wrap items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900">{member.display_name}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {member.last_checkin_date ? `Last check-in ${member.last_checkin_date}` : 'No check-ins yet'}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-[11px]">
+                        <span className="bg-gray-200 text-gray-700 px-2 py-1 rounded-full">{Math.round((member.completion_rate || 0) * 100)}% complete</span>
+                        <span className="bg-gray-200 text-gray-700 px-2 py-1 rounded-full">Streak {member.streak_current}</span>
+                        <span className="bg-amber-50 text-amber-700 px-2 py-1 rounded-full">{member.missed_dates.length} missed</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
 
         {loading ? (
           <div className="py-12 text-center text-sm text-gray-400">Loading today’s plan…</div>
         ) : !plan ? (
           <div className="mt-4 rounded-xl border border-dashed border-gray-200 px-4 py-5 text-sm text-gray-500">
             <p>No active practice plan for this space yet.</p>
-            {selectedSpace?.is_owner ? (
+            {selectedSpaceIsOwner ? (
               <button
                 type="button"
-                onClick={() => onOpenDashboard?.(selectedSpace.id)}
+                onClick={() => setShowCoachTools(true)}
                 className="mt-3 text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
               >
                 Set up a plan
