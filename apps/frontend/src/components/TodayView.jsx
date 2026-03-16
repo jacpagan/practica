@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { authHeaders } from '../auth'
 import { useToast } from './Toast'
 import PlanEditor from './PlanEditor'
+import { writeReferenceAttemptDraft } from '../utils'
 
 const STATUS_OPTIONS = [
   { value: 'complete', label: 'Complete' },
@@ -55,6 +56,8 @@ function TodayView({
   const [showCoachTools, setShowCoachTools] = useState(false)
   const [coachSummaryLoading, setCoachSummaryLoading] = useState(false)
   const [coachSummary, setCoachSummary] = useState(null)
+  const [referenceTitleDraft, setReferenceTitleDraft] = useState('')
+  const [referenceUrlDraft, setReferenceUrlDraft] = useState('')
 
   useEffect(() => {
     if (!spaces.length) {
@@ -140,6 +143,20 @@ function TodayView({
         },
       },
     }))
+  }
+
+  const launchReferenceAttempt = (launcher) => {
+    const url = referenceUrlDraft.trim()
+    if (!url) {
+      toast.error('Paste a YouTube or teacher video URL first')
+      return
+    }
+    writeReferenceAttemptDraft({
+      reference_title: referenceTitleDraft.trim(),
+      reference_url: url,
+      space_id: selectedSpaceId || null,
+    })
+    launcher?.(selectedSpaceId)
   }
 
   const submitCheckin = async () => {
@@ -391,7 +408,53 @@ function TodayView({
             <div className="rounded-2xl border border-gray-200 p-4 space-y-4">
               <div>
                 <p className="text-sm font-semibold text-gray-900">Optional proof video</p>
-                <p className="text-sm text-gray-500 mt-1">Video is secondary in this MVP — use it only when context or accountability helps.</p>
+                <p className="text-sm text-gray-500 mt-1">Best flow: paste the teacher video you are following, then record your attempt against it.</p>
+              </div>
+
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Start from a YouTube reference</p>
+                  <p className="text-xs text-gray-500 mt-1">Example: Dorothy Fitzer qigong follow-alongs. This keeps the source video attached to your attempt for teacher review.</p>
+                </div>
+                <input
+                  type="text"
+                  value={referenceTitleDraft}
+                  onChange={(e) => setReferenceTitleDraft(e.target.value)}
+                  placeholder="Dorothy Fitzer — 8 Brocades"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white"
+                />
+                <input
+                  type="url"
+                  value={referenceUrlDraft}
+                  onChange={(e) => setReferenceUrlDraft(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?..."
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white"
+                />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => launchReferenceAttempt(onQuickRecordProof)}
+                    className="text-xs font-medium text-white bg-gray-900 rounded-lg px-3 py-2 hover:bg-gray-800 transition-colors"
+                  >
+                    Record attempt
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => launchReferenceAttempt(onUploadProof)}
+                    className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
+                  >
+                    Upload attempt
+                  </button>
+                  {onScreenRecordProof ? (
+                    <button
+                      type="button"
+                      onClick={() => launchReferenceAttempt(onScreenRecordProof)}
+                      className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
+                    >
+                      Screen-record attempt
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
               <div className="flex flex-wrap gap-2">

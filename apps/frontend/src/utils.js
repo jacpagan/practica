@@ -7,6 +7,7 @@ const MULTIPART_CONCURRENCY = 4
 const RETRY_BASE_DELAY_MS = 500
 const RETRY_MAX_DELAY_MS = 4000
 const MULTIPART_RESUME_PREFIX = 'practica.multipart.resume.v1'
+const REFERENCE_ATTEMPT_DRAFT_KEY = 'practica.reference_attempt_draft.v1'
 const RECORDER_MIME_CANDIDATES = [
   'video/webm;codecs=vp9',
   'video/webm;codecs=vp8',
@@ -159,6 +160,53 @@ const localStore = () => {
   }
 }
 
+const sessionStore = () => {
+  try {
+    return window.sessionStorage
+  } catch {
+    return null
+  }
+}
+
+export const readReferenceAttemptDraft = () => {
+  const store = sessionStore()
+  if (!store) return null
+  try {
+    const raw = store.getItem(REFERENCE_ATTEMPT_DRAFT_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+export const writeReferenceAttemptDraft = (draft = {}) => {
+  const store = sessionStore()
+  if (!store) return
+  try {
+    store.setItem(REFERENCE_ATTEMPT_DRAFT_KEY, JSON.stringify({
+      reference_title: String(draft.reference_title || '').trim(),
+      reference_url: String(draft.reference_url || '').trim(),
+      space_id: draft.space_id || null,
+      updated_at: Date.now(),
+    }))
+  } catch {
+    // Ignore draft persistence failures.
+  }
+}
+
+export const clearReferenceAttemptDraft = () => {
+  const store = sessionStore()
+  if (!store) return
+  try {
+    store.removeItem(REFERENCE_ATTEMPT_DRAFT_KEY)
+  } catch {
+    // Ignore draft persistence failures.
+  }
+}
+
 const trimLogValue = (value, maxChars) => String(value || '').slice(0, maxChars)
 
 export const reportClientError = ({ message = '', stack = '', source = 'ui', extra = {} } = {}) => {
@@ -195,6 +243,8 @@ const multipartFingerprint = ({ payload, videoFile }) => {
     videoFile?.size || 0,
     videoFile?.lastModified || 0,
     payload?.title || '',
+    payload?.reference_title || '',
+    payload?.reference_url || '',
     payload?.space || '',
     payload?.duration_seconds || '',
     tags,

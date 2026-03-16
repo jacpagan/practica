@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useToast } from './Toast'
 import TagInput from './TagInput'
-import { createSessionUpload, fmtTimer, uploadErrorMessage, pickRecorderMimeType } from '../utils'
+import { clearReferenceAttemptDraft, createSessionUpload, fmtTimer, pickRecorderMimeType, readReferenceAttemptDraft, uploadErrorMessage } from '../utils'
 import { useConfirm } from './ConfirmDialog'
 
 const STEPS = { CAMERA: 'camera', RECORDING: 'recording', REVIEW: 'review', SAVE: 'save' }
@@ -31,6 +31,14 @@ function QuickRecord({ token, exercises, spaces = [], initialSpaceId = '', onCom
   const timerRef = useRef(null)
   const blobUrlRef = useRef(null)
   const facingRef = useRef('environment')
+
+  useEffect(() => {
+    const draft = readReferenceAttemptDraft()
+    if (!draft) return
+    if (draft.space_id && !selectedSpace) setSelectedSpace(draft.space_id)
+    if (draft.reference_title) setReferenceTitle(draft.reference_title)
+    if (draft.reference_url) setReferenceUrl(draft.reference_url)
+  }, [])
 
   // ── Cleanup ──
   const stopStream = useCallback(() => {
@@ -197,6 +205,7 @@ function QuickRecord({ token, exercises, spaces = [], initialSpaceId = '', onCom
       if (res.ok) {
         success = true
         const session = res.data
+        clearReferenceAttemptDraft()
         toast.success('Session saved')
         onComplete(session)
       } else {

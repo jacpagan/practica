@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useToast } from './Toast'
 import TagInput from './TagInput'
-import { createSessionUpload, pickRecorderMimeType, uploadErrorMessage } from '../utils'
+import { clearReferenceAttemptDraft, createSessionUpload, pickRecorderMimeType, readReferenceAttemptDraft, uploadErrorMessage } from '../utils'
 
 function SessionUpload({ token, spaces = [], activeSpace, onComplete, onCancel }) {
   const [selectedSpace, setSelectedSpace] = useState(activeSpace || '')
@@ -22,6 +22,14 @@ function SessionUpload({ token, spaces = [], activeSpace, onComplete, onCancel }
   const blobUrlRef = useRef(null)
   const videoRef = useRef(null)
   const streamRef = useRef(null)
+
+  useEffect(() => {
+    const draft = readReferenceAttemptDraft()
+    if (!draft) return
+    if (draft.space_id && !selectedSpace) setSelectedSpace(draft.space_id)
+    if (draft.reference_title) setReferenceTitle(draft.reference_title)
+    if (draft.reference_url) setReferenceUrl(draft.reference_url)
+  }, [])
 
   const startWebcam = async () => {
     try {
@@ -93,7 +101,12 @@ function SessionUpload({ token, spaces = [], activeSpace, onComplete, onCancel }
         videoFile,
         onProgress: (percent) => setUploadProgress(percent),
       })
-      if (res.ok) { success = true; toast.success('Session uploaded'); onComplete() }
+      if (res.ok) {
+        success = true
+        clearReferenceAttemptDraft()
+        toast.success('Session uploaded')
+        onComplete(res.data)
+      }
       else toast.error(uploadErrorMessage(res))
     } catch { toast.error('Error uploading') }
     finally {
