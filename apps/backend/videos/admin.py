@@ -2,6 +2,7 @@ from django.contrib import admin
 from .models import (
     Profile, Exercise, Session, Chapter, Comment, InviteCode, Tag, Space,
     SpaceMember, MultipartSessionUpload, ExerciseReferenceClip, SessionAsset,
+    PracticePlan, PracticePlanItem, DailyCheckIn, DailyCheckInItem,
 )
 
 
@@ -21,6 +22,18 @@ class SpaceMemberInline(admin.TabularInline):
     model = SpaceMember
     extra = 0
     raw_id_fields = ['user']
+
+
+class PracticePlanItemInline(admin.TabularInline):
+    model = PracticePlanItem
+    extra = 0
+    raw_id_fields = ['exercise', 'reference_clip']
+
+
+class DailyCheckInItemInline(admin.TabularInline):
+    model = DailyCheckInItem
+    extra = 0
+    raw_id_fields = ['plan_item']
 
 
 @admin.register(Profile)
@@ -49,6 +62,24 @@ class ExerciseReferenceClipAdmin(admin.ModelAdmin):
     list_filter = ['exercise']
     search_fields = ['title', 'youtube_video_id', 'youtube_playlist_id', 'user__username', 'exercise__name']
     raw_id_fields = ['user', 'exercise']
+
+
+@admin.register(PracticePlan)
+class PracticePlanAdmin(admin.ModelAdmin):
+    list_display = ['name', 'space', 'created_by', 'timezone', 'is_active', 'start_date', 'end_date', 'updated_at']
+    list_filter = ['space', 'is_active']
+    search_fields = ['name', 'space__name', 'created_by__username']
+    raw_id_fields = ['space', 'created_by']
+    inlines = [PracticePlanItemInline]
+
+
+@admin.register(DailyCheckIn)
+class DailyCheckInAdmin(admin.ModelAdmin):
+    list_display = ['space', 'user', 'date', 'status', 'total_minutes', 'linked_session', 'updated_at']
+    list_filter = ['space', 'status', 'date']
+    search_fields = ['space__name', 'user__username', 'notes']
+    raw_id_fields = ['space', 'user', 'plan', 'linked_session']
+    inlines = [DailyCheckInItemInline]
 
 
 @admin.register(Session)

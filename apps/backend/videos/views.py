@@ -2,7 +2,8 @@ import secrets
 import uuid
 import math
 import logging
-from datetime import timedelta
+from datetime import date, timedelta
+from zoneinfo import ZoneInfo
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
 from django.db import connection, transaction
@@ -10,6 +11,7 @@ from django.db.models import Q
 from django.utils import timezone
 from django.conf import settings
 from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
@@ -18,19 +20,22 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
 from .models import (
     Exercise, Session, Chapter, Comment, InviteCode, SessionLastSeen,
     Tag, Space, SpaceMember, MultipartSessionUpload, ExerciseReferenceClip, SessionAsset,
+    PracticePlan, PracticePlanItem, DailyCheckIn, DailyCheckInItem,
 )
 from .serializers import (
     UserSerializer, RegisterSerializer, SpaceSerializer,
     ExerciseSerializer, SessionSerializer, SessionListSerializer,
     ChapterSerializer, ProgressChapterSerializer, TagSerializer,
     ExerciseReferenceClipSerializer,
+    PracticePlanSerializer, PracticePlanItemSerializer,
+    DailyCheckInSerializer,
 )
 from .services.media_pipeline import enqueue_session_processing, apply_processing_update
 
@@ -56,6 +61,71 @@ def can_post_to_space(user, space):
     if user.is_staff or space.owner_id == user.id:
         return True
     return SpaceMember.objects.filter(space=space, user=user).exists()
+
+
+def can_view_space(user, space):
+    if not user.is_authenticated:
+        return False
+    if user.is_staff or space.owner_id == user.id:
+        return True
+    return SpaceMember.objects.filter(space=space, user=user).exists()
+
+
+def _active_practice_plan(space):
+    return (
+        space.practice_plans.filter(is_active=True)
+        .select_related('created_by', 'created_by__profile')
+        .prefetch_related('items__exercise', 'items__reference_clip')
+        .order_by('-updated_at', '-id')
+        .first()
+    )
+
+
+def _plan_zoneinfo(plan):
+    tz_name = (getattr(plan, 'timezone', '') or 'America/Los_Angeles').strip()
+    try:
+        return ZoneInfo(tz_name)
+    except Exception:
+        return ZoneInfo('America/Los_Angeles')
+
+
+def _plan_today(plan):
+    return timezone.now().astimezone(_plan_zoneinfo(plan)).date()
+
+
+def _plan_active_on_date(plan, target_date):
+    if not plan:
+        return False
+    if plan.start_date and target_date < plan.start_date:
+        return False
+    if plan.end_date and target_date > plan.end_date:
+        return False
+    return True
+
+
+def _item_scheduled_for_date(item, target_date):
+    schedule = item.schedule_json or {}
+    schedule_type = (schedule.get('type') or 'daily').strip()
+    if schedule_type == 'days_of_week':
+        try:
+            days = {int(day) for day in (schedule.get('days') or [])}
+        except (TypeError, ValueError):
+            return False
+        return target_date.isoweekday() in days
+    return True
+
+
+def _scheduled_plan_items_for_date(plan, target_date):
+    if not plan or not _plan_active_on_date(plan, target_date):
+        return []
+    return [item for item in plan.items.all() if _item_scheduled_for_date(item, target_date)]
+
+
+def _parse_iso_date(value, label='date'):
+    try:
+        return date.fromisoformat(str(value))
+    except (TypeError, ValueError):
+        raise ValidationError({label: 'Use YYYY-MM-DD.'})
 
 
 def can_edit_session(user, session):
@@ -304,6 +374,21 @@ class SpaceViewSet(viewsets.ModelViewSet):
         if space.owner_id != self.request.user.id:
             raise PermissionDenied("Only the space owner can modify this space.")
 
+    def _resolve_space_user(self, space, user_id=None):
+        if self.request.user.is_staff or space.owner_id == self.request.user.id:
+            if not user_id:
+                return None
+            target_user = get_object_or_404(User, pk=user_id)
+            if target_user.id != space.owner_id and not SpaceMember.objects.filter(space=space, user=target_user).exists():
+                raise ValidationError({'user': 'User is not a member of this space.'})
+            return target_user
+
+        if not can_view_space(self.request.user, space):
+            raise PermissionDenied("You do not have access to this space.")
+        if user_id and str(self.request.user.id) != str(user_id):
+            raise PermissionDenied("You can only access your own check-ins.")
+        return self.request.user
+
     def perform_update(self, serializer):
         self._ensure_space_owner(serializer.instance)
         serializer.save()
@@ -311,6 +396,344 @@ class SpaceViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         self._ensure_space_owner(instance)
         instance.delete()
+
+    @action(detail=True, methods=['get'], url_path='plan/active')
+    def active_plan(self, request, pk=None):
+        space = self.get_object()
+        if not can_view_space(request.user, space):
+            raise PermissionDenied("You do not have access to this space.")
+        plan = _active_practice_plan(space)
+        if not plan:
+            return Response(None)
+        serializer = PracticePlanSerializer(plan, context={'request': request})
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='plan')
+    def create_plan(self, request, pk=None):
+        space = self.get_object()
+        self._ensure_space_owner(space)
+        serializer = PracticePlanSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            if serializer.validated_data.get('is_active', True):
+                space.practice_plans.filter(is_active=True).update(is_active=False)
+            plan = serializer.save(space=space, created_by=request.user)
+        return Response(PracticePlanSerializer(plan, context={'request': request}).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['patch'], url_path=r'plan/(?P<plan_id>[0-9]+)')
+    def update_plan(self, request, pk=None, plan_id=None):
+        space = self.get_object()
+        self._ensure_space_owner(space)
+        plan = get_object_or_404(PracticePlan, pk=plan_id, space=space)
+        serializer = PracticePlanSerializer(plan, data=request.data, partial=True, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            if serializer.validated_data.get('is_active') is True:
+                space.practice_plans.exclude(pk=plan.id).filter(is_active=True).update(is_active=False)
+            plan = serializer.save()
+        return Response(PracticePlanSerializer(plan, context={'request': request}).data)
+
+    @action(detail=True, methods=['post'], url_path=r'plan/(?P<plan_id>[0-9]+)/items')
+    def add_plan_item(self, request, pk=None, plan_id=None):
+        space = self.get_object()
+        self._ensure_space_owner(space)
+        plan = get_object_or_404(PracticePlan, pk=plan_id, space=space)
+        serializer = PracticePlanItemSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        reference_clip = serializer.validated_data.get('reference_clip')
+        exercise = serializer.validated_data.get('exercise')
+        if reference_clip and reference_clip.exercise_id != exercise.id:
+            raise ValidationError({'reference_clip': 'Reference clip must belong to the selected exercise.'})
+        item = serializer.save(plan=plan)
+        return Response(PracticePlanItemSerializer(item, context={'request': request}).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['patch', 'delete'], url_path=r'plan/items/(?P<item_id>[0-9]+)')
+    def plan_item_detail(self, request, pk=None, item_id=None):
+        space = self.get_object()
+        self._ensure_space_owner(space)
+        item = get_object_or_404(PracticePlanItem.objects.select_related('plan'), pk=item_id, plan__space=space)
+        if request.method == 'DELETE':
+            item.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        serializer = PracticePlanItemSerializer(item, data=request.data, partial=True, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        reference_clip = serializer.validated_data.get('reference_clip', item.reference_clip)
+        exercise = serializer.validated_data.get('exercise', item.exercise)
+        if reference_clip and reference_clip.exercise_id != exercise.id:
+            raise ValidationError({'reference_clip': 'Reference clip must belong to the selected exercise.'})
+        updated = serializer.save()
+        return Response(PracticePlanItemSerializer(updated, context={'request': request}).data)
+
+    @action(detail=True, methods=['get'], url_path='checkins')
+    def checkins(self, request, pk=None):
+        space = self.get_object()
+        user_filter = request.query_params.get('user')
+        target_user = self._resolve_space_user(space, user_filter)
+
+        checkins = DailyCheckIn.objects.filter(space=space).select_related(
+            'user', 'user__profile', 'plan', 'linked_session'
+        ).prefetch_related(
+            'items__plan_item__exercise', 'items__plan_item__reference_clip'
+        )
+        if target_user is not None:
+            checkins = checkins.filter(user=target_user)
+
+        from_value = request.query_params.get('from')
+        to_value = request.query_params.get('to')
+        if from_value:
+            checkins = checkins.filter(date__gte=_parse_iso_date(from_value, 'from'))
+        if to_value:
+            checkins = checkins.filter(date__lte=_parse_iso_date(to_value, 'to'))
+
+        serializer = DailyCheckInSerializer(checkins.order_by('-date', '-updated_at'), many=True, context={'request': request})
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'], url_path='checkins/today')
+    def today_checkin(self, request, pk=None):
+        space = self.get_object()
+        if not can_view_space(request.user, space):
+            raise PermissionDenied("You do not have access to this space.")
+
+        plan = _active_practice_plan(space)
+        today = _plan_today(plan)
+        checkin = DailyCheckIn.objects.filter(space=space, user=request.user, date=today).select_related(
+            'user', 'user__profile', 'plan', 'linked_session'
+        ).prefetch_related(
+            'items__plan_item__exercise', 'items__plan_item__reference_clip'
+        ).first()
+        plan_items = _scheduled_plan_items_for_date(plan, today)
+        return Response({
+            'date': today.isoformat(),
+            'plan': PracticePlanSerializer(plan, context={'request': request}).data if plan else None,
+            'plan_items': PracticePlanItemSerializer(plan_items, many=True, context={'request': request}).data,
+            'checkin': DailyCheckInSerializer(checkin, context={'request': request}).data if checkin else None,
+        })
+
+    @action(detail=True, methods=['post'], url_path='checkins/upsert')
+    def upsert_checkin(self, request, pk=None):
+        space = self.get_object()
+        if not can_view_space(request.user, space):
+            raise PermissionDenied("You do not have access to this space.")
+
+        payload = request.data or {}
+        active_plan = _active_practice_plan(space)
+        target_date = _parse_iso_date(payload.get('date'), 'date') if payload.get('date') else _plan_today(active_plan)
+        items_payload = payload.get('items') if isinstance(payload.get('items'), list) else None
+
+        existing = DailyCheckIn.objects.filter(space=space, user=request.user, date=target_date).first()
+        plan = existing.plan if existing and existing.plan_id else active_plan
+
+        status_value = payload.get('status') or (existing.status if existing else DailyCheckIn.STATUS_PARTIAL)
+        allowed_statuses = {choice[0] for choice in DailyCheckIn.STATUS_CHOICES}
+        if status_value not in allowed_statuses:
+            raise ValidationError({'status': f'Status must be one of: {", ".join(sorted(allowed_statuses))}.'})
+
+        total_minutes = payload.get('total_minutes', existing.total_minutes if existing else None)
+        if total_minutes in ('', None):
+            total_minutes = None
+        else:
+            try:
+                total_minutes = int(total_minutes)
+            except (TypeError, ValueError):
+                raise ValidationError({'total_minutes': 'Use a whole number of minutes.'})
+
+        linked_session = existing.linked_session if existing else None
+        linked_session_id = payload.get('linked_session_id')
+        if linked_session_id in ('', None):
+            linked_session = None
+        elif linked_session_id is not None:
+            linked_session = get_object_or_404(Session, pk=linked_session_id, user=request.user, space=space)
+
+        with transaction.atomic():
+            checkin, created = DailyCheckIn.objects.get_or_create(
+                space=space,
+                user=request.user,
+                date=target_date,
+                defaults={
+                    'plan': plan,
+                    'status': status_value,
+                    'total_minutes': total_minutes,
+                    'notes': (payload.get('notes') or '').strip(),
+                    'linked_session': linked_session,
+                },
+            )
+
+            if not created:
+                checkin.plan = plan
+                checkin.status = status_value
+                checkin.total_minutes = total_minutes
+                checkin.notes = (payload.get('notes', checkin.notes) or '').strip()
+                checkin.linked_session = linked_session
+                checkin.save()
+
+            if items_payload is not None:
+                prepared_items = []
+                for item_payload in items_payload:
+                    plan_item_id = item_payload.get('plan_item_id') or item_payload.get('plan_item')
+                    if not plan_item_id:
+                        raise ValidationError({'items': 'Each item requires plan_item_id.'})
+                    plan_item = get_object_or_404(
+                        PracticePlanItem.objects.select_related('plan', 'exercise'),
+                        pk=plan_item_id,
+                        plan__space=space,
+                    )
+                    if plan and plan_item.plan_id != plan.id:
+                        raise ValidationError({'items': 'All item rows must belong to the selected plan.'})
+                    if plan is None:
+                        plan = plan_item.plan
+
+                    minutes_value = item_payload.get('minutes')
+                    reps_value = item_payload.get('reps')
+                    for key, value in [('minutes', minutes_value), ('reps', reps_value)]:
+                        if value in ('', None):
+                            continue
+                        try:
+                            int(value)
+                        except (TypeError, ValueError):
+                            raise ValidationError({'items': f'Item {key} must be a whole number.'})
+
+                    prepared_items.append({
+                        'plan_item': plan_item,
+                        'completed': bool(item_payload.get('completed')),
+                        'minutes': None if minutes_value in ('', None) else int(minutes_value),
+                        'reps': None if reps_value in ('', None) else int(reps_value),
+                        'notes': (item_payload.get('notes') or '').strip(),
+                    })
+
+                if checkin.plan_id != (plan.id if plan else None):
+                    checkin.plan = plan
+                    checkin.save(update_fields=['plan', 'updated_at'])
+
+                checkin.items.all().delete()
+                for prepared in prepared_items:
+                    DailyCheckInItem.objects.create(checkin=checkin, **prepared)
+
+        refreshed = DailyCheckIn.objects.filter(pk=checkin.pk).select_related(
+            'user', 'user__profile', 'plan', 'linked_session'
+        ).prefetch_related(
+            'items__plan_item__exercise', 'items__plan_item__reference_clip'
+        ).get()
+        return Response(DailyCheckInSerializer(refreshed, context={'request': request}).data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'], url_path='adherence')
+    def adherence(self, request, pk=None):
+        space = self.get_object()
+        self._ensure_space_owner(space)
+
+        try:
+            window_days = int(request.query_params.get('window_days', 30))
+        except (TypeError, ValueError):
+            raise ValidationError({'window_days': 'Use 7 or 30.'})
+        if window_days not in (7, 30):
+            raise ValidationError({'window_days': 'Use 7 or 30.'})
+
+        plan = _active_practice_plan(space)
+        today = _plan_today(plan)
+        start_date = today - timedelta(days=window_days - 1)
+        members = list(space.members.select_related('user', 'user__profile').all())
+        member_ids = [member.user_id for member in members]
+        checkins = DailyCheckIn.objects.filter(
+            space=space,
+            user_id__in=member_ids,
+            date__gte=start_date,
+            date__lte=today,
+        ).select_related('user', 'user__profile')
+
+        checkins_by_user = {}
+        for checkin in checkins:
+            checkins_by_user.setdefault(checkin.user_id, {})[checkin.date] = checkin
+
+        def expected_dates_for_window():
+            dates = []
+            current = start_date
+            while current <= today:
+                if plan:
+                    if _scheduled_plan_items_for_date(plan, current):
+                        dates.append(current)
+                else:
+                    dates.append(current)
+                current += timedelta(days=1)
+            return dates
+
+        expected_dates = expected_dates_for_window()
+
+        def compute_streaks(statuses):
+            best = 0
+            current = 0
+            for status_value in statuses:
+                if status_value == DailyCheckIn.STATUS_COMPLETE:
+                    current += 1
+                    best = max(best, current)
+                else:
+                    current = 0
+            current_streak = 0
+            for status_value in reversed(statuses):
+                if status_value == DailyCheckIn.STATUS_COMPLETE:
+                    current_streak += 1
+                else:
+                    break
+            return current_streak, best
+
+        response_members = []
+        for member in members:
+            user = member.user
+            display_name = user.profile.display_name if hasattr(user, 'profile') and user.profile.display_name else user.username
+            by_date = checkins_by_user.get(user.id, {})
+
+            status_timeline = []
+            missed_dates = []
+            completed_days = 0
+            for target in expected_dates:
+                checkin = by_date.get(target)
+                if checkin:
+                    status_value = checkin.status
+                else:
+                    status_value = DailyCheckIn.STATUS_MISSED
+                status_timeline.append(status_value)
+                if status_value == DailyCheckIn.STATUS_COMPLETE:
+                    completed_days += 1
+                if status_value == DailyCheckIn.STATUS_MISSED:
+                    missed_dates.append(target.isoformat())
+
+            streak_current, streak_best = compute_streaks(status_timeline)
+            ordered_actual_dates = sorted(by_date.keys())
+            last_checkin_date = ordered_actual_dates[-1].isoformat() if ordered_actual_dates else None
+
+            last_7_days_summary = []
+            summary_start = today - timedelta(days=6)
+            current = summary_start
+            while current <= today:
+                checkin = by_date.get(current)
+                scheduled = (not plan) or bool(_scheduled_plan_items_for_date(plan, current))
+                last_7_days_summary.append({
+                    'date': current.isoformat(),
+                    'scheduled': scheduled,
+                    'status': checkin.status if checkin else (DailyCheckIn.STATUS_MISSED if scheduled else None),
+                })
+                current += timedelta(days=1)
+
+            total_days = len(expected_dates)
+            completion_rate = round((completed_days / total_days), 3) if total_days else None
+            response_members.append({
+                'user_id': user.id,
+                'display_name': display_name,
+                'completion_rate': completion_rate,
+                'streak_current': streak_current,
+                'streak_best': streak_best,
+                'missed_dates': missed_dates,
+                'last_checkin_date': last_checkin_date,
+                'last_7_days_summary': last_7_days_summary,
+            })
+
+        return Response({
+            'space_id': space.id,
+            'window_days': window_days,
+            'from': start_date.isoformat(),
+            'to': today.isoformat(),
+            'plan_id': plan.id if plan else None,
+            'members': response_members,
+        })
 
     @action(detail=True, methods=['post'])
     def invite(self, request, pk=None):
