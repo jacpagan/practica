@@ -241,7 +241,7 @@ if [ "$FINAL_STATUS" != "Success" ]; then
 fi
 
 DEPLOY_STATUS="pending"
-MAX_DEPLOY_POLLS="${DEPLOY_STATUS_MAX_POLLS:-240}"
+MAX_DEPLOY_POLLS="${DEPLOY_STATUS_MAX_POLLS:-480}"
 for i in $(seq 1 "$MAX_DEPLOY_POLLS"); do
   STATUS_CMD_ID=$(send_short_ssm "if [ -f /opt/practica/.deploy-success ]; then echo success; elif [ -f /opt/practica/.deploy-failed ]; then echo failed; else echo pending; fi" "Practica deploy status")
   DEPLOY_STATUS=$(wait_for_ssm_output "$STATUS_CMD_ID" | tr -d '\r' | tail -n 1)
