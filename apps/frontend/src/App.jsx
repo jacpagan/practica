@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, Component } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { AuthProvider, useAuth, authHeaders } from './auth'
 import { ToastProvider, useToast } from './components/Toast'
 import { ConfirmProvider } from './components/ConfirmDialog'
@@ -9,8 +9,7 @@ import ConnectionsView from './components/ConnectionsView'
 import QuickRecord from './components/QuickRecord'
 import ScreenRecord from './components/ScreenRecord'
 import TodayView from './components/TodayView'
-import CoachDashboard from './components/CoachDashboard'
-import { canUseScreenRecording, reportClientError } from './utils'
+import { canUseScreenRecording } from './utils'
 
 const parseRoute = (pathname) => {
   if (pathname === '/today') return { view: 'today', sessionId: null, spaceId: null }
@@ -18,11 +17,6 @@ const parseRoute = (pathname) => {
   if (pathname === '/spaces') return { view: 'connections', sessionId: null, spaceId: null }
   if (pathname === '/record') return { view: 'quickRecord', sessionId: null, spaceId: null }
   if (pathname === '/record-screen') return { view: 'screenRecord', sessionId: null, spaceId: null }
-
-  const dashboardMatch = pathname.match(/^\/spaces\/(\d+)\/dashboard$/)
-  if (dashboardMatch) {
-    return { view: 'coachDashboard', sessionId: null, spaceId: Number(dashboardMatch[1]) }
-  }
 
   const sessionMatch = pathname.match(/^\/sessions\/(\d+)$/)
   if (sessionMatch) {
@@ -38,41 +32,8 @@ const routePath = ({ view, sessionId, spaceId }) => {
   if (view === 'connections') return '/spaces'
   if (view === 'quickRecord') return '/record'
   if (view === 'screenRecord') return '/record-screen'
-  if (view === 'coachDashboard' && spaceId) return `/spaces/${spaceId}/dashboard`
   if (view === 'detail' && sessionId) return `/sessions/${sessionId}`
   return '/today'
-}
-
-class ErrorBoundary extends Component {
-  constructor(props) {
-    super(props)
-    this.state = { error: null }
-  }
-
-  static getDerivedStateFromError(error) {
-    return { error: error.message }
-  }
-
-  componentDidCatch(error, errorInfo) {
-    reportClientError({
-      source: 'react_error_boundary',
-      message: error?.message || 'Unknown UI error',
-      stack: `${error?.stack || ''}\n${errorInfo?.componentStack || ''}`,
-    })
-  }
-
-  render() {
-    if (this.state.error) {
-      return (
-        <div className="px-4 py-12 text-center">
-          <p className="text-sm text-red-500 mb-2">Something went wrong</p>
-          <p className="text-xs text-gray-400 mb-4">{this.state.error}</p>
-          <button onClick={this.props.onBack} className="text-sm text-gray-500 underline">Go back</button>
-        </div>
-      )
-    }
-    return this.props.children
-  }
 }
 
 function AppContent() {
@@ -213,8 +174,6 @@ function AppContent() {
   }, [navigate, fetchSpaces])
 
   const openToday = () => navigate({ view: 'today', sessionId: null, spaceId: null })
-  const openCoachDashboard = (spaceId) => navigate({ view: 'coachDashboard', sessionId: null, spaceId })
-
   const handleProofSessionComplete = (session) => {
     fetchExercises()
     fetchSpaces()
@@ -293,7 +252,7 @@ function AppContent() {
             user={user}
             spaces={spaces}
             initialSpaceId={routeSpaceId}
-            onOpenDashboard={openCoachDashboard}
+            exercises={exercises}
             onOpenSession={openSession}
             onUploadProof={(spaceId) => navigate({ view: 'upload', sessionId: null, spaceId: spaceId || null })}
             onQuickRecordProof={(spaceId) => navigate({ view: 'quickRecord', sessionId: null, spaceId: spaceId || null })}
@@ -330,22 +289,6 @@ function AppContent() {
 
         {view === 'connections' && (
           <ConnectionsView spaces={spaces} token={token} onSpacesChange={fetchSpaces} />
-        )}
-
-        {view === 'coachDashboard' && routeSpaceId && (
-          <ErrorBoundary onBack={goHome}>
-            <CoachDashboard
-              token={token}
-              spaces={spaces}
-              spaceId={routeSpaceId}
-              exercises={exercises}
-              exercisesLoading={exercisesLoading}
-              exercisesLoaded={exercisesLoaded}
-              exercisesHasMore={Boolean(exercisesNext)}
-              onLoadMoreExercises={loadMoreExercises}
-              onOpenSpaceDashboard={openCoachDashboard}
-            />
-          </ErrorBoundary>
         )}
       </main>
     </div>
