@@ -3,9 +3,11 @@ import { useToast } from './Toast'
 import TagInput from './TagInput'
 import {
   canUseScreenRecording,
+  clearReferenceAttemptDraft,
   createSessionUpload,
   fmtTimer,
   pickRecorderMimeType,
+  readReferenceAttemptDraft,
   uploadErrorMessage,
 } from '../utils'
 import { useConfirm } from './ConfirmDialog'
@@ -45,6 +47,14 @@ function ScreenRecord({ token, spaces = [], initialSpaceId = '', onComplete, onC
   const stepRef = useRef(STEPS.IDLE)
   const audioContextRef = useRef(null)
   const screenSupported = canUseScreenRecording()
+
+  useEffect(() => {
+    const draft = readReferenceAttemptDraft()
+    if (!draft) return
+    if (draft.space_id && !selectedSpace) setSelectedSpace(draft.space_id)
+    if (draft.reference_title) setReferenceTitle(draft.reference_title)
+    if (draft.reference_url) setReferenceUrl(draft.reference_url)
+  }, [])
 
   useEffect(() => {
     stepRef.current = step
@@ -337,6 +347,7 @@ function ScreenRecord({ token, spaces = [], initialSpaceId = '', onComplete, onC
       if (res.ok) {
         success = true
         const session = res.data
+        clearReferenceAttemptDraft()
         toast.success('Session saved')
         onComplete(session)
       } else {
