@@ -27,7 +27,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 
 from .models import (
     Exercise, Session, Chapter, Comment, InviteCode, SessionLastSeen,
-    Tag, Space, SpaceMember, MultipartSessionUpload, ExerciseReferenceClip, SessionAsset,
+    Tag, Space, SpaceMember, MultipartSessionUpload, ExerciseReferenceClip, SessionAsset, SpaceReferenceVideo,
     PracticePlan, PracticePlanItem, DailyCheckIn, DailyCheckInItem,
 )
 from .serializers import (
@@ -35,6 +35,7 @@ from .serializers import (
     ExerciseSerializer, SessionSerializer, SessionListSerializer,
     ChapterSerializer, ProgressChapterSerializer, TagSerializer,
     ExerciseReferenceClipSerializer,
+    SpaceReferenceVideoSerializer,
     PracticePlanSerializer, PracticePlanItemSerializer,
     DailyCheckInSerializer,
 )
@@ -390,6 +391,12 @@ class SpaceViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("You can only access your own check-ins.")
         return self.request.user
 
+    def _ensure_space_reference_editable(self, reference):
+        user = self.request.user
+        if user.is_staff or reference.space.owner_id == user.id or reference.created_by_id == user.id:
+            return
+        raise PermissionDenied("You cannot edit this reference.")
+
     def perform_update(self, serializer):
         self._ensure_space_owner(serializer.instance)
         serializer.save()
@@ -735,6 +742,38 @@ class SpaceViewSet(viewsets.ModelViewSet):
             'plan_id': plan.id if plan else None,
             'members': response_members,
         })
+
+    @action(detail=True, methods=['get', 'post'], url_path='references')
+    def references(self, request, pk=None):
+        space = self.get_object()
+        if not can_view_space(request.user, space):
+            raise PermissionDenied("You do not have access to this space.")
+
+        if request.method == 'GET':
+            references = space.reference_videos.select_related('created_by', 'created_by__profile').all()
+            return Response(SpaceReferenceVideoSerializer(references, many=True, context={'request': request}).data)
+
+        serializer = SpaceReferenceVideoSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        reference = serializer.save(space=space, created_by=request.user)
+        return Response(SpaceReferenceVideoSerializer(reference, context={'request': request}).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['patch', 'delete'], url_path=r'references/(?P<reference_id>[0-9]+)')
+    def reference_detail(self, request, pk=None, reference_id=None):
+        space = self.get_object()
+        if not can_view_space(request.user, space):
+            raise PermissionDenied("You do not have access to this space.")
+        reference = get_object_or_404(SpaceReferenceVideo.objects.select_related('space'), pk=reference_id, space=space)
+        self._ensure_space_reference_editable(reference)
+
+        if request.method == 'DELETE':
+            reference.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        serializer = SpaceReferenceVideoSerializer(reference, data=request.data, partial=True, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        updated = serializer.save()
+        return Response(SpaceReferenceVideoSerializer(updated, context={'request': request}).data)
 
     @action(detail=True, methods=['post'])
     def invite(self, request, pk=None):
