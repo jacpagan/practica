@@ -192,6 +192,7 @@ function AppContent() {
         token={token}
         exercises={exercises}
         spaces={spaces}
+        initialSpaceId={routeSpaceId}
         onComplete={handleProofSessionComplete}
         onCancel={goHome}
       />
@@ -203,6 +204,7 @@ function AppContent() {
       <ScreenRecord
         token={token}
         spaces={spaces}
+        initialSpaceId={routeSpaceId}
         onComplete={handleProofSessionComplete}
         onCancel={goHome}
       />

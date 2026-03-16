@@ -13,7 +13,7 @@ import { useConfirm } from './ConfirmDialog'
 const STEPS = { IDLE: 'idle', PREVIEWING: 'previewing', RECORDING: 'recording', REVIEW: 'review' }
 const getAudioContextClass = () => window.AudioContext || window.webkitAudioContext || null
 
-function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
+function ScreenRecord({ token, spaces = [], initialSpaceId = '', onComplete, onCancel }) {
   const toast = useToast()
   const confirm = useConfirm()
   const [step, setStep] = useState(STEPS.IDLE)
@@ -21,8 +21,10 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
   const [error, setError] = useState(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [referenceTitle, setReferenceTitle] = useState('')
+  const [referenceUrl, setReferenceUrl] = useState('')
   const [tags, setTags] = useState([])
-  const [selectedSpace, setSelectedSpace] = useState('')
+  const [selectedSpace, setSelectedSpace] = useState(initialSpaceId || '')
   const [saving, setSaving] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(null)
   const [recordedFile, setRecordedFile] = useState(null)
@@ -323,6 +325,8 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
         payload: {
           title: sessionTitle,
           description: description.trim(),
+          reference_title: referenceTitle.trim(),
+          reference_url: referenceUrl.trim(),
           duration_seconds: elapsed,
           tags,
           space: selectedSpace || null,
@@ -482,6 +486,18 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
             <textarea value={description} onChange={(e) => setDescription(e.target.value)}
               placeholder="What did you work on?" rows={2}
               className="w-full px-0 py-1 text-sm text-gray-700 placeholder-gray-300 border-b border-gray-100 focus:border-gray-400 focus:outline-none resize-none transition-colors" />
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 space-y-3">
+              <div>
+                <p className="text-sm font-medium text-gray-900">Optional reference video</p>
+                <p className="text-xs text-gray-500 mt-1">Best when you are following a teacher's browser or YouTube video while screen recording.</p>
+              </div>
+              <input type="text" value={referenceTitle} onChange={(e) => setReferenceTitle(e.target.value)}
+                placeholder="Dorothy Fitzer — Follow Along"
+                className="w-full px-0 py-2 text-sm text-gray-700 placeholder-gray-300 border-b border-gray-100 focus:border-gray-400 focus:outline-none transition-colors bg-transparent" />
+              <input type="url" value={referenceUrl} onChange={(e) => setReferenceUrl(e.target.value)}
+                placeholder="https://www.youtube.com/watch?..."
+                className="w-full px-0 py-2 text-sm text-gray-700 placeholder-gray-300 border-b border-gray-100 focus:border-gray-400 focus:outline-none transition-colors bg-transparent" />
+            </div>
             {spaces.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {spaces.map(s => (

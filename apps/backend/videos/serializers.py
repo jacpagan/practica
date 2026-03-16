@@ -396,6 +396,7 @@ class SessionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Session
         fields = ['id', 'title', 'description', 'video_file',
+                  'reference_title', 'reference_url',
                   'duration_seconds', 'recorded_at', 'created_at', 'updated_at',
                   'processing_status', 'processing_error',
                   'space_id', 'space_name', 'tag_names',
@@ -452,6 +453,7 @@ class SessionListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Session
         fields = ['id', 'title', 'description', 'video_file',
+                  'reference_title', 'reference_url',
                   'duration_seconds', 'recorded_at', 'created_at',
                   'processing_status',
                   'space_id', 'space_name', 'tag_names',

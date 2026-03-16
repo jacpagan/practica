@@ -8,6 +8,8 @@ function SessionUpload({ token, spaces = [], activeSpace, onComplete, onCancel }
   const toast = useToast()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [referenceTitle, setReferenceTitle] = useState('')
+  const [referenceUrl, setReferenceUrl] = useState('')
   const [tags, setTags] = useState([])
   const [videoFile, setVideoFile] = useState(null)
   const [isUploading, setIsUploading] = useState(false)
@@ -83,6 +85,8 @@ function SessionUpload({ token, spaces = [], activeSpace, onComplete, onCancel }
         payload: {
           title: title.trim(),
           description: description.trim(),
+          reference_title: referenceTitle.trim(),
+          reference_url: referenceUrl.trim(),
           tags,
           space: selectedSpace || null,
         },
@@ -114,6 +118,24 @@ function SessionUpload({ token, spaces = [], activeSpace, onComplete, onCancel }
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2}
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
               placeholder="What did you work on?" />
+          </div>
+          <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 space-y-3">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Optional reference video</p>
+              <p className="text-xs text-gray-500 mt-1">Paste the teacher or YouTube video you are following while you upload or record your attempt.</p>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600 mb-1.5">Reference title</label>
+              <input type="text" value={referenceTitle} onChange={(e) => setReferenceTitle(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                placeholder="Dorothy Fitzer — Follow Along" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600 mb-1.5">Reference URL</label>
+              <input type="url" value={referenceUrl} onChange={(e) => setReferenceUrl(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                placeholder="https://www.youtube.com/watch?..." />
+            </div>
           </div>
           {spaces.length > 0 && (
             <div>
