@@ -11,6 +11,7 @@ import {
 import { useConfirm } from './ConfirmDialog'
 
 const STEPS = { IDLE: 'idle', PREVIEWING: 'previewing', RECORDING: 'recording', REVIEW: 'review' }
+const getAudioContextClass = () => window.AudioContext || window.webkitAudioContext || null
 
 function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
   const toast = useToast()
@@ -80,11 +81,19 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
     }
     setError(null)
     try {
-      // Request screen sharing
-      const screenStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { width: { ideal: 1920 }, height: { ideal: 1080 } },
-        audio: true, // system audio if available
-      })
+      let screenStream
+      try {
+        screenStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { width: { ideal: 1920 }, height: { ideal: 1080 } },
+          audio: true,
+        })
+      } catch (displayError) {
+        if (displayError?.name === 'NotAllowedError') throw displayError
+        screenStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { width: { ideal: 1920 }, height: { ideal: 1080 } },
+          audio: false,
+        })
+      }
       screenStreamRef.current = screenStream
 
       // When user stops sharing via browser UI, handle it
@@ -95,11 +104,20 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
 
       // Request camera (optional — might fail on desktop without webcam)
       try {
-        const cameraStream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: 'user' },
-          audio: true, // mic audio
-        })
+        let cameraStream
+        try {
+          cameraStream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: 'user' },
+            audio: true,
+          })
+        } catch {
+          cameraStream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: 'user' },
+            audio: false,
+          })
+        }
         cameraStreamRef.current = cameraStream
+        setShowCamera(true)
         if (cameraVideoRef.current) {
           cameraVideoRef.current.srcObject = cameraStream
           cameraVideoRef.current.play().catch(() => {})
@@ -127,11 +145,12 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
   // ── Canvas compositing: screen + camera overlay ──
   const startCompositing = () => {
     const canvas = canvasRef.current
-    if (!canvas) return null
+    if (!canvas || typeof canvas.captureStream !== 'function') return null
 
     const screenVideo = screenVideoRef.current
     const cameraVideo = cameraVideoRef.current
     const ctx = canvas.getContext('2d')
+    if (!ctx) return null
 
     canvas.width = 1920
     canvas.height = 1080
@@ -197,64 +216,88 @@ function ScreenRecord({ token, spaces = [], onComplete, onCancel }) {
     // Create composite stream from canvas + audio
     const canvasStream = canvas.captureStream(30)
 
-    // Mix audio: mic (camera stream) + system (screen stream)
-    const audioCtx = new AudioContext()
-    audioContextRef.current = audioCtx
-    const dest = audioCtx.createMediaStreamDestination()
+    const tracks = [...canvasStream.getVideoTracks()]
+    const cameraAudioTracks = cameraStreamRef.current?.getAudioTracks() || []
+    const screenAudioTracks = screenStreamRef.current?.getAudioTracks() || []
+    const audioCtxClass = getAudioContextClass()
 
-    if (cameraStreamRef.current?.getAudioTracks().length > 0) {
-      const micSource = audioCtx.createMediaStreamSource(cameraStreamRef.current)
-      micSource.connect(dest)
-    }
-    if (screenStreamRef.current?.getAudioTracks().length > 0) {
-      const sysSource = audioCtx.createMediaStreamSource(screenStreamRef.current)
-      sysSource.connect(dest)
+    if ((cameraAudioTracks.length > 0 || screenAudioTracks.length > 0) && audioCtxClass) {
+      try {
+        const audioCtx = new audioCtxClass()
+        audioContextRef.current = audioCtx
+        const dest = audioCtx.createMediaStreamDestination()
+
+        if (cameraAudioTracks.length > 0) {
+          const micSource = audioCtx.createMediaStreamSource(cameraStreamRef.current)
+          micSource.connect(dest)
+        }
+        if (screenAudioTracks.length > 0) {
+          const sysSource = audioCtx.createMediaStreamSource(screenStreamRef.current)
+          sysSource.connect(dest)
+        }
+
+        tracks.push(...dest.stream.getAudioTracks())
+      } catch {
+        if (cameraAudioTracks[0]) tracks.push(cameraAudioTracks[0])
+        else if (screenAudioTracks[0]) tracks.push(screenAudioTracks[0])
+      }
+    } else if (cameraAudioTracks[0]) {
+      tracks.push(cameraAudioTracks[0])
+    } else if (screenAudioTracks[0]) {
+      tracks.push(screenAudioTracks[0])
     }
 
-    // Combine canvas video + mixed audio
-    const tracks = [...canvasStream.getVideoTracks(), ...dest.stream.getAudioTracks()]
     return new MediaStream(tracks)
   }
 
   // ── Recording ──
   const startRecording = () => {
-    const compositeStream = startCompositing()
-    if (!compositeStream) return
+    try {
+      const compositeStream = startCompositing()
+      if (!compositeStream) {
+        toast.error('Could not prepare screen recording on this browser')
+        return
+      }
 
-    compositeStreamRef.current = compositeStream
+      compositeStreamRef.current = compositeStream
 
-    const mimeType = pickRecorderMimeType()
+      const mimeType = pickRecorderMimeType()
 
-    const recorder = mimeType
-      ? new MediaRecorder(compositeStream, { mimeType })
-      : new MediaRecorder(compositeStream)
-    recorderRef.current = recorder
-    chunksRef.current = []
-    setElapsed(0)
+      const recorder = mimeType
+        ? new MediaRecorder(compositeStream, { mimeType })
+        : new MediaRecorder(compositeStream)
+      recorderRef.current = recorder
+      chunksRef.current = []
+      setElapsed(0)
 
-    recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunksRef.current.push(e.data)
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data)
+      }
+
+      recorder.onstop = () => {
+        const outputType = mimeType || recorder.mimeType || 'video/webm'
+        const blob = new Blob(chunksRef.current, { type: outputType })
+        const ext = outputType.includes('mp4') ? 'mp4' : 'webm'
+        const file = new File([blob], `screen-${Date.now()}.${ext}`, { type: outputType })
+        if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
+        blobUrlRef.current = URL.createObjectURL(blob)
+        setRecordedFile(file)
+        stopStreams()
+        setStep(STEPS.REVIEW)
+      }
+
+      recorder.start(1000)
+      setStep(STEPS.RECORDING)
+
+      const startTime = Date.now()
+      timerRef.current = setInterval(() => {
+        setElapsed(Math.floor((Date.now() - startTime) / 1000))
+      }, 250)
+    } catch {
+      compositeStreamRef.current?.getTracks().forEach((track) => track.stop())
+      compositeStreamRef.current = null
+      toast.error('Could not start screen recording')
     }
-
-    recorder.onstop = () => {
-      const outputType = mimeType || recorder.mimeType || 'video/webm'
-      const blob = new Blob(chunksRef.current, { type: outputType })
-      const ext = outputType.includes('mp4') ? 'mp4' : 'webm'
-      const file = new File([blob], `screen-${Date.now()}.${ext}`, { type: outputType })
-      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
-      blobUrlRef.current = URL.createObjectURL(blob)
-      setRecordedFile(file)
-      stopStreams()
-      setStep(STEPS.REVIEW)
-    }
-
-    recorder.start(1000)
-    setStep(STEPS.RECORDING)
-
-    const startTime = Date.now()
-    timerRef.current = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startTime) / 1000))
-    }, 250)
   }
 
   const stopRecording = () => {

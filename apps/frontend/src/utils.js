@@ -142,10 +142,12 @@ export const pickRecorderMimeType = (preferred = []) => {
 
 export const canUseScreenRecording = () => {
   if (typeof window === 'undefined') return false
+  const canvas = document.createElement('canvas')
   return Boolean(
     window.MediaRecorder &&
     navigator?.mediaDevices &&
-    typeof navigator.mediaDevices.getDisplayMedia === 'function'
+    typeof navigator.mediaDevices.getDisplayMedia === 'function' &&
+    typeof canvas.captureStream === 'function'
   )
 }
 
