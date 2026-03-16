@@ -280,6 +280,38 @@ if [ "$PUBLIC_FINAL" != "1" ]; then
   exit 1
 fi
 
+STABILITY_FINAL=0
+for i in $(seq 1 6); do
+  HEALTH_JSON=$(curl -fsS --max-time 10 https://practica.jpagan.com/health/ 2>/dev/null || true)
+  if [ -n "$HEALTH_JSON" ] && python3 - "$EXPECTED_SHA" <<'PY' <<<"$HEALTH_JSON"
+import json
+import sys
+
+expected = (sys.argv[1] or '').strip()
+try:
+    payload = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+
+status = str(payload.get('status') or '').strip()
+deployed_sha = str(payload.get('deployed_sha') or '').strip()
+sys.exit(0 if status == 'healthy' and deployed_sha == expected else 1)
+PY
+  then
+    STABILITY_FINAL=1
+  else
+    STABILITY_FINAL=0
+    break
+  fi
+  sleep 5
+done
+if [ "$STABILITY_FINAL" != "1" ]; then
+  echo "Public deploy became unhealthy during stability window" >&2
+  LOG_CMD_ID=$(send_short_ssm "tail -n 200 /opt/practica/deploy.log 2>/dev/null || true" "Practica deploy log tail")
+  wait_for_ssm_output "$LOG_CMD_ID" || true
+  exit 1
+fi
+
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
   echo "command_id=$CMD_ID" >> "$GITHUB_OUTPUT"
   echo "ssm_status=Success" >> "$GITHUB_OUTPUT"
