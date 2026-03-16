@@ -2,6 +2,7 @@ import secrets
 import uuid
 import math
 import logging
+import os
 from datetime import date, timedelta
 from zoneinfo import ZoneInfo
 from django.shortcuts import get_object_or_404
@@ -1514,6 +1515,7 @@ def health_check(request):
         'services': {},
         'version': '3.0.0',
         'environment': 'development' if settings.DEBUG else 'production',
+        'deployed_sha': os.getenv('DEPLOYED_GIT_SHA', ''),
     }
     try:
         with connection.cursor() as cursor:

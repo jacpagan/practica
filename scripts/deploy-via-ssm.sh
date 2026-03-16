@@ -56,6 +56,7 @@ git clean -fd
 git checkout -f "$REF" || git checkout -f -B "$REF" "origin/$REF"
 git clean -fd
 git pull --ff-only origin "$REF" || true
+export DEPLOYED_GIT_SHA=$(git rev-parse HEAD 2>/dev/null || echo '')
 
 printf '%s' "__ENV_B64__" | base64 -d > .env.production
 set -a; source .env.production; set +a
@@ -240,35 +241,42 @@ if [ "$FINAL_STATUS" != "Success" ]; then
   exit 1
 fi
 
-DEPLOY_STATUS="pending"
-MAX_DEPLOY_POLLS="${DEPLOY_STATUS_MAX_POLLS:-480}"
-for i in $(seq 1 "$MAX_DEPLOY_POLLS"); do
+EXPECTED_SHA=$(git rev-parse HEAD 2>/dev/null || echo '')
+PUBLIC_VERIFY_MAX_POLLS="${PUBLIC_VERIFY_MAX_POLLS:-720}"
+PUBLIC_FINAL=0
+for i in $(seq 1 "$PUBLIC_VERIFY_MAX_POLLS"); do
+  HEALTH_JSON=$(curl -fsS --max-time 10 https://practica.jpagan.com/health/ 2>/dev/null || true)
+  if [ -n "$HEALTH_JSON" ] && python3 - "$EXPECTED_SHA" <<'PY' <<<"$HEALTH_JSON"
+import json
+import sys
+
+expected = (sys.argv[1] or '').strip()
+try:
+    payload = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+
+status = str(payload.get('status') or '').strip()
+deployed_sha = str(payload.get('deployed_sha') or '').strip()
+if status == 'healthy' and deployed_sha == expected:
+    print(f"healthy deployed_sha={deployed_sha}")
+    sys.exit(0)
+sys.exit(1)
+PY
+  then
+    PUBLIC_FINAL=1
+    break
+  fi
+  echo "Waiting for public deploy: expected sha ${EXPECTED_SHA:-unknown}"
+  sleep 5
+done
+if [ "$PUBLIC_FINAL" != "1" ]; then
+  echo "Public deploy verification timed out" >&2
   STATUS_CMD_ID=$(send_short_ssm "if [ -f /opt/practica/.deploy-success ]; then echo success; elif [ -f /opt/practica/.deploy-failed ]; then echo failed; else echo pending; fi" "Practica deploy status")
   DEPLOY_STATUS=$(wait_for_ssm_output "$STATUS_CMD_ID" | tr -d '\r' | tail -n 1)
   echo "Remote deploy status: ${DEPLOY_STATUS:-pending}"
-  if [ "$DEPLOY_STATUS" = "success" ]; then
-    break
-  fi
-  if [ "$DEPLOY_STATUS" = "failed" ]; then
-    LOG_CMD_ID=$(send_short_ssm "tail -n 200 /opt/practica/deploy.log 2>/dev/null || true" "Practica deploy log tail")
-    wait_for_ssm_output "$LOG_CMD_ID" || true
-    exit 1
-  fi
-  sleep 5
-done
-if [ "$DEPLOY_STATUS" != "success" ]; then
-  echo "Background deploy did not finish in time" >&2
   LOG_CMD_ID=$(send_short_ssm "tail -n 200 /opt/practica/deploy.log 2>/dev/null || true" "Practica deploy log tail")
   wait_for_ssm_output "$LOG_CMD_ID" || true
-  exit 1
-fi
-
-PUBLIC_FINAL=0
-for i in $(seq 1 30); do
-  curl -fsS https://practica.jpagan.com/health/ && PUBLIC_FINAL=1 && break || sleep 2
-done
-if [ "$PUBLIC_FINAL" != "1" ]; then
-  echo "Public health check failed after background deploy" >&2
   exit 1
 fi
 
