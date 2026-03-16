@@ -100,6 +100,110 @@ class ExerciseReferenceClip(models.Model):
         return f"ExerciseReferenceClip #{self.id} user={self.user_id} exercise={self.exercise_id}"
 
 
+class PracticePlan(models.Model):
+    """A coach-defined practice plan scoped to a space."""
+
+    space = models.ForeignKey(Space, on_delete=models.CASCADE, related_name='practice_plans')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_practice_plans')
+    name = models.CharField(max_length=120)
+    description = models.TextField(blank=True)
+    timezone = models.CharField(max_length=64, default='America/Los_Angeles')
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-is_active', 'name', '-created_at']
+
+    def __str__(self):
+        return f"{self.name} ({self.space.name})"
+
+
+class PracticePlanItem(models.Model):
+    """A scheduled exercise within a practice plan."""
+
+    plan = models.ForeignKey(PracticePlan, on_delete=models.CASCADE, related_name='items')
+    exercise = models.ForeignKey(Exercise, on_delete=models.PROTECT, related_name='practice_plan_items')
+    sort_order = models.IntegerField(default=0)
+    target_minutes = models.IntegerField(null=True, blank=True)
+    target_reps = models.IntegerField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+    reference_clip = models.ForeignKey(
+        ExerciseReferenceClip,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='practice_plan_items',
+    )
+    schedule_json = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ['sort_order', 'id']
+
+    def __str__(self):
+        return f"{self.plan.name}: {self.exercise.name}"
+
+
+class DailyCheckIn(models.Model):
+    """A member's daily accountability check-in for a space."""
+
+    STATUS_COMPLETE = 'complete'
+    STATUS_PARTIAL = 'partial'
+    STATUS_SKIPPED = 'skipped'
+    STATUS_MISSED = 'missed'
+    STATUS_CHOICES = [
+        (STATUS_COMPLETE, 'Complete'),
+        (STATUS_PARTIAL, 'Partial'),
+        (STATUS_SKIPPED, 'Skipped'),
+        (STATUS_MISSED, 'Missed'),
+    ]
+
+    space = models.ForeignKey(Space, on_delete=models.CASCADE, related_name='daily_checkins')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='daily_checkins')
+    plan = models.ForeignKey(PracticePlan, null=True, blank=True, on_delete=models.SET_NULL, related_name='daily_checkins')
+    date = models.DateField()
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PARTIAL)
+    total_minutes = models.IntegerField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+    linked_session = models.ForeignKey(
+        'Session',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='daily_checkins',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-date', '-updated_at']
+        constraints = [
+            models.UniqueConstraint(fields=['space', 'user', 'date'], name='uniq_daily_checkin_space_user_date'),
+        ]
+
+    def __str__(self):
+        return f"Check-in {self.space.name} {self.user_id} {self.date}"
+
+
+class DailyCheckInItem(models.Model):
+    """Per-plan-item completion data for a daily check-in."""
+
+    checkin = models.ForeignKey(DailyCheckIn, on_delete=models.CASCADE, related_name='items')
+    plan_item = models.ForeignKey(PracticePlanItem, on_delete=models.CASCADE, related_name='checkins')
+    completed = models.BooleanField(default=False)
+    minutes = models.IntegerField(null=True, blank=True)
+    reps = models.IntegerField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['id']
+
+    def __str__(self):
+        return f"CheckInItem checkin={self.checkin_id} plan_item={self.plan_item_id}"
+
+
 class Tag(models.Model):
     """A freeform label for organizing sessions."""
     name = models.CharField(max_length=100, unique=True)

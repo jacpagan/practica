@@ -12,14 +12,22 @@ import ConnectionsView from './components/ConnectionsView'
 import QuickRecord from './components/QuickRecord'
 import ScreenRecord from './components/ScreenRecord'
 import SpaceCompareView from './components/SpaceCompareView'
+import TodayView from './components/TodayView'
+import CoachDashboard from './components/CoachDashboard'
 import { canUseScreenRecording, reportClientError } from './utils'
 
 const parseRoute = (pathname) => {
   const searchParams = new URLSearchParams(window.location.search)
+  if (pathname === '/today') return { view: 'today', sessionId: null, exerciseId: null, spaceId: null }
   if (pathname === '/upload') return { view: 'upload', sessionId: null, exerciseId: null, spaceId: null }
   if (pathname === '/spaces') return { view: 'connections', sessionId: null, exerciseId: null, spaceId: null }
   if (pathname === '/record') return { view: 'quickRecord', sessionId: null, exerciseId: null, spaceId: null }
   if (pathname === '/record-screen') return { view: 'screenRecord', sessionId: null, exerciseId: null, spaceId: null }
+
+  const dashboardMatch = pathname.match(/^\/spaces\/(\d+)\/dashboard$/)
+  if (dashboardMatch) {
+    return { view: 'coachDashboard', sessionId: null, exerciseId: null, spaceId: Number(dashboardMatch[1]) }
+  }
 
   const compareMatch = pathname.match(/^\/spaces\/(\d+)\/compare$/)
   if (compareMatch) {
@@ -41,10 +49,12 @@ const parseRoute = (pathname) => {
 }
 
 const routePath = ({ view, sessionId, exerciseId, spaceId }) => {
+  if (view === 'today') return '/today'
   if (view === 'upload') return '/upload'
   if (view === 'connections') return '/spaces'
   if (view === 'quickRecord') return '/record'
   if (view === 'screenRecord') return '/record-screen'
+  if (view === 'coachDashboard' && spaceId) return `/spaces/${spaceId}/dashboard`
   if (view === 'compare' && spaceId) return `/spaces/${spaceId}/compare${sessionId ? `?session=${sessionId}` : ''}`
   if (view === 'detail' && sessionId) return `/sessions/${sessionId}`
   if (view === 'progress' && exerciseId) return `/exercises/${exerciseId}`
@@ -328,6 +338,14 @@ function AppContent() {
     navigate({ view: 'detail', sessionId: session.id, exerciseId: null })
   }
 
+  const openToday = () => {
+    navigate({ view: 'today', sessionId: null, exerciseId: null, spaceId: null })
+  }
+
+  const openCoachDashboard = (spaceId) => {
+    navigate({ view: 'coachDashboard', sessionId: null, exerciseId: null, spaceId })
+  }
+
   const hasSpaces = spaces.length > 0 || Boolean(user?.has_spaces)
   const joinedSpacesCount = Number.isFinite(user?.joined_spaces_count) ? user.joined_spaces_count : 0
 
@@ -368,6 +386,12 @@ function AppContent() {
             {view === 'sessions' && (
               <>
                 <button
+                  onClick={openToday}
+                  className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                  Today
+                </button>
+                <button
                   onClick={() => navigate({ view: 'upload', sessionId: null, exerciseId: null, spaceId: null })}
                   className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors hidden sm:block"
                 >
@@ -382,9 +406,24 @@ function AppContent() {
               </>
             )}
             {view !== 'sessions' && (
-              <button onClick={goHome} className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
-                Back
-              </button>
+              <>
+                {hasSpaces && view !== 'today' && (
+                  <button onClick={openToday} className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
+                    Today
+                  </button>
+                )}
+                {view !== 'connections' && (
+                  <button
+                    onClick={() => navigate({ view: 'connections', sessionId: null, exerciseId: null, spaceId: null })}
+                    className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
+                  >
+                    Spaces
+                  </button>
+                )}
+                <button onClick={goHome} className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
+                  Back
+                </button>
+              </>
             )}
             <div className="flex items-center gap-2 border-l border-gray-100 pl-3">
               <span className="text-xs text-gray-400">{user.display_name}</span>
@@ -499,6 +538,15 @@ function AppContent() {
             />
           </>
         )}
+        {view === 'today' && (
+          <TodayView
+            token={token}
+            user={user}
+            spaces={spaces}
+            initialSpaceId={routeSpaceId}
+            onOpenDashboard={openCoachDashboard}
+          />
+        )}
         {view === 'upload' && (
           <SessionUpload
             token={token}
@@ -543,6 +591,15 @@ function AppContent() {
         )}
         {view === 'connections' && (
           <ConnectionsView spaces={spaces} token={token} onSpacesChange={fetchSpaces} />
+        )}
+        {view === 'coachDashboard' && routeSpaceId && (
+          <CoachDashboard
+            token={token}
+            spaces={spaces}
+            spaceId={routeSpaceId}
+            exercises={exercises}
+            onOpenSpaceDashboard={openCoachDashboard}
+          />
         )}
       </main>
 

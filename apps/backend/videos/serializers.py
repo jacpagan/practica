@@ -7,6 +7,7 @@ import re
 from .models import (
     Profile, Exercise, Session, Chapter, Comment, InviteCode, SessionLastSeen,
     Tag, Space, SpaceMember, ExerciseReferenceClip, SessionAsset,
+    PracticePlan, PracticePlanItem, DailyCheckIn, DailyCheckInItem,
 )
 
 
@@ -248,6 +249,76 @@ class ExerciseReferenceClipSerializer(serializers.ModelSerializer):
         if obj.youtube_playlist_id:
             params['list'] = obj.youtube_playlist_id
         return f"https://www.youtube.com/watch?{urlencode(params)}"
+
+
+class PracticePlanItemSerializer(serializers.ModelSerializer):
+    exercise_name = serializers.CharField(source='exercise.name', read_only=True)
+    reference_clip_detail = ExerciseReferenceClipSerializer(source='reference_clip', read_only=True)
+
+    class Meta:
+        model = PracticePlanItem
+        fields = [
+            'id', 'plan', 'exercise', 'exercise_name', 'sort_order',
+            'target_minutes', 'target_reps', 'notes',
+            'reference_clip', 'reference_clip_detail', 'schedule_json',
+        ]
+        read_only_fields = ['id', 'plan', 'exercise_name', 'reference_clip_detail']
+
+
+class PracticePlanSerializer(serializers.ModelSerializer):
+    items = PracticePlanItemSerializer(many=True, read_only=True)
+    created_by_display_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PracticePlan
+        fields = [
+            'id', 'space', 'created_by', 'created_by_display_name',
+            'name', 'description', 'timezone', 'start_date', 'end_date',
+            'is_active', 'created_at', 'updated_at', 'items',
+        ]
+        read_only_fields = ['id', 'space', 'created_by', 'created_by_display_name', 'created_at', 'updated_at', 'items']
+
+    def get_created_by_display_name(self, obj):
+        if not obj.created_by:
+            return ''
+        if hasattr(obj.created_by, 'profile') and obj.created_by.profile.display_name:
+            return obj.created_by.profile.display_name
+        return obj.created_by.username
+
+
+class DailyCheckInItemSerializer(serializers.ModelSerializer):
+    plan_item_detail = PracticePlanItemSerializer(source='plan_item', read_only=True)
+
+    class Meta:
+        model = DailyCheckInItem
+        fields = ['id', 'plan_item', 'plan_item_detail', 'completed', 'minutes', 'reps', 'notes']
+        read_only_fields = ['id', 'plan_item_detail']
+
+
+class DailyCheckInSerializer(serializers.ModelSerializer):
+    items = DailyCheckInItemSerializer(many=True, read_only=True)
+    user_display_name = serializers.SerializerMethodField()
+    linked_session_id = serializers.IntegerField(source='linked_session.id', read_only=True, default=None)
+    linked_session_title = serializers.CharField(source='linked_session.title', read_only=True, default='')
+    plan_name = serializers.CharField(source='plan.name', read_only=True, default='')
+
+    class Meta:
+        model = DailyCheckIn
+        fields = [
+            'id', 'space', 'user', 'user_display_name', 'plan', 'plan_name',
+            'date', 'status', 'total_minutes', 'notes',
+            'linked_session', 'linked_session_id', 'linked_session_title',
+            'created_at', 'updated_at', 'items',
+        ]
+        read_only_fields = [
+            'id', 'space', 'user', 'user_display_name', 'plan_name', 'linked_session_id', 'linked_session_title',
+            'created_at', 'updated_at', 'items',
+        ]
+
+    def get_user_display_name(self, obj):
+        if hasattr(obj.user, 'profile') and obj.user.profile.display_name:
+            return obj.user.profile.display_name
+        return obj.user.username
 
 
 class SessionAssetSerializer(serializers.ModelSerializer):
