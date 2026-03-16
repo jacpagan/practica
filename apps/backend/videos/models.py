@@ -100,6 +100,39 @@ class ExerciseReferenceClip(models.Model):
         return f"ExerciseReferenceClip #{self.id} user={self.user_id} exercise={self.exercise_id}"
 
 
+class SpaceReferenceVideo(models.Model):
+    """A shared reference video library entry for a space."""
+
+    space = models.ForeignKey(Space, on_delete=models.CASCADE, related_name='reference_videos')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='space_reference_videos')
+    title = models.CharField(max_length=200)
+    youtube_url = models.URLField()
+    youtube_video_id = models.CharField(max_length=32)
+    youtube_playlist_id = models.CharField(max_length=64, blank=True, default='')
+    start_seconds = models.PositiveIntegerField(default=0)
+    end_seconds = models.PositiveIntegerField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['space', 'created_at'], name='space_reference_video_space_time_idx'),
+            models.Index(fields=['youtube_video_id'], name='space_reference_video_id_idx'),
+        ]
+        constraints = [
+            models.CheckConstraint(check=models.Q(start_seconds__gte=0), name='space_reference_start_seconds_gte_0'),
+            models.CheckConstraint(
+                check=models.Q(end_seconds__isnull=True) | models.Q(end_seconds__gt=models.F('start_seconds')),
+                name='space_reference_end_seconds_gt_start_or_null',
+            ),
+        ]
+
+    def __str__(self):
+        return f"SpaceReferenceVideo #{self.id} space={self.space_id}"
+
+
 class PracticePlan(models.Model):
     """A coach-defined practice plan scoped to a space."""
 
