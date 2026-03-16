@@ -1,64 +1,46 @@
 import React, { useState, useEffect, useMemo, useCallback, Component } from 'react'
 import { AuthProvider, useAuth, authHeaders } from './auth'
-import { ToastProvider } from './components/Toast'
-import { useToast } from './components/Toast'
+import { ToastProvider, useToast } from './components/Toast'
 import { ConfirmProvider } from './components/ConfirmDialog'
 import AuthForm from './components/AuthForm'
-import SessionList from './components/SessionList'
 import SessionUpload from './components/SessionUpload'
 import SessionDetail from './components/SessionDetail'
-import ProgressView from './components/ProgressView'
 import ConnectionsView from './components/ConnectionsView'
 import QuickRecord from './components/QuickRecord'
 import ScreenRecord from './components/ScreenRecord'
-import SpaceCompareView from './components/SpaceCompareView'
 import TodayView from './components/TodayView'
 import CoachDashboard from './components/CoachDashboard'
 import { canUseScreenRecording, reportClientError } from './utils'
 
 const parseRoute = (pathname) => {
-  const searchParams = new URLSearchParams(window.location.search)
-  if (pathname === '/today') return { view: 'today', sessionId: null, exerciseId: null, spaceId: null }
-  if (pathname === '/upload') return { view: 'upload', sessionId: null, exerciseId: null, spaceId: null }
-  if (pathname === '/spaces') return { view: 'connections', sessionId: null, exerciseId: null, spaceId: null }
-  if (pathname === '/record') return { view: 'quickRecord', sessionId: null, exerciseId: null, spaceId: null }
-  if (pathname === '/record-screen') return { view: 'screenRecord', sessionId: null, exerciseId: null, spaceId: null }
+  if (pathname === '/today') return { view: 'today', sessionId: null, spaceId: null }
+  if (pathname === '/upload') return { view: 'upload', sessionId: null, spaceId: null }
+  if (pathname === '/spaces') return { view: 'connections', sessionId: null, spaceId: null }
+  if (pathname === '/record') return { view: 'quickRecord', sessionId: null, spaceId: null }
+  if (pathname === '/record-screen') return { view: 'screenRecord', sessionId: null, spaceId: null }
 
   const dashboardMatch = pathname.match(/^\/spaces\/(\d+)\/dashboard$/)
   if (dashboardMatch) {
-    return { view: 'coachDashboard', sessionId: null, exerciseId: null, spaceId: Number(dashboardMatch[1]) }
-  }
-
-  const compareMatch = pathname.match(/^\/spaces\/(\d+)\/compare$/)
-  if (compareMatch) {
-    const sessionParam = Number(searchParams.get('session') || '') || null
-    return { view: 'compare', sessionId: sessionParam, exerciseId: null, spaceId: Number(compareMatch[1]) }
+    return { view: 'coachDashboard', sessionId: null, spaceId: Number(dashboardMatch[1]) }
   }
 
   const sessionMatch = pathname.match(/^\/sessions\/(\d+)$/)
   if (sessionMatch) {
-    return { view: 'detail', sessionId: Number(sessionMatch[1]), exerciseId: null, spaceId: null }
+    return { view: 'detail', sessionId: Number(sessionMatch[1]), spaceId: null }
   }
 
-  const exerciseMatch = pathname.match(/^\/exercises\/(\d+)$/)
-  if (exerciseMatch) {
-    return { view: 'progress', sessionId: null, exerciseId: Number(exerciseMatch[1]), spaceId: null }
-  }
-
-  return { view: 'sessions', sessionId: null, exerciseId: null, spaceId: null }
+  return { view: 'today', sessionId: null, spaceId: null }
 }
 
-const routePath = ({ view, sessionId, exerciseId, spaceId }) => {
+const routePath = ({ view, sessionId, spaceId }) => {
   if (view === 'today') return '/today'
   if (view === 'upload') return '/upload'
   if (view === 'connections') return '/spaces'
   if (view === 'quickRecord') return '/record'
   if (view === 'screenRecord') return '/record-screen'
   if (view === 'coachDashboard' && spaceId) return `/spaces/${spaceId}/dashboard`
-  if (view === 'compare' && spaceId) return `/spaces/${spaceId}/compare${sessionId ? `?session=${sessionId}` : ''}`
   if (view === 'detail' && sessionId) return `/sessions/${sessionId}`
-  if (view === 'progress' && exerciseId) return `/exercises/${exerciseId}`
-  return '/'
+  return '/today'
 }
 
 class ErrorBoundary extends Component {
@@ -96,33 +78,24 @@ class ErrorBoundary extends Component {
 function AppContent() {
   const { user, token, loading, logout, refreshUser } = useAuth()
   const toast = useToast()
-  const [sessions, setSessions] = useState([])
   const [exercises, setExercises] = useState([])
   const [spaces, setSpaces] = useState([])
-  const [sessionsLoading, setSessionsLoading] = useState(false)
   const [exercisesLoading, setExercisesLoading] = useState(false)
-  const [sessionsLoaded, setSessionsLoaded] = useState(false)
   const [exercisesLoaded, setExercisesLoaded] = useState(false)
-  const [sessionsNext, setSessionsNext] = useState(null)
   const [exercisesNext, setExercisesNext] = useState(null)
-  const [activeSpace, setActiveSpace] = useState(null) // null = all
   const initialRoute = useMemo(() => parseRoute(window.location.pathname), [])
   const [view, setView] = useState(initialRoute.view)
   const [routeSessionId, setRouteSessionId] = useState(initialRoute.sessionId)
-  const [routeExerciseId, setRouteExerciseId] = useState(initialRoute.exerciseId)
   const [routeSpaceId, setRouteSpaceId] = useState(initialRoute.spaceId)
   const [selectedSession, setSelectedSession] = useState(null)
-  const [selectedExercise, setSelectedExercise] = useState(null)
-  const [showCreateSpace, setShowCreateSpace] = useState(false)
-  const [newSpaceName, setNewSpaceName] = useState('')
 
   const headers = useMemo(() => authHeaders(token), [token])
   const screenRecordSupported = canUseScreenRecording()
+  const hasSpaces = spaces.length > 0 || Boolean(user?.has_spaces)
 
   const navigate = useCallback((nextRoute, { replace = false } = {}) => {
     setView(nextRoute.view)
     setRouteSessionId(nextRoute.sessionId ?? null)
-    setRouteExerciseId(nextRoute.exerciseId ?? null)
     setRouteSpaceId(nextRoute.spaceId ?? null)
     const path = routePath(nextRoute)
     if (path !== window.location.pathname) {
@@ -136,35 +109,15 @@ function AppContent() {
       const route = parseRoute(window.location.pathname)
       setView(route.view)
       setRouteSessionId(route.sessionId)
-      setRouteExerciseId(route.exerciseId)
       setRouteSpaceId(route.spaceId)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
-  useEffect(() => {
-    if (view !== 'detail') setSelectedSession(null)
-    if (view !== 'progress') setSelectedExercise(null)
-  }, [view])
-
-  const normalizeApiUrl = (url) => {
-    if (!url) return null
-    try {
-      const parsed = new URL(url, window.location.origin)
-      return `${parsed.pathname}${parsed.search}`
-    } catch {
-      return url
-    }
-  }
-
   const parseCollectionPayload = (data) => {
-    if (Array.isArray(data)) {
-      return { items: data, next: null }
-    }
-    if (data && Array.isArray(data.results)) {
-      return { items: data.results, next: normalizeApiUrl(data.next) }
-    }
+    if (Array.isArray(data)) return { items: data, next: null }
+    if (data && Array.isArray(data.results)) return { items: data.results, next: data.next || null }
     return { items: [], next: null }
   }
 
@@ -178,25 +131,6 @@ function AppContent() {
     }
   }, [headers, toast])
 
-  const fetchSessions = useCallback(async ({ append = false, url = null } = {}) => {
-    if (!append) setSessionsLoaded(false)
-    setSessionsLoading(true)
-    try {
-      const targetUrl = url || (activeSpace ? `/api/sessions/?space=${activeSpace}` : '/api/sessions/')
-      const res = await fetch(targetUrl, { headers })
-      if (!res.ok) throw new Error('sessions')
-      const data = await res.json()
-      const parsed = parseCollectionPayload(data)
-      setSessions(prev => (append ? [...prev, ...parsed.items] : parsed.items))
-      setSessionsNext(parsed.next)
-      setSessionsLoaded(true)
-    } catch {
-      if (!append) toast.error('Could not load sessions')
-    } finally {
-      setSessionsLoading(false)
-    }
-  }, [activeSpace, headers, toast])
-
   const fetchExercises = useCallback(async ({ append = false, url = null } = {}) => {
     if (!append) setExercisesLoaded(false)
     setExercisesLoading(true)
@@ -205,7 +139,7 @@ function AppContent() {
       if (!res.ok) throw new Error('exercises')
       const data = await res.json()
       const parsed = parseCollectionPayload(data)
-      setExercises(prev => (append ? [...prev, ...parsed.items] : parsed.items))
+      setExercises((prev) => (append ? [...prev, ...parsed.items] : parsed.items))
       setExercisesNext(parsed.next)
       setExercisesLoaded(true)
     } catch {
@@ -215,16 +149,25 @@ function AppContent() {
     }
   }, [headers, toast])
 
+  const openSessionById = useCallback(async (sessionId, { updateUrl = true } = {}) => {
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/`, { headers })
+      if (!res.ok) throw new Error('session')
+      const data = await res.json()
+      setSelectedSession(data)
+      if (updateUrl) navigate({ view: 'detail', sessionId: data.id, spaceId: null })
+    } catch {
+      toast.error('Could not load session')
+      navigate({ view: 'today', sessionId: null, spaceId: null }, { replace: true })
+    }
+  }, [headers, navigate, toast])
+
   useEffect(() => {
     if (user) {
       fetchSpaces()
       fetchExercises()
     }
   }, [user, fetchSpaces, fetchExercises])
-
-  useEffect(() => {
-    if (user) fetchSessions()
-  }, [user, activeSpace, fetchSessions])
 
   useEffect(() => {
     const handler = () => refreshUser()
@@ -238,118 +181,50 @@ function AppContent() {
     return () => window.removeEventListener('space-updated', handler)
   }, [fetchSpaces])
 
-  const openSessionById = useCallback(async (sessionId, { updateUrl = true } = {}) => {
-    try {
-      const res = await fetch(`/api/sessions/${sessionId}/`, { headers })
-      if (!res.ok) return toast.error('Could not load session')
-      const data = await res.json()
-      setSelectedSession(data)
-      if (updateUrl) navigate({ view: 'detail', sessionId: data.id, exerciseId: null })
-      else {
-        setView('detail')
-        setRouteSessionId(data.id)
-      }
-    } catch {
-      toast.error('Could not load session')
-    }
-  }, [headers, navigate, toast])
-
   useEffect(() => {
     if (!user) return
     if (view === 'detail' && routeSessionId && selectedSession?.id !== routeSessionId) {
       openSessionById(routeSessionId, { updateUrl: false })
     }
-    if (view === 'progress' && routeExerciseId && selectedExercise?.id !== routeExerciseId) {
-      const found = exercises.find((exercise) => exercise.id === routeExerciseId)
-      setSelectedExercise(found || { id: routeExerciseId, name: 'Exercise' })
-    }
-  }, [
-    user,
-    view,
-    routeSessionId,
-    routeExerciseId,
-    selectedSession?.id,
-    selectedExercise?.id,
-    exercises,
-    openSessionById,
-  ])
+  }, [user, view, routeSessionId, selectedSession?.id, openSessionById])
 
   useEffect(() => {
     if (!user) return
     if (view !== 'screenRecord') return
     if (screenRecordSupported) return
     toast.error('Screen recording is not supported on this browser')
-    navigate({ view: 'sessions', sessionId: null, exerciseId: null }, { replace: true })
+    navigate({ view: 'today', sessionId: null, spaceId: null }, { replace: true })
   }, [user, view, screenRecordSupported, navigate, toast])
-
-  const loadMoreSessions = async () => {
-    if (!sessionsNext || sessionsLoading) return
-    await fetchSessions({ append: true, url: sessionsNext })
-  }
 
   const loadMoreExercises = async () => {
     if (!exercisesNext || exercisesLoading) return
     await fetchExercises({ append: true, url: exercisesNext })
   }
 
-  const createSpace = async () => {
-    if (!newSpaceName.trim()) return
-    try {
-      const trimmedName = newSpaceName.trim()
-      const res = await fetch('/api/spaces/', {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: trimmedName }),
-      })
-      if (!res.ok) throw new Error('create-space')
-      setNewSpaceName('')
-      setShowCreateSpace(false)
-      fetchSpaces()
-      window.dispatchEvent(new CustomEvent('user-updated'))
-      toast.success(`Space "${trimmedName}" created`)
-    } catch {
-      toast.error('Error creating space')
-    }
-  }
-
   const openSession = (session) => {
     setSelectedSession(session)
-    navigate({ view: 'detail', sessionId: session.id, exerciseId: null })
+    navigate({ view: 'detail', sessionId: session.id, spaceId: null })
   }
 
-  const openProgress = (exercise) => {
-    setSelectedExercise(exercise)
-    navigate({ view: 'progress', sessionId: null, exerciseId: exercise.id })
-  }
-
-  const goHome = () => {
-    navigate({ view: 'sessions', sessionId: null, exerciseId: null, spaceId: null })
+  const goHome = useCallback(() => {
+    navigate({ view: 'today', sessionId: null, spaceId: null })
     setSelectedSession(null)
-    setSelectedExercise(null)
-    fetchSessions()
+    fetchSpaces()
+  }, [navigate, fetchSpaces])
+
+  const openToday = () => navigate({ view: 'today', sessionId: null, spaceId: null })
+  const openCoachDashboard = (spaceId) => navigate({ view: 'coachDashboard', sessionId: null, spaceId })
+
+  const handleProofSessionComplete = (session) => {
     fetchExercises()
     fetchSpaces()
-  }
-
-  const handleQuickRecordComplete = (session) => {
-    fetchSessions()
-    fetchExercises()
     setSelectedSession(session)
-    navigate({ view: 'detail', sessionId: session.id, exerciseId: null })
+    navigate({ view: 'detail', sessionId: session.id, spaceId: null })
   }
 
-  const openToday = () => {
-    navigate({ view: 'today', sessionId: null, exerciseId: null, spaceId: null })
+  if (loading) {
+    return <div className="min-h-screen bg-white flex items-center justify-center"><p className="text-sm text-gray-400">Loading...</p></div>
   }
-
-  const openCoachDashboard = (spaceId) => {
-    navigate({ view: 'coachDashboard', sessionId: null, exerciseId: null, spaceId })
-  }
-
-  const hasSpaces = spaces.length > 0 || Boolean(user?.has_spaces)
-  const joinedSpacesCount = Number.isFinite(user?.joined_spaces_count) ? user.joined_spaces_count : 0
-
-  if (loading) return <div className="min-h-screen bg-white flex items-center justify-center"><p className="text-sm text-gray-400">Loading...</p></div>
   if (!user) return <AuthForm />
 
   if (view === 'quickRecord') {
@@ -358,7 +233,7 @@ function AppContent() {
         token={token}
         exercises={exercises}
         spaces={spaces}
-        onComplete={handleQuickRecordComplete}
+        onComplete={handleProofSessionComplete}
         onCancel={goHome}
       />
     )
@@ -369,7 +244,7 @@ function AppContent() {
       <ScreenRecord
         token={token}
         spaces={spaces}
-        onComplete={handleQuickRecordComplete}
+        onComplete={handleProofSessionComplete}
         onCancel={goHome}
       />
     )
@@ -383,47 +258,23 @@ function AppContent() {
             Practica
           </button>
           <div className="flex items-center gap-3">
-            {view === 'sessions' && (
-              <>
-                <button
-                  onClick={openToday}
-                  className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
-                >
-                  Today
-                </button>
-                <button
-                  onClick={() => navigate({ view: 'upload', sessionId: null, exerciseId: null, spaceId: null })}
-                  className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors hidden sm:block"
-                >
-                  + Upload
-                </button>
-                <button
-                  onClick={() => navigate({ view: 'connections', sessionId: null, exerciseId: null, spaceId: null })}
-                  className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
-                >
-                  Spaces
-                </button>
-              </>
+            {hasSpaces && view !== 'today' && (
+              <button onClick={openToday} className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+                Today
+              </button>
             )}
-            {view !== 'sessions' && (
-              <>
-                {hasSpaces && view !== 'today' && (
-                  <button onClick={openToday} className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
-                    Today
-                  </button>
-                )}
-                {view !== 'connections' && (
-                  <button
-                    onClick={() => navigate({ view: 'connections', sessionId: null, exerciseId: null, spaceId: null })}
-                    className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
-                  >
-                    Spaces
-                  </button>
-                )}
-                <button onClick={goHome} className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
-                  Back
-                </button>
-              </>
+            {view !== 'connections' && (
+              <button
+                onClick={() => navigate({ view: 'connections', sessionId: null, spaceId: null })}
+                className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
+              >
+                Spaces
+              </button>
+            )}
+            {view !== 'today' && (
+              <button onClick={goHome} className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
+                Back
+              </button>
             )}
             <div className="flex items-center gap-2 border-l border-gray-100 pl-3">
               <span className="text-xs text-gray-400">{user.display_name}</span>
@@ -436,108 +287,6 @@ function AppContent() {
       </header>
 
       <main className="max-w-5xl mx-auto pb-24">
-        {view === 'sessions' && spaces.length > 0 && (
-          <div className="px-4 sm:px-6 pt-3">
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-              <button
-                onClick={() => setActiveSpace(null)}
-                className={`text-xs px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
-                  !activeSpace ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >All</button>
-              {spaces.map(space => (
-                <button
-                  key={space.id}
-                  onClick={() => setActiveSpace(activeSpace === space.id ? null : space.id)}
-                  className={`text-xs px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
-                    activeSpace === space.id ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {space.name}
-                  {space.session_count > 0 && <span className="ml-1 opacity-60">{space.session_count}</span>}
-                </button>
-              ))}
-              <button
-                onClick={() => setShowCreateSpace(true)}
-                className="text-xs px-2 py-1.5 text-gray-400 hover:text-gray-600 transition-colors whitespace-nowrap"
-              >+</button>
-            </div>
-          </div>
-        )}
-
-        {showCreateSpace && (
-          <div className="px-4 sm:px-6 pt-2 pb-1">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newSpaceName}
-                onChange={(e) => setNewSpaceName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && createSpace()}
-                placeholder="e.g. Drumming, Production, Qigong"
-                className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
-                autoFocus
-              />
-              <button onClick={createSpace} className="text-xs font-medium text-white bg-gray-900 px-3 py-1.5 rounded-lg">Create</button>
-              <button onClick={() => { setShowCreateSpace(false); setNewSpaceName('') }} className="text-xs text-gray-400 px-2">Cancel</button>
-            </div>
-          </div>
-        )}
-
-        {view === 'sessions' && !hasSpaces && !showCreateSpace && (
-          <div className="px-4 sm:px-6 pt-4">
-            <div className="w-full p-4 rounded-xl border border-dashed border-gray-200">
-              <p className="text-sm font-medium text-gray-700">Set up your first space</p>
-              <p className="text-xs text-gray-400 mt-1">Create your own space or join a space with an invite code.</p>
-              <div className="mt-3 flex gap-2">
-                <button
-                  onClick={() => setShowCreateSpace(true)}
-                  className="text-xs font-medium text-white bg-gray-900 px-3 py-1.5 rounded-md hover:bg-gray-800"
-                >
-                  Create space
-                </button>
-                <button
-                  onClick={() => navigate({ view: 'connections', sessionId: null, exerciseId: null })}
-                  className="text-xs text-gray-600 border border-gray-200 px-3 py-1.5 rounded-md hover:bg-gray-50"
-                >
-                  Join with code
-                </button>
-              </div>
-            </div>
-            {joinedSpacesCount > 0 && (
-              <p className="text-xs text-gray-400 mt-2">
-                You are currently a member in {joinedSpacesCount} joined {joinedSpacesCount === 1 ? 'space' : 'spaces'}.
-              </p>
-            )}
-          </div>
-        )}
-
-        {view === 'sessions' && (
-          <>
-            <SessionList
-              sessions={sessions}
-              exercises={exercises}
-              user={user}
-              spaces={spaces}
-              activeSpace={activeSpace}
-              sessionsLoading={sessionsLoading}
-              exercisesLoading={exercisesLoading}
-              sessionsLoaded={sessionsLoaded}
-              exercisesLoaded={exercisesLoaded}
-              sessionsHasMore={Boolean(sessionsNext)}
-              exercisesHasMore={Boolean(exercisesNext)}
-              onLoadMoreSessions={loadMoreSessions}
-              onLoadMoreExercises={loadMoreExercises}
-              onSessionSelect={openSession}
-              onExerciseSelect={openProgress}
-              onUploadClick={() => navigate({ view: 'upload', sessionId: null, exerciseId: null })}
-              onDeleteSession={async (id) => {
-                const res = await fetch(`/api/sessions/${id}/`, { method: 'DELETE', headers })
-                if (res.ok) fetchSessions()
-                else toast.error('You can only delete your own sessions')
-              }}
-            />
-          </>
-        )}
         {view === 'today' && (
           <TodayView
             token={token}
@@ -545,21 +294,23 @@ function AppContent() {
             spaces={spaces}
             initialSpaceId={routeSpaceId}
             onOpenDashboard={openCoachDashboard}
+            onOpenSession={openSession}
+            onUploadProof={(spaceId) => navigate({ view: 'upload', sessionId: null, spaceId: spaceId || null })}
+            onQuickRecordProof={(spaceId) => navigate({ view: 'quickRecord', sessionId: null, spaceId: spaceId || null })}
+            onScreenRecordProof={screenRecordSupported ? (spaceId) => navigate({ view: 'screenRecord', sessionId: null, spaceId: spaceId || null }) : null}
           />
         )}
+
         {view === 'upload' && (
           <SessionUpload
             token={token}
             spaces={spaces}
-            activeSpace={activeSpace}
-            onComplete={() => {
-              fetchSessions()
-              fetchSpaces()
-              navigate({ view: 'sessions', sessionId: null, exerciseId: null })
-            }}
-            onCancel={() => navigate({ view: 'sessions', sessionId: null, exerciseId: null, spaceId: null })}
+            activeSpace={routeSpaceId}
+            onComplete={handleProofSessionComplete}
+            onCancel={goHome}
           />
         )}
+
         {view === 'detail' && selectedSession && (
           <SessionDetail
             session={selectedSession}
@@ -573,58 +324,30 @@ function AppContent() {
               fetchExercises()
               fetchSpaces()
             }}
-            onOpenCompare={(spaceId, sessionId) => navigate({ view: 'compare', spaceId, sessionId, exerciseId: null })}
+            onOpenCompare={null}
           />
         )}
-        {view === 'compare' && routeSpaceId && (
-          <SpaceCompareView
-            token={token}
-            spaceId={routeSpaceId}
-            initialSessionId={routeSessionId}
-            onBack={goHome}
-          />
-        )}
-        {view === 'progress' && selectedExercise && (
-          <ErrorBoundary onBack={goHome}>
-            <ProgressView exercise={selectedExercise} token={token} onBack={goHome} />
-          </ErrorBoundary>
-        )}
+
         {view === 'connections' && (
           <ConnectionsView spaces={spaces} token={token} onSpacesChange={fetchSpaces} />
         )}
+
         {view === 'coachDashboard' && routeSpaceId && (
-          <CoachDashboard
-            token={token}
-            spaces={spaces}
-            spaceId={routeSpaceId}
-            exercises={exercises}
-            onOpenSpaceDashboard={openCoachDashboard}
-          />
+          <ErrorBoundary onBack={goHome}>
+            <CoachDashboard
+              token={token}
+              spaces={spaces}
+              spaceId={routeSpaceId}
+              exercises={exercises}
+              exercisesLoading={exercisesLoading}
+              exercisesLoaded={exercisesLoaded}
+              exercisesHasMore={Boolean(exercisesNext)}
+              onLoadMoreExercises={loadMoreExercises}
+              onOpenSpaceDashboard={openCoachDashboard}
+            />
+          </ErrorBoundary>
         )}
       </main>
-
-      {view === 'sessions' && (
-        <div className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-40 flex flex-col items-center gap-3">
-          {screenRecordSupported && (
-            <button
-              onClick={() => navigate({ view: 'screenRecord', sessionId: null, exerciseId: null })}
-              className="w-10 h-10 rounded-full bg-gray-800 hover:bg-gray-700 shadow-lg flex items-center justify-center transition-all active:scale-90 hover:scale-105 hidden sm:flex"
-              title="Record screen"
-            >
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
-              </svg>
-            </button>
-          )}
-          <button
-            onClick={() => navigate({ view: 'quickRecord', sessionId: null, exerciseId: null })}
-            className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/30 flex items-center justify-center transition-all active:scale-90 hover:scale-105"
-          >
-            <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-white rounded-full" />
-          </button>
-          <p className="text-[10px] text-gray-400 text-center">Record</p>
-        </div>
-      )}
     </div>
   )
 }

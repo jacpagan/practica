@@ -31,7 +31,17 @@ const buildCheckinState = (planItems, checkin) => {
   }
 }
 
-function TodayView({ token, user, spaces = [], initialSpaceId = null, onOpenDashboard }) {
+function TodayView({
+  token,
+  user,
+  spaces = [],
+  initialSpaceId = null,
+  onOpenDashboard,
+  onOpenSession,
+  onUploadProof,
+  onQuickRecordProof,
+  onScreenRecordProof,
+}) {
   const toast = useToast()
   const [selectedSpaceId, setSelectedSpaceId] = useState(initialSpaceId || spaces[0]?.id || null)
   const [loading, setLoading] = useState(false)
@@ -187,7 +197,16 @@ function TodayView({ token, user, spaces = [], initialSpaceId = null, onOpenDash
           <div className="py-12 text-center text-sm text-gray-400">Loading today’s plan…</div>
         ) : !plan ? (
           <div className="mt-4 rounded-xl border border-dashed border-gray-200 px-4 py-5 text-sm text-gray-500">
-            No active practice plan for this space yet.
+            <p>No active practice plan for this space yet.</p>
+            {selectedSpace?.is_owner ? (
+              <button
+                type="button"
+                onClick={() => onOpenDashboard?.(selectedSpace.id)}
+                className="mt-3 text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
+              >
+                Set up a plan
+              </button>
+            ) : null}
           </div>
         ) : (
           <div className="mt-4 space-y-4">
@@ -274,6 +293,60 @@ function TodayView({ token, user, spaces = [], initialSpaceId = null, onOpenDash
                   )
                 })
               )}
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 p-4 space-y-4">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Optional proof video</p>
+                <p className="text-sm text-gray-500 mt-1">Video is secondary in this MVP — use it only when context or accountability helps.</p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => onQuickRecordProof?.(selectedSpaceId)}
+                  className="text-xs font-medium text-white bg-gray-900 rounded-lg px-3 py-2 hover:bg-gray-800 transition-colors"
+                >
+                  Quick record
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onUploadProof?.(selectedSpaceId)}
+                  className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
+                >
+                  Upload video
+                </button>
+                {onScreenRecordProof ? (
+                  <button
+                    type="button"
+                    onClick={() => onScreenRecordProof(selectedSpaceId)}
+                    className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
+                  >
+                    Screen record
+                  </button>
+                ) : null}
+              </div>
+
+              {recentOwnSessions.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Recent proof sessions</p>
+                  {recentOwnSessions.slice(0, 4).map((session) => (
+                    <div key={session.id} className="rounded-xl bg-gray-50 px-3 py-3 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{session.title}</p>
+                        <p className="text-xs text-gray-500 mt-1">{session.description || 'Recorded proof video'}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onOpenSession?.(session)}
+                        className="text-xs text-gray-600 hover:text-gray-900 flex-shrink-0"
+                      >
+                        Review
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
 
             <div className="rounded-2xl border border-gray-200 p-4 space-y-4">
