@@ -169,7 +169,7 @@ EOS
 REMOTE_SCRIPT="${REMOTE_SCRIPT//__ENV_B64__/$ENV_B64}"
 REMOTE_SCRIPT="${REMOTE_SCRIPT//__GIT_REF__/${GIT_REF:-main}}"
 REMOTE_B64=$(printf '%s' "$REMOTE_SCRIPT" | base64 | tr -d '\n')
-COMMAND="mkdir -p /opt/practica && rm -f /opt/practica/.deploy-success /opt/practica/.deploy-failed && : > /opt/practica/deploy.log && echo '$REMOTE_B64' | base64 -d > /tmp/practica-deploy.sh && (systemctl stop practica-deploy.service 2>/dev/null || true) && (systemctl reset-failed practica-deploy.service 2>/dev/null || true) && systemd-run --unit practica-deploy --collect --no-block /bin/bash /tmp/practica-deploy.sh"
+COMMAND="mkdir -p /opt/practica && rm -f /opt/practica/.deploy-success /opt/practica/.deploy-failed && : > /opt/practica/deploy.log && echo '$REMOTE_B64' | base64 -d > /tmp/practica-deploy.sh && chmod +x /tmp/practica-deploy.sh && (systemctl stop practica-deploy.service 2>/dev/null || true) && (systemctl reset-failed practica-deploy.service 2>/dev/null || true) && systemd-run --unit practica-deploy --collect --no-block /bin/bash -lc '/tmp/practica-deploy.sh >> /opt/practica/deploy.log 2>&1'"
 COMMAND_ESCAPED=$(printf '%s' "$COMMAND" | sed 's/\\/\\\\/g; s/"/\\"/g')
 PARAMS_JSON="{\"commands\":[\"$COMMAND_ESCAPED\"]}"
 
@@ -241,7 +241,8 @@ if [ "$FINAL_STATUS" != "Success" ]; then
 fi
 
 DEPLOY_STATUS="pending"
-for i in $(seq 1 120); do
+MAX_DEPLOY_POLLS="${DEPLOY_STATUS_MAX_POLLS:-240}"
+for i in $(seq 1 "$MAX_DEPLOY_POLLS"); do
   STATUS_CMD_ID=$(send_short_ssm "if [ -f /opt/practica/.deploy-success ]; then echo success; elif [ -f /opt/practica/.deploy-failed ]; then echo failed; else echo pending; fi" "Practica deploy status")
   DEPLOY_STATUS=$(wait_for_ssm_output "$STATUS_CMD_ID" | tr -d '\r' | tail -n 1)
   echo "Remote deploy status: ${DEPLOY_STATUS:-pending}"
