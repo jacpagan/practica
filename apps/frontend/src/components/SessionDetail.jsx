@@ -22,10 +22,19 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
 
   const canEdit = Boolean(session?.can_edit)
   const reviewFeedback = Array.isArray(session?.review_feedback) ? session.review_feedback : []
-  const [shareUrl, setShareUrl] = useState('')
+  const [activeReviewLink, setActiveReviewLink] = useState(session?.active_review_link || null)
   const [sharing, setSharing] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [revokingShare, setRevokingShare] = useState(false)
+  const [editingFeedbackId, setEditingFeedbackId] = useState(null)
+  const [feedbackDraft, setFeedbackDraft] = useState({ text: '', timestamp_seconds: '' })
+  const [savingFeedback, setSavingFeedback] = useState(false)
+  const [deletingFeedbackId, setDeletingFeedbackId] = useState(null)
+
+  useEffect(() => {
+    setActiveReviewLink(initialSession?.active_review_link || null)
+  }, [initialSession?.active_review_link])
 
   const jumpToTimestamp = (seconds) => {
     const video = videoRef.current
@@ -83,11 +92,53 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
       })
       if (res.ok) {
         const data = await res.json()
-        setShareUrl(data.url)
+        setActiveReviewLink(data)
         try { await navigator.clipboard.writeText(data.url) } catch {}
+        toast.success(res.status === 201 ? 'Review link created' : 'Review link copied')
       }
-    } catch {}
+      else throw new Error('share')
+    } catch { toast.error('Could not create review link') }
     finally { setSharing(false) }
+  }
+
+  const copyShareLink = async () => {
+    if (!activeReviewLink?.url) return
+    try {
+      await navigator.clipboard.writeText(activeReviewLink.url)
+      toast.success('Review link copied')
+    } catch {
+      toast.error('Could not copy review link')
+    }
+  }
+
+  const revokeShareLink = async () => {
+    if (!token || !session?.id || !activeReviewLink) return
+    const accepted = await confirm?.({
+      title: 'Revoke review link?',
+      message: 'People with the current link will no longer be able to open or comment on this review page.',
+      confirmLabel: 'Revoke',
+      cancelLabel: 'Keep active',
+      tone: 'danger',
+    })
+    if (!accepted) return
+
+    setRevokingShare(true)
+    try {
+      const res = await fetch(`/api/sessions/${session.id}/share/revoke/`, {
+        method: 'POST',
+        headers: authHeaders,
+      })
+      if (!res.ok) throw new Error('revoke')
+      setActiveReviewLink(null)
+      const nextSession = { ...session, active_review_link: null }
+      setSession(nextSession)
+      onSessionUpdate?.(nextSession)
+      toast.success('Review link revoked')
+    } catch {
+      toast.error('Could not revoke review link')
+    } finally {
+      setRevokingShare(false)
+    }
   }
 
   const refreshSession = async () => {
@@ -98,6 +149,7 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
       if (!res.ok) throw new Error('refresh')
       const data = await res.json()
       setSession(data)
+      setActiveReviewLink(data.active_review_link || null)
       onSessionUpdate?.(data)
     } catch {
       toast.error('Could not refresh session')
@@ -130,6 +182,86 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
       toast.error('Could not delete practice entry')
     } finally {
       setDeleting(false)
+    }
+  }
+
+  const startEditingFeedback = (item) => {
+    setEditingFeedbackId(item.id)
+    setFeedbackDraft({
+      text: item.text || '',
+      timestamp_seconds: typeof item.timestamp_seconds === 'number' ? String(item.timestamp_seconds) : '',
+    })
+  }
+
+  const cancelEditingFeedback = () => {
+    setEditingFeedbackId(null)
+    setFeedbackDraft({ text: '', timestamp_seconds: '' })
+  }
+
+  const saveFeedbackEdit = async (feedbackId) => {
+    if (!token || !session?.id) return
+    const payload = {
+      text: feedbackDraft.text.trim(),
+      timestamp_seconds: feedbackDraft.timestamp_seconds === '' ? null : Number(feedbackDraft.timestamp_seconds),
+    }
+    if (!payload.text) {
+      toast.error('Feedback text is required')
+      return
+    }
+    setSavingFeedback(true)
+    try {
+      const res = await fetch(`/api/sessions/${session.id}/review-feedback/${feedbackId}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error('save-feedback')
+      const updated = await res.json()
+      const nextSession = {
+        ...session,
+        review_feedback: reviewFeedback.map((item) => item.id === feedbackId ? updated : item),
+      }
+      setSession(nextSession)
+      onSessionUpdate?.(nextSession)
+      cancelEditingFeedback()
+      toast.success('Feedback updated')
+    } catch {
+      toast.error('Could not update feedback')
+    } finally {
+      setSavingFeedback(false)
+    }
+  }
+
+  const deleteFeedback = async (item) => {
+    if (!token || !session?.id) return
+    const accepted = await confirm?.({
+      title: 'Delete feedback?',
+      message: 'This removes the public feedback comment from the session.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Keep',
+      tone: 'danger',
+    })
+    if (!accepted) return
+
+    setDeletingFeedbackId(item.id)
+    try {
+      const res = await fetch(`/api/sessions/${session.id}/review-feedback/${item.id}/`, {
+        method: 'DELETE',
+        headers: authHeaders,
+      })
+      if (!res.ok) throw new Error('delete-feedback')
+      const nextSession = {
+        ...session,
+        review_feedback: reviewFeedback.filter((feedback) => feedback.id !== item.id),
+      }
+      setSession(nextSession)
+      onSessionUpdate?.(nextSession)
+      if (editingFeedbackId === item.id) cancelEditingFeedback()
+      toast.success('Feedback deleted')
+    } catch {
+      toast.error('Could not delete feedback')
+    } finally {
+      setDeletingFeedbackId(null)
     }
   }
 
@@ -179,9 +311,20 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
                 </div>
                 {canEdit ? (
                   <div className="flex items-center gap-2">
-                    <button onClick={createShare} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
-                      {sharing ? 'Sharing…' : 'Share for review'}
-                    </button>
+                    {activeReviewLink ? (
+                      <>
+                        <button onClick={copyShareLink} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
+                          Copy review link
+                        </button>
+                        <button onClick={revokeShareLink} disabled={revokingShare} className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50 transition-colors">
+                          {revokingShare ? 'Revoking…' : 'Revoke link'}
+                        </button>
+                      </>
+                    ) : (
+                      <button onClick={createShare} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
+                        {sharing ? 'Sharing…' : 'Share for review'}
+                      </button>
+                    )}
                     <button onClick={refreshSession} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
                       {refreshing ? 'Refreshing…' : 'Refresh'}
                     </button>
@@ -193,10 +336,13 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
                 ) : null}
               </div>
 
-              {shareUrl ? (
+              {activeReviewLink?.url ? (
                 <div className="rounded-md bg-gray-50 border border-gray-200 px-3 py-2">
-                  <p className="text-xs text-gray-700">Link copied. Share this URL for feedback:</p>
-                  <p className="text-xs text-blue-700 break-all">{shareUrl}</p>
+                  <p className="text-xs text-gray-700">Share this URL for feedback:</p>
+                  <p className="text-xs text-blue-700 break-all">{activeReviewLink.url}</p>
+                  {activeReviewLink.expires_at ? (
+                    <p className="text-[11px] text-gray-400 mt-1">Expires {new Date(activeReviewLink.expires_at).toLocaleString()}</p>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -232,7 +378,61 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
                             </button>
                           ) : null}
                         </div>
-                        <p className="text-sm text-gray-700 mt-2 whitespace-pre-wrap">{item.text}</p>
+                        {editingFeedbackId === item.id ? (
+                          <div className="mt-2 space-y-3">
+                            <textarea
+                              value={feedbackDraft.text}
+                              onChange={(e) => setFeedbackDraft((current) => ({ ...current, text: e.target.value }))}
+                              rows={3}
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none bg-white"
+                            />
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Timestamp (seconds)</label>
+                              <input
+                                type="number"
+                                min="0"
+                                max={session.duration_seconds || undefined}
+                                step="1"
+                                value={feedbackDraft.timestamp_seconds}
+                                onChange={(e) => setFeedbackDraft((current) => ({ ...current, timestamp_seconds: e.target.value }))}
+                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white"
+                                placeholder="Leave blank for no timestamp"
+                              />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => saveFeedbackEdit(item.id)}
+                                disabled={savingFeedback}
+                                className="text-xs font-medium text-white bg-gray-900 rounded-lg px-3 py-2 hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                              >
+                                {savingFeedback ? 'Saving…' : 'Save'}
+                              </button>
+                              <button type="button" onClick={cancelEditingFeedback} className="text-xs text-gray-500 hover:text-gray-700 transition-colors">
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-sm text-gray-700 mt-2 whitespace-pre-wrap">{item.text}</p>
+                            {canEdit ? (
+                              <div className="flex items-center gap-3 mt-2">
+                                <button type="button" onClick={() => startEditingFeedback(item)} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => deleteFeedback(item)}
+                                  disabled={deletingFeedbackId === item.id}
+                                  className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50 transition-colors"
+                                >
+                                  {deletingFeedbackId === item.id ? 'Deleting…' : 'Delete'}
+                                </button>
+                              </div>
+                            ) : null}
+                          </>
+                        )}
                         <p className="text-xs text-gray-400 mt-2">{new Date(item.created_at).toLocaleString()}</p>
                       </div>
                     ))}

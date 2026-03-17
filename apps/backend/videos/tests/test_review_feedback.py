@@ -78,3 +78,47 @@ class ReviewFeedbackApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['timestamp_seconds'], 90)
+
+    def test_session_detail_includes_active_review_link_for_owner(self):
+        self._auth(self.owner)
+
+        response = self.client.post(f'/api/sessions/{self.session.id}/share/')
+        self.assertIn(response.status_code, {status.HTTP_200_OK, status.HTTP_201_CREATED})
+
+        detail = self.client.get(f'/api/sessions/{self.session.id}/')
+        self.assertEqual(detail.status_code, status.HTTP_200_OK)
+        self.assertIsNotNone(detail.data['active_review_link'])
+        self.assertIn('/r/', detail.data['active_review_link']['url'])
+
+    def test_create_share_link_reuses_existing_active_link(self):
+        self._auth(self.owner)
+
+        first = self.client.post(f'/api/sessions/{self.session.id}/share/')
+        second = self.client.post(f'/api/sessions/{self.session.id}/share/')
+
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
+        self.assertEqual(first.data['token'], second.data['token'])
+
+    def test_owner_can_update_and_delete_public_feedback(self):
+        item = ReviewFeedback.objects.create(
+            session=self.session,
+            review_link=self.link,
+            name='Coach',
+            timestamp_seconds=25,
+            text='Initial note',
+        )
+        self._auth(self.owner)
+
+        update_response = self.client.patch(
+            f'/api/sessions/{self.session.id}/review-feedback/{item.id}/',
+            {'text': 'Updated note', 'timestamp_seconds': 40},
+            format='json',
+        )
+        self.assertEqual(update_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(update_response.data['text'], 'Updated note')
+        self.assertEqual(update_response.data['timestamp_seconds'], 40)
+
+        delete_response = self.client.delete(f'/api/sessions/{self.session.id}/review-feedback/{item.id}/')
+        self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(ReviewFeedback.objects.filter(id=item.id).exists())

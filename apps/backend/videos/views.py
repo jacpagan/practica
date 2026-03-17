@@ -1039,6 +1039,9 @@ class SessionViewSet(viewsets.ModelViewSet):
         session = self.get_object()
         if not can_edit_session(request.user, session):
             raise PermissionDenied("You can only share your own sessions.")
+        existing_link = session.review_links.filter(is_active=True, expires_at__gt=timezone.now()).order_by('-created_at').first()
+        if existing_link:
+            return Response(ReviewLinkSerializer(existing_link, context={'request': request}).data, status=status.HTTP_200_OK)
         expires_at = timezone.now() + timedelta(days=7)
         token = secrets.token_urlsafe(16)
         link = ReviewLink.objects.create(
@@ -1058,6 +1061,23 @@ class SessionViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("You can only revoke your own sessions' links.")
         ReviewLink.objects.filter(session=session, is_active=True).update(is_active=False)
         return Response({'ok': True})
+
+    @action(detail=True, methods=['patch', 'delete'], url_path=r'review-feedback/(?P<feedback_id>[0-9]+)')
+    def review_feedback_detail(self, request, pk=None, feedback_id=None):
+        session = self.get_object()
+        if not can_edit_session(request.user, session):
+            raise PermissionDenied("You can only manage feedback on your own sessions.")
+
+        feedback = get_object_or_404(ReviewFeedback, pk=feedback_id, session=session)
+
+        if request.method == 'DELETE':
+            feedback.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        serializer = ReviewFeedbackSerializer(feedback, data=request.data, partial=True, context={'session': session})
+        serializer.is_valid(raise_exception=True)
+        updated = serializer.save()
+        return Response(ReviewFeedbackSerializer(updated).data)
 
     @action(detail=False, methods=['post'], url_path='multipart/initiate')
     def multipart_initiate(self, request):
