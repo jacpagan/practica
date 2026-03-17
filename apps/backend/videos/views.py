@@ -6,7 +6,7 @@ import os
 from datetime import date, timedelta
 from zoneinfo import ZoneInfo
 from django.shortcuts import get_object_or_404
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.db import connection, transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -1557,3 +1557,14 @@ def health_check(request):
         health_status['status'] = 'unhealthy'
     status_code = 200 if health_status['status'] == 'healthy' else 503
     return JsonResponse(health_status, status=status_code)
+
+
+def favicon(request):
+    """Serve a tiny blank favicon to avoid 404/502 noise.
+
+    Many browsers request /favicon.ico by default; serving an empty icon prevents gateway errors
+    if static assets aren't available yet.
+    """
+    resp = HttpResponse(b"", content_type='image/x-icon', status=200)
+    resp['Cache-Control'] = 'public, max-age=86400'
+    return resp

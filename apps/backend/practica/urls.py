@@ -12,6 +12,7 @@ from videos.views import (
     join_space, space_info,
     coach_metrics_summary,
     review_link_info, review_link_feedback,
+    favicon,
 )
 
 router = DefaultRouter()
@@ -35,6 +36,7 @@ urlpatterns = [
     path('api/join/<slug:slug>/', join_space, name='join_space'),
     path('api/space-info/<slug:slug>/', space_info, name='space_info'),
     path('health/', health_check, name='health_check'),
+    path('favicon.ico', favicon, name='favicon'),
 ]
 
 if settings.DEBUG:
