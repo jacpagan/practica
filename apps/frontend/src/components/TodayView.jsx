@@ -1,44 +1,19 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { authHeaders } from '../auth'
+import {
+  deleteSavedSpaceReference,
+  fmtDate,
+  readSavedSpaceReferences,
+  saveSavedSpaceReference,
+  writeReferenceAttemptDraft,
+} from '../utils'
 import { useToast } from './Toast'
-import PlanEditor from './PlanEditor'
-import { deleteSavedSpaceReference, readSavedSpaceReferences, saveSavedSpaceReference, writeReferenceAttemptDraft } from '../utils'
-
-const STATUS_OPTIONS = [
-  { value: 'complete', label: 'Complete' },
-  { value: 'partial', label: 'Partial' },
-  { value: 'skipped', label: 'Skipped' },
-  { value: 'missed', label: 'Missed' },
-]
-
-const buildCheckinState = (planItems, checkin) => {
-  const existingItems = new Map((checkin?.items || []).map((item) => [item.plan_item, item]))
-  const items = {}
-  planItems.forEach((planItem) => {
-    const existing = existingItems.get(planItem.id)
-    items[planItem.id] = {
-      completed: Boolean(existing?.completed),
-      minutes: existing?.minutes ?? '',
-      reps: existing?.reps ?? '',
-      notes: existing?.notes || '',
-    }
-  })
-
-  return {
-    status: checkin?.status || 'partial',
-    totalMinutes: checkin?.total_minutes ?? '',
-    notes: checkin?.notes || '',
-    linkedSessionId: checkin?.linked_session_id || '',
-    items,
-  }
-}
 
 function TodayView({
   token,
   user,
   spaces = [],
   initialSpaceId = null,
-  exercises = [],
   onOpenSession,
   onUploadProof,
   onQuickRecordProof,
@@ -47,18 +22,10 @@ function TodayView({
   const toast = useToast()
   const [selectedSpaceId, setSelectedSpaceId] = useState(initialSpaceId || spaces[0]?.id || null)
   const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [bundle, setBundle] = useState(null)
-  const [plan, setPlan] = useState(null)
-  const [planItems, setPlanItems] = useState([])
-  const [checkinState, setCheckinState] = useState(buildCheckinState([], null))
-  const [recentSessions, setRecentSessions] = useState([])
-  const [showCoachTools, setShowCoachTools] = useState(false)
-  const [coachSummaryLoading, setCoachSummaryLoading] = useState(false)
-  const [coachSummary, setCoachSummary] = useState(null)
-  const [referenceTitleDraft, setReferenceTitleDraft] = useState('')
-  const [referenceUrlDraft, setReferenceUrlDraft] = useState('')
-  const [referenceNotesDraft, setReferenceNotesDraft] = useState('')
+  const [sessions, setSessions] = useState([])
+  const [referenceTitle, setReferenceTitle] = useState('')
+  const [referenceUrl, setReferenceUrl] = useState('')
+  const [referenceNotes, setReferenceNotes] = useState('')
   const [savedReferences, setSavedReferences] = useState([])
 
   useEffect(() => {
@@ -71,157 +38,78 @@ function TodayView({
     }
   }, [spaces, selectedSpaceId, initialSpaceId])
 
-  const selectedSpace = useMemo(
-    () => spaces.find((space) => space.id === selectedSpaceId) || null,
-    [spaces, selectedSpaceId],
-  )
-  const selectedSpaceIsOwner = Boolean(selectedSpace?.is_owner)
-
-  const recentOwnSessions = useMemo(
-    () => recentSessions.filter((session) => session.owner_id === user?.id),
-    [recentSessions, user?.id],
-  )
-
-  const loadToday = useCallback(async () => {
-    if (!selectedSpaceId) return
-    setLoading(true)
-    try {
-      const [todayRes, sessionsRes] = await Promise.all([
-        fetch(`/api/spaces/${selectedSpaceId}/checkins/today/`, { headers: authHeaders(token) }),
-        fetch(`/api/sessions/?space=${selectedSpaceId}`, { headers: authHeaders(token) }),
-      ])
-      if (!todayRes.ok) throw new Error('today')
-      const todayData = await todayRes.json()
-      const sessionsData = sessionsRes.ok ? await sessionsRes.json() : []
-      const nextPlan = todayData?.plan || null
-      const nextItems = Array.isArray(todayData?.plan_items) ? todayData.plan_items : []
-      const nextCheckin = todayData?.checkin || null
-      setBundle(todayData)
-      setPlan(nextPlan)
-      setPlanItems(nextItems)
-      setCheckinState(buildCheckinState(nextItems, nextCheckin))
-      setRecentSessions(Array.isArray(sessionsData?.results) ? sessionsData.results : Array.isArray(sessionsData) ? sessionsData : [])
-    } catch {
-      toast.error('Could not load practice workspace')
-    } finally {
-      setLoading(false)
-    }
-  }, [selectedSpaceId, token, toast])
-
-  useEffect(() => {
-    if (selectedSpaceId) loadToday()
-  }, [selectedSpaceId, loadToday])
-
   useEffect(() => {
     setSavedReferences(readSavedSpaceReferences(selectedSpaceId))
   }, [selectedSpaceId])
 
-  const loadCoachSummary = useCallback(async () => {
-    if (!selectedSpaceId || !selectedSpaceIsOwner) {
-      setCoachSummary(null)
-      return
-    }
-    setCoachSummaryLoading(true)
-    try {
-      const res = await fetch(`/api/spaces/${selectedSpaceId}/adherence/?window_days=7`, { headers: authHeaders(token) })
-      if (!res.ok) throw new Error('adherence')
-      const data = await res.json()
-      setCoachSummary(data)
-    } catch {
-      toast.error('Could not load student accountability snapshot')
-    } finally {
-      setCoachSummaryLoading(false)
-    }
-  }, [selectedSpaceId, selectedSpaceIsOwner, token, toast])
+  const selectedSpace = useMemo(
+    () => spaces.find((space) => space.id === selectedSpaceId) || null,
+    [spaces, selectedSpaceId],
+  )
 
   useEffect(() => {
-    loadCoachSummary()
-  }, [loadCoachSummary])
+    if (!selectedSpaceId) {
+      setSessions([])
+      return
+    }
 
-  const updateItem = (itemId, field, value) => {
-    setCheckinState((current) => ({
-      ...current,
-      items: {
-        ...current.items,
-        [itemId]: {
-          ...(current.items[itemId] || {}),
-          [field]: value,
-        },
-      },
-    }))
-  }
+    let cancelled = false
+    const loadSessions = async () => {
+      setLoading(true)
+      try {
+        const res = await fetch(`/api/sessions/?space=${selectedSpaceId}`, { headers: authHeaders(token) })
+        if (!res.ok) throw new Error('sessions')
+        const data = await res.json()
+        const items = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : []
+        if (!cancelled) setSessions(items)
+      } catch {
+        if (!cancelled) toast.error('Could not load practice journal')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
 
-  const launchReferenceAttempt = (launcher, override = null) => {
-    const draftTitle = String(override?.title ?? override?.reference_title ?? referenceTitleDraft).trim()
-    const draftUrl = String(override?.reference_url ?? referenceUrlDraft).trim()
-    const url = draftUrl
-    if (!url) {
-      toast.error('Paste a YouTube or teacher video URL first')
+    loadSessions()
+    return () => { cancelled = true }
+  }, [selectedSpaceId, token, toast])
+
+  const launchAttempt = (launcher, override = null) => {
+    const nextTitle = String(override?.title ?? referenceTitle).trim()
+    const nextUrl = String(override?.reference_url ?? referenceUrl).trim()
+    const nextNotes = String(override?.notes ?? referenceNotes).trim()
+    if (!nextUrl) {
+      toast.error('Paste a YouTube link first')
       return
     }
     writeReferenceAttemptDraft({
-      reference_title: draftTitle,
-      reference_url: url,
+      reference_title: nextTitle,
+      reference_url: nextUrl,
+      notes: nextNotes,
       space_id: selectedSpaceId || null,
     })
-    setReferenceTitleDraft(draftTitle)
-    setReferenceUrlDraft(draftUrl)
-    setReferenceNotesDraft(String(override?.notes ?? referenceNotesDraft).trim())
+    setReferenceTitle(nextTitle)
+    setReferenceUrl(nextUrl)
+    setReferenceNotes(nextNotes)
     launcher?.(selectedSpaceId)
   }
 
-  const saveReferenceToLibrary = () => {
-    const url = referenceUrlDraft.trim()
-    if (!selectedSpaceId || !url) {
-      toast.error('Paste a YouTube URL first')
+  const saveReference = () => {
+    if (!selectedSpaceId || !referenceUrl.trim()) {
+      toast.error('Paste a YouTube link first')
       return
     }
     const next = saveSavedSpaceReference(selectedSpaceId, {
-      title: referenceTitleDraft.trim() || url,
-      reference_url: url,
-      notes: referenceNotesDraft.trim(),
+      title: referenceTitle.trim() || referenceUrl.trim(),
+      reference_url: referenceUrl.trim(),
+      notes: referenceNotes.trim(),
     })
     setSavedReferences(next)
-    toast.success('Saved reference')
+    toast.success('Saved link')
   }
 
-  const removeSavedReference = (referenceId) => {
+  const removeReference = (referenceId) => {
     const next = deleteSavedSpaceReference(selectedSpaceId, referenceId)
     setSavedReferences(next)
-  }
-
-  const submitCheckin = async () => {
-    if (!selectedSpaceId) return
-    setSaving(true)
-    try {
-      const itemsPayload = planItems.map((item) => ({
-        plan_item_id: item.id,
-        completed: Boolean(checkinState.items[item.id]?.completed),
-        minutes: checkinState.items[item.id]?.minutes === '' ? null : Number(checkinState.items[item.id]?.minutes),
-        reps: checkinState.items[item.id]?.reps === '' ? null : Number(checkinState.items[item.id]?.reps),
-        notes: (checkinState.items[item.id]?.notes || '').trim(),
-      }))
-
-      const res = await fetch(`/api/spaces/${selectedSpaceId}/checkins/upsert/`, {
-        method: 'POST',
-        headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          date: bundle?.date,
-          status: checkinState.status,
-          total_minutes: checkinState.totalMinutes === '' ? null : Number(checkinState.totalMinutes),
-          notes: checkinState.notes.trim(),
-          linked_session_id: checkinState.linkedSessionId || null,
-          items: itemsPayload,
-        }),
-      })
-      if (!res.ok) throw new Error('save')
-      toast.success('Check-in saved')
-      await loadToday()
-    } catch {
-      toast.error('Could not save check-in')
-    } finally {
-      setSaving(false)
-    }
   }
 
   if (!spaces.length) {
@@ -229,7 +117,7 @@ function TodayView({
       <div className="px-4 sm:px-6 pt-6">
         <div className="rounded-2xl border border-dashed border-gray-200 p-6 text-center">
           <h2 className="text-sm font-semibold text-gray-900">No spaces yet</h2>
-          <p className="text-sm text-gray-500 mt-2">Join or create a space before using daily check-ins.</p>
+          <p className="text-sm text-gray-500 mt-2">Create or join a space first. After that, this becomes a simple practice journal.</p>
         </div>
       </div>
     )
@@ -249,447 +137,180 @@ function TodayView({
         ))}
       </div>
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-gray-400">Practice</p>
-            <h2 className="text-lg font-semibold text-gray-900 mt-1">{selectedSpace?.name}</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              {bundle?.date ? `Reference → attempt → feedback for ${bundle.date}` : 'Reference-led practice workspace'}
-            </p>
-          </div>
-          {selectedSpaceIsOwner ? (
-            <button
-              onClick={() => setShowCoachTools((current) => !current)}
-              className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
-            >
-              {showCoachTools ? 'Hide coach tools' : 'Coach tools'}
-            </button>
-          ) : null}
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5 space-y-5">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-gray-400">Practice Journal</p>
+          <h2 className="text-lg font-semibold text-gray-900 mt-1">{selectedSpace?.name}</h2>
+          <p className="text-sm text-gray-500 mt-1">Paste a YouTube practice video, record your attempt, and keep a simple accountability log.</p>
         </div>
 
-        {selectedSpaceIsOwner ? (
-          <div className="mt-4 rounded-2xl border border-gray-200 p-4 space-y-4 bg-white">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-gray-900">Coach view</p>
-                <p className="text-sm text-gray-500 mt-1">Structured coaching is optional here — only use it when it helps the loop.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowCoachTools((current) => !current)}
-                className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
-              >
-                {showCoachTools ? 'Hide structured plan' : 'Structured plan (optional)'}
-              </button>
-            </div>
-
-            {showCoachTools ? (
-              <PlanEditor token={token} space={selectedSpace} exercises={exercises} onPlanChange={() => { loadToday(); loadCoachSummary() }} />
-            ) : null}
-
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Student snapshot</p>
-              {coachSummaryLoading ? (
-                <p className="text-sm text-gray-400">Loading student check-ins…</p>
-              ) : (coachSummary?.members || []).length === 0 ? (
-                <p className="text-sm text-gray-500">Invite a student from Spaces to start the accountability loop.</p>
-              ) : (
-                <div className="space-y-2">
-                  {coachSummary.members.map((member) => (
-                    <div key={member.user_id} className="rounded-xl bg-gray-50 px-3 py-3 flex flex-wrap items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900">{member.display_name}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {member.last_checkin_date ? `Last check-in ${member.last_checkin_date}` : 'No check-ins yet'}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2 text-[11px]">
-                        <span className="bg-gray-200 text-gray-700 px-2 py-1 rounded-full">{Math.round((member.completion_rate || 0) * 100)}% complete</span>
-                        <span className="bg-gray-200 text-gray-700 px-2 py-1 rounded-full">Streak {member.streak_current}</span>
-                        <span className="bg-amber-50 text-amber-700 px-2 py-1 rounded-full">{member.missed_dates.length} missed</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+        <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 space-y-3">
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Start from a YouTube reference</p>
+            <p className="text-xs text-gray-500 mt-1">Perfect for Dorothy Fitzer or any other teacher-led qigong/tai chi follow-along.</p>
           </div>
-        ) : null}
-
-        {loading ? (
-          <div className="py-12 text-center text-sm text-gray-400">Loading practice workspace…</div>
-        ) : !plan ? (
-          <div className="mt-4 rounded-xl border border-dashed border-gray-200 px-4 py-5 text-sm text-gray-500">
-            <p>No structured plan is set for this space yet.</p>
-            {selectedSpaceIsOwner ? (
+          <input
+            type="text"
+            value={referenceTitle}
+            onChange={(e) => setReferenceTitle(e.target.value)}
+            placeholder="Dorothy Fitzer — 8 Brocades"
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white"
+          />
+          <input
+            type="url"
+            value={referenceUrl}
+            onChange={(e) => setReferenceUrl(e.target.value)}
+            placeholder="https://www.youtube.com/watch?..."
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white"
+          />
+          <textarea
+            value={referenceNotes}
+            onChange={(e) => setReferenceNotes(e.target.value)}
+            rows={2}
+            placeholder="Optional note to yourself or your coach"
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white resize-none"
+          />
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => launchAttempt(onQuickRecordProof)}
+              className="text-xs font-medium text-white bg-gray-900 rounded-lg px-3 py-2 hover:bg-gray-800 transition-colors"
+            >
+              Record attempt
+            </button>
+            <button
+              type="button"
+              onClick={() => launchAttempt(onUploadProof)}
+              className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
+            >
+              Upload attempt
+            </button>
+            {onScreenRecordProof ? (
               <button
                 type="button"
-                onClick={() => setShowCoachTools(true)}
-                className="mt-3 text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
+                onClick={() => launchAttempt(onScreenRecordProof)}
+                className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
               >
-                Add optional plan
+                Screen record
               </button>
             ) : null}
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => onQuickRecordProof?.(selectedSpaceId)}
-                className="text-xs font-medium text-white bg-gray-900 rounded-lg px-3 py-2 hover:bg-gray-800 transition-colors"
-              >
-                Record attempt anyway
-              </button>
-              <button
-                type="button"
-                onClick={() => onUploadProof?.(selectedSpaceId)}
-                className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
-              >
-                Upload attempt
-              </button>
-            </div>
-            <p className="text-xs text-gray-400 mt-3">A plan is optional — the main flow is still reference video → attempt.</p>
+            <button
+              type="button"
+              onClick={saveReference}
+              className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
+            >
+              Save link
+            </button>
           </div>
-        ) : (
-          <div className="mt-4 space-y-4">
-            <div className="rounded-xl bg-gray-50 px-4 py-3">
-              <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Optional structure</p>
-              <p className="text-sm font-medium text-gray-900">{plan.name}</p>
-              {plan.description ? <p className="text-sm text-gray-600 mt-1">{plan.description}</p> : null}
-              <p className="text-xs text-gray-400 mt-2">Timezone: {plan.timezone}</p>
-            </div>
+        </div>
 
-            <div className="space-y-3">
-              {planItems.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-gray-200 px-4 py-5 text-sm text-gray-500">
-                  Nothing is scheduled for today.
-                </div>
-              ) : (
-                planItems.map((item) => {
-                  const state = checkinState.items[item.id] || {}
-                  return (
-                    <div key={item.id} className="rounded-2xl border border-gray-200 p-4 space-y-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">{item.exercise_name}</p>
-                          <div className="flex flex-wrap gap-1.5 mt-1">
-                            {item.target_minutes ? <span className="text-[11px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{item.target_minutes} min</span> : null}
-                            {item.target_reps ? <span className="text-[11px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{item.target_reps} reps</span> : null}
-                          </div>
-                        </div>
-                        <label className="flex items-center gap-2 text-sm text-gray-700">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(state.completed)}
-                            onChange={(e) => updateItem(item.id, 'completed', e.target.checked)}
-                            className="rounded border-gray-300"
-                          />
-                          Done
-                        </label>
-                      </div>
-
-                      {item.notes ? <p className="text-sm text-gray-600">{item.notes}</p> : null}
-                      {item.reference_clip_detail?.watch_url_with_start ? (
-                        <a
-                          href={item.reference_clip_detail.watch_url_with_start}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex text-xs text-blue-600 hover:text-blue-700"
-                        >
-                          {item.reference_clip_detail.title || 'Open reference clip'}
-                        </a>
-                      ) : null}
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <label className="block">
-                          <span className="text-xs text-gray-500">Minutes</span>
-                          <input
-                            type="number"
-                            min="0"
-                            value={state.minutes ?? ''}
-                            onChange={(e) => updateItem(item.id, 'minutes', e.target.value)}
-                            className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
-                          />
-                        </label>
-                        <label className="block">
-                          <span className="text-xs text-gray-500">Reps</span>
-                          <input
-                            type="number"
-                            min="0"
-                            value={state.reps ?? ''}
-                            onChange={(e) => updateItem(item.id, 'reps', e.target.value)}
-                            className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
-                          />
-                        </label>
-                        <label className="block sm:col-span-1">
-                          <span className="text-xs text-gray-500">Quick note</span>
-                          <input
-                            type="text"
-                            value={state.notes || ''}
-                            onChange={(e) => updateItem(item.id, 'notes', e.target.value)}
-                            className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
-                            placeholder="How it felt"
-                          />
-                        </label>
-                      </div>
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Saved links on this device</p>
+          {savedReferences.length === 0 ? (
+            <p className="text-sm text-gray-500">Save your favorite reference links once, then relaunch attempts with one tap.</p>
+          ) : (
+            <div className="space-y-2">
+              {savedReferences.map((reference) => (
+                <div key={reference.id} className="rounded-xl bg-gray-50 px-3 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900">{reference.title}</p>
+                      {reference.notes ? <p className="text-xs text-gray-500 mt-1">{reference.notes}</p> : null}
                     </div>
-                  )
-                })
-              )}
-            </div>
-
-            <div className="rounded-2xl border border-gray-200 p-4 space-y-4">
-              <div>
-                <p className="text-sm font-semibold text-gray-900">Optional proof video</p>
-                <p className="text-sm text-gray-500 mt-1">Best flow: paste the teacher video you are following, then record your attempt against it.</p>
-              </div>
-
-              <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 space-y-3">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Start from a YouTube reference</p>
-                  <p className="text-xs text-gray-500 mt-1">Example: Dorothy Fitzer qigong follow-alongs. This keeps the source video attached to your attempt for teacher review.</p>
-                </div>
-                <input
-                  type="text"
-                  value={referenceTitleDraft}
-                  onChange={(e) => setReferenceTitleDraft(e.target.value)}
-                  placeholder="Dorothy Fitzer — 8 Brocades"
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white"
-                />
-                <input
-                  type="url"
-                  value={referenceUrlDraft}
-                  onChange={(e) => setReferenceUrlDraft(e.target.value)}
-                  placeholder="https://www.youtube.com/watch?..."
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white"
-                />
-                <textarea
-                  value={referenceNotesDraft}
-                  onChange={(e) => setReferenceNotesDraft(e.target.value)}
-                  rows={2}
-                  placeholder="Optional note about why this reference matters"
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white resize-none"
-                />
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => launchReferenceAttempt(onQuickRecordProof)}
-                    className="text-xs font-medium text-white bg-gray-900 rounded-lg px-3 py-2 hover:bg-gray-800 transition-colors"
-                  >
-                    Record attempt
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => launchReferenceAttempt(onUploadProof)}
-                    className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
-                  >
-                    Upload attempt
-                  </button>
-                  {onScreenRecordProof ? (
                     <button
                       type="button"
-                      onClick={() => launchReferenceAttempt(onScreenRecordProof)}
-                      className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
+                      onClick={() => removeReference(reference.id)}
+                      className="text-xs text-gray-400 hover:text-red-500 flex-shrink-0"
                     >
-                      Screen-record attempt
+                      Delete
                     </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={saveReferenceToLibrary}
-                    className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
-                  >
-                    Save link
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Saved links on this device</p>
-                {savedReferences.length === 0 ? (
-                  <p className="text-sm text-gray-500">Save your favorite Dorothy Fitzer links once, then relaunch attempts with one tap.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {savedReferences.map((reference) => (
-                      <div key={reference.id} className="rounded-xl bg-gray-50 px-3 py-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-gray-900">{reference.title}</p>
-                            {reference.notes ? <p className="text-xs text-gray-500 mt-1">{reference.notes}</p> : null}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => removeSavedReference(reference.id)}
-                            className="text-xs text-gray-400 hover:text-red-500 flex-shrink-0"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setReferenceTitleDraft(reference.title || '')
-                              setReferenceUrlDraft(reference.reference_url || '')
-                              setReferenceNotesDraft(reference.notes || '')
-                            }}
-                            className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
-                          >
-                            Use
-                          </button>
-                          <a
-                            href={reference.reference_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
-                          >
-                            Open
-                          </a>
-                          <button
-                            type="button"
-                            onClick={() => launchReferenceAttempt(onQuickRecordProof, reference)}
-                            className="text-xs font-medium text-white bg-gray-900 rounded-lg px-3 py-2 hover:bg-gray-800 transition-colors"
-                          >
-                            Record
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => launchReferenceAttempt(onUploadProof, reference)}
-                            className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
-                          >
-                            Upload
-                          </button>
-                          {onScreenRecordProof ? (
-                            <button
-                              type="button"
-                              onClick={() => launchReferenceAttempt(onScreenRecordProof, reference)}
-                              className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
-                            >
-                              Screen record
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    ))}
                   </div>
-                )}
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => onQuickRecordProof?.(selectedSpaceId)}
-                  className="text-xs font-medium text-white bg-gray-900 rounded-lg px-3 py-2 hover:bg-gray-800 transition-colors"
-                >
-                  Quick record
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onUploadProof?.(selectedSpaceId)}
-                  className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
-                >
-                  Upload video
-                </button>
-                {onScreenRecordProof ? (
-                  <button
-                    type="button"
-                    onClick={() => onScreenRecordProof(selectedSpaceId)}
-                    className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
-                  >
-                    Screen record
-                  </button>
-                ) : null}
-              </div>
-
-              {recentOwnSessions.length > 0 ? (
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Recent proof sessions</p>
-                  {recentOwnSessions.slice(0, 4).map((session) => (
-                    <div key={session.id} className="rounded-xl bg-gray-50 px-3 py-3 flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{session.title}</p>
-                        <p className="text-xs text-gray-500 mt-1">{session.description || 'Recorded proof video'}</p>
-                      </div>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReferenceTitle(reference.title || '')
+                        setReferenceUrl(reference.reference_url || '')
+                        setReferenceNotes(reference.notes || '')
+                      }}
+                      className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
+                    >
+                      Use
+                    </button>
+                    <a
+                      href={reference.reference_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
+                    >
+                      Open
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => launchAttempt(onQuickRecordProof, reference)}
+                      className="text-xs font-medium text-white bg-gray-900 rounded-lg px-3 py-2 hover:bg-gray-800 transition-colors"
+                    >
+                      Record
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => launchAttempt(onUploadProof, reference)}
+                      className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
+                    >
+                      Upload
+                    </button>
+                    {onScreenRecordProof ? (
                       <button
                         type="button"
-                        onClick={() => onOpenSession?.(session)}
-                        className="text-xs text-gray-600 hover:text-gray-900 flex-shrink-0"
+                        onClick={() => launchAttempt(onScreenRecordProof, reference)}
+                        className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
                       >
-                        Review
+                        Screen
                       </button>
-                    </div>
-                  ))}
+                    ) : null}
+                  </div>
                 </div>
-              ) : null}
+              ))}
             </div>
+          )}
+        </div>
 
-            <div className="rounded-2xl border border-gray-200 p-4 space-y-4">
-              <div>
-                <p className="text-sm font-semibold text-gray-900">Daily summary</p>
-                <p className="text-sm text-gray-500 mt-1">Capture how today went, even if it was partial.</p>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {STATUS_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setCheckinState((current) => ({ ...current, status: option.value }))}
-                    className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${checkinState.status === option.value ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="text-xs text-gray-500">Total minutes</span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={checkinState.totalMinutes}
-                    onChange={(e) => setCheckinState((current) => ({ ...current, totalMinutes: e.target.value }))}
-                    className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-gray-400"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-xs text-gray-500">Optional proof session</span>
-                  <select
-                    value={checkinState.linkedSessionId}
-                    onChange={(e) => setCheckinState((current) => ({ ...current, linkedSessionId: e.target.value }))}
-                    className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm bg-white focus:outline-none focus:border-gray-400"
-                  >
-                    <option value="">No linked session</option>
-                    {recentOwnSessions.map((session) => (
-                      <option key={session.id} value={session.id}>{session.title}</option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="block sm:col-span-2">
-                  <span className="text-xs text-gray-500">Notes</span>
-                  <textarea
-                    value={checkinState.notes}
-                    onChange={(e) => setCheckinState((current) => ({ ...current, notes: e.target.value }))}
-                    rows={3}
-                    className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:border-gray-400"
-                    placeholder="Anything your coach should know?"
-                  />
-                </label>
-              </div>
-
-              <button
-                type="button"
-                onClick={submitCheckin}
-                disabled={saving}
-                className="text-sm font-medium text-white bg-gray-900 rounded-xl px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors"
-              >
-                {saving ? 'Saving…' : 'Save practice check-in'}
-              </button>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Recent journal entries</p>
+              <p className="text-xs text-gray-500 mt-1">Each entry is a practice attempt your coach can review.</p>
             </div>
+            {loading ? <span className="text-xs text-gray-400">Loading…</span> : null}
           </div>
-        )}
+
+          {sessions.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-200 px-4 py-5 text-sm text-gray-500">
+              No attempts yet. Start from a YouTube link above.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {sessions.map((session) => (
+                <button
+                  key={session.id}
+                  type="button"
+                  onClick={() => onOpenSession?.(session)}
+                  className="w-full text-left rounded-2xl border border-gray-200 px-4 py-3 hover:border-gray-300 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{session.title}</p>
+                      <p className="text-xs text-gray-500 mt-1">{session.owner_name || 'You'} · {fmtDate(session.recorded_at || session.created_at)}</p>
+                      {session.reference_title ? <p className="text-xs text-blue-700 mt-2 truncate">Reference: {session.reference_title}</p> : null}
+                      {session.description ? <p className="text-xs text-gray-500 mt-2 line-clamp-2">{session.description}</p> : null}
+                    </div>
+                    <span className="text-xs text-gray-400 flex-shrink-0">Open</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
