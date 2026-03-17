@@ -457,3 +457,45 @@ class CoachDailyMetric(models.Model):
 
     def __str__(self):
         return f"CoachDailyMetric coach={self.coach_id} date={self.date}"
+
+
+# ── Review links (magic share) ─────────────────────────────────────
+
+class ReviewLink(models.Model):
+    """A time-limited share token that grants public view access to a session."""
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='review_links')
+    token = models.CharField(max_length=40, unique=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_review_links')
+    expires_at = models.DateTimeField()
+    is_active = models.BooleanField(default=True)
+    allow_comments = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_accessed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"ReviewLink {self.token} session={self.session_id} active={self.is_active}"
+
+
+class ReviewFeedback(models.Model):
+    """Lightweight comments from public reviewers via ReviewLink.
+
+    Kept separate from internal Comment to avoid auth/user constraints.
+    """
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='review_feedback')
+    review_link = models.ForeignKey(ReviewLink, on_delete=models.CASCADE, related_name='feedback')
+    name = models.CharField(max_length=120, blank=True)
+    email = models.EmailField(blank=True)
+    timestamp_seconds = models.IntegerField(null=True, blank=True)
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['timestamp_seconds', 'created_at']
+
+    def __str__(self):
+        ts = f"@{self.timestamp_seconds}s " if self.timestamp_seconds is not None else ''
+        who = self.name or 'Anonymous'
+        return f"{ts}{who}: {self.text[:40]}"

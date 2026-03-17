@@ -4,18 +4,22 @@ import { AuthProvider, useAuth } from './auth'
 import { ToastProvider, useToast } from './components/Toast'
 import { ConfirmProvider } from './components/ConfirmDialog'
 import AuthForm from './components/AuthForm'
+import ReviewPage from './components/ReviewPage'
 import SessionUpload from './components/SessionUpload'
 import SessionDetail from './components/SessionDetail'
 
 const parseRoute = (pathname) => {
   if (pathname === '/' || pathname === '/upload') return { view: 'upload', sessionId: null }
+  const reviewMatch = pathname.match(/^\/r\/(.+)$/)
+  if (reviewMatch) return { view: 'review', token: reviewMatch[1] }
   const sessionMatch = pathname.match(/^\/sessions\/(\d+)$/)
   if (sessionMatch) return { view: 'detail', sessionId: Number(sessionMatch[1]) }
   return { view: 'upload', sessionId: null }
 }
 
-const routePath = ({ view, sessionId }) => {
+const routePath = ({ view, sessionId, token }) => {
   if (view === 'upload') return '/upload'
+  if (view === 'review' && token) return `/r/${token}`
   if (view === 'detail' && sessionId) return `/sessions/${sessionId}`
   return '/upload'
 }
@@ -27,11 +31,13 @@ function AppContent() {
   const [view, setView] = useState(initialRoute.view)
   const [routeSessionId, setRouteSessionId] = useState(initialRoute.sessionId)
   const [selectedSession, setSelectedSession] = useState(null)
+  const [reviewToken, setReviewToken] = useState(initialRoute.token || '')
 
 
   const navigate = useCallback((nextRoute, { replace = false } = {}) => {
     setView(nextRoute.view)
     setRouteSessionId(nextRoute.sessionId ?? null)
+    setReviewToken(nextRoute.token || '')
     const path = routePath(nextRoute)
     if (path !== window.location.pathname) {
       if (replace) window.history.replaceState(null, '', path)
@@ -44,6 +50,7 @@ function AppContent() {
       const route = parseRoute(window.location.pathname)
       setView(route.view)
       setRouteSessionId(route.sessionId)
+      setReviewToken(route.token || '')
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
@@ -101,7 +108,10 @@ function AppContent() {
   if (loading) {
     return <div className="min-h-screen bg-white flex items-center justify-center"><p className="text-sm text-gray-400">Loading...</p></div>
   }
-  if (!user) return <AuthForm />
+  if (!user) {
+    if (view === 'review') return <ReviewPage />
+    return <AuthForm />
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -122,6 +132,9 @@ function AppContent() {
       </header>
 
       <main className="max-w-5xl mx-auto pb-24">
+        {view === 'review' && (
+          <ReviewPage />
+        )}
         {view === 'upload' && (
           <SessionUpload
             token={token}

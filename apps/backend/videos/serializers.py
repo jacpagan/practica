@@ -8,6 +8,7 @@ from .models import (
     Profile, Exercise, Session, Chapter, Comment, InviteCode, SessionLastSeen,
     Tag, Space, SpaceMember, ExerciseReferenceClip, SessionAsset,
     PracticePlan, PracticePlanItem, DailyCheckIn, DailyCheckInItem,
+    ReviewLink, ReviewFeedback,
 )
 
 
@@ -516,3 +517,34 @@ class ProgressChapterSerializer(serializers.ModelSerializer):
         model = Chapter
         fields = ['id', 'timestamp_seconds', 'end_seconds', 'notes',
                   'session_id', 'session_title', 'session_video', 'session_date', 'created_at']
+
+
+class PublicSessionSerializer(serializers.ModelSerializer):
+    assets = SessionAssetSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Session
+        fields = ['id', 'title', 'description', 'video_file', 'duration_seconds', 'recorded_at', 'assets']
+        read_only_fields = fields
+
+
+class ReviewLinkSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ReviewLink
+        fields = ['token', 'expires_at', 'is_active', 'allow_comments', 'url']
+        read_only_fields = ['token', 'expires_at', 'is_active', 'allow_comments', 'url']
+
+    def get_url(self, obj):
+        request = self.context.get('request')
+        base = request.build_absolute_uri('/') if request else '/'
+        base = base.rstrip('/')
+        return f"{base}/r/{obj.token}"
+
+
+class ReviewFeedbackSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReviewFeedback
+        fields = ['id', 'name', 'email', 'timestamp_seconds', 'text', 'created_at']
+        read_only_fields = ['id', 'created_at']

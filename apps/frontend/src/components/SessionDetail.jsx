@@ -18,6 +18,8 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
   }, [initialSession])
 
   const canEdit = Boolean(session?.can_edit)
+  const [shareUrl, setShareUrl] = useState('')
+  const [sharing, setSharing] = useState(false)
 
   const startEditing = () => {
     setEditTitle(session.title || '')
@@ -54,6 +56,23 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
     } finally {
       setSaving(false)
     }
+  }
+
+  const createShare = async () => {
+    if (!token) return
+    setSharing(true)
+    try {
+      const res = await fetch(`/api/sessions/${session.id}/share/`, {
+        method: 'POST',
+        headers: { Authorization: `Token ${token}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setShareUrl(data.url)
+        try { await navigator.clipboard.writeText(data.url) } catch {}
+      }
+    } catch {}
+    finally { setSharing(false) }
   }
 
   return (
@@ -95,15 +114,27 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
               </div>
             ) : (
               <>
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h1 className="text-lg font-semibold text-gray-900">{session.title}</h1>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h1 className="text-lg font-semibold text-gray-900">{session.title}</h1>
                   <p className="text-xs text-gray-400 mt-1">{session.owner?.display_name || 'You'}</p>
-                  </div>
-                  {canEdit ? (
-                    <button onClick={startEditing} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">Edit</button>
-                  ) : null}
                 </div>
+                {canEdit ? (
+                  <div className="flex items-center gap-2">
+                    <button onClick={createShare} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
+                      {sharing ? 'Sharing…' : 'Share for review'}
+                    </button>
+                    <button onClick={startEditing} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">Edit</button>
+                  </div>
+                ) : null}
+              </div>
+
+              {shareUrl ? (
+                <div className="rounded-md bg-gray-50 border border-gray-200 px-3 py-2">
+                  <p className="text-xs text-gray-700">Link copied. Share this URL for feedback:</p>
+                  <p className="text-xs text-blue-700 break-all">{shareUrl}</p>
+                </div>
+              ) : null}
 
                 {session.description ? <p className="text-sm text-gray-600">{session.description}</p> : null}
 
