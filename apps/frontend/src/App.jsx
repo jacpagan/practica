@@ -32,6 +32,8 @@ function AppContent() {
   const [routeSessionId, setRouteSessionId] = useState(initialRoute.sessionId)
   const [selectedSession, setSelectedSession] = useState(null)
   const [reviewToken, setReviewToken] = useState(initialRoute.token || '')
+  const [recentSessions, setRecentSessions] = useState([])
+  const [recentSessionsLoading, setRecentSessionsLoading] = useState(false)
 
 
   const navigate = useCallback((nextRoute, { replace = false } = {}) => {
@@ -95,15 +97,39 @@ function AppContent() {
     navigate({ view: 'detail', sessionId: session.id })
   }
 
+  const loadRecentSessions = useCallback(async () => {
+    if (!token) return
+    setRecentSessionsLoading(true)
+    try {
+      const res = await fetch('/api/sessions/', {
+        headers: { Authorization: `Token ${token}` },
+      })
+      if (!res.ok) throw new Error('sessions')
+      const data = await res.json()
+      const items = Array.isArray(data) ? data : data.results || []
+      setRecentSessions(items.slice(0, 6))
+    } catch {
+      setRecentSessions([])
+    } finally {
+      setRecentSessionsLoading(false)
+    }
+  }, [token])
+
   const goHome = useCallback(() => {
     navigate({ view: 'upload', sessionId: null })
     setSelectedSession(null)
   }, [navigate])
 
   const handleUploadComplete = (session) => {
+    setRecentSessions((current) => [session, ...current.filter((item) => item.id !== session.id)].slice(0, 6))
     setSelectedSession(session)
     navigate({ view: 'detail', sessionId: session.id })
   }
+
+  useEffect(() => {
+    if (!user || view !== 'upload') return
+    loadRecentSessions()
+  }, [user, view, loadRecentSessions])
 
   if (loading) {
     return <div className="min-h-screen bg-white flex items-center justify-center"><p className="text-sm text-gray-400">Loading...</p></div>
@@ -140,6 +166,9 @@ function AppContent() {
             token={token}
             onComplete={handleUploadComplete}
             onCancel={goHome}
+            recentSessions={recentSessions}
+            recentSessionsLoading={recentSessionsLoading}
+            onOpenSession={openSession}
           />
         )}
 

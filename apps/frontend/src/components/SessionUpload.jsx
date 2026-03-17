@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useToast } from './Toast'
-import { createSessionUpload, uploadErrorMessage } from '../utils'
+import { createSessionUpload, fmtDate, uploadErrorMessage } from '../utils'
 
-function SessionUpload({ token, onComplete, onCancel }) {
+function SessionUpload({ token, onComplete, onCancel, recentSessions = [], recentSessionsLoading = false, onOpenSession }) {
   const toast = useToast()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -77,7 +77,20 @@ function SessionUpload({ token, onComplete, onCancel }) {
   return (
     <div className="px-4 sm:px-6 py-6">
       <div className="max-w-lg mx-auto">
-        <h2 className="text-lg font-semibold text-gray-900 mb-6">Upload your practice</h2>
+        <div className="mb-6 space-y-3">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Upload your practice</h2>
+            <p className="text-sm text-gray-500 mt-1">Save a quick note, upload one video, and share it for feedback when you want.</p>
+          </div>
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Simple MVP flow</p>
+            <div className="mt-2 grid gap-2 text-sm text-gray-600">
+              <p><span className="font-medium text-gray-900">1.</span> Upload one practice video.</p>
+              <p><span className="font-medium text-gray-900">2.</span> Add a title and a short note.</p>
+              <p><span className="font-medium text-gray-900">3.</span> Open the entry and share a review link.</p>
+            </div>
+          </div>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm text-gray-600 mb-1.5">Title</label>
@@ -133,6 +146,44 @@ function SessionUpload({ token, onComplete, onCancel }) {
             </div>
           )}
         </form>
+
+        <div className="mt-8 border-t border-gray-100 pt-6">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h3 className="text-sm font-semibold text-gray-900">Recent practice</h3>
+            {recentSessionsLoading ? <span className="text-xs text-gray-400">Loading…</span> : null}
+          </div>
+
+          {recentSessions.length ? (
+            <div className="space-y-2">
+              {recentSessions.map((session) => (
+                <button
+                  key={session.id}
+                  type="button"
+                  onClick={() => onOpenSession?.(session)}
+                  className="w-full text-left rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 line-clamp-1">{session.title}</p>
+                      <p className="text-xs text-gray-500 mt-1">{fmtDate(session.recorded_at || session.created_at)}</p>
+                    </div>
+                    <span className="text-[11px] uppercase tracking-wide text-gray-400">
+                      {session.processing_status === 'ready' ? 'Ready' : session.processing_status || 'Saved'}
+                    </span>
+                  </div>
+                  {session.description ? (
+                    <p className="text-xs text-gray-500 mt-2 line-clamp-2">{session.description}</p>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-5 text-center">
+              <p className="text-sm text-gray-600">No practice entries yet.</p>
+              <p className="text-xs text-gray-400 mt-1">Upload your first video to start a simple review-ready journal.</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

@@ -89,9 +89,9 @@ class ExerciseReferenceClip(models.Model):
             models.Index(fields=['youtube_playlist_id'], name='exercise_clip_playlist_id_idx'),
         ]
         constraints = [
-            models.CheckConstraint(check=models.Q(start_seconds__gte=0), name='exercise_clip_start_seconds_gte_0'),
+            models.CheckConstraint(condition=models.Q(start_seconds__gte=0), name='exercise_clip_start_seconds_gte_0'),
             models.CheckConstraint(
-                check=models.Q(end_seconds__isnull=True) | models.Q(end_seconds__gt=models.F('start_seconds')),
+                condition=models.Q(end_seconds__isnull=True) | models.Q(end_seconds__gt=models.F('start_seconds')),
                 name='exercise_clip_end_seconds_gt_start_or_null',
             ),
         ]
@@ -391,7 +391,7 @@ class Comment(models.Model):
         ordering = ['timestamp_seconds', 'created_at']
         constraints = [
             models.CheckConstraint(
-                check=models.Q(legacy_text_only=True) | (models.Q(video_reply__isnull=False) & ~models.Q(video_reply='')),
+                condition=models.Q(legacy_text_only=True) | (models.Q(video_reply__isnull=False) & ~models.Q(video_reply='')),
                 name='comment_legacy_or_video_required',
             ),
         ]

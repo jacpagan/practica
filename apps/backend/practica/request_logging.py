@@ -1,3 +1,4 @@
+import os
 import json
 import time
 import uuid
@@ -64,4 +65,3 @@ class RequestIdLoggingMiddleware(MiddlewareMixin):
             # Never break responses due to logging
             pass
         return response
-

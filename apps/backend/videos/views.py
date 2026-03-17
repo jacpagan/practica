@@ -6,7 +6,7 @@ import os
 from datetime import date, timedelta
 from zoneinfo import ZoneInfo
 from django.shortcuts import get_object_or_404
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, Http404
 from django.db import connection, transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -866,6 +866,49 @@ def accept_invite(request):
     })
 
 
+def _active_review_link_or_404(token):
+    link = get_object_or_404(
+        ReviewLink.objects.select_related('session'),
+        token=token,
+        is_active=True,
+    )
+    if link.expires_at <= timezone.now():
+        raise Http404('Review link expired')
+    return link
+
+
+@csrf_exempt
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def review_link_info(request, token):
+    link = _active_review_link_or_404(token)
+    ReviewLink.objects.filter(pk=link.pk).update(last_accessed_at=timezone.now())
+    link.refresh_from_db(fields=['last_accessed_at'])
+    return Response({
+        'session': PublicSessionSerializer(link.session, context={'request': request}).data,
+        'link': ReviewLinkSerializer(link, context={'request': request}).data,
+    })
+
+
+@csrf_exempt
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def review_link_feedback(request, token):
+    link = _active_review_link_or_404(token)
+
+    if request.method == 'GET':
+        feedback = link.feedback.all().order_by('timestamp_seconds', 'created_at')
+        return Response(ReviewFeedbackSerializer(feedback, many=True).data)
+
+    if not link.allow_comments:
+        return Response({'error': 'Comments are disabled for this link'}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = ReviewFeedbackSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    item = serializer.save(session=link.session, review_link=link)
+    return Response(ReviewFeedbackSerializer(item).data, status=status.HTTP_201_CREATED)
+
+
 # ── Exercise views ──────────────────────────────────────────────────
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -1559,6 +1602,37 @@ def health_check(request):
         health_status['status'] = 'unhealthy'
     status_code = 200 if health_status['status'] == 'healthy' else 503
     return JsonResponse(health_status, status=status_code)
+
+
+def ready_check(request):
+    frontend_index = None
+    frontend_dir = getattr(settings, 'FRONTEND_DIR', None)
+    if frontend_dir:
+        frontend_index = str(frontend_dir / 'index.html')
+
+    ready_status = {
+        'status': 'ready',
+        'timestamp': timezone.now().isoformat(),
+        'checks': {},
+        'deployed_sha': os.getenv('DEPLOYED_GIT_SHA', ''),
+    }
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT 1')
+        ready_status['checks']['database'] = 'ready'
+    except Exception as exc:
+        ready_status['checks']['database'] = f'error: {exc}'
+        ready_status['status'] = 'not_ready'
+
+    if frontend_index and os.path.exists(frontend_index):
+        ready_status['checks']['frontend_bundle'] = 'ready'
+    else:
+        ready_status['checks']['frontend_bundle'] = 'missing'
+        ready_status['status'] = 'not_ready'
+
+    status_code = 200 if ready_status['status'] == 'ready' else 503
+    return JsonResponse(ready_status, status=status_code)
 
 
 def favicon(request):
