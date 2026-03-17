@@ -9,6 +9,7 @@ const RETRY_MAX_DELAY_MS = 4000
 const MULTIPART_RESUME_PREFIX = 'practica.multipart.resume.v1'
 const REFERENCE_ATTEMPT_DRAFT_KEY = 'practica.reference_attempt_draft.v1'
 const SPACE_REFERENCE_LIBRARY_PREFIX = 'practica.space_reference_library.v1'
+const CLIENT_TRACE_ID_KEY = 'practica.client_trace_id.v1'
 const RECORDER_MIME_CANDIDATES = [
   'video/webm;codecs=vp9',
   'video/webm;codecs=vp8',
@@ -263,12 +264,21 @@ const trimLogValue = (value, maxChars) => String(value || '').slice(0, maxChars)
 export const reportClientError = ({ message = '', stack = '', source = 'ui', extra = {} } = {}) => {
   if (typeof window === 'undefined') return
   try {
+    let traceId = ''
+    try {
+      const store = window.sessionStorage
+      traceId = store.getItem(CLIENT_TRACE_ID_KEY)
+      if (!traceId) {
+        traceId = Math.random().toString(36).slice(2) + Date.now().toString(36)
+        store.setItem(CLIENT_TRACE_ID_KEY, traceId)
+      }
+    } catch {}
     const payload = {
       message: trimLogValue(message, 1000),
       stack: trimLogValue(stack, 6000),
       source: trimLogValue(source, 64),
       path: trimLogValue(`${window.location.pathname}${window.location.search}`, 512),
-      extra: extra && typeof extra === 'object' ? extra : {},
+      extra: extra && typeof extra === 'object' ? { ...extra, client_trace_id: traceId } : { client_trace_id: traceId },
     }
     const body = JSON.stringify(payload)
     if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {

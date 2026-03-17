@@ -323,11 +323,13 @@ def client_error_view(request):
     user_id = request.user.id if getattr(request.user, 'is_authenticated', False) else None
     user_agent = request.META.get('HTTP_USER_AGENT', '')[:512]
 
+    request_id = request.META.get('HTTP_X_REQUEST_ID', '')
     logger.warning(
-        'ClientError source=%s path=%s user_id=%s message=%s ua=%s extra=%s stack=%s',
+        'ClientError source=%s path=%s user_id=%s request_id=%s message=%s ua=%s extra=%s stack=%s',
         source or 'unknown',
         path or 'unknown',
         user_id,
+        request_id,
         message or 'n/a',
         user_agent or 'n/a',
         extra,

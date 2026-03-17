@@ -6,6 +6,7 @@ from django.views.generic import TemplateView
 from rest_framework.routers import DefaultRouter
 from videos.views import (
     SessionViewSet, ExerciseViewSet, SpaceViewSet, health_check,
+    ready_check,
     register_view, login_view, me_view,
     client_error_view,
     create_invite, accept_invite, tag_list,
@@ -36,6 +37,7 @@ urlpatterns = [
     path('api/join/<slug:slug>/', join_space, name='join_space'),
     path('api/space-info/<slug:slug>/', space_info, name='space_info'),
     path('health/', health_check, name='health_check'),
+    path('ready/', ready_check, name='ready_check'),
     path('favicon.ico', favicon, name='favicon'),
 ]
 
