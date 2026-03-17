@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
@@ -17,8 +19,8 @@ class V1VideoFeaturesTests(APITestCase):
         self.space = Space.objects.create(name='V1 Space', owner=self.owner)
         SpaceMember.objects.create(space=self.space, user=self.member)
 
-    def _video_file(self, name='clip.mp4'):
-        return SimpleUploadedFile(name, b'video-data', content_type='video/mp4')
+    def _video_file(self, name='clip.mp4', content_type='video/mp4'):
+        return SimpleUploadedFile(name, b'video-data', content_type=content_type)
 
     def _create_session(self, user=None, space=None, title='Session 1'):
         return Session.objects.create(
@@ -152,6 +154,31 @@ class V1VideoFeaturesTests(APITestCase):
         created = Session.objects.get(id=res.data['id'])
         self.assertEqual(created.processing_status, Session.STATUS_FAILED)
         self.assertIn('browser playback needs transcoding', created.processing_error.lower())
+
+    @override_settings(
+        AWS_STORAGE_BUCKET_NAME='',
+        AWS_MEDIA_CONVERT_ROLE_ARN='',
+        AWS_MEDIA_CONVERT_ENDPOINT_URL='',
+    )
+    @patch('videos.views.enqueue_local_session_transcode', return_value=(True, ''))
+    def test_mov_session_uses_local_transcode_fallback_when_available(self, enqueue_local_transcode):
+        self.client.force_authenticate(user=self.owner)
+
+        res = self.client.post(
+            '/api/sessions/',
+            {
+                'title': 'Queued MOV Session',
+                'description': 'mov',
+                'space': self.space.id,
+                'video_file': self._video_file('queued.mov', content_type='video/quicktime'),
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        created = Session.objects.get(id=res.data['id'])
+        self.assertEqual(created.processing_status, Session.STATUS_PROCESSING)
+        enqueue_local_transcode.assert_called_once()
 
     @override_settings(MEDIA_PROCESSING_CALLBACK_TOKEN='callback-secret')
     def test_processing_update_endpoint_upserts_assets(self):

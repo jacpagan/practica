@@ -40,7 +40,7 @@ from .serializers import (
     DailyCheckInSerializer,
     PublicSessionSerializer, ReviewLinkSerializer, ReviewFeedbackSerializer,
 )
-from .services.media_pipeline import enqueue_session_processing, apply_processing_update
+from .services.media_pipeline import enqueue_session_processing, enqueue_local_session_transcode, apply_processing_update
 
 logger = logging.getLogger(__name__)
 
@@ -267,7 +267,7 @@ def _start_processing_pipeline(session):
     if queued:
         return
 
-    # Fallback when transcoding is unavailable.
+    # Fallback when managed transcoding is unavailable.
     if 'not configured' in error.lower():
         if _browser_playable_source(session.video_file.name):
             SessionAsset.objects.get_or_create(
@@ -282,9 +282,13 @@ def _start_processing_pipeline(session):
             session.processing_status = Session.STATUS_READY
             session.processing_error = ''
         else:
+            queued_local, local_error = enqueue_local_session_transcode(session)
+            if queued_local:
+                return
             session.processing_status = Session.STATUS_FAILED
             session.processing_error = (
                 'Upload finished, but browser playback needs transcoding for this file type. '
+                f'Local transcoding is unavailable: {local_error or "ffmpeg missing"}. '
                 'Please upload MP4/WebM or enable AWS MediaConvert for MOV playback.'
             )
     else:

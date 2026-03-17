@@ -1,4 +1,8 @@
 import logging
+import os
+import shutil
+import subprocess
+import sys
 from typing import Iterable
 
 import boto3
@@ -9,6 +13,10 @@ from django.db import transaction
 from videos.models import Session, SessionAsset
 
 logger = logging.getLogger(__name__)
+
+
+def local_transcode_enabled():
+    return bool(shutil.which('ffmpeg'))
 
 
 def media_pipeline_enabled():
@@ -173,6 +181,29 @@ def enqueue_session_processing(session):
 
     job_id = str(resp.get('Job', {}).get('Id', '')).strip()
     return True, '', job_id
+
+
+def enqueue_local_session_transcode(session):
+    if not local_transcode_enabled():
+        return False, 'Local ffmpeg transcoding is not available'
+
+    manage_py = os.path.join(settings.BASE_DIR, 'manage.py')
+    command = [sys.executable, manage_py, 'transcode_session_local', str(session.id)]
+    try:
+        subprocess.Popen(
+            command,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL,
+            cwd=str(settings.BASE_DIR),
+            start_new_session=True,
+            close_fds=True,
+            env=os.environ.copy(),
+        )
+    except Exception as exc:
+        logger.exception('Local transcode enqueue failed for session_id=%s', session.id)
+        return False, str(exc)
+    return True, ''
 
 
 def _normalized_assets(assets: Iterable[dict]):
