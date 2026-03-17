@@ -102,7 +102,7 @@ function TodayView({
       setCheckinState(buildCheckinState(nextItems, nextCheckin))
       setRecentSessions(Array.isArray(sessionsData?.results) ? sessionsData.results : Array.isArray(sessionsData) ? sessionsData : [])
     } catch {
-      toast.error('Could not load today’s checklist')
+      toast.error('Could not load practice workspace')
     } finally {
       setLoading(false)
     }
@@ -252,10 +252,10 @@ function TodayView({
       <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-wide text-gray-400">Today</p>
+            <p className="text-xs uppercase tracking-wide text-gray-400">Practice</p>
             <h2 className="text-lg font-semibold text-gray-900 mt-1">{selectedSpace?.name}</h2>
             <p className="text-sm text-gray-500 mt-1">
-              {bundle?.date ? `Check in for ${bundle.date}` : 'Your daily accountability checklist'}
+              {bundle?.date ? `Reference → attempt → feedback for ${bundle.date}` : 'Reference-led practice workspace'}
             </p>
           </div>
           {selectedSpaceIsOwner ? (
@@ -273,14 +273,14 @@ function TodayView({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-gray-900">Coach view</p>
-                <p className="text-sm text-gray-500 mt-1">Set the plan and scan student follow-through without leaving Today.</p>
+                <p className="text-sm text-gray-500 mt-1">Structured coaching is optional here — only use it when it helps the loop.</p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowCoachTools((current) => !current)}
                 className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
               >
-                {showCoachTools ? 'Hide editor' : 'Edit active plan'}
+                {showCoachTools ? 'Hide structured plan' : 'Structured plan (optional)'}
               </button>
             </div>
 
@@ -318,17 +318,17 @@ function TodayView({
         ) : null}
 
         {loading ? (
-          <div className="py-12 text-center text-sm text-gray-400">Loading today’s plan…</div>
+          <div className="py-12 text-center text-sm text-gray-400">Loading practice workspace…</div>
         ) : !plan ? (
           <div className="mt-4 rounded-xl border border-dashed border-gray-200 px-4 py-5 text-sm text-gray-500">
-            <p>No active practice plan for this space yet.</p>
+            <p>No structured plan is set for this space yet.</p>
             {selectedSpaceIsOwner ? (
               <button
                 type="button"
                 onClick={() => setShowCoachTools(true)}
                 className="mt-3 text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
               >
-                Set up a plan
+                Add optional plan
               </button>
             ) : null}
             <div className="mt-4 flex flex-wrap gap-2">
@@ -347,11 +347,12 @@ function TodayView({
                 Upload attempt
               </button>
             </div>
-            <p className="text-xs text-gray-400 mt-3">No plan is required — you can still record a practice attempt and attach a reference video when saving.</p>
+            <p className="text-xs text-gray-400 mt-3">A plan is optional — the main flow is still reference video → attempt.</p>
           </div>
         ) : (
           <div className="mt-4 space-y-4">
             <div className="rounded-xl bg-gray-50 px-4 py-3">
+              <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Optional structure</p>
               <p className="text-sm font-medium text-gray-900">{plan.name}</p>
               {plan.description ? <p className="text-sm text-gray-600 mt-1">{plan.description}</p> : null}
               <p className="text-xs text-gray-400 mt-2">Timezone: {plan.timezone}</p>
@@ -684,7 +685,7 @@ function TodayView({
                 disabled={saving}
                 className="text-sm font-medium text-white bg-gray-900 rounded-xl px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors"
               >
-                {saving ? 'Saving…' : 'Save today’s check-in'}
+                {saving ? 'Saving…' : 'Save practice check-in'}
               </button>
             </div>
           </div>

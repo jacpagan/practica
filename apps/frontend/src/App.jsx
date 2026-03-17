@@ -221,7 +221,7 @@ function AppContent() {
           <div className="flex items-center gap-3">
             {hasSpaces && view !== 'today' && (
               <button onClick={openToday} className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
-                Today
+                Practice
               </button>
             )}
             {view !== 'connections' && (
