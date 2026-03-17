@@ -2,7 +2,7 @@ from django.contrib import admin
 from .models import (
     Profile, Exercise, Session, Chapter, Comment, InviteCode, Tag, Space,
     SpaceMember, MultipartSessionUpload, ExerciseReferenceClip, SessionAsset,
-    PracticePlan, PracticePlanItem, DailyCheckIn, DailyCheckInItem, SpaceReferenceVideo,
+    PracticePlan, PracticePlanItem, DailyCheckIn, DailyCheckInItem,
 )
 
 
@@ -62,14 +62,6 @@ class ExerciseReferenceClipAdmin(admin.ModelAdmin):
     list_filter = ['exercise']
     search_fields = ['title', 'youtube_video_id', 'youtube_playlist_id', 'user__username', 'exercise__name']
     raw_id_fields = ['user', 'exercise']
-
-
-@admin.register(SpaceReferenceVideo)
-class SpaceReferenceVideoAdmin(admin.ModelAdmin):
-    list_display = ['id', 'title', 'space', 'created_by', 'youtube_video_id', 'start_seconds', 'end_seconds', 'created_at']
-    list_filter = ['space']
-    search_fields = ['title', 'space__name', 'created_by__username', 'youtube_video_id', 'youtube_playlist_id']
-    raw_id_fields = ['space', 'created_by']
 
 
 @admin.register(PracticePlan)

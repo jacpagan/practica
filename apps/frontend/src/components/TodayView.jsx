@@ -58,10 +58,6 @@ function TodayView({
   const [coachSummary, setCoachSummary] = useState(null)
   const [referenceTitleDraft, setReferenceTitleDraft] = useState('')
   const [referenceUrlDraft, setReferenceUrlDraft] = useState('')
-  const [referenceNotesDraft, setReferenceNotesDraft] = useState('')
-  const [savedReferences, setSavedReferences] = useState([])
-  const [referencesLoading, setReferencesLoading] = useState(false)
-  const [savingReference, setSavingReference] = useState(false)
 
   useEffect(() => {
     if (!spaces.length) {
@@ -114,28 +110,6 @@ function TodayView({
     if (selectedSpaceId) loadToday()
   }, [selectedSpaceId, loadToday])
 
-  const loadSavedReferences = useCallback(async () => {
-    if (!selectedSpaceId) {
-      setSavedReferences([])
-      return
-    }
-    setReferencesLoading(true)
-    try {
-      const res = await fetch(`/api/spaces/${selectedSpaceId}/references/`, { headers: authHeaders(token) })
-      if (!res.ok) throw new Error('references')
-      const data = await res.json()
-      setSavedReferences(Array.isArray(data) ? data : [])
-    } catch {
-      toast.error('Could not load saved reference videos')
-    } finally {
-      setReferencesLoading(false)
-    }
-  }, [selectedSpaceId, token, toast])
-
-  useEffect(() => {
-    loadSavedReferences()
-  }, [loadSavedReferences])
-
   const loadCoachSummary = useCallback(async () => {
     if (!selectedSpaceId || !selectedSpaceIsOwner) {
       setCoachSummary(null)
@@ -171,71 +145,18 @@ function TodayView({
     }))
   }
 
-  const launchReferenceAttempt = (launcher, override = null) => {
-    const draftTitle = String(override?.reference_title ?? referenceTitleDraft).trim()
-    const draftUrl = String(override?.reference_url ?? referenceUrlDraft).trim()
-    const draftNotes = String(override?.notes ?? referenceNotesDraft).trim()
-    const url = draftUrl
+  const launchReferenceAttempt = (launcher) => {
+    const url = referenceUrlDraft.trim()
     if (!url) {
       toast.error('Paste a YouTube or teacher video URL first')
       return
     }
     writeReferenceAttemptDraft({
-      reference_title: draftTitle,
+      reference_title: referenceTitleDraft.trim(),
       reference_url: url,
       space_id: selectedSpaceId || null,
     })
-    setReferenceTitleDraft(draftTitle)
-    setReferenceUrlDraft(draftUrl)
-    setReferenceNotesDraft(draftNotes)
     launcher?.(selectedSpaceId)
-  }
-
-  const applyReference = (reference) => {
-    setReferenceTitleDraft(reference.title || '')
-    setReferenceUrlDraft(reference.watch_url_with_start || reference.youtube_url || '')
-    setReferenceNotesDraft(reference.notes || '')
-  }
-
-  const saveReferenceToLibrary = async () => {
-    const youtubeUrl = referenceUrlDraft.trim()
-    if (!selectedSpaceId || !youtubeUrl) {
-      toast.error('Paste a YouTube URL first')
-      return
-    }
-    setSavingReference(true)
-    try {
-      const res = await fetch(`/api/spaces/${selectedSpaceId}/references/`, {
-        method: 'POST',
-        headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: referenceTitleDraft.trim() || youtubeUrl,
-          youtube_url: youtubeUrl,
-          notes: referenceNotesDraft.trim(),
-        }),
-      })
-      if (!res.ok) throw new Error('save-reference')
-      toast.success('Saved to space library')
-      await loadSavedReferences()
-    } catch {
-      toast.error('Could not save reference video')
-    } finally {
-      setSavingReference(false)
-    }
-  }
-
-  const deleteReference = async (referenceId) => {
-    try {
-      const res = await fetch(`/api/spaces/${selectedSpaceId}/references/${referenceId}/`, {
-        method: 'DELETE',
-        headers: authHeaders(token),
-      })
-      if (!res.ok) throw new Error('delete-reference')
-      toast.success('Reference removed')
-      await loadSavedReferences()
-    } catch {
-      toast.error('Could not remove reference video')
-    }
   }
 
   const submitCheckin = async () => {
@@ -509,13 +430,6 @@ function TodayView({
                   placeholder="https://www.youtube.com/watch?..."
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white"
                 />
-                <textarea
-                  value={referenceNotesDraft}
-                  onChange={(e) => setReferenceNotesDraft(e.target.value)}
-                  rows={2}
-                  placeholder="Optional notes about this reference for the space"
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white resize-none"
-                />
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -540,100 +454,7 @@ function TodayView({
                       Screen-record attempt
                     </button>
                   ) : null}
-                  <button
-                    type="button"
-                    onClick={saveReferenceToLibrary}
-                    disabled={savingReference}
-                    className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                  >
-                    {savingReference ? 'Saving…' : 'Save link'}
-                  </button>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Saved reference videos</p>
-                  {referencesLoading ? <span className="text-xs text-gray-400">Loading…</span> : null}
-                </div>
-                {savedReferences.length === 0 ? (
-                  <p className="text-sm text-gray-500">No saved references yet. Save a Dorothy Fitzer link once, then reuse it for future attempts.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {savedReferences.map((reference) => (
-                      <div key={reference.id} className="rounded-xl bg-gray-50 px-3 py-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-gray-900">{reference.title}</p>
-                            <p className="text-xs text-gray-500 mt-1">Added by {reference.created_by_display_name || 'space member'}</p>
-                            {reference.notes ? <p className="text-xs text-gray-500 mt-2">{reference.notes}</p> : null}
-                          </div>
-                          {reference.can_edit ? (
-                            <button
-                              type="button"
-                              onClick={() => deleteReference(reference.id)}
-                              className="text-xs text-gray-400 hover:text-red-500 flex-shrink-0"
-                            >
-                              Delete
-                            </button>
-                          ) : null}
-                        </div>
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          <button
-                            type="button"
-                            onClick={() => applyReference(reference)}
-                            className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
-                          >
-                            Use
-                          </button>
-                          <a
-                            href={reference.watch_url_with_start || reference.youtube_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
-                          >
-                            Open
-                          </a>
-                          <button
-                            type="button"
-                            onClick={() => launchReferenceAttempt(onQuickRecordProof, {
-                              reference_title: reference.title,
-                              reference_url: reference.watch_url_with_start || reference.youtube_url,
-                              notes: reference.notes,
-                            })}
-                            className="text-xs font-medium text-white bg-gray-900 rounded-lg px-3 py-2 hover:bg-gray-800 transition-colors"
-                          >
-                            Record
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => launchReferenceAttempt(onUploadProof, {
-                              reference_title: reference.title,
-                              reference_url: reference.watch_url_with_start || reference.youtube_url,
-                              notes: reference.notes,
-                            })}
-                            className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
-                          >
-                            Upload
-                          </button>
-                          {onScreenRecordProof ? (
-                            <button
-                              type="button"
-                              onClick={() => launchReferenceAttempt(onScreenRecordProof, {
-                                reference_title: reference.title,
-                                reference_url: reference.watch_url_with_start || reference.youtube_url,
-                                notes: reference.notes,
-                              })}
-                              className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
-                            >
-                              Screen record
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
 
               <div className="flex flex-wrap gap-2">
