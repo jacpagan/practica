@@ -83,6 +83,9 @@ function SessionUpload({
       if (res.ok) {
         success = true
         toast.success('Session uploaded')
+        if (res.data?.processing_status === 'failed' && res.data?.processing_error) {
+          toast.error(res.data.processing_error)
+        }
         onComplete(res.data)
       }
       else toast.error(uploadErrorMessage(res))
@@ -235,6 +238,9 @@ function SessionUpload({
                   </div>
                   {session.description ? (
                     <p className="text-xs text-gray-500 mt-2 line-clamp-2">{session.description}</p>
+                  ) : null}
+                  {session.processing_status === 'failed' && session.processing_error ? (
+                    <p className="text-xs text-red-600 mt-2 line-clamp-2">{session.processing_error}</p>
                   ) : null}
                 </div>
               ))}

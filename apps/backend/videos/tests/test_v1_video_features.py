@@ -129,6 +129,30 @@ class V1VideoFeaturesTests(APITestCase):
         self.assertEqual(created.processing_status, Session.STATUS_READY)
         self.assertTrue(created.assets.filter(asset_type=SessionAsset.TYPE_PROXY_MP4).exists())
 
+    @override_settings(
+        AWS_STORAGE_BUCKET_NAME='',
+        AWS_MEDIA_CONVERT_ROLE_ARN='',
+        AWS_MEDIA_CONVERT_ENDPOINT_URL='',
+    )
+    def test_mov_session_without_transcoding_fails_with_clear_message(self):
+        self.client.force_authenticate(user=self.owner)
+
+        res = self.client.post(
+            '/api/sessions/',
+            {
+                'title': 'Uploaded MOV Session',
+                'description': 'mov',
+                'space': self.space.id,
+                'video_file': self._video_file('uploaded.mov', content_type='video/quicktime'),
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        created = Session.objects.get(id=res.data['id'])
+        self.assertEqual(created.processing_status, Session.STATUS_FAILED)
+        self.assertIn('browser playback needs transcoding', created.processing_error.lower())
+
     @override_settings(MEDIA_PROCESSING_CALLBACK_TOKEN='callback-secret')
     def test_processing_update_endpoint_upserts_assets(self):
         session = self._create_session()

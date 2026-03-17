@@ -246,6 +246,18 @@ def _can_modify_session(user, session):
     return can_edit_session(user, session)
 
 
+def _browser_playable_source(filename):
+    name = str(filename or '').strip().lower()
+    return name.endswith(('.mp4', '.m4v', '.webm'))
+
+
+def _fallback_content_type(filename):
+    name = str(filename or '').strip().lower()
+    if name.endswith('.webm'):
+        return 'video/webm'
+    return 'video/mp4'
+
+
 def _start_processing_pipeline(session):
     session.processing_status = Session.STATUS_PROCESSING
     session.processing_error = ''
@@ -255,19 +267,26 @@ def _start_processing_pipeline(session):
     if queued:
         return
 
-    # Local/dev fallback: no MediaConvert configured. Keep UX usable.
+    # Fallback when transcoding is unavailable.
     if 'not configured' in error.lower():
-        SessionAsset.objects.get_or_create(
-            session=session,
-            asset_type=SessionAsset.TYPE_PROXY_MP4,
-            defaults={
-                'object_key': session.video_file.name,
-                'content_type': 'video/mp4',
-                'metadata_json': {'source': 'original'},
-            },
-        )
-        session.processing_status = Session.STATUS_READY
-        session.processing_error = ''
+        if _browser_playable_source(session.video_file.name):
+            SessionAsset.objects.get_or_create(
+                session=session,
+                asset_type=SessionAsset.TYPE_PROXY_MP4,
+                defaults={
+                    'object_key': session.video_file.name,
+                    'content_type': _fallback_content_type(session.video_file.name),
+                    'metadata_json': {'source': 'original'},
+                },
+            )
+            session.processing_status = Session.STATUS_READY
+            session.processing_error = ''
+        else:
+            session.processing_status = Session.STATUS_FAILED
+            session.processing_error = (
+                'Upload finished, but browser playback needs transcoding for this file type. '
+                'Please upload MP4/WebM or enable AWS MediaConvert for MOV playback.'
+            )
     else:
         session.processing_status = Session.STATUS_FAILED
         session.processing_error = (error or 'Failed to enqueue media processing')[:2000]

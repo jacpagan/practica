@@ -464,6 +464,7 @@ class SessionListSerializer(serializers.ModelSerializer):
     has_unread = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
     processing_status = serializers.CharField(read_only=True)
+    processing_error = serializers.CharField(read_only=True)
     assets = SessionAssetSerializer(many=True, read_only=True)
     is_space_main = serializers.SerializerMethodField()
 
@@ -472,7 +473,7 @@ class SessionListSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'description', 'video_file',
                   'reference_title', 'reference_url',
                   'duration_seconds', 'recorded_at', 'created_at',
-                  'processing_status',
+                  'processing_status', 'processing_error',
                   'space_id', 'space_name', 'tag_names',
                   'assets', 'is_space_main',
                   'chapter_count', 'comment_count', 'owner_name', 'owner_id', 'has_unread',

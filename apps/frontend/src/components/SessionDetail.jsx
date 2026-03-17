@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { fmtTimer, preferredSessionVideoUrl } from '../utils'
+import { fmtTimer, preferredSessionVideoUrl, videoUrl } from '../utils'
 import { useConfirm } from './ConfirmDialog'
 import { useToast } from './Toast'
 
@@ -352,6 +352,23 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
                 {session.recorded_at ? <span>Recorded {new Date(session.recorded_at).toLocaleString()}</span> : null}
                 {session.duration_seconds ? <span>{Math.round(session.duration_seconds / 60)} min</span> : null}
               </div>
+
+              {session.processing_status === 'failed' && session.processing_error ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                  <p className="text-sm font-medium text-red-800">Playback needs conversion</p>
+                  <p className="text-sm text-red-700 mt-1">{session.processing_error}</p>
+                  {session.video_file ? (
+                    <a
+                      href={videoUrl(session.video_file)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex mt-3 text-xs text-red-700 hover:text-red-900 transition-colors"
+                    >
+                      Open original file
+                    </a>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div className="border-t border-gray-100 pt-4">
                 <div className="flex items-center justify-between gap-3 mb-3">
