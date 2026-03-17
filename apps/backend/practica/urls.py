@@ -11,6 +11,7 @@ from videos.views import (
     create_invite, accept_invite, tag_list,
     join_space, space_info,
     coach_metrics_summary,
+    review_link_info, review_link_feedback,
 )
 
 router = DefaultRouter()
@@ -29,6 +30,8 @@ urlpatterns = [
     path('api/invite/accept/', accept_invite, name='accept_invite'),
     path('api/tags/', tag_list, name='tag_list'),
     path('api/coach-metrics/summary/', coach_metrics_summary, name='coach_metrics_summary'),
+    path('api/review/<slug:token>/', review_link_info, name='review_link_info'),
+    path('api/review/<slug:token>/feedback/', review_link_feedback, name='review_link_feedback'),
     path('api/join/<slug:slug>/', join_space, name='join_space'),
     path('api/space-info/<slug:slug>/', space_info, name='space_info'),
     path('health/', health_check, name='health_check'),

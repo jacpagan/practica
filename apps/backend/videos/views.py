@@ -29,6 +29,7 @@ from .models import (
     Exercise, Session, Chapter, Comment, InviteCode, SessionLastSeen,
     Tag, Space, SpaceMember, MultipartSessionUpload, ExerciseReferenceClip, SessionAsset,
     PracticePlan, PracticePlanItem, DailyCheckIn, DailyCheckInItem,
+    ReviewLink, ReviewFeedback,
 )
 from .serializers import (
     UserSerializer, RegisterSerializer, SpaceSerializer,
@@ -37,6 +38,7 @@ from .serializers import (
     ExerciseReferenceClipSerializer,
     PracticePlanSerializer, PracticePlanItemSerializer,
     DailyCheckInSerializer,
+    PublicSessionSerializer, ReviewLinkSerializer, ReviewFeedbackSerializer,
 )
 from .services.media_pipeline import enqueue_session_processing, apply_processing_update
 
@@ -986,6 +988,31 @@ class SessionViewSet(viewsets.ModelViewSet):
         if not can_edit_session(self.request.user, instance):
             raise PermissionDenied("You can only delete your own sessions.")
         instance.delete()
+
+    @action(detail=True, methods=['post'], url_path='share')
+    def create_share_link(self, request, pk=None):
+        session = self.get_object()
+        if not can_edit_session(request.user, session):
+            raise PermissionDenied("You can only share your own sessions.")
+        expires_at = timezone.now() + timedelta(days=7)
+        token = secrets.token_urlsafe(16)
+        link = ReviewLink.objects.create(
+            session=session,
+            token=token,
+            created_by=request.user,
+            expires_at=expires_at,
+            is_active=True,
+            allow_comments=True,
+        )
+        return Response(ReviewLinkSerializer(link, context={'request': request}).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], url_path='share/revoke')
+    def revoke_share_link(self, request, pk=None):
+        session = self.get_object()
+        if not can_edit_session(request.user, session):
+            raise PermissionDenied("You can only revoke your own sessions' links.")
+        ReviewLink.objects.filter(session=session, is_active=True).update(is_active=False)
+        return Response({'ok': True})
 
     @action(detail=False, methods=['post'], url_path='multipart/initiate')
     def multipart_initiate(self, request):
