@@ -32,8 +32,10 @@ function AppContent() {
   const [routeSessionId, setRouteSessionId] = useState(initialRoute.sessionId)
   const [selectedSession, setSelectedSession] = useState(null)
   const [reviewToken, setReviewToken] = useState(initialRoute.token || '')
-  const [recentSessions, setRecentSessions] = useState([])
-  const [recentSessionsLoading, setRecentSessionsLoading] = useState(false)
+  const [sessions, setSessions] = useState([])
+  const [sessionsLoading, setSessionsLoading] = useState(false)
+  const [sessionsLoadingMore, setSessionsLoadingMore] = useState(false)
+  const [sessionsNextUrl, setSessionsNextUrl] = useState(null)
 
 
   const navigate = useCallback((nextRoute, { replace = false } = {}) => {
@@ -92,28 +94,37 @@ function AppContent() {
     }
   }, [user, view, routeSessionId, selectedSession?.id, openSessionById])
 
-  const openSession = (session) => {
-    setSelectedSession(session)
-    navigate({ view: 'detail', sessionId: session.id })
-  }
-
-  const loadRecentSessions = useCallback(async () => {
+  const loadSessions = useCallback(async ({ url = '/api/sessions/', append = false } = {}) => {
     if (!token) return
-    setRecentSessionsLoading(true)
+    if (append) setSessionsLoadingMore(true)
+    else setSessionsLoading(true)
     try {
-      const res = await fetch('/api/sessions/', {
+      const res = await fetch(url, {
         headers: { Authorization: `Token ${token}` },
       })
       if (!res.ok) throw new Error('sessions')
       const data = await res.json()
       const items = Array.isArray(data) ? data : data.results || []
-      setRecentSessions(items.slice(0, 6))
+      setSessions((current) => {
+        if (!append) return items
+        const byId = new Map(current.map((item) => [item.id, item]))
+        for (const item of items) byId.set(item.id, item)
+        return Array.from(byId.values())
+      })
+      setSessionsNextUrl(Array.isArray(data) ? null : data.next || null)
     } catch {
-      setRecentSessions([])
+      if (!append) setSessions([])
+      setSessionsNextUrl(null)
     } finally {
-      setRecentSessionsLoading(false)
+      if (append) setSessionsLoadingMore(false)
+      else setSessionsLoading(false)
     }
   }, [token])
+
+  const openSession = useCallback((session) => {
+    if (!session?.id) return
+    openSessionById(session.id)
+  }, [openSessionById])
 
   const goHome = useCallback(() => {
     navigate({ view: 'upload', sessionId: null })
@@ -121,15 +132,15 @@ function AppContent() {
   }, [navigate])
 
   const handleUploadComplete = (session) => {
-    setRecentSessions((current) => [session, ...current.filter((item) => item.id !== session.id)].slice(0, 6))
+    setSessions((current) => [session, ...current.filter((item) => item.id !== session.id)])
     setSelectedSession(session)
     navigate({ view: 'detail', sessionId: session.id })
   }
 
   useEffect(() => {
     if (!user || view !== 'upload') return
-    loadRecentSessions()
-  }, [user, view, loadRecentSessions])
+    loadSessions({ url: '/api/sessions/', append: false })
+  }, [user, view, loadSessions])
 
   if (loading) {
     return <div className="min-h-screen bg-white flex items-center justify-center"><p className="text-sm text-gray-400">Loading...</p></div>
@@ -166,9 +177,16 @@ function AppContent() {
             token={token}
             onComplete={handleUploadComplete}
             onCancel={goHome}
-            recentSessions={recentSessions}
-            recentSessionsLoading={recentSessionsLoading}
+            sessions={sessions}
+            sessionsLoading={sessionsLoading}
+            sessionsLoadingMore={sessionsLoadingMore}
+            hasMoreSessions={Boolean(sessionsNextUrl)}
+            onLoadMoreSessions={() => sessionsNextUrl ? loadSessions({ url: sessionsNextUrl, append: true }) : null}
             onOpenSession={openSession}
+            onDeleteSession={(sessionId) => {
+              setSessions((current) => current.filter((item) => item.id !== sessionId))
+              if (selectedSession?.id === sessionId) setSelectedSession(null)
+            }}
           />
         )}
 
@@ -179,12 +197,12 @@ function AppContent() {
             onBack={goHome}
             onSessionUpdate={(sessionData) => {
               setSelectedSession(sessionData)
-              setRecentSessions((current) => current.map((item) => (
+              setSessions((current) => current.map((item) => (
                 item.id === sessionData.id ? { ...item, ...sessionData } : item
               )))
             }}
             onSessionDelete={(sessionId) => {
-              setRecentSessions((current) => current.filter((item) => item.id !== sessionId))
+              setSessions((current) => current.filter((item) => item.id !== sessionId))
               setSelectedSession(null)
               navigate({ view: 'upload', sessionId: null }, { replace: true })
             }}
