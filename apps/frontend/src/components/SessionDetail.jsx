@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { fmtTimer, preferredSessionVideoUrl } from '../utils'
+import { useConfirm } from './ConfirmDialog'
 import { useToast } from './Toast'
 
-function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate }) {
+function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate, onSessionDelete }) {
   const toast = useToast()
+  const confirm = useConfirm()
   const videoRef = useRef(null)
   const [session, setSession] = useState(initialSession)
   const [editing, setEditing] = useState(false)
@@ -23,6 +25,7 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
   const [shareUrl, setShareUrl] = useState('')
   const [sharing, setSharing] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const jumpToTimestamp = (seconds) => {
     const video = videoRef.current
@@ -103,6 +106,33 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
     }
   }
 
+  const deleteSession = async () => {
+    if (!session?.id || !token || !canEdit) return
+    const accepted = await confirm?.({
+      title: 'Delete practice entry?',
+      message: 'This permanently deletes the video and its session details. This cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Keep',
+      tone: 'danger',
+    })
+    if (!accepted) return
+
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/sessions/${session.id}/`, {
+        method: 'DELETE',
+        headers: authHeaders,
+      })
+      if (!res.ok) throw new Error('delete')
+      toast.success('Practice entry deleted')
+      onSessionDelete?.(session.id)
+    } catch {
+      toast.error('Could not delete practice entry')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
     <div className="px-4 sm:px-6 py-4 max-w-3xl mx-auto">
       <div className="mb-4">
@@ -156,6 +186,9 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
                       {refreshing ? 'Refreshing…' : 'Refresh'}
                     </button>
                     <button onClick={startEditing} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">Edit</button>
+                    <button onClick={deleteSession} disabled={deleting} className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50 transition-colors">
+                      {deleting ? 'Deleting…' : 'Delete'}
+                    </button>
                   </div>
                 ) : null}
               </div>

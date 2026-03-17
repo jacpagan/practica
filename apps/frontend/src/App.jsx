@@ -179,6 +179,14 @@ function AppContent() {
             onBack={goHome}
             onSessionUpdate={(sessionData) => {
               setSelectedSession(sessionData)
+              setRecentSessions((current) => current.map((item) => (
+                item.id === sessionData.id ? { ...item, ...sessionData } : item
+              )))
+            }}
+            onSessionDelete={(sessionId) => {
+              setRecentSessions((current) => current.filter((item) => item.id !== sessionId))
+              setSelectedSession(null)
+              navigate({ view: 'upload', sessionId: null }, { replace: true })
             }}
             onOpenCompare={null}
           />
