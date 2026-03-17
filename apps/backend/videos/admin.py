@@ -167,18 +167,18 @@ class SessionLastSeenAdmin(admin.ModelAdmin):
 
 @admin.register(CoachEvent)
 class CoachEventAdmin(admin.ModelAdmin):
-    list_display = ['id', 'coach_user', 'student_user', 'space', 'session', 'event_type', 'created_at']
-    list_filter = ['event_type', 'created_at', 'space']
-    search_fields = ['coach_user__username', 'student_user__username', 'space__name', 'session__title']
-    raw_id_fields = ['coach_user', 'student_user', 'space', 'session', 'comment']
+    list_display = ['id', 'user', 'space', 'session', 'event_type', 'occurred_at']
+    list_filter = ['event_type', 'occurred_at', 'space']
+    search_fields = ['user__username', 'space__name', 'session__title']
+    raw_id_fields = ['user', 'space', 'session']
 
 
 @admin.register(CoachDailyMetric)
 class CoachDailyMetricAdmin(admin.ModelAdmin):
     list_display = [
-        'date', 'coach_user', 'active_students_30d', 'coach_comments_7d', 'coach_comments_30d',
+        'date', 'coach', 'active_students_30d', 'coach_comments_7d', 'coach_comments_30d',
         'median_time_to_first_coach_comment_hours_30d', 'estimated_time_saved_hours_30d',
     ]
     list_filter = ['date']
-    search_fields = ['coach_user__username']
-    raw_id_fields = ['coach_user']
+    search_fields = ['coach__username']
+    raw_id_fields = ['coach']
