@@ -39,11 +39,7 @@ const routePath = ({ view, sessionId, spaceId }) => {
 function AppContent() {
   const { user, token, loading, logout, refreshUser } = useAuth()
   const toast = useToast()
-  const [exercises, setExercises] = useState([])
   const [spaces, setSpaces] = useState([])
-  const [exercisesLoading, setExercisesLoading] = useState(false)
-  const [exercisesLoaded, setExercisesLoaded] = useState(false)
-  const [exercisesNext, setExercisesNext] = useState(null)
   const initialRoute = useMemo(() => parseRoute(window.location.pathname), [])
   const [view, setView] = useState(initialRoute.view)
   const [routeSessionId, setRouteSessionId] = useState(initialRoute.sessionId)
@@ -76,12 +72,6 @@ function AppContent() {
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
-  const parseCollectionPayload = (data) => {
-    if (Array.isArray(data)) return { items: data, next: null }
-    if (data && Array.isArray(data.results)) return { items: data.results, next: data.next || null }
-    return { items: [], next: null }
-  }
-
   const fetchSpaces = useCallback(async () => {
     try {
       const res = await fetch('/api/spaces/', { headers })
@@ -89,24 +79,6 @@ function AppContent() {
       setSpaces(data.results || data)
     } catch {
       toast.error('Could not load spaces')
-    }
-  }, [headers, toast])
-
-  const fetchExercises = useCallback(async ({ append = false, url = null } = {}) => {
-    if (!append) setExercisesLoaded(false)
-    setExercisesLoading(true)
-    try {
-      const res = await fetch(url || '/api/exercises/', { headers })
-      if (!res.ok) throw new Error('exercises')
-      const data = await res.json()
-      const parsed = parseCollectionPayload(data)
-      setExercises((prev) => (append ? [...prev, ...parsed.items] : parsed.items))
-      setExercisesNext(parsed.next)
-      setExercisesLoaded(true)
-    } catch {
-      if (!append) toast.error('Could not load exercises')
-    } finally {
-      setExercisesLoading(false)
     }
   }, [headers, toast])
 
@@ -126,9 +98,8 @@ function AppContent() {
   useEffect(() => {
     if (user) {
       fetchSpaces()
-      fetchExercises()
     }
-  }, [user, fetchSpaces, fetchExercises])
+  }, [user, fetchSpaces])
 
   useEffect(() => {
     const handler = () => refreshUser()
@@ -157,11 +128,6 @@ function AppContent() {
     navigate({ view: 'today', sessionId: null, spaceId: null }, { replace: true })
   }, [user, view, screenRecordSupported, navigate, toast])
 
-  const loadMoreExercises = async () => {
-    if (!exercisesNext || exercisesLoading) return
-    await fetchExercises({ append: true, url: exercisesNext })
-  }
-
   const openSession = (session) => {
     setSelectedSession(session)
     navigate({ view: 'detail', sessionId: session.id, spaceId: null })
@@ -175,7 +141,6 @@ function AppContent() {
 
   const openToday = () => navigate({ view: 'today', sessionId: null, spaceId: null })
   const handleProofSessionComplete = (session) => {
-    fetchExercises()
     fetchSpaces()
     setSelectedSession(session)
     navigate({ view: 'detail', sessionId: session.id, spaceId: null })
@@ -190,7 +155,7 @@ function AppContent() {
     return (
       <QuickRecord
         token={token}
-        exercises={exercises}
+        exercises={[]}
         spaces={spaces}
         initialSpaceId={routeSpaceId}
         onComplete={handleProofSessionComplete}
@@ -254,7 +219,6 @@ function AppContent() {
             user={user}
             spaces={spaces}
             initialSpaceId={routeSpaceId}
-            exercises={exercises}
             onOpenSession={openSession}
             onUploadProof={(spaceId) => navigate({ view: 'upload', sessionId: null, spaceId: spaceId || null })}
             onQuickRecordProof={(spaceId) => navigate({ view: 'quickRecord', sessionId: null, spaceId: spaceId || null })}
@@ -275,14 +239,11 @@ function AppContent() {
         {view === 'detail' && selectedSession && (
           <SessionDetail
             session={selectedSession}
-            exercises={exercises}
             spaces={spaces}
             token={token}
-            user={user}
             onBack={goHome}
             onSessionUpdate={(sessionData) => {
               setSelectedSession(sessionData)
-              fetchExercises()
               fetchSpaces()
             }}
             onOpenCompare={null}
