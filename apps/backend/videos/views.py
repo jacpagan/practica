@@ -1099,6 +1099,18 @@ class SessionViewSet(viewsets.ModelViewSet):
         ReviewLink.objects.filter(session=session, is_active=True).update(is_active=False)
         return Response({'ok': True})
 
+    @action(detail=True, methods=['post'], url_path='retry-processing')
+    def retry_processing(self, request, pk=None):
+        session = self.get_object()
+        if not can_edit_session(request.user, session):
+            raise PermissionDenied("You can only reprocess your own sessions.")
+
+        session.assets.filter(asset_type=SessionAsset.TYPE_PROXY_MP4).delete()
+        _start_processing_pipeline(session)
+        session.refresh_from_db()
+        serializer = self.get_serializer(session)
+        return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+
     @action(detail=True, methods=['patch', 'delete'], url_path=r'review-feedback/(?P<feedback_id>[0-9]+)')
     def review_feedback_detail(self, request, pk=None, feedback_id=None):
         session = self.get_object()

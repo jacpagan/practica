@@ -26,6 +26,7 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
   const [sharing, setSharing] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [retryingProcessing, setRetryingProcessing] = useState(false)
   const [revokingShare, setRevokingShare] = useState(false)
   const [editingFeedbackId, setEditingFeedbackId] = useState(null)
   const [feedbackDraft, setFeedbackDraft] = useState({ text: '', timestamp_seconds: '' })
@@ -182,6 +183,27 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
       toast.error('Could not delete practice entry')
     } finally {
       setDeleting(false)
+    }
+  }
+
+  const retryProcessing = async () => {
+    if (!token || !session?.id || !canEdit) return
+    setRetryingProcessing(true)
+    try {
+      const res = await fetch(`/api/sessions/${session.id}/retry-processing/`, {
+        method: 'POST',
+        headers: authHeaders,
+      })
+      if (!res.ok) throw new Error('retry-processing')
+      const data = await res.json()
+      setSession(data)
+      setActiveReviewLink(data.active_review_link || null)
+      onSessionUpdate?.(data)
+      toast.success('Conversion started')
+    } catch {
+      toast.error('Could not start conversion')
+    } finally {
+      setRetryingProcessing(false)
     }
   }
 
@@ -351,7 +373,27 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
               <div className="flex flex-wrap gap-2 text-xs text-gray-500">
                 {session.recorded_at ? <span>Recorded {new Date(session.recorded_at).toLocaleString()}</span> : null}
                 {session.duration_seconds ? <span>{Math.round(session.duration_seconds / 60)} min</span> : null}
+                {session.processing_status ? <span>Status: {session.processing_status}</span> : null}
               </div>
+
+              {canEdit && String(session.video_file || '').toLowerCase().endsWith('.mov') ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-amber-900">QuickTime upload</p>
+                      <p className="text-sm text-amber-800 mt-1">If playback is blank, convert this MOV into a browser-friendly MP4 proxy.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={retryProcessing}
+                      disabled={retryingProcessing || session.processing_status === 'processing'}
+                      className="text-xs font-medium text-white bg-amber-700 rounded-lg px-3 py-2 hover:bg-amber-800 disabled:opacity-50 transition-colors"
+                    >
+                      {retryingProcessing || session.processing_status === 'processing' ? 'Converting…' : 'Convert for playback'}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
 
               {session.processing_status === 'failed' && session.processing_error ? (
                 <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
