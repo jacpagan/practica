@@ -3,6 +3,7 @@ from .models import (
     Profile, Exercise, Session, Chapter, Comment, InviteCode, Tag, Space,
     SpaceMember, MultipartSessionUpload, ExerciseReferenceClip, SessionAsset,
     PracticePlan, PracticePlanItem, DailyCheckIn, DailyCheckInItem,
+    SessionLastSeen, CoachEvent, CoachDailyMetric,
 )
 
 
@@ -48,6 +49,14 @@ class SpaceAdmin(admin.ModelAdmin):
     inlines = [SpaceMemberInline]
 
 
+@admin.register(SpaceMember)
+class SpaceMemberAdmin(admin.ModelAdmin):
+    list_display = ['space', 'user', 'created_at']
+    list_filter = ['space', 'created_at']
+    search_fields = ['space__name', 'user__username', 'user__profile__display_name']
+    raw_id_fields = ['space', 'user']
+
+
 @admin.register(Exercise)
 class ExerciseAdmin(admin.ModelAdmin):
     list_display = ['name', 'category', 'created_at']
@@ -73,6 +82,14 @@ class PracticePlanAdmin(admin.ModelAdmin):
     inlines = [PracticePlanItemInline]
 
 
+@admin.register(PracticePlanItem)
+class PracticePlanItemAdmin(admin.ModelAdmin):
+    list_display = ['id', 'plan', 'exercise', 'sort_order', 'target_minutes', 'target_reps']
+    list_filter = ['plan__space', 'plan']
+    search_fields = ['plan__name', 'plan__space__name', 'exercise__name', 'notes']
+    raw_id_fields = ['plan', 'exercise', 'reference_clip']
+
+
 @admin.register(DailyCheckIn)
 class DailyCheckInAdmin(admin.ModelAdmin):
     list_display = ['space', 'user', 'date', 'status', 'total_minutes', 'linked_session', 'updated_at']
@@ -80,6 +97,14 @@ class DailyCheckInAdmin(admin.ModelAdmin):
     search_fields = ['space__name', 'user__username', 'notes']
     raw_id_fields = ['space', 'user', 'plan', 'linked_session']
     inlines = [DailyCheckInItemInline]
+
+
+@admin.register(DailyCheckInItem)
+class DailyCheckInItemAdmin(admin.ModelAdmin):
+    list_display = ['id', 'checkin', 'plan_item', 'completed', 'minutes', 'reps']
+    list_filter = ['completed', 'checkin__space', 'checkin__date']
+    search_fields = ['checkin__user__username', 'checkin__space__name', 'notes', 'plan_item__exercise__name']
+    raw_id_fields = ['checkin', 'plan_item']
 
 
 @admin.register(Session)
@@ -130,3 +155,30 @@ class MultipartSessionUploadAdmin(admin.ModelAdmin):
     list_filter = ['status']
     search_fields = ['user__username', 'original_filename', 's3_key', 's3_upload_id']
     raw_id_fields = ['user', 'space', 'session']
+
+
+@admin.register(SessionLastSeen)
+class SessionLastSeenAdmin(admin.ModelAdmin):
+    list_display = ['user', 'session', 'seen_at']
+    list_filter = ['seen_at']
+    search_fields = ['user__username', 'session__title']
+    raw_id_fields = ['user', 'session']
+
+
+@admin.register(CoachEvent)
+class CoachEventAdmin(admin.ModelAdmin):
+    list_display = ['id', 'coach_user', 'student_user', 'space', 'session', 'event_type', 'created_at']
+    list_filter = ['event_type', 'created_at', 'space']
+    search_fields = ['coach_user__username', 'student_user__username', 'space__name', 'session__title']
+    raw_id_fields = ['coach_user', 'student_user', 'space', 'session', 'comment']
+
+
+@admin.register(CoachDailyMetric)
+class CoachDailyMetricAdmin(admin.ModelAdmin):
+    list_display = [
+        'date', 'coach_user', 'active_students_30d', 'coach_comments_7d', 'coach_comments_30d',
+        'median_time_to_first_coach_comment_hours_30d', 'estimated_time_saved_hours_30d',
+    ]
+    list_filter = ['date']
+    search_fields = ['coach_user__username']
+    raw_id_fields = ['coach_user']
