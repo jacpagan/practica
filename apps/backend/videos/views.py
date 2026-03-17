@@ -29,7 +29,7 @@ from .models import (
     Exercise, Session, Chapter, Comment, InviteCode, SessionLastSeen,
     Tag, Space, SpaceMember, MultipartSessionUpload, ExerciseReferenceClip, SessionAsset,
     PracticePlan, PracticePlanItem, DailyCheckIn, DailyCheckInItem,
-    ReviewLink, ReviewFeedback,
+    ReviewLink,
 )
 from .serializers import (
     UserSerializer, RegisterSerializer, SpaceSerializer,
@@ -903,7 +903,7 @@ def review_link_feedback(request, token):
     if not link.allow_comments:
         return Response({'error': 'Comments are disabled for this link'}, status=status.HTTP_403_FORBIDDEN)
 
-    serializer = ReviewFeedbackSerializer(data=request.data)
+    serializer = ReviewFeedbackSerializer(data=request.data, context={'session': link.session})
     serializer.is_valid(raise_exception=True)
     item = serializer.save(session=link.session, review_link=link)
     return Response(ReviewFeedbackSerializer(item).data, status=status.HTTP_201_CREATED)

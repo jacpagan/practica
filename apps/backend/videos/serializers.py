@@ -382,6 +382,7 @@ class TagSerializer(serializers.ModelSerializer):
 class SessionSerializer(serializers.ModelSerializer):
     chapters = ChapterSerializer(many=True, read_only=True)
     comments = CommentSerializer(many=True, read_only=True)
+    review_feedback = serializers.SerializerMethodField()
     tag_names = serializers.SerializerMethodField()
     space_name = serializers.CharField(source='space.name', read_only=True, default=None)
     space_id = serializers.IntegerField(source='space.id', read_only=True, default=None)
@@ -402,7 +403,7 @@ class SessionSerializer(serializers.ModelSerializer):
                   'processing_status', 'processing_error',
                   'space_id', 'space_name', 'tag_names',
                   'assets', 'is_space_main',
-                  'chapters', 'comments', 'chapter_count', 'comment_count', 'owner',
+                  'chapters', 'comments', 'review_feedback', 'chapter_count', 'comment_count', 'owner',
                   'can_edit']
         read_only_fields = ['id', 'recorded_at', 'created_at', 'updated_at']
 
@@ -414,6 +415,10 @@ class SessionSerializer(serializers.ModelSerializer):
 
     def get_comment_count(self, obj):
         return obj.comments.count()
+
+    def get_review_feedback(self, obj):
+        feedback = obj.review_feedback.all().order_by('timestamp_seconds', 'created_at')
+        return ReviewFeedbackSerializer(feedback, many=True).data
 
     def get_owner(self, obj):
         if obj.user:
@@ -544,6 +549,18 @@ class ReviewLinkSerializer(serializers.ModelSerializer):
 
 
 class ReviewFeedbackSerializer(serializers.ModelSerializer):
+    def validate_timestamp_seconds(self, value):
+        if value is None:
+            return value
+        if value < 0:
+            raise serializers.ValidationError('Timestamp must be 0 or greater.')
+
+        session = self.context.get('session')
+        duration_seconds = getattr(session, 'duration_seconds', None) if session else None
+        if duration_seconds is not None and value > int(duration_seconds):
+            raise serializers.ValidationError('Timestamp must be within the video duration.')
+        return value
+
     class Meta:
         model = ReviewFeedback
         fields = ['id', 'name', 'email', 'timestamp_seconds', 'text', 'created_at']
