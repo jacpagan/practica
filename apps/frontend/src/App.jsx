@@ -67,6 +67,14 @@ function AppContent() {
     return () => window.removeEventListener('user-updated', handler)
   }, [refreshUser])
 
+  // Ensure we always land users on the upload screen after login
+  useEffect(() => {
+    if (user && view !== 'detail') {
+      navigate({ view: 'upload', sessionId: null }, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
+
   useEffect(() => {
     if (!user) return
     if (view === 'detail' && routeSessionId && selectedSession?.id !== routeSessionId) {
@@ -137,12 +145,40 @@ function AppContent() {
   )
 }
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError() { return { hasError: true } }
+  componentDidCatch(err) {
+    try { console.error(err) } catch {}
+    if (typeof window !== 'undefined') {
+      setTimeout(() => { try { window.location.reload() } catch {} }, 300)
+    }
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-white flex items-center justify-center px-4">
+          <div className="text-center">
+            <p className="text-sm text-gray-600">Something went wrong. Reloading…</p>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 function App() {
   return (
     <AuthProvider>
       <ToastProvider>
         <ConfirmProvider>
-          <AppContent />
+          <ErrorBoundary>
+            <AppContent />
+          </ErrorBoundary>
         </ConfirmProvider>
       </ToastProvider>
     </AuthProvider>
