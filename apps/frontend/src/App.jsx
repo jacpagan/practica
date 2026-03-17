@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { reportClientError } from './utils'
 import { AuthProvider, useAuth } from './auth'
 import { ToastProvider, useToast } from './components/Toast'
 import { ConfirmProvider } from './components/ConfirmDialog'
@@ -153,9 +154,19 @@ class ErrorBoundary extends React.Component {
   static getDerivedStateFromError() { return { hasError: true } }
   componentDidCatch(err) {
     try { console.error(err) } catch {}
-    if (typeof window !== 'undefined') {
-      setTimeout(() => { try { window.location.reload() } catch {} }, 300)
-    }
+    try {
+      reportClientError({ source: 'ErrorBoundary', message: err?.message || 'render error', stack: err?.stack || '' })
+    } catch {}
+    try {
+      if (typeof window !== 'undefined') {
+        const key = 'practica.errorboundary.reloaded'
+        const once = window.sessionStorage?.getItem(key)
+        if (!once) {
+          window.sessionStorage?.setItem(key, '1')
+          setTimeout(() => { try { window.location.reload() } catch {} }, 250)
+        }
+      }
+    } catch {}
   }
   render() {
     if (this.state.hasError) {
