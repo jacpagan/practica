@@ -63,7 +63,7 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
-    # Command defined in Dockerfile: migrate, collectstatic, gunicorn
+    # Command defined in Dockerfile: gunicorn only; deploy automation runs prep first
 
 volumes:
   postgres_prod_data:

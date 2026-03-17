@@ -96,14 +96,22 @@ else
   echo "DB snapshot skipped (db not ready or db missing)." >&2
 fi
 
-# Ensure old containers do not keep host ports (especially :8000) allocated.
-compose -f docker-compose.prod.yml down --remove-orphans || true
+# Keep supporting services up while preparing the next backend image.
+compose -f docker-compose.prod.yml up -d db redis
+
+# Build next backend image and run prep work before cutting over traffic.
+compose -f docker-compose.prod.yml build backend
+compose -f docker-compose.prod.yml run --rm backend python /app/apps/backend/manage.py migrate
+compose -f docker-compose.prod.yml run --rm backend python /app/apps/backend/manage.py collectstatic --noinput
+
+# Recreate only backend for the final cutover.
+docker ps -aq \
+  --filter label=com.docker.compose.project=practica \
+  --filter label=com.docker.compose.service=backend | xargs -r docker rm -f
 docker ps --filter publish=8000 -q | xargs -r docker rm -f
+compose -f docker-compose.prod.yml up -d --no-deps backend
 
-compose -f docker-compose.prod.yml up -d --build
-
-# Ensure DB schema and schedule periodic coach metrics aggregation.
-compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py migrate
+# Schedule periodic coach metrics aggregation.
 cat > /etc/cron.d/practica-coach-metrics <<CRON
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

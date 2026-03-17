@@ -40,5 +40,5 @@ RUN mkdir -p /app/apps/backend/media
 
 EXPOSE 8000
 
-# Use gunicorn in production; migrations + collectstatic on start
-CMD ["/bin/sh", "-c", "python /app/apps/backend/manage.py migrate && python /app/apps/backend/manage.py collectstatic --noinput && gunicorn --chdir /app/apps/backend practica.wsgi:application -b 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-3} --threads ${GUNICORN_THREADS:-2} --timeout ${GUNICORN_TIMEOUT:-3600} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT:-120} --keep-alive ${GUNICORN_KEEPALIVE:-75} --worker-tmp-dir /dev/shm --max-requests 1000 --max-requests-jitter 100"]
+# Use gunicorn in production; deploy automation runs migrations + collectstatic before cutover
+CMD ["/bin/sh", "-c", "gunicorn --chdir /app/apps/backend practica.wsgi:application -b 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-3} --threads ${GUNICORN_THREADS:-2} --timeout ${GUNICORN_TIMEOUT:-3600} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT:-120} --keep-alive ${GUNICORN_KEEPALIVE:-75} --worker-tmp-dir /dev/shm --max-requests 1000 --max-requests-jitter 100"]
