@@ -18,6 +18,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       postgresql-client \
+      ffmpeg \
       build-essential \
       libpq-dev \
  && rm -rf /var/lib/apt/lists/*
