@@ -91,24 +91,7 @@ function SessionUpload({ token, onComplete, onCancel }) {
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
               placeholder="What did you work on?" />
           </div>
-          <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 space-y-3">
-            <div>
-              <p className="text-sm font-medium text-gray-900">Optional reference video</p>
-              <p className="text-xs text-gray-500 mt-1">Paste the teacher or YouTube video you are following while you upload or record your attempt.</p>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1.5">Reference title</label>
-              <input type="text" value={referenceTitle} onChange={(e) => setReferenceTitle(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
-                placeholder="Dorothy Fitzer — Follow Along" />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1.5">Reference URL</label>
-              <input type="url" value={referenceUrl} onChange={(e) => setReferenceUrl(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
-                placeholder="https://www.youtube.com/watch?..." />
-            </div>
-          </div>
+          {/* Reference fields removed to keep upload flow focused */}
           <div>
             <label className="block text-sm text-gray-600 mb-2">Video</label>
             <div
