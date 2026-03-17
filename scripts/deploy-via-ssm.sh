@@ -241,6 +241,31 @@ if [ "$FINAL_STATUS" != "Success" ]; then
   exit 1
 fi
 
+REMOTE_DEPLOY_MAX_POLLS="${REMOTE_DEPLOY_MAX_POLLS:-180}"
+REMOTE_DEPLOY_FINAL=0
+for i in $(seq 1 "$REMOTE_DEPLOY_MAX_POLLS"); do
+  STATUS_CMD_ID=$(send_short_ssm "if [ -f /opt/practica/.deploy-success ]; then echo success; elif [ -f /opt/practica/.deploy-failed ]; then echo failed; else echo pending; fi" "Practica deploy status")
+  DEPLOY_STATUS=$(wait_for_ssm_output "$STATUS_CMD_ID" | tr -d '\r' | tail -n 1)
+  if [ "$DEPLOY_STATUS" = "success" ]; then
+    REMOTE_DEPLOY_FINAL=1
+    break
+  fi
+  if [ "$DEPLOY_STATUS" = "failed" ]; then
+    echo "Remote deploy reported failure" >&2
+    LOG_CMD_ID=$(send_short_ssm "tail -n 200 /opt/practica/deploy.log 2>/dev/null || true" "Practica deploy log tail")
+    wait_for_ssm_output "$LOG_CMD_ID" || true
+    exit 1
+  fi
+  echo "Waiting for remote deploy completion"
+  sleep 5
+done
+if [ "$REMOTE_DEPLOY_FINAL" != "1" ]; then
+  echo "Remote deploy completion timed out" >&2
+  LOG_CMD_ID=$(send_short_ssm "tail -n 200 /opt/practica/deploy.log 2>/dev/null || true" "Practica deploy log tail")
+  wait_for_ssm_output "$LOG_CMD_ID" || true
+  exit 1
+fi
+
 EXPECTED_SHA=$(git rev-parse HEAD 2>/dev/null || echo '')
 PUBLIC_VERIFY_MAX_POLLS="${PUBLIC_VERIFY_MAX_POLLS:-720}"
 PUBLIC_FINAL=0
