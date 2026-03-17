@@ -198,3 +198,23 @@ class MultipartUploadApiTests(APITestCase):
             )
         self.assertEqual(status_res.status_code, status.HTTP_200_OK)
         self.assertEqual(status_res.data['status'], MultipartSessionUpload.STATUS_EXPIRED)
+
+    def test_multipart_initiate_accepts_mov_with_generic_content_type(self):
+        fake_s3 = FakeS3Client()
+        self.client.force_authenticate(user=self.member)
+
+        with patch('videos.views._s3_client', return_value=fake_s3):
+            init_res = self.client.post(
+                '/api/sessions/multipart/initiate/',
+                {
+                    'title': 'QuickTime upload',
+                    'description': 'mov file',
+                    'size_bytes': 50 * 1024 * 1024,
+                    'filename': 'IMG_1313.MOV',
+                    'content_type': 'application/octet-stream',
+                    'space': self.space.id,
+                },
+                format='json',
+            )
+
+        self.assertEqual(init_res.status_code, status.HTTP_201_CREATED)

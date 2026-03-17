@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useConfirm } from './ConfirmDialog'
 import { useToast } from './Toast'
-import { createSessionUpload, fmtDate, uploadErrorMessage } from '../utils'
+import { createSessionUpload, fmtDate, isLikelyVideoFile, uploadErrorMessage, videoFileAccept } from '../utils'
 
 function SessionUpload({
   token,
@@ -53,6 +53,11 @@ function SessionUpload({
   const handleFilePick = (e) => {
     const file = e.target.files?.[0]
     if (file) {
+      if (!isLikelyVideoFile(file)) {
+        toast.error('Please choose a video file like .mov, .mp4, or .webm')
+        e.target.value = ''
+        return
+      }
       setVideoFile(file)
       if (!title.trim()) setTitle(file.name.replace(/\.[^.]+$/, ''))
     }
@@ -154,14 +159,14 @@ function SessionUpload({
               className="cursor-pointer rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center hover:bg-gray-100 transition-colors"
             >
               <p className="text-sm font-medium text-gray-900">Drag & drop your video here</p>
-              <p className="text-xs text-gray-500 mt-1">or click to choose a file (max 2GB)</p>
+              <p className="text-xs text-gray-500 mt-1">or click to choose a file (supports .mov, .mp4, .webm; max 2GB)</p>
               {videoFile ? (
                 <p className="text-xs text-gray-600 mt-3">Selected: {videoFile.name}</p>
               ) : null}
               <input
                 ref={inputRef}
                 type="file"
-                accept="video/*"
+                accept={videoFileAccept()}
                 className="hidden"
                 onChange={handleFilePick}
               />

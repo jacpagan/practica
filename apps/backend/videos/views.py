@@ -197,6 +197,20 @@ def _parse_tag_names(raw_tags):
     return []
 
 
+def _filename_has_video_extension(filename):
+    name = str(filename or '').strip().lower()
+    return name.endswith(('.mov', '.mp4', '.m4v', '.webm', '.avi', '.mkv', '.mpeg', '.mpg', '.wmv', '.3gp'))
+
+
+def _is_allowed_video_upload(content_type, filename=''):
+    normalized_type = str(content_type or '').strip().lower()
+    if normalized_type.startswith('video/'):
+        return True
+    if normalized_type in {'application/octet-stream', 'binary/octet-stream', ''} and _filename_has_video_extension(filename):
+        return True
+    return False
+
+
 def _resolve_space_for_create(user, space_id):
     if not space_id:
         return None
@@ -1100,7 +1114,7 @@ class SessionViewSet(viewsets.ModelViewSet):
             return Response({'error': 'File exceeds max upload size (2GB)'}, status=status.HTTP_400_BAD_REQUEST)
 
         content_type = str(request.data.get('content_type', '')).strip().lower()
-        if content_type and not content_type.startswith('video/'):
+        if not _is_allowed_video_upload(content_type, request.data.get('filename')):
             return Response({'error': 'Only video files allowed'}, status=status.HTTP_400_BAD_REQUEST)
 
         filename = _sanitize_filename(request.data.get('filename'))

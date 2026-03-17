@@ -1,7 +1,7 @@
 const API_BASE = window.location.hostname === 'localhost'
   ? 'http://localhost:8000'
   : ''
-const MULTIPART_THRESHOLD_BYTES = 64 * 1024 * 1024
+const MULTIPART_THRESHOLD_BYTES = 8 * 1024 * 1024
 const MAX_PART_RETRIES = 3
 const MULTIPART_CONCURRENCY = 4
 const RETRY_BASE_DELAY_MS = 500
@@ -16,6 +16,31 @@ const RECORDER_MIME_CANDIDATES = [
   'video/webm',
   'video/mp4',
 ]
+const VIDEO_FILE_ACCEPT = '.mov,.mp4,.m4v,.webm,.avi,.mkv,video/*,video/quicktime'
+const KNOWN_VIDEO_EXTENSIONS = ['mov', 'mp4', 'm4v', 'webm', 'avi', 'mkv', 'mpeg', 'mpg', 'wmv', '3gp']
+
+export const videoFileAccept = () => VIDEO_FILE_ACCEPT
+
+export const isLikelyVideoFile = (file) => {
+  const name = String(file?.name || '').toLowerCase()
+  const type = String(file?.type || '').toLowerCase()
+  if (type.startsWith('video/')) return true
+  const extension = name.includes('.') ? name.split('.').pop() : ''
+  return KNOWN_VIDEO_EXTENSIONS.includes(extension)
+}
+
+export const normalizedVideoContentType = (file) => {
+  const type = String(file?.type || '').trim().toLowerCase()
+  if (type.startsWith('video/')) return type
+
+  const name = String(file?.name || '').toLowerCase()
+  if (name.endsWith('.mov')) return 'video/quicktime'
+  if (name.endsWith('.mp4') || name.endsWith('.m4v')) return 'video/mp4'
+  if (name.endsWith('.webm')) return 'video/webm'
+  if (name.endsWith('.avi')) return 'video/x-msvideo'
+  if (name.endsWith('.mkv')) return 'video/x-matroska'
+  return type || 'application/octet-stream'
+}
 
 export const videoUrl = (path) => {
   if (!path) return null
@@ -479,6 +504,7 @@ const buildPartsPayload = (partsByNumber) =>
     .map(([partNumber, etag]) => ({ part_number: partNumber, etag }))
 
 const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress }) => {
+  const normalizedContentType = normalizedVideoContentType(videoFile)
   const fingerprint = multipartFingerprint({ payload, videoFile })
   const storageKey = multipartResumeKey(fingerprint)
 
@@ -513,7 +539,7 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
       body: {
         ...payload,
         filename: videoFile.name,
-        content_type: videoFile.type,
+        content_type: normalizedContentType,
         size_bytes: videoFile.size,
       },
     })
