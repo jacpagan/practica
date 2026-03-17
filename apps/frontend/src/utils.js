@@ -8,6 +8,7 @@ const RETRY_BASE_DELAY_MS = 500
 const RETRY_MAX_DELAY_MS = 4000
 const MULTIPART_RESUME_PREFIX = 'practica.multipart.resume.v1'
 const REFERENCE_ATTEMPT_DRAFT_KEY = 'practica.reference_attempt_draft.v1'
+const SPACE_REFERENCE_LIBRARY_PREFIX = 'practica.space_reference_library.v1'
 const RECORDER_MIME_CANDIDATES = [
   'video/webm;codecs=vp9',
   'video/webm;codecs=vp8',
@@ -205,6 +206,56 @@ export const clearReferenceAttemptDraft = () => {
   } catch {
     // Ignore draft persistence failures.
   }
+}
+
+const referenceLibraryKey = (spaceId) => `${SPACE_REFERENCE_LIBRARY_PREFIX}:${spaceId || 'none'}`
+
+export const readSavedSpaceReferences = (spaceId) => {
+  if (!spaceId) return []
+  const store = localStore()
+  if (!store) return []
+  try {
+    const raw = store.getItem(referenceLibraryKey(spaceId))
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+export const saveSavedSpaceReference = (spaceId, reference = {}) => {
+  if (!spaceId) return []
+  const store = localStore()
+  if (!store) return []
+  const existing = readSavedSpaceReferences(spaceId)
+  const normalized = {
+    id: reference.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    title: String(reference.title || reference.reference_title || reference.reference_url || '').trim(),
+    reference_url: String(reference.reference_url || '').trim(),
+    notes: String(reference.notes || '').trim(),
+    created_at: reference.created_at || new Date().toISOString(),
+  }
+  const next = [normalized, ...existing.filter((item) => item.id !== normalized.id)]
+  try {
+    store.setItem(referenceLibraryKey(spaceId), JSON.stringify(next))
+  } catch {
+    return existing
+  }
+  return next
+}
+
+export const deleteSavedSpaceReference = (spaceId, referenceId) => {
+  if (!spaceId) return []
+  const store = localStore()
+  if (!store) return []
+  const next = readSavedSpaceReferences(spaceId).filter((item) => item.id !== referenceId)
+  try {
+    store.setItem(referenceLibraryKey(spaceId), JSON.stringify(next))
+  } catch {
+    return readSavedSpaceReferences(spaceId)
+  }
+  return next
 }
 
 const trimLogValue = (value, maxChars) => String(value || '').slice(0, maxChars)

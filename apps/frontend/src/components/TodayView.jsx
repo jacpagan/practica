@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { authHeaders } from '../auth'
 import { useToast } from './Toast'
 import PlanEditor from './PlanEditor'
-import { writeReferenceAttemptDraft } from '../utils'
+import { deleteSavedSpaceReference, readSavedSpaceReferences, saveSavedSpaceReference, writeReferenceAttemptDraft } from '../utils'
 
 const STATUS_OPTIONS = [
   { value: 'complete', label: 'Complete' },
@@ -58,6 +58,8 @@ function TodayView({
   const [coachSummary, setCoachSummary] = useState(null)
   const [referenceTitleDraft, setReferenceTitleDraft] = useState('')
   const [referenceUrlDraft, setReferenceUrlDraft] = useState('')
+  const [referenceNotesDraft, setReferenceNotesDraft] = useState('')
+  const [savedReferences, setSavedReferences] = useState([])
 
   useEffect(() => {
     if (!spaces.length) {
@@ -110,6 +112,10 @@ function TodayView({
     if (selectedSpaceId) loadToday()
   }, [selectedSpaceId, loadToday])
 
+  useEffect(() => {
+    setSavedReferences(readSavedSpaceReferences(selectedSpaceId))
+  }, [selectedSpaceId])
+
   const loadCoachSummary = useCallback(async () => {
     if (!selectedSpaceId || !selectedSpaceIsOwner) {
       setCoachSummary(null)
@@ -145,18 +151,43 @@ function TodayView({
     }))
   }
 
-  const launchReferenceAttempt = (launcher) => {
-    const url = referenceUrlDraft.trim()
+  const launchReferenceAttempt = (launcher, override = null) => {
+    const draftTitle = String(override?.title ?? override?.reference_title ?? referenceTitleDraft).trim()
+    const draftUrl = String(override?.reference_url ?? referenceUrlDraft).trim()
+    const url = draftUrl
     if (!url) {
       toast.error('Paste a YouTube or teacher video URL first')
       return
     }
     writeReferenceAttemptDraft({
-      reference_title: referenceTitleDraft.trim(),
+      reference_title: draftTitle,
       reference_url: url,
       space_id: selectedSpaceId || null,
     })
+    setReferenceTitleDraft(draftTitle)
+    setReferenceUrlDraft(draftUrl)
+    setReferenceNotesDraft(String(override?.notes ?? referenceNotesDraft).trim())
     launcher?.(selectedSpaceId)
+  }
+
+  const saveReferenceToLibrary = () => {
+    const url = referenceUrlDraft.trim()
+    if (!selectedSpaceId || !url) {
+      toast.error('Paste a YouTube URL first')
+      return
+    }
+    const next = saveSavedSpaceReference(selectedSpaceId, {
+      title: referenceTitleDraft.trim() || url,
+      reference_url: url,
+      notes: referenceNotesDraft.trim(),
+    })
+    setSavedReferences(next)
+    toast.success('Saved reference')
+  }
+
+  const removeSavedReference = (referenceId) => {
+    const next = deleteSavedSpaceReference(selectedSpaceId, referenceId)
+    setSavedReferences(next)
   }
 
   const submitCheckin = async () => {
@@ -430,6 +461,13 @@ function TodayView({
                   placeholder="https://www.youtube.com/watch?..."
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white"
                 />
+                <textarea
+                  value={referenceNotesDraft}
+                  onChange={(e) => setReferenceNotesDraft(e.target.value)}
+                  rows={2}
+                  placeholder="Optional note about why this reference matters"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white resize-none"
+                />
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -454,7 +492,85 @@ function TodayView({
                       Screen-record attempt
                     </button>
                   ) : null}
+                  <button
+                    type="button"
+                    onClick={saveReferenceToLibrary}
+                    className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors"
+                  >
+                    Save link
+                  </button>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Saved links on this device</p>
+                {savedReferences.length === 0 ? (
+                  <p className="text-sm text-gray-500">Save your favorite Dorothy Fitzer links once, then relaunch attempts with one tap.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {savedReferences.map((reference) => (
+                      <div key={reference.id} className="rounded-xl bg-gray-50 px-3 py-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900">{reference.title}</p>
+                            {reference.notes ? <p className="text-xs text-gray-500 mt-1">{reference.notes}</p> : null}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeSavedReference(reference.id)}
+                            className="text-xs text-gray-400 hover:text-red-500 flex-shrink-0"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReferenceTitleDraft(reference.title || '')
+                              setReferenceUrlDraft(reference.reference_url || '')
+                              setReferenceNotesDraft(reference.notes || '')
+                            }}
+                            className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
+                          >
+                            Use
+                          </button>
+                          <a
+                            href={reference.reference_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
+                          >
+                            Open
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => launchReferenceAttempt(onQuickRecordProof, reference)}
+                            className="text-xs font-medium text-white bg-gray-900 rounded-lg px-3 py-2 hover:bg-gray-800 transition-colors"
+                          >
+                            Record
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => launchReferenceAttempt(onUploadProof, reference)}
+                            className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
+                          >
+                            Upload
+                          </button>
+                          {onScreenRecordProof ? (
+                            <button
+                              type="button"
+                              onClick={() => launchReferenceAttempt(onScreenRecordProof, reference)}
+                              className="text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
+                            >
+                              Screen record
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-2">
