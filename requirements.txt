@@ -19,6 +19,7 @@ Pillow
 # Caching
 redis
 django-redis
+celery
 
 # Environment Management
 python-decouple

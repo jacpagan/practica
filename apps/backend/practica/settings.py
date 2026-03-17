@@ -122,6 +122,8 @@ if FRONTEND_DIR.exists():
 # Storage backends
 AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME', '')
 AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-1')
+AWS_S3_ENDPOINT_URL = os.environ.get('AWS_S3_ENDPOINT_URL', '')
+AWS_S3_ADDRESSING_STYLE = os.environ.get('AWS_S3_ADDRESSING_STYLE', 'auto')
 AWS_S3_FILE_OVERWRITE = False
 AWS_DEFAULT_ACL = None
 AWS_QUERYSTRING_AUTH = True
@@ -139,6 +141,8 @@ if AWS_STORAGE_BUCKET_NAME:
             'OPTIONS': {
                 'bucket_name': AWS_STORAGE_BUCKET_NAME,
                 'region_name': AWS_S3_REGION_NAME,
+                'endpoint_url': AWS_S3_ENDPOINT_URL or None,
+                'addressing_style': AWS_S3_ADDRESSING_STYLE,
                 'file_overwrite': False,
                 'default_acl': None,
                 'querystring_auth': True,
@@ -221,6 +225,15 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.FileUploadParser',
     ],
 }
+
+# Celery
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', os.environ.get('REDIS_URL', 'redis://localhost:6379/0'))
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', CELERY_BROKER_URL)
+CELERY_TASK_ALWAYS_EAGER = os.environ.get('CELERY_TASK_ALWAYS_EAGER', 'False').lower() in ['true', '1', 'yes']
+
+# Notifications
+NOTIFICATIONS_PROVIDER = os.environ.get('NOTIFICATIONS_PROVIDER', 'django_email')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@practica.local')
 
 # Security headers (production)
 if not DEBUG:

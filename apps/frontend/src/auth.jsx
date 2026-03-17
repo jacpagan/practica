@@ -40,7 +40,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (token) {
-      fetch('/api/auth/me/', {
+      fetch('/api/v1/auth/me', {
         headers: { 'Authorization': `Token ${token}` },
       })
         .then(r => r.ok ? r.json() : Promise.reject())
@@ -52,11 +52,11 @@ export function AuthProvider({ children }) {
     }
   }, [token])
 
-  const login = async (username, password) => {
-    const res = await fetch('/api/auth/login/', {
+  const login = async (email, password) => {
+    const res = await fetch('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ email, password }),
     })
     if (!res.ok) throw new Error('Invalid credentials')
     const data = await res.json()
@@ -66,11 +66,11 @@ export function AuthProvider({ children }) {
     return data.user
   }
 
-  const loginWithInvite = async (username, password, inviteSlug) => {
-    const loginRes = await fetch('/api/auth/login/', {
+  const loginWithInvite = async (email, password, inviteSlug) => {
+    const loginRes = await fetch('/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ email, password }),
     })
     if (!loginRes.ok) throw new Error('Invalid credentials')
     const loginData = await loginRes.json()
@@ -91,10 +91,10 @@ export function AuthProvider({ children }) {
   }
 
   const register = async ({ username, password, display_name, invite_code, invite_slug }) => {
-    const body = { username, password, display_name }
+    const body = { email: username, password, display_name, role: 'student' }
     if (invite_code) body.invite_code = invite_code
     if (invite_slug) body.invite_slug = invite_slug
-    const res = await fetch('/api/auth/register/', {
+    const res = await fetch('/api/v1/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -119,7 +119,7 @@ export function AuthProvider({ children }) {
   const refreshUser = async () => {
     if (!token) return
     try {
-      const res = await fetch('/api/auth/me/', { headers: { 'Authorization': `Token ${token}` } })
+      const res = await fetch('/api/v1/auth/me', { headers: { 'Authorization': `Token ${token}` } })
       if (res.ok) setUser(await res.json())
     } catch {}
   }

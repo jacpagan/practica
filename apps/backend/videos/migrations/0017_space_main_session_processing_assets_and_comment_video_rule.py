@@ -77,7 +77,7 @@ class Migration(migrations.Migration):
         migrations.AddConstraint(
             model_name='comment',
             constraint=models.CheckConstraint(
-                check=models.Q(legacy_text_only=True) | (models.Q(video_reply__isnull=False) & ~models.Q(video_reply='')),
+                condition=models.Q(legacy_text_only=True) | (models.Q(video_reply__isnull=False) & ~models.Q(video_reply='')),
                 name='comment_legacy_or_video_required',
             ),
         ),

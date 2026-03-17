@@ -16,7 +16,7 @@ class Command(BaseCommand):
             video_count = ExerciseVideo.objects.count()
             thread_count = PracticeThread.objects.count()
             self.stdout.write(
-                self.style.SUCCESS(f"✅ Database connection working!")
+                self.style.SUCCESS("✅ Database connection working!")
             )
             self.stdout.write(f"   Exercise Videos: {video_count}")
             self.stdout.write(f"   Practice Threads: {thread_count}")
@@ -34,7 +34,7 @@ class Command(BaseCommand):
                 tags="test, drum, lesson"
             )
             self.stdout.write(
-                self.style.SUCCESS(f"✅ Model creation working!")
+                self.style.SUCCESS("✅ Model creation working!")
             )
             self.stdout.write(f"   Created: {test_video}")
             

@@ -107,7 +107,7 @@ function SessionUpload({ token, onComplete, onCancel }) {
               <input
                 ref={inputRef}
                 type="file"
-                accept="video/*"
+                accept=".mp4,.mov,.m4v,video/mp4,video/quicktime"
                 className="hidden"
                 onChange={handleFilePick}
               />

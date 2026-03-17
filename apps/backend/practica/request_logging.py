@@ -1,4 +1,5 @@
 import json
+import os
 import time
 import uuid
 from django.utils.deprecation import MiddlewareMixin
@@ -19,6 +20,10 @@ class RequestIdLoggingMiddleware(MiddlewareMixin):
         if not req_id:
             req_id = uuid.uuid4().hex
         request._request_id = req_id
+        trace_id = request.META.get("HTTP_X_TRACE_ID")
+        if not trace_id:
+            trace_id = req_id
+        request._trace_id = trace_id
         return None
 
     def process_response(self, request, response):
@@ -28,9 +33,12 @@ class RequestIdLoggingMiddleware(MiddlewareMixin):
             if start is not None:
                 elapsed_ms = int((time.perf_counter() - start) * 1000)
             request_id = getattr(request, "_request_id", "")
+            trace_id = getattr(request, "_trace_id", request_id)
             # Attach header for clients and proxies
             if request_id:
                 response["X-Request-ID"] = request_id
+            if trace_id:
+                response["X-Trace-ID"] = trace_id
 
             # Best-effort bytes in/out
             bytes_out = None
@@ -47,15 +55,19 @@ class RequestIdLoggingMiddleware(MiddlewareMixin):
                 bytes_in = None
 
             payload = {
-                "ts": timezone.now().isoformat(),
+                "timestamp": timezone.now().isoformat(),
+                "level": "INFO",
+                "service": os.getenv("SERVICE_NAME", "practica-api"),
+                "environment": os.getenv("ENVIRONMENT", "development"),
                 "method": request.method,
                 "path": request.get_full_path(),
-                "status": getattr(response, "status_code", None),
-                "ms": elapsed_ms,
+                "status_code": getattr(response, "status_code", None),
+                "latency_ms": elapsed_ms,
                 "user_id": getattr(getattr(request, "user", None), "id", None),
                 "bytes_out": bytes_out,
                 "bytes_in": bytes_in,
                 "request_id": request_id,
+                "trace_id": trace_id,
                 "deployed_sha": os.getenv("DEPLOYED_GIT_SHA", ""),
             }
             # Log to stdout in JSON for aggregation

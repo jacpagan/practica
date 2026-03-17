@@ -1,180 +1,58 @@
-# Practica - Personal Practice Tracking System
+# Practica MVP
 
-A containerized Django + React application for tracking personal practice sessions with video uploads.
+Practica is a video-based practice accountability app built as a modular Django + React monolith.
 
-## 🎯 Features
+## Quick start (out of the box)
 
-- **Exercise Video Management**: Upload and organize 60-minute drum lessons
-- **Practice Session Tracking**: Record and link 10-minute practice sessions
-- **Progress Visualization**: Track practice frequency and improvement
-- **AWS Integration**: Cost-effective cloud storage and deployment
+1. `cp .env.example .env`
+2. `docker compose up --build`
+3. Open:
+   - Web: `http://localhost:3000`
+   - API root: `http://localhost:8000`
+   - Health live: `http://localhost:8000/health/live/`
+   - Health ready: `http://localhost:8000/health/ready/`
 
-## 🚀 Quick Start
+## Services started by compose
 
-### Prerequisites
+- `frontend` (React/Vite)
+- `backend` (Django + DRF)
+- `db` (PostgreSQL)
+- `redis` (broker/cache)
+- `celery-worker` (background jobs)
+- `minio` + `minio-setup` (S3-compatible local object storage)
 
-- Docker & Docker Compose
-- AWS CLI (for cloud deployment)
-- Terraform (for infrastructure)
+## Seed demo data
 
-### Local Development
+After stack is up:
 
-1. **Clone and setup**:
-   ```bash
-   git clone <your-repo>
-   cd practica
-   cp env.example .env
-   # Edit .env with your configuration
-   ```
+- `docker compose exec backend python manage.py seed_mvp`
 
-2. **Start with Docker**:
-   ```bash
-   docker-compose up -d
-   ```
+Demo accounts:
 
-3. **Access the application**:
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8000
-   - Django Admin: http://localhost:8000/admin/
+- Student: `student@practica.local` / `student123`
+- Coach: `coach@practica.local` / `coach123`
+- Admin: `admin@practica.local` / `admin123`
 
-### AWS Deployment (Idempotent)
+## MVP API (versioned)
 
-1. **Setup AWS credentials**:
-   ```bash
-   aws configure
-   ```
+All APIs are under `/api/v1`:
 
-2. **Check current status**:
-   ```bash
-   ./status-aws.sh
-   ```
+- Auth: `/auth/register`, `/auth/login`, `/auth/logout`, `/auth/me`
+- Sessions: `/sessions`, `/sessions/:id`
+- Uploads: `/uploads/request`, `/uploads/:id/sign-part`, `/uploads/:id/status`, `/uploads/:id/complete`, `/uploads/:id/abort`
+- Comments: `/sessions/:id/comments`
+- Review links: `/sessions/:id/review-links`, `/review-links/:token`, `/review-links/:token/verify-pin`, `/review-links/:token/feedback`, `/review-links/:id/revoke`
+- Analytics: `/analytics/me/summary`, `/analytics/me/weekly`
 
-3. **Deploy infrastructure** (safe to run multiple times):
-   ```bash
-   ./deploy-aws.sh
-   ```
+## Common commands
 
-4. **Clean up when done**:
-   ```bash
-   ./cleanup-aws.sh
-   ```
+- `make up` / `make down`
+- `make logs`
+- `make migrate`
+- `make shell`
 
-### Deployment Commands
+## Notes
 
-- `./setup-aws.sh` - Validate AWS setup and Terraform config
-- `./deploy-aws.sh` - Deploy/update infrastructure (idempotent)
-- `./status-aws.sh` - Check current infrastructure status  
-- `./cleanup-aws.sh` - Destroy all AWS resources
-
-### Deployment Strategy (Solo Mode)
-
-- `main` is the only production deployment branch.
-- Deployment contract: `feature branch -> PR -> main -> production`.
-- No active staging promotion path exists in CI.
-- Guardrails stay enabled: backup/smoke checks and fast rollback are part of the production flow.
-
-## 🏗️ Architecture
-
-### Backend (Django)
-- **Framework**: Django 4.2 + Django REST Framework
-- **Database**: PostgreSQL (production) / SQLite (development)
-- **Cache**: Redis for performance
-- **Storage**: AWS S3 for video files
-
-### Frontend (React)
-- **Framework**: React 18 + Vite
-- **Styling**: Tailwind CSS
-- **State**: React hooks
-- **API**: Axios for HTTP requests
-
-### Infrastructure (AWS)
-- **Database**: RDS PostgreSQL (db.t3.micro)
-- **Storage**: S3 Standard
-- **CDN**: CloudFront (PriceClass_100)
-- **Cache**: ElastiCache Redis (optional)
-
-## 💰 Cost-Saving Features
-
-- **Database**: db.t3.micro instance (smallest available)
-- **Storage**: S3 Standard (not IA or Glacier)
-- **CDN**: PriceClass_100 (US, Canada, Europe only)
-- **Backup**: Minimal retention (7 days)
-- **Deployment**: Single AZ for development
-
-## 🐳 Docker Services
-
-- `db`: PostgreSQL database
-- `redis`: Redis cache
-- `backend`: Django API server
-- `frontend`: React development server
-
-## 📁 Project Structure
-
-```
-practica/
-├── apps/
-│   ├── backend/          # Django API
-│   └── frontend/         # React app
-├── infrastructure/       # Terraform configs
-├── docker-compose.yml    # Local development
-├── deploy-aws.sh         # AWS deployment script
-└── requirements.txt      # Python dependencies
-```
-
-## 🔧 Development Commands
-
-```bash
-# Start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-
-# Rebuild containers
-docker-compose build --no-cache
-
-# Django management
-docker-compose exec backend python manage.py migrate
-docker-compose exec backend python manage.py createsuperuser
-```
-
-## 🌐 Production Deployment
-
-1. **Deploy AWS infrastructure**:
-   ```bash
-   cd infrastructure
-   terraform apply
-   ```
-
-2. **Update environment variables**:
-   ```bash
-   # Set production values in .env
-   DEBUG=False
-   DATABASE_URL=postgresql://...
-   ```
-
-3. **Deploy application**:
-   ```bash
-   docker-compose -f docker-compose.prod.yml up -d
-   ```
-
-## 📊 Monitoring
-
-- **Health checks**: Built into Docker Compose
-- **Logs**: Centralized logging with Docker
-- **Metrics**: Basic Django admin monitoring
-- **Cost tracking**: AWS Cost Explorer
-
-## 🔒 Security
-
-- **Environment variables**: Sensitive data in .env
-- **CORS**: Configured for frontend domains
-- **Database**: Isolated in private subnets
-- **S3**: Bucket policies for access control
-
-## 📝 License
-
-Personal use only. This is your private practice tracking system.
+- Direct uploads use multipart pre-signed URLs to S3-compatible storage (MinIO in local dev).
+- Background processing is queued through Celery; local fallback processing is preserved when cloud transcoding is not configured.
+- Notification sending is provider-abstracted via `NOTIFICATIONS_PROVIDER`.

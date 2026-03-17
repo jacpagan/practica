@@ -2,6 +2,7 @@ import logging
 from typing import Iterable
 
 import boto3
+from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
 from django.db import transaction
@@ -20,10 +21,12 @@ def media_pipeline_enabled():
 
 
 def _mediaconvert_client():
+    endpoint_url = (getattr(settings, 'AWS_MEDIA_CONVERT_ENDPOINT_URL', None) or '').strip() or None
     return boto3.client(
         'mediaconvert',
         region_name=getattr(settings, 'AWS_S3_REGION_NAME', None),
-        endpoint_url=getattr(settings, 'AWS_MEDIA_CONVERT_ENDPOINT_URL', None),
+        endpoint_url=endpoint_url,
+        config=Config(retries={'max_attempts': 3}),
     )
 
 
@@ -203,7 +206,11 @@ def apply_processing_update(session, status, error='', assets=None):
     if next_status not in {Session.STATUS_PROCESSING, Session.STATUS_READY, Session.STATUS_FAILED}:
         raise ValueError('Invalid processing status')
 
+    update_fields = {'status': next_status}
     if next_status == Session.STATUS_READY:
+        hls_url = ''
+        mp4_url = ''
+        thumb_url = ''
         for asset in _normalized_assets(assets):
             SessionAsset.objects.update_or_create(
                 session=session,
@@ -214,11 +221,23 @@ def apply_processing_update(session, status, error='', assets=None):
                     'metadata_json': asset['metadata_json'],
                 },
             )
+            if asset['asset_type'] == SessionAsset.TYPE_HLS_MASTER:
+                hls_url = asset['object_key']
+            elif asset['asset_type'] == SessionAsset.TYPE_PROXY_MP4:
+                mp4_url = asset['object_key']
+            elif asset['asset_type'] == SessionAsset.TYPE_THUMB_SPRITE:
+                thumb_url = asset['object_key']
         has_proxy = session.assets.filter(asset_type=SessionAsset.TYPE_PROXY_MP4).exists()
         if not has_proxy:
             raise ValueError('Ready status requires at least one proxy_mp4 asset')
+        update_fields['playback_hls_url'] = hls_url
+        update_fields['playback_mp4_url'] = mp4_url
+        update_fields['thumbnail_url'] = thumb_url
 
+    session.status = next_status
     session.processing_status = next_status
     session.processing_error = (error or '').strip()
-    session.save(update_fields=['processing_status', 'processing_error', 'updated_at'])
+    for key, value in update_fields.items():
+        setattr(session, key, value)
+    session.save(update_fields=['status', 'processing_status', 'processing_error', 'playback_hls_url', 'playback_mp4_url', 'thumbnail_url', 'updated_at'])
     return session

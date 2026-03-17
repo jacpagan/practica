@@ -397,17 +397,20 @@ const parseJsonResponse = async (res) => {
   }
 }
 
-const authedJsonPost = async ({ url, token, body }) => {
+const authedJsonRequest = async ({ url, token, body, method = 'POST' }) => {
   const res = await fetch(url, {
-    method: 'POST',
+    method,
     headers: {
-      'Content-Type': 'application/json',
+      ...(method !== 'GET' ? { 'Content-Type': 'application/json' } : {}),
       ...(token ? { Authorization: `Token ${token}` } : {}),
     },
-    body: JSON.stringify(body),
+    ...(method !== 'GET' ? { body: JSON.stringify(body) } : {}),
   })
   return parseJsonResponse(res)
 }
+
+const authedJsonPost = async ({ url, token, body }) => authedJsonRequest({ url, token, body, method: 'POST' })
+const authedJsonGet = async ({ url, token }) => authedJsonRequest({ url, token, method: 'GET' })
 
 const putBlobToSignedUrl = ({ signedUrl, blob, onProgress }) =>
   new Promise((resolve, reject) => {
@@ -489,13 +492,12 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
 
   const resumeRecord = readResumeRecord(storageKey)
   if (resumeRecord?.upload_id && Number(resumeRecord?.size_bytes) === Number(videoFile.size)) {
-    const statusRes = await authedJsonPost({
-      url: '/api/sessions/multipart/status/',
+    const statusRes = await authedJsonGet({
+      url: `/api/v1/uploads/${resumeRecord.upload_id}/status`,
       token,
-      body: { multipart_upload_id: resumeRecord.upload_id },
     })
-    if (statusRes.ok && statusRes.data?.status === 'initiated') {
-      uploadId = statusRes.data?.multipart_upload_id
+    if (statusRes.ok && ['initiated', 'uploading'].includes(statusRes.data?.status)) {
+      uploadId = statusRes.data?.upload_id
       partSize = statusRes.data?.part_size
       totalParts = statusRes.data?.total_parts
       uploadedParts = statusRes.data?.uploaded_parts || []
@@ -508,10 +510,11 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
 
   if (!uploadId) {
     const initRes = await authedJsonPost({
-      url: '/api/sessions/multipart/initiate/',
+      url: '/api/v1/uploads/request',
       token,
       body: {
         ...payload,
+        session_id: payload.session_id || null,
         filename: videoFile.name,
         content_type: videoFile.type,
         size_bytes: videoFile.size,
@@ -519,7 +522,7 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
     })
     if (!initRes.ok) return initRes
 
-    uploadId = initRes.data?.multipart_upload_id
+    uploadId = initRes.data?.upload_id
     partSize = initRes.data?.part_size
     totalParts = initRes.data?.total_parts
     uploadedParts = []
@@ -571,9 +574,9 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
 
     try {
       const signRes = await retry(() => authedJsonPost({
-        url: '/api/sessions/multipart/sign-part/',
+        url: `/api/v1/uploads/${uploadId}/sign-part`,
         token,
-        body: { multipart_upload_id: uploadId, part_number: partNumber },
+        body: { part_number: partNumber },
       }))
       if (!signRes.ok || !signRes.data?.signed_url) throw asApiError(signRes)
 
@@ -618,10 +621,9 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
   }
 
   const completeRes = await authedJsonPost({
-    url: '/api/sessions/multipart/complete/',
+    url: `/api/v1/uploads/${uploadId}/complete`,
     token,
     body: {
-      multipart_upload_id: uploadId,
       parts: buildPartsPayload(partsByNumber),
     },
   })
@@ -638,23 +640,27 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
 
 export const createSessionUpload = async ({ token, payload, videoFile, onProgress }) => {
   try {
-    if (videoFile && videoFile.size >= MULTIPART_THRESHOLD_BYTES) {
-      const multipartRes = await createSessionViaMultipart({ token, payload, videoFile, onProgress })
-      if (multipartRes.ok || ![400, 404, 405].includes(multipartRes.status)) return multipartRes
+    const sessionRes = await authedJsonPost({
+      url: '/api/v1/sessions',
+      token,
+      body: {
+        title: payload.title || '',
+        description: payload.description || '',
+        duration_seconds: payload.duration_seconds || null,
+      },
+    })
+    if (!sessionRes.ok) return sessionRes
+    const multipartRes = await createSessionViaMultipart({
+      token,
+      payload: { ...payload, session_id: sessionRes.data?.id },
+      videoFile,
+      onProgress,
+    })
+    if (!multipartRes.ok) return multipartRes
+    return {
+      ...multipartRes,
+      data: multipartRes.data?.session || multipartRes.data,
     }
-
-    const fd = new FormData()
-    fd.append('title', payload.title || '')
-    fd.append('description', payload.description || '')
-    fd.append('reference_title', payload.reference_title || '')
-    fd.append('reference_url', payload.reference_url || '')
-    fd.append('video_file', videoFile)
-    if (payload.duration_seconds !== undefined && payload.duration_seconds !== null && payload.duration_seconds !== '') {
-      fd.append('duration_seconds', payload.duration_seconds)
-    }
-    if (payload.space) fd.append('space', payload.space)
-    if (payload.tags?.length) fd.append('tags', payload.tags.join(','))
-    return uploadFormData({ url: '/api/sessions/', formData: fd, token, onProgress })
   } catch {
     return {
       ok: false,

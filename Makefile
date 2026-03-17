@@ -1,8 +1,8 @@
 SHELL := /bin/bash
 
-.PHONY: up down restart logs ps migrate createsuperuser shell collectstatic nuke backend-shell frontend-shell fmt help
+.PHONY: up down restart logs ps migrate createsuperuser shell collectstatic seed nuke backend-shell frontend-shell fmt help
 
-DC := docker-compose
+DC := docker compose
 
 help:
 	@echo "Common dev targets:"
@@ -14,6 +14,7 @@ help:
 	@echo "  make createsuperuser# Create Django superuser (interactive)"
 	@echo "  make shell          # Django shell"
 	@echo "  make collectstatic  # Collect static files"
+	@echo "  make seed           # Seed demo MVP data"
 	@echo "  make nuke           # Stop and remove volumes (destructive)"
 
 up:
@@ -41,6 +42,9 @@ shell:
 
 collectstatic:
 	$(DC) exec backend python manage.py collectstatic --noinput
+
+seed:
+	$(DC) exec backend python manage.py seed_mvp
 
 nuke:
 	$(DC) down -v

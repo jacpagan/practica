@@ -15,7 +15,7 @@ from .models import (
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
-        fields = ['display_name']
+        fields = ['display_name', 'role']
 
 
 class SpaceSerializer(serializers.ModelSerializer):
@@ -65,6 +65,7 @@ class SpaceSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     display_name = serializers.SerializerMethodField()
+    role = serializers.SerializerMethodField()
     spaces = serializers.SerializerMethodField()
     has_spaces = serializers.SerializerMethodField()
     joined_spaces_count = serializers.SerializerMethodField()
@@ -76,6 +77,7 @@ class UserSerializer(serializers.ModelSerializer):
             'username',
             'email',
             'display_name',
+            'role',
             'spaces',
             'has_spaces',
             'joined_spaces_count',
@@ -86,6 +88,11 @@ class UserSerializer(serializers.ModelSerializer):
         if hasattr(obj, 'profile') and obj.profile.display_name:
             return obj.profile.display_name
         return obj.username
+
+    def get_role(self, obj):
+        if hasattr(obj, 'profile') and obj.profile.role:
+            return obj.profile.role
+        return Profile.ROLE_STUDENT
 
     def get_spaces(self, obj):
         owned = [{'id': s.id, 'name': s.name, 'role': 'owner'} for s in obj.owned_spaces.all()]
@@ -390,6 +397,7 @@ class SessionSerializer(serializers.ModelSerializer):
     owner = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
     processing_status = serializers.CharField(read_only=True)
+    status = serializers.CharField(read_only=True)
     processing_error = serializers.CharField(read_only=True)
     assets = SessionAssetSerializer(many=True, read_only=True)
     is_space_main = serializers.SerializerMethodField()
@@ -399,7 +407,8 @@ class SessionSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'description', 'video_file',
                   'reference_title', 'reference_url',
                   'duration_seconds', 'recorded_at', 'created_at', 'updated_at',
-                  'processing_status', 'processing_error',
+                  'status', 'processing_status', 'processing_error',
+                  'source_video_object_key', 'playback_hls_url', 'playback_mp4_url', 'thumbnail_url',
                   'space_id', 'space_name', 'tag_names',
                   'assets', 'is_space_main',
                   'chapters', 'comments', 'chapter_count', 'comment_count', 'owner',
@@ -448,6 +457,7 @@ class SessionListSerializer(serializers.ModelSerializer):
     has_unread = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
     processing_status = serializers.CharField(read_only=True)
+    status = serializers.CharField(read_only=True)
     assets = SessionAssetSerializer(many=True, read_only=True)
     is_space_main = serializers.SerializerMethodField()
 
@@ -456,7 +466,7 @@ class SessionListSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'description', 'video_file',
                   'reference_title', 'reference_url',
                   'duration_seconds', 'recorded_at', 'created_at',
-                  'processing_status',
+                  'status', 'processing_status',
                   'space_id', 'space_name', 'tag_names',
                   'assets', 'is_space_main',
                   'chapter_count', 'comment_count', 'owner_name', 'owner_id', 'has_unread',

@@ -1,6 +1,18 @@
 from django.db import migrations
 
 
+def drop_feedback_request_fk_column(apps, schema_editor):
+    # SQLite in local/tests can fail on IF EXISTS/CASCADE syntax used by Postgres.
+    if schema_editor.connection.vendor != 'postgresql':
+        return
+    schema_editor.execute(
+        """
+        ALTER TABLE videos_coachevent
+        DROP COLUMN IF EXISTS feedback_request_id CASCADE;
+        """
+    )
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -8,13 +20,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunSQL(
-            sql="""
-                ALTER TABLE videos_coachevent
-                DROP COLUMN IF EXISTS feedback_request_id CASCADE;
-            """,
-            reverse_sql=migrations.RunSQL.noop,
-        ),
+        migrations.RunPython(drop_feedback_request_fk_column, reverse_code=migrations.RunPython.noop),
         migrations.SeparateDatabaseAndState(
             state_operations=[
                 migrations.RemoveField(
@@ -25,7 +31,7 @@ class Migration(migrations.Migration):
             database_operations=[],
         ),
         migrations.RunSQL(
-            sql="DROP TABLE IF EXISTS videos_feedbackassignment CASCADE;",
+            sql="DROP TABLE IF EXISTS videos_feedbackassignment;",
             reverse_sql=migrations.RunSQL.noop,
         ),
         migrations.SeparateDatabaseAndState(
@@ -37,7 +43,7 @@ class Migration(migrations.Migration):
             database_operations=[],
         ),
         migrations.RunSQL(
-            sql="DROP TABLE IF EXISTS videos_feedbackrequest CASCADE;",
+            sql="DROP TABLE IF EXISTS videos_feedbackrequest;",
             reverse_sql=migrations.RunSQL.noop,
         ),
         migrations.SeparateDatabaseAndState(

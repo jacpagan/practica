@@ -11,6 +11,7 @@ from django.db import connection, transaction
 from django.db.models import Q
 from django.utils import timezone
 from django.conf import settings
+from django.core.files.storage import default_storage
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.views.decorators.csrf import csrf_exempt
@@ -23,13 +24,14 @@ from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import PermissionDenied, ValidationError
 import boto3
+from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
 from .models import (
     Exercise, Session, Chapter, Comment, InviteCode, SessionLastSeen,
     Tag, Space, SpaceMember, MultipartSessionUpload, ExerciseReferenceClip, SessionAsset,
     PracticePlan, PracticePlanItem, DailyCheckIn, DailyCheckInItem,
-    ReviewLink, ReviewFeedback,
+    ReviewLink, ReviewFeedback, CoachDailyMetric,
 )
 from .serializers import (
     UserSerializer, RegisterSerializer, SpaceSerializer,
@@ -41,6 +43,7 @@ from .serializers import (
     PublicSessionSerializer, ReviewLinkSerializer, ReviewFeedbackSerializer,
 )
 from .services.media_pipeline import enqueue_session_processing, apply_processing_update
+from .services.notifications import send_notification
 
 logger = logging.getLogger(__name__)
 
@@ -142,9 +145,13 @@ def _direct_uploads_enabled():
 
 
 def _s3_client():
+    addressing_style = getattr(settings, 'AWS_S3_ADDRESSING_STYLE', 'auto') or 'auto'
+    endpoint_url = getattr(settings, 'AWS_S3_ENDPOINT_URL', '') or None
     return boto3.client(
         's3',
         region_name=getattr(settings, 'AWS_S3_REGION_NAME', None),
+        endpoint_url=endpoint_url,
+        config=Config(s3={'addressing_style': addressing_style}),
     )
 
 
@@ -208,7 +215,9 @@ def _resolve_space_for_create(user, space_id):
 
 def _attach_tags_to_session(session, raw_tags):
     for name in _parse_tag_names(raw_tags):
-        tag, _ = Tag.objects.get_or_create(name__iexact=name, defaults={'name': name})
+        tag = Tag.objects.filter(name__iexact=name).first()
+        if not tag:
+            tag = Tag.objects.create(name=name)
         session.tags.add(tag)
 
 
@@ -232,10 +241,26 @@ def _can_modify_session(user, session):
     return can_edit_session(user, session)
 
 
+def _coach_metrics_enabled():
+    return bool(getattr(settings, 'COACH_METRICS_ENABLED', False))
+
+
+def _coach_metrics_user_allowed(user):
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_staff:
+        return True
+    allowed_user_ids = set(getattr(settings, 'COACH_METRICS_INTERNAL_USER_IDS', []))
+    if allowed_user_ids:
+        return user.id in allowed_user_ids
+    return Space.objects.filter(owner=user).exists()
+
+
 def _start_processing_pipeline(session):
+    session.status = Session.STATUS_PROCESSING
     session.processing_status = Session.STATUS_PROCESSING
     session.processing_error = ''
-    session.save(update_fields=['processing_status', 'processing_error', 'updated_at'])
+    session.save(update_fields=['status', 'processing_status', 'processing_error', 'updated_at'])
 
     queued, error, _job_id = enqueue_session_processing(session)
     if queued:
@@ -253,11 +278,22 @@ def _start_processing_pipeline(session):
             },
         )
         session.processing_status = Session.STATUS_READY
+        session.status = Session.STATUS_READY
         session.processing_error = ''
+        try:
+            session.playback_mp4_url = default_storage.url(session.video_file.name)
+        except Exception:
+            session.playback_mp4_url = session.video_file.name
+        send_notification(
+            subject='Your Practica session is ready',
+            body=f'Your session "{session.title}" is ready to review.',
+            recipients=[session.user.email] if session.user_id and session.user and session.user.email else [],
+        )
     else:
         session.processing_status = Session.STATUS_FAILED
+        session.status = Session.STATUS_FAILED
         session.processing_error = (error or 'Failed to enqueue media processing')[:2000]
-    session.save(update_fields=['processing_status', 'processing_error', 'updated_at'])
+    session.save(update_fields=['status', 'processing_status', 'processing_error', 'playback_mp4_url', 'updated_at'])
 
 
 def _processing_callback_authorized(request):
@@ -967,7 +1003,13 @@ class SessionViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         space_id = self.request.data.get('space')
         space = _resolve_space_for_create(self.request.user, space_id)
-        session = serializer.save(user=self.request.user, space=space)
+        session = serializer.save(
+            user=self.request.user,
+            space=space,
+            status=Session.STATUS_UPLOADED,
+            processing_status=Session.STATUS_UPLOADED,
+            source_video_object_key=serializer.validated_data.get('video_file').name if serializer.validated_data.get('video_file') else '',
+        )
         _attach_tags_to_session(session, self.request.data.get('tags', ''))
         _start_processing_pipeline(session)
 
@@ -1216,6 +1258,8 @@ class SessionViewSet(viewsets.ModelViewSet):
                 upload.status = MultipartSessionUpload.STATUS_EXPIRED
                 upload.save(update_fields=['status'])
                 return Response({'error': 'Upload has expired'}, status=status.HTTP_400_BAD_REQUEST)
+            upload.status = MultipartSessionUpload.STATUS_UPLOADING
+            upload.save(update_fields=['status', 'updated_at'])
 
             try:
                 _s3_client().complete_multipart_upload(
@@ -1238,6 +1282,9 @@ class SessionViewSet(viewsets.ModelViewSet):
                 reference_title=upload.reference_title,
                 reference_url=upload.reference_url,
                 video_file=upload.s3_key,
+                source_video_object_key=upload.s3_key,
+                status=Session.STATUS_UPLOADED,
+                processing_status=Session.STATUS_UPLOADED,
                 duration_seconds=upload.duration_seconds,
             )
             _attach_tags_to_session(session, upload.tags_csv)
@@ -1305,6 +1352,12 @@ class SessionViewSet(viewsets.ModelViewSet):
             logger.exception('Failed processing update for session_id=%s', session.id)
             return Response({'error': 'Could not apply processing update'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+        if session.status == Session.STATUS_READY and session.user_id and session.user.email:
+            send_notification(
+                subject='Your Practica session is ready',
+                body=f'Your session "{session.title}" has finished processing.',
+                recipients=[session.user.email],
+            )
         return Response(SessionSerializer(session, context={'request': request}).data)
 
     @action(detail=True, methods=['post'])
@@ -1317,7 +1370,9 @@ class SessionViewSet(viewsets.ModelViewSet):
             tag_names = [t.strip() for t in tag_names.split(',') if t.strip()]
         session.tags.clear()
         for name in tag_names:
-            tag, _ = Tag.objects.get_or_create(name__iexact=name, defaults={'name': name})
+            tag = Tag.objects.filter(name__iexact=name).first()
+            if not tag:
+                tag = Tag.objects.create(name=name)
             session.tags.add(tag)
         session.refresh_from_db()
         return Response(SessionSerializer(session).data)
@@ -1333,7 +1388,9 @@ class SessionViewSet(viewsets.ModelViewSet):
         if exercise_id:
             exercise = get_object_or_404(Exercise, pk=exercise_id)
         elif exercise_name:
-            exercise, _ = Exercise.objects.get_or_create(name__iexact=exercise_name, defaults={'name': exercise_name})
+            exercise = Exercise.objects.filter(name__iexact=exercise_name).first()
+            if not exercise:
+                exercise = Exercise.objects.create(name=exercise_name)
         ts = request.data.get('timestamp_seconds', 0)
         end = request.data.get('end_seconds')
         try:
@@ -1369,7 +1426,9 @@ class SessionViewSet(viewsets.ModelViewSet):
 
         exercise_name = request.data.get('exercise_name', '').strip()
         if exercise_name:
-            exercise, _ = Exercise.objects.get_or_create(name__iexact=exercise_name, defaults={'name': exercise_name})
+            exercise = Exercise.objects.filter(name__iexact=exercise_name).first()
+            if not exercise:
+                exercise = Exercise.objects.create(name=exercise_name)
             chapter.exercise = exercise
 
         if 'notes' in request.data:
@@ -1427,6 +1486,12 @@ class SessionViewSet(viewsets.ModelViewSet):
             session=session, user=request.user,
             timestamp_seconds=timestamp, text=text, video_reply=video_file, legacy_text_only=False,
         )
+        if session.user_id and session.user_id != request.user.id and session.user.email:
+            send_notification(
+                subject='New coach feedback on your Practica session',
+                body=f'You received new feedback on "{session.title}".',
+                recipients=[session.user.email],
+            )
         session.refresh_from_db()
         return Response(SessionSerializer(session).data, status=status.HTTP_201_CREATED)
 
@@ -1539,6 +1604,47 @@ def coach_metrics_summary(request):
     return Response(response)
 
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def review_link_info(request, token):
+    link = get_object_or_404(ReviewLink, token=token)
+    if not link.is_active or link.expires_at <= timezone.now():
+        return Response({'error': 'This link is inactive or expired.'}, status=status.HTTP_404_NOT_FOUND)
+    ReviewLink.objects.filter(pk=link.pk).update(last_accessed_at=timezone.now())
+    payload = {
+        'session': PublicSessionSerializer(link.session, context={'request': request}).data,
+        'link': ReviewLinkSerializer(link, context={'request': request}).data,
+    }
+    return Response(payload)
+
+
+@csrf_exempt
+@ratelimit(key='ip', rate='30/h', method='POST', block=True)
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def review_link_feedback(request, token):
+    link = get_object_or_404(ReviewLink, token=token)
+    if not link.is_active or link.expires_at <= timezone.now():
+        return Response({'error': 'This link is inactive or expired.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        rows = ReviewFeedback.objects.filter(review_link=link).order_by('timestamp_seconds', 'created_at')
+        return Response(ReviewFeedbackSerializer(rows, many=True).data)
+
+    if not link.allow_comments:
+        return Response({'error': 'Comments are disabled for this link.'}, status=status.HTTP_403_FORBIDDEN)
+    serializer = ReviewFeedbackSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    serializer.save(review_link=link, session=link.session)
+    owner_email = link.session.user.email if link.session.user_id and link.session.user and link.session.user.email else ''
+    send_notification(
+        subject='New public feedback on Practica session',
+        body=f'New public feedback was posted for "{link.session.title}".',
+        recipients=[owner_email] if owner_email else [],
+    )
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
 # ── Health check ────────────────────────────────────────────────────
 
 def health_check(request):
@@ -1559,6 +1665,20 @@ def health_check(request):
         health_status['status'] = 'unhealthy'
     status_code = 200 if health_status['status'] == 'healthy' else 503
     return JsonResponse(health_status, status=status_code)
+
+
+def ready_check(request):
+    ready = {'status': 'ready', 'checks': {}}
+    http_status = 200
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT 1')
+        ready['checks']['database'] = 'ok'
+    except Exception as exc:
+        ready['checks']['database'] = f'error: {exc}'
+        ready['status'] = 'not_ready'
+        http_status = 503
+    return JsonResponse(ready, status=http_status)
 
 
 def favicon(request):

@@ -23,7 +23,7 @@ function ReviewPage() {
       setLoading(true)
       setError('')
       try {
-        const res = await fetch(`/api/review/${token}/`)
+        const res = await fetch(`/api/v1/review-links/${token}`)
         if (!res.ok) throw new Error('invalid')
         const data = await res.json()
         if (!cancelled) {
@@ -42,7 +42,7 @@ function ReviewPage() {
 
   const loadFeedback = async () => {
     try {
-      const res = await fetch(`/api/review/${token}/feedback/`)
+      const res = await fetch(`/api/v1/review-links/${token}/feedback`)
       if (res.ok) setFeedback(await res.json())
     } catch {}
   }
@@ -55,7 +55,7 @@ function ReviewPage() {
     setSubmitting(true)
     try {
       const ts = parseTimeInput(timestamp)
-      const res = await fetch(`/api/review/${token}/feedback/`, {
+      const res = await fetch(`/api/v1/review-links/${token}/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), email: email.trim(), timestamp_seconds: ts, text: text.trim() }),

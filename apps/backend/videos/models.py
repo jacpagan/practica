@@ -6,8 +6,18 @@ from django.utils import timezone
 
 class Profile(models.Model):
     """Extended user profile."""
+    ROLE_STUDENT = 'student'
+    ROLE_COACH = 'coach'
+    ROLE_ADMIN = 'admin'
+    ROLE_CHOICES = [
+        (ROLE_STUDENT, 'Student'),
+        (ROLE_COACH, 'Coach'),
+        (ROLE_ADMIN, 'Admin'),
+    ]
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     display_name = models.CharField(max_length=100, blank=True)
+    role = models.CharField(max_length=16, choices=ROLE_CHOICES, default=ROLE_STUDENT)
 
     def __str__(self):
         return self.display_name or self.user.username
@@ -89,9 +99,9 @@ class ExerciseReferenceClip(models.Model):
             models.Index(fields=['youtube_playlist_id'], name='exercise_clip_playlist_id_idx'),
         ]
         constraints = [
-            models.CheckConstraint(check=models.Q(start_seconds__gte=0), name='exercise_clip_start_seconds_gte_0'),
+            models.CheckConstraint(condition=models.Q(start_seconds__gte=0), name='exercise_clip_start_seconds_gte_0'),
             models.CheckConstraint(
-                check=models.Q(end_seconds__isnull=True) | models.Q(end_seconds__gt=models.F('start_seconds')),
+                condition=models.Q(end_seconds__isnull=True) | models.Q(end_seconds__gt=models.F('start_seconds')),
                 name='exercise_clip_end_seconds_gt_start_or_null',
             ),
         ]
@@ -218,11 +228,15 @@ class Tag(models.Model):
 
 class Session(models.Model):
     """A practice session — typically one long recording."""
+    STATUS_DRAFT = 'draft'
+    STATUS_UPLOAD_IN_PROGRESS = 'upload_in_progress'
     STATUS_UPLOADED = 'uploaded'
     STATUS_PROCESSING = 'processing'
     STATUS_READY = 'ready'
     STATUS_FAILED = 'failed'
     STATUS_CHOICES = [
+        (STATUS_DRAFT, 'Draft'),
+        (STATUS_UPLOAD_IN_PROGRESS, 'Upload in Progress'),
         (STATUS_UPLOADED, 'Uploaded'),
         (STATUS_PROCESSING, 'Processing'),
         (STATUS_READY, 'Ready'),
@@ -236,8 +250,13 @@ class Session(models.Model):
     reference_title = models.CharField(max_length=200, blank=True)
     reference_url = models.URLField(blank=True)
     video_file = models.FileField(upload_to='sessions/')
-    processing_status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_UPLOADED)
+    status = models.CharField(max_length=24, choices=STATUS_CHOICES, default=STATUS_DRAFT)
+    processing_status = models.CharField(max_length=24, choices=STATUS_CHOICES, default=STATUS_UPLOADED)
     processing_error = models.TextField(blank=True)
+    source_video_object_key = models.CharField(max_length=512, blank=True)
+    playback_hls_url = models.URLField(blank=True)
+    playback_mp4_url = models.URLField(blank=True)
+    thumbnail_url = models.URLField(blank=True)
     tags = models.ManyToManyField(Tag, blank=True, related_name='sessions')
     duration_seconds = models.IntegerField(null=True, blank=True)
     recorded_at = models.DateTimeField(auto_now_add=True)
@@ -287,11 +306,13 @@ class MultipartSessionUpload(models.Model):
     """Tracks direct-to-S3 multipart uploads before session creation."""
 
     STATUS_INITIATED = 'initiated'
+    STATUS_UPLOADING = 'uploading'
     STATUS_COMPLETED = 'completed'
     STATUS_ABORTED = 'aborted'
     STATUS_EXPIRED = 'expired'
     STATUS_CHOICES = [
         (STATUS_INITIATED, 'Initiated'),
+        (STATUS_UPLOADING, 'Uploading'),
         (STATUS_COMPLETED, 'Completed'),
         (STATUS_ABORTED, 'Aborted'),
         (STATUS_EXPIRED, 'Expired'),
@@ -391,7 +412,7 @@ class Comment(models.Model):
         ordering = ['timestamp_seconds', 'created_at']
         constraints = [
             models.CheckConstraint(
-                check=models.Q(legacy_text_only=True) | (models.Q(video_reply__isnull=False) & ~models.Q(video_reply='')),
+                condition=models.Q(legacy_text_only=True) | (models.Q(video_reply__isnull=False) & ~models.Q(video_reply='')),
                 name='comment_legacy_or_video_required',
             ),
         ]
@@ -469,6 +490,7 @@ class ReviewLink(models.Model):
     expires_at = models.DateTimeField()
     is_active = models.BooleanField(default=True)
     allow_comments = models.BooleanField(default=True)
+    pin_code_hash = models.CharField(max_length=128, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     last_accessed_at = models.DateTimeField(null=True, blank=True)
 
@@ -499,3 +521,25 @@ class ReviewFeedback(models.Model):
         ts = f"@{self.timestamp_seconds}s " if self.timestamp_seconds is not None else ''
         who = self.name or 'Anonymous'
         return f"{ts}{who}: {self.text[:40]}"
+
+
+class AnalyticsDaily(models.Model):
+    """Per-user daily practice counters for dashboard stats."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='analytics_daily')
+    date = models.DateField()
+    session_count = models.PositiveIntegerField(default=0)
+    practice_minutes = models.PositiveIntegerField(default=0)
+    comments_received = models.PositiveIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['date']
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'date'], name='analytics_daily_user_date_uniq'),
+        ]
+        indexes = [
+            models.Index(fields=['user', 'date'], name='analytics_daily_user_date_idx'),
+        ]
+
+    def __str__(self):
+        return f"AnalyticsDaily user={self.user_id} date={self.date}"
