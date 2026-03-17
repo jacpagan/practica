@@ -241,34 +241,11 @@ if [ "$FINAL_STATUS" != "Success" ]; then
   exit 1
 fi
 
-REMOTE_DEPLOY_MAX_POLLS="${REMOTE_DEPLOY_MAX_POLLS:-180}"
-REMOTE_DEPLOY_FINAL=0
-for i in $(seq 1 "$REMOTE_DEPLOY_MAX_POLLS"); do
-  STATUS_CMD_ID=$(send_short_ssm "if [ -f /opt/practica/.deploy-success ]; then echo success; elif [ -f /opt/practica/.deploy-failed ]; then echo failed; else echo pending; fi" "Practica deploy status")
-  DEPLOY_STATUS=$(wait_for_ssm_output "$STATUS_CMD_ID" | tr -d '\r' | tail -n 1)
-  if [ "$DEPLOY_STATUS" = "success" ]; then
-    REMOTE_DEPLOY_FINAL=1
-    break
-  fi
-  if [ "$DEPLOY_STATUS" = "failed" ]; then
-    echo "Remote deploy reported failure" >&2
-    LOG_CMD_ID=$(send_short_ssm "tail -n 200 /opt/practica/deploy.log 2>/dev/null || true" "Practica deploy log tail")
-    wait_for_ssm_output "$LOG_CMD_ID" || true
-    exit 1
-  fi
-  echo "Waiting for remote deploy completion"
-  sleep 5
-done
-if [ "$REMOTE_DEPLOY_FINAL" != "1" ]; then
-  echo "Remote deploy completion timed out" >&2
-  LOG_CMD_ID=$(send_short_ssm "tail -n 200 /opt/practica/deploy.log 2>/dev/null || true" "Practica deploy log tail")
-  wait_for_ssm_output "$LOG_CMD_ID" || true
-  exit 1
-fi
-
 EXPECTED_SHA=$(git rev-parse HEAD 2>/dev/null || echo '')
 PUBLIC_VERIFY_MAX_POLLS="${PUBLIC_VERIFY_MAX_POLLS:-720}"
+PUBLIC_STABLE_SUCCESSES="${PUBLIC_STABLE_SUCCESSES:-3}"
 PUBLIC_FINAL=0
+PUBLIC_STREAK=0
 for i in $(seq 1 "$PUBLIC_VERIFY_MAX_POLLS"); do
   HEALTH_JSON=$(curl -fsS --max-time 10 https://practica.jpagan.com/health/ 2>/dev/null || true)
   if [ -n "$HEALTH_JSON" ] && python3 - "$EXPECTED_SHA" <<'PY' <<<"$HEALTH_JSON"
@@ -289,10 +266,37 @@ if status == 'healthy' and deployed_sha == expected:
 sys.exit(1)
 PY
   then
-    PUBLIC_FINAL=1
-    break
+    READY_JSON=$(curl -fsS --max-time 10 https://practica.jpagan.com/ready/ 2>/dev/null || true)
+    if [ -n "$READY_JSON" ] && python3 <<'PY' <<<"$READY_JSON"
+import json
+import sys
+
+try:
+    payload = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+
+sys.exit(0 if str(payload.get('status') or '').strip() == 'ready' else 1)
+PY
+    then
+      PUBLIC_STREAK=$((PUBLIC_STREAK + 1))
+      echo "Public deploy healthy ($PUBLIC_STREAK/$PUBLIC_STABLE_SUCCESSES)"
+      if [ "$PUBLIC_STREAK" -ge "$PUBLIC_STABLE_SUCCESSES" ]; then
+        PUBLIC_FINAL=1
+        break
+      fi
+    else
+      PUBLIC_STREAK=0
+      echo "Public deploy health matched SHA but readiness is not ready yet"
+    fi
+  else
+    if [ "$PUBLIC_STREAK" -gt 0 ]; then
+      echo "Public deploy lost health during verification; retrying"
+    else
+      echo "Waiting for public deploy: expected sha ${EXPECTED_SHA:-unknown}"
+    fi
+    PUBLIC_STREAK=0
   fi
-  echo "Waiting for public deploy: expected sha ${EXPECTED_SHA:-unknown}"
   sleep 5
 done
 if [ "$PUBLIC_FINAL" != "1" ]; then
@@ -300,38 +304,6 @@ if [ "$PUBLIC_FINAL" != "1" ]; then
   STATUS_CMD_ID=$(send_short_ssm "if [ -f /opt/practica/.deploy-success ]; then echo success; elif [ -f /opt/practica/.deploy-failed ]; then echo failed; else echo pending; fi" "Practica deploy status")
   DEPLOY_STATUS=$(wait_for_ssm_output "$STATUS_CMD_ID" | tr -d '\r' | tail -n 1)
   echo "Remote deploy status: ${DEPLOY_STATUS:-pending}"
-  LOG_CMD_ID=$(send_short_ssm "tail -n 200 /opt/practica/deploy.log 2>/dev/null || true" "Practica deploy log tail")
-  wait_for_ssm_output "$LOG_CMD_ID" || true
-  exit 1
-fi
-
-STABILITY_FINAL=0
-for i in $(seq 1 6); do
-  HEALTH_JSON=$(curl -fsS --max-time 10 https://practica.jpagan.com/health/ 2>/dev/null || true)
-  if [ -n "$HEALTH_JSON" ] && python3 - "$EXPECTED_SHA" <<'PY' <<<"$HEALTH_JSON"
-import json
-import sys
-
-expected = (sys.argv[1] or '').strip()
-try:
-    payload = json.load(sys.stdin)
-except Exception:
-    sys.exit(1)
-
-status = str(payload.get('status') or '').strip()
-deployed_sha = str(payload.get('deployed_sha') or '').strip()
-sys.exit(0 if status == 'healthy' and deployed_sha == expected else 1)
-PY
-  then
-    STABILITY_FINAL=1
-  else
-    STABILITY_FINAL=0
-    break
-  fi
-  sleep 5
-done
-if [ "$STABILITY_FINAL" != "1" ]; then
-  echo "Public deploy became unhealthy during stability window" >&2
   LOG_CMD_ID=$(send_short_ssm "tail -n 200 /opt/practica/deploy.log 2>/dev/null || true" "Practica deploy log tail")
   wait_for_ssm_output "$LOG_CMD_ID" || true
   exit 1

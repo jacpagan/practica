@@ -97,4 +97,5 @@ jobs:
           MSG=":rotating_light: Practica production deploy failed\nRepo: ${GITHUB_REPOSITORY}\nRef: ${REF_VALUE}\nCommit: ${GITHUB_SHA}\nRun: ${RUN_URL}\nSSM Status: ${SSM_STATUS_VALUE}\nSSM Command ID: ${SSM_CMD_VALUE}"
           ESCAPED_MSG=$(printf '%s' "$MSG" | sed 's/\\/\\\\/g; s/"/\\"/g; s/$/\\n/' | tr -d '\n')
           PAYLOAD="{\"text\":\"${ESCAPED_MSG}\"}"
-          curl -fsS -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL"
+          curl -fsS -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL" || \
+            echo "::warning::Slack deploy-failure notification failed."
