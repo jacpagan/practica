@@ -954,6 +954,7 @@ def review_link_feedback(request, token):
         item = serializer.save(
             session=link.session,
             review_link=link,
+            author_user=request.user,
             name=name,
             email=request.user.email or '',
         )
@@ -1138,6 +1139,7 @@ class SessionViewSet(viewsets.ModelViewSet):
         item = serializer.save(
             session=session,
             review_link=link,
+            author_user=request.user,
             name=name,
             email=request.user.email or '',
         )

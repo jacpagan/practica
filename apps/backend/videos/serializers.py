@@ -505,6 +505,8 @@ class SessionListSerializer(serializers.ModelSerializer):
     chapter_count = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
     review_feedback_count = serializers.SerializerMethodField()
+    feedback_given_by_you_count = serializers.SerializerMethodField()
+    has_feedback_from_you = serializers.SerializerMethodField()
     student_streak_days = serializers.SerializerMethodField()
     owner_name = serializers.SerializerMethodField()
     owner_id = serializers.IntegerField(source='user.id', read_only=True, default=None)
@@ -525,7 +527,7 @@ class SessionListSerializer(serializers.ModelSerializer):
                   'processing_status', 'processing_error',
                   'space_id', 'space_name', 'tag_names',
                   'assets', 'is_space_main',
-                  'chapter_count', 'comment_count', 'review_feedback_count', 'student_streak_days', 'owner_name', 'owner_id', 'has_unread',
+                  'chapter_count', 'comment_count', 'review_feedback_count', 'feedback_given_by_you_count', 'has_feedback_from_you', 'student_streak_days', 'owner_name', 'owner_id', 'has_unread',
                   'can_review_feedback', 'needs_review',
                   'can_edit']
         read_only_fields = ['id', 'recorded_at', 'created_at']
@@ -541,6 +543,15 @@ class SessionListSerializer(serializers.ModelSerializer):
 
     def get_review_feedback_count(self, obj):
         return obj.review_feedback.count()
+
+    def get_feedback_given_by_you_count(self, obj):
+        user = self._request_user()
+        if not user:
+            return 0
+        return obj.review_feedback.filter(author_user_id=user.id).count()
+
+    def get_has_feedback_from_you(self, obj):
+        return self.get_feedback_given_by_you_count(obj) > 0
 
     def get_student_streak_days(self, obj):
         if not obj.user_id:
@@ -665,6 +676,22 @@ class ReviewLinkSerializer(serializers.ModelSerializer):
 
 
 class ReviewFeedbackSerializer(serializers.ModelSerializer):
+    author_display_name = serializers.SerializerMethodField()
+    authored_by_current_user = serializers.SerializerMethodField()
+
+    def get_author_display_name(self, obj):
+        if getattr(obj, 'author_user', None):
+            user = obj.author_user
+            if hasattr(user, 'profile') and user.profile.display_name:
+                return user.profile.display_name
+            return user.username
+        return obj.name or 'Anonymous'
+
+    def get_authored_by_current_user(self, obj):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
+        return bool(user and user.is_authenticated and getattr(obj, 'author_user_id', None) == user.id)
+
     def validate_timestamp_seconds(self, value):
         if value is None:
             return value
@@ -679,5 +706,5 @@ class ReviewFeedbackSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ReviewFeedback
-        fields = ['id', 'name', 'email', 'timestamp_seconds', 'text', 'created_at']
+        fields = ['id', 'name', 'email', 'author_display_name', 'authored_by_current_user', 'timestamp_seconds', 'text', 'created_at']
         read_only_fields = ['id', 'created_at']

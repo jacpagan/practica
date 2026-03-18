@@ -5,6 +5,8 @@ function TeacherQueue({ sessions = [], sessionsLoading = false, onOpenSession })
   const now = Date.now()
   const reviewable = sessions
     .filter((session) => session.can_review_feedback && !session.can_edit)
+  const needsAttention = reviewable
+    .filter((session) => session.needs_review || session.has_unread)
     .sort((left, right) => {
       const leftRecordedAt = new Date(left.recorded_at || left.created_at).getTime()
       const rightRecordedAt = new Date(right.recorded_at || right.created_at).getTime()
@@ -15,9 +17,55 @@ function TeacherQueue({ sessions = [], sessionsLoading = false, onOpenSession })
       if (leftStale !== rightStale) return leftStale ? -1 : 1
       return leftRecordedAt - rightRecordedAt
     })
+  const coachedByYou = reviewable
+    .filter((session) => session.has_feedback_from_you && !session.needs_review && !session.has_unread)
+    .sort((left, right) => new Date(right.recorded_at || right.created_at) - new Date(left.recorded_at || left.created_at))
 
-  const needsReviewCount = reviewable.filter((session) => session.needs_review).length
-  const unreadCount = reviewable.filter((session) => session.has_unread).length
+  const needsReviewCount = needsAttention.filter((session) => session.needs_review).length
+  const unreadCount = needsAttention.filter((session) => session.has_unread).length
+
+  const renderSessionRow = (session) => {
+    const recordedAt = new Date(session.recorded_at || session.created_at)
+    const stale = now - recordedAt.getTime() > 3 * 24 * 60 * 60 * 1000
+    return (
+      <button
+        key={session.id}
+        type="button"
+        onClick={() => onOpenSession?.(session, 'review')}
+        className="w-full text-left rounded-2xl border border-gray-200 px-4 py-4 hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-sm font-medium text-gray-900 line-clamp-1">{session.title}</p>
+              {session.has_unread ? (
+                <span className="text-[11px] uppercase tracking-wide bg-blue-100 text-blue-800 px-2 py-1 rounded-full">New activity</span>
+              ) : session.needs_review ? (
+                <span className="text-[11px] uppercase tracking-wide bg-amber-100 text-amber-800 px-2 py-1 rounded-full">Needs review</span>
+              ) : (
+                <span className="text-[11px] uppercase tracking-wide bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">Coached by you</span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              {session.owner_name || 'Student'}
+              {session.space_name ? ` · ${session.space_name}` : ''}
+              {` · ${fmtDate(session.recorded_at || session.created_at)}`}
+            </p>
+            <div className="flex items-center gap-2 flex-wrap mt-2">
+              <span className="text-[11px] uppercase tracking-wide bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">{session.student_streak_days || 0} day streak</span>
+              {stale ? <span className="text-[11px] uppercase tracking-wide bg-rose-100 text-rose-800 px-2 py-1 rounded-full">Stale</span> : null}
+              {session.feedback_given_by_you_count ? <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">{session.feedback_given_by_you_count} from you</span> : null}
+            </div>
+            {session.description ? <p className="text-xs text-gray-500 mt-2 line-clamp-2">{session.description}</p> : null}
+          </div>
+          <div className="text-right shrink-0">
+            <p className="text-[11px] uppercase tracking-wide text-gray-400">{session.processing_status === 'ready' ? 'Ready' : session.processing_status || 'Saved'}</p>
+            <p className="text-xs text-gray-500 mt-2">{session.review_feedback_count || 0} feedback</p>
+          </div>
+        </div>
+      </button>
+    )
+  }
 
   return (
     <div className="px-4 sm:px-6 py-6">
@@ -35,48 +83,22 @@ function TeacherQueue({ sessions = [], sessionsLoading = false, onOpenSession })
         {sessionsLoading ? (
           <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading review queue…</div>
         ) : reviewable.length ? (
-          <div className="space-y-2">
-            {reviewable.map((session) => {
-              const recordedAt = new Date(session.recorded_at || session.created_at)
-              const stale = now - recordedAt.getTime() > 3 * 24 * 60 * 60 * 1000
-              return (
-              <button
-                key={session.id}
-                type="button"
-                onClick={() => onOpenSession?.(session, 'review')}
-                className="w-full text-left rounded-2xl border border-gray-200 px-4 py-4 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-medium text-gray-900 line-clamp-1">{session.title}</p>
-                      {session.has_unread ? (
-                        <span className="text-[11px] uppercase tracking-wide bg-blue-100 text-blue-800 px-2 py-1 rounded-full">New activity</span>
-                      ) : session.needs_review ? (
-                        <span className="text-[11px] uppercase tracking-wide bg-amber-100 text-amber-800 px-2 py-1 rounded-full">Needs review</span>
-                      ) : (
-                        <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-600 px-2 py-1 rounded-full">Reviewed</span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {session.owner_name || 'Student'}
-                      {session.space_name ? ` · ${session.space_name}` : ''}
-                      {` · ${fmtDate(session.recorded_at || session.created_at)}`}
-                    </p>
-                    <div className="flex items-center gap-2 flex-wrap mt-2">
-                      <span className="text-[11px] uppercase tracking-wide bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">{session.student_streak_days || 0} day streak</span>
-                      {stale ? <span className="text-[11px] uppercase tracking-wide bg-rose-100 text-rose-800 px-2 py-1 rounded-full">Stale</span> : null}
-                    </div>
-                    {session.description ? <p className="text-xs text-gray-500 mt-2 line-clamp-2">{session.description}</p> : null}
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-[11px] uppercase tracking-wide text-gray-400">{session.processing_status === 'ready' ? 'Ready' : session.processing_status || 'Saved'}</p>
-                    <p className="text-xs text-gray-500 mt-2">{session.review_feedback_count || 0} feedback</p>
-                  </div>
-                </div>
-              </button>
-              )
-            })}
+          <div className="space-y-6">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-900">Needs your attention</h3>
+                <span className="text-xs text-gray-400">{needsAttention.length}</span>
+              </div>
+              {needsAttention.length ? <div className="space-y-2">{needsAttention.map(renderSessionRow)}</div> : <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-500">Nothing urgent right now.</div>}
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-900">Recent coaching by you</h3>
+                <span className="text-xs text-gray-400">{coachedByYou.length}</span>
+              </div>
+              {coachedByYou.length ? <div className="space-y-2">{coachedByYou.map(renderSessionRow)}</div> : <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-500">Your reviewed student clips will show up here.</div>}
+            </div>
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-8 text-center">

@@ -564,7 +564,7 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
                       <div key={item.id} className="rounded-xl bg-gray-50 px-3 py-3">
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="text-sm font-medium text-gray-900">{item.name || 'Anonymous reviewer'}</p>
+                            <p className="text-sm font-medium text-gray-900">{item.authored_by_current_user ? 'You' : (item.author_display_name || item.name || 'Anonymous reviewer')}</p>
                             {item.email ? <p className="text-xs text-gray-400 mt-0.5">{item.email}</p> : null}
                           </div>
                           {typeof item.timestamp_seconds === 'number' ? (

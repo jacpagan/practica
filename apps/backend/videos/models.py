@@ -486,6 +486,7 @@ class ReviewFeedback(models.Model):
     """
     session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='review_feedback')
     review_link = models.ForeignKey(ReviewLink, on_delete=models.CASCADE, related_name='feedback')
+    author_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='authored_review_feedback')
     name = models.CharField(max_length=120, blank=True)
     email = models.EmailField(blank=True)
     timestamp_seconds = models.IntegerField(null=True, blank=True)
