@@ -23,8 +23,11 @@ function SessionUpload({
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(null)
   const [deletingSessionId, setDeletingSessionId] = useState(null)
+  const [showNotes, setShowNotes] = useState(false)
   const dropRef = useRef(null)
   const inputRef = useRef(null)
+  const captureInputRef = useRef(null)
+  const libraryInputRef = useRef(null)
 
   useEffect(() => {
     const el = dropRef.current
@@ -36,6 +39,10 @@ function SessionUpload({
       el.classList.remove('ring-2', 'ring-gray-300')
       const file = e.dataTransfer?.files?.[0]
       if (file) {
+        if (!isLikelyVideoFile(file)) {
+          toast.error('Please choose a video file like .mov, .mp4, or .webm')
+          return
+        }
         setVideoFile(file)
         if (!title.trim()) setTitle(file.name.replace(/\.[^.]+$/, ''))
       }
@@ -96,6 +103,10 @@ function SessionUpload({
     }
   }
 
+  const openCamera = () => captureInputRef.current?.click()
+  const openLibrary = () => libraryInputRef.current?.click()
+  const openFiles = () => inputRef.current?.click()
+
   const handleDeleteSession = async (session) => {
     if (!session?.id || !session?.can_edit || !token) return
     const accepted = await confirm?.({
@@ -128,16 +139,23 @@ function SessionUpload({
       <div className="max-w-lg mx-auto">
         <div className="mb-6 space-y-3">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Upload your practice</h2>
-            <p className="text-sm text-gray-500 mt-1">Save a quick note, upload one video, and share it for feedback when you want.</p>
+            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Practice on your phone, fast</h2>
+            <p className="text-sm text-gray-500 mt-1">Pick a video, keep the title simple, and share it for feedback when you’re ready.</p>
           </div>
-          <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Simple MVP flow</p>
-            <div className="mt-2 grid gap-2 text-sm text-gray-600">
-              <p><span className="font-medium text-gray-900">1.</span> Upload one practice video.</p>
-              <p><span className="font-medium text-gray-900">2.</span> Add a title and a short note.</p>
-              <p><span className="font-medium text-gray-900">3.</span> Open the entry and share a review link.</p>
+          <div className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Start here</p>
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <button type="button" onClick={openCamera} className="rounded-2xl bg-gray-900 text-white px-4 py-3 text-sm font-medium hover:bg-gray-800 transition-colors">
+                Record now
+              </button>
+              <button type="button" onClick={openLibrary} className="rounded-2xl border border-gray-200 bg-white text-gray-900 px-4 py-3 text-sm font-medium hover:bg-gray-50 transition-colors">
+                Choose from library
+              </button>
+              <button type="button" onClick={openFiles} className="rounded-2xl border border-gray-200 bg-white text-gray-900 px-4 py-3 text-sm font-medium hover:bg-gray-50 transition-colors">
+                Browse files
+              </button>
             </div>
+            <p className="text-xs text-gray-500 mt-3">Supports `.mov`, `.mp4`, and `.webm`. Large phone videos upload more reliably now.</p>
           </div>
         </div>
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -145,29 +163,55 @@ function SessionUpload({
             <label className="block text-sm text-gray-600 mb-1.5">Title</label>
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
-              placeholder="What did you practice?" required />
+              placeholder={videoFile ? 'Auto-filled from your video, or rename it here' : 'Add a short title'} required />
           </div>
           <div>
-            <label className="block text-sm text-gray-600 mb-1.5">Description</label>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
-              placeholder="What did you work on?" />
+            <button
+              type="button"
+              onClick={() => setShowNotes((current) => !current)}
+              className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
+            >
+              {showNotes ? 'Hide note' : 'Add note (optional)'}
+            </button>
+            {showNotes ? (
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3}
+                className="w-full mt-2 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
+                placeholder="What did you work on?" />
+            ) : null}
           </div>
           {/* Reference fields removed to keep upload flow focused */}
           <div>
             <label className="block text-sm text-gray-600 mb-2">Video</label>
             <div
               ref={dropRef}
-              onClick={() => inputRef.current?.click()}
+              onClick={openFiles}
               className="cursor-pointer rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center hover:bg-gray-100 transition-colors"
             >
               <p className="text-sm font-medium text-gray-900">Drag & drop your video here</p>
               <p className="text-xs text-gray-500 mt-1">or click to choose a file (supports .mov, .mp4, .webm; max 2GB)</p>
               {videoFile ? (
-                <p className="text-xs text-gray-600 mt-3">Selected: {videoFile.name}</p>
+                <div className="mt-3 rounded-xl bg-white border border-gray-200 px-3 py-2 text-left">
+                  <p className="text-xs text-gray-500">Selected video</p>
+                  <p className="text-sm text-gray-900 font-medium mt-0.5 truncate">{videoFile.name}</p>
+                </div>
               ) : null}
               <input
                 ref={inputRef}
+                type="file"
+                accept={videoFileAccept()}
+                className="hidden"
+                onChange={handleFilePick}
+              />
+              <input
+                ref={captureInputRef}
+                type="file"
+                accept={videoFileAccept()}
+                capture="environment"
+                className="hidden"
+                onChange={handleFilePick}
+              />
+              <input
+                ref={libraryInputRef}
                 type="file"
                 accept={videoFileAccept()}
                 className="hidden"
@@ -190,7 +234,7 @@ function SessionUpload({
                 />
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Upload in progress{uploadProgress !== null ? ` (${uploadProgress}%)` : ''}. Max file size is 2GB.
+                Uploading{uploadProgress !== null ? ` (${uploadProgress}%)` : ''}. Keep this tab open until it finishes.
               </p>
             </div>
           )}

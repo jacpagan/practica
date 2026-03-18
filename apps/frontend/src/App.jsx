@@ -152,7 +152,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-white">
-      <header className="border-b border-gray-100 px-4 py-3 sm:px-6">
+      <header className="sticky top-0 z-30 border-b border-gray-100 bg-white/95 backdrop-blur px-4 py-3 sm:px-6">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <button onClick={goHome} className="text-lg font-semibold text-gray-900 tracking-tight">
             Practica

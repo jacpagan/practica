@@ -288,7 +288,7 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
   }
 
   return (
-    <div className="px-4 sm:px-6 py-4 max-w-3xl mx-auto">
+    <div className="px-4 sm:px-6 py-4 pb-28 max-w-3xl mx-auto">
       <div className="mb-4">
         <button onClick={onBack} className="text-sm text-gray-500 hover:text-gray-900 transition-colors">← Back to practice</button>
       </div>
@@ -507,6 +507,28 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
           )}
         </div>
       </div>
+
+      {canEdit ? (
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white/95 backdrop-blur px-4 py-3 sm:hidden">
+          <div className="max-w-3xl mx-auto flex items-center gap-2">
+            {activeReviewLink ? (
+              <button onClick={copyShareLink} className="flex-1 rounded-xl bg-gray-900 text-white py-3 text-sm font-medium hover:bg-gray-800 transition-colors">
+                Copy review link
+              </button>
+            ) : (
+              <button onClick={createShare} disabled={sharing} className="flex-1 rounded-xl bg-gray-900 text-white py-3 text-sm font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors">
+                {sharing ? 'Sharing…' : 'Share for feedback'}
+              </button>
+            )}
+            <button onClick={startEditing} className="rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+              Edit
+            </button>
+            <button onClick={deleteSession} disabled={deleting} className="rounded-xl border border-red-200 px-4 py-3 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors">
+              {deleting ? '…' : 'Delete'}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
