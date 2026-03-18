@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from django.conf import settings
 from django.utils import timezone
 from django.core.files.storage import default_storage
 from rest_framework import serializers
@@ -657,6 +658,8 @@ class ReviewLinkSerializer(serializers.ModelSerializer):
     def get_url(self, obj):
         request = self.context.get('request')
         base = request.build_absolute_uri('/') if request else '/'
+        if not settings.DEBUG and base.startswith('http://'):
+            base = base.replace('http://', 'https://', 1)
         base = base.rstrip('/')
         return f"{base}/r/{obj.token}"
 

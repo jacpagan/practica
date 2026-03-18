@@ -258,13 +258,10 @@ def _can_review_session_feedback(user, session):
 
 def _browser_playable_source(filename):
     name = str(filename or '').strip().lower()
-    return name.endswith(('.mp4', '.m4v', '.webm'))
+    return name.endswith(('.mp4', '.m4v'))
 
 
 def _fallback_content_type(filename):
-    name = str(filename or '').strip().lower()
-    if name.endswith('.webm'):
-        return 'video/webm'
     return 'video/mp4'
 
 
@@ -299,7 +296,7 @@ def _start_processing_pipeline(session):
             session.processing_error = (
                 'Upload finished, but browser playback needs transcoding for this file type. '
                 f'Local transcoding is unavailable: {local_error or "ffmpeg missing"}. '
-                'Please upload MP4/WebM or enable AWS MediaConvert for MOV playback.'
+                'Please upload MP4 or enable AWS MediaConvert/local ffmpeg playback conversion.'
             )
     else:
         session.processing_status = Session.STATUS_FAILED
