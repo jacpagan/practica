@@ -7,11 +7,13 @@ import AuthForm from './components/AuthForm'
 import ReviewPage from './components/ReviewPage'
 import SessionLibrary from './components/SessionLibrary'
 import TeacherQueue from './components/TeacherQueue'
+import TeacherActivation from './components/TeacherActivation'
 import UpdatesFeed from './components/UpdatesFeed'
 import SessionUpload from './components/SessionUpload'
 import SessionDetail from './components/SessionDetail'
 
 const parseRoute = (pathname) => {
+  if (pathname === '/activate') return { view: 'activate', sessionId: null }
   if (pathname === '/' || pathname === '/upload') return { view: 'upload', sessionId: null }
   if (pathname === '/library') return { view: 'library', sessionId: null }
   if (pathname === '/review') return { view: 'reviewQueue', sessionId: null }
@@ -24,6 +26,7 @@ const parseRoute = (pathname) => {
 }
 
 const routePath = ({ view, sessionId, token }) => {
+  if (view === 'activate') return '/activate'
   if (view === 'upload') return '/upload'
   if (view === 'library') return '/library'
   if (view === 'reviewQueue') return '/review'
@@ -53,6 +56,7 @@ function AppContent() {
     () => Array.isArray(user?.spaces) && user.spaces.some((space) => space.role === 'owner'),
     [user?.spaces],
   )
+  const hasJoinedGroups = useMemo(() => (user?.joined_spaces_count || 0) > 0, [user?.joined_spaces_count])
   const libraryUnreadCount = useMemo(
     () => sessions.filter((session) => session.can_edit && session.has_unread).length,
     [sessions],
@@ -91,9 +95,10 @@ function AppContent() {
   const updatesCount = updates.length
 
   const defaultHomeView = useMemo(() => {
+    if (!hasOwnedSpaces && !hasJoinedGroups) return 'activate'
     if (hasOwnedSpaces) return 'reviewQueue'
     return 'upload'
-  }, [hasOwnedSpaces])
+  }, [hasJoinedGroups, hasOwnedSpaces])
 
 
   const navigate = useCallback((nextRoute, { replace = false } = {}) => {
@@ -146,7 +151,7 @@ function AppContent() {
 
   // Ensure we always land users on the upload screen after login
   useEffect(() => {
-    if (user && view !== 'detail' && view !== 'library' && view !== 'reviewQueue' && view !== 'updates' && view !== 'review') {
+    if (user && view !== 'detail' && view !== 'library' && view !== 'reviewQueue' && view !== 'updates' && view !== 'review' && view !== 'activate') {
       navigate({ view: defaultHomeView, sessionId: null }, { replace: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -237,6 +242,11 @@ function AppContent() {
           </button>
           <div className="flex items-center gap-3">
             <nav className="hidden sm:flex items-center gap-2">
+              {defaultHomeView === 'activate' ? (
+                <button onClick={() => navigate({ view: 'activate', sessionId: null })} className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'activate' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
+                  Start
+                </button>
+              ) : null}
               <button onClick={() => navigate({ view: 'upload', sessionId: null })} className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'upload' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
                 Record / Upload
               </button>
@@ -262,6 +272,14 @@ function AppContent() {
         </div>
         <div className="max-w-5xl mx-auto mt-3 sm:hidden">
           <nav className="grid grid-cols-2 gap-2">
+            {defaultHomeView === 'activate' ? (
+              <button
+                onClick={() => navigate({ view: 'activate', sessionId: null })}
+                className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'activate' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'} col-span-2`}
+              >
+                Start
+              </button>
+            ) : null}
             <button
               onClick={() => navigate({ view: 'upload', sessionId: null })}
               className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'upload' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
@@ -295,6 +313,15 @@ function AppContent() {
       <main className="max-w-5xl mx-auto pb-24">
         {view === 'review' && (
           <ReviewPage />
+        )}
+        {view === 'activate' && (
+          <TeacherActivation
+            token={token}
+            onActivated={async () => {
+              await refreshUser()
+              navigate({ view: 'reviewQueue', sessionId: null }, { replace: true })
+            }}
+          />
         )}
         {view === 'upload' && (
           <SessionUpload
