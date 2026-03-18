@@ -349,7 +349,6 @@ function AppContent() {
             onComplete={handleUploadComplete}
             onCancel={goHome}
             primaryRole={user?.primary_role || 'new'}
-            currentStreakDays={user?.current_streak_days || 0}
             updatesCount={updatesCount}
             onOpenUpdates={() => navigate({ view: 'updates', sessionId: null })}
             initialRecorderOpen={openRecorderOnUpload}

@@ -47,16 +47,15 @@ function TeacherQueue({ primaryRole = 'teacher', sessions = [], sessionsLoading 
                 <span className="text-[11px] uppercase tracking-wide bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">Coached by you</span>
               )}
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              {session.owner_name || 'Student'}
-              {session.space_name ? ` · ${session.space_name}` : ''}
-              {` · ${fmtDate(session.recorded_at || session.created_at)}`}
-            </p>
-            <div className="flex items-center gap-2 flex-wrap mt-2">
-              <span className="text-[11px] uppercase tracking-wide bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">{session.student_streak_days || 0} day streak</span>
-              {stale ? <span className="text-[11px] uppercase tracking-wide bg-rose-100 text-rose-800 px-2 py-1 rounded-full">Stale</span> : null}
-              {session.feedback_given_by_you_count ? <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">{session.feedback_given_by_you_count} from you</span> : null}
-            </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {session.owner_name || 'Student'}
+                      {session.space_name ? ` · ${session.space_name}` : ''}
+                      {` · ${fmtDate(session.recorded_at || session.created_at)}`}
+                    </p>
+                    <div className="flex items-center gap-2 flex-wrap mt-2">
+                      {stale ? <span className="text-[11px] uppercase tracking-wide bg-rose-100 text-rose-800 px-2 py-1 rounded-full">Stale</span> : null}
+                      {session.feedback_given_by_you_count ? <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">{session.feedback_given_by_you_count} from you</span> : null}
+                    </div>
             {session.description ? <p className="text-xs text-gray-500 mt-2 line-clamp-2">{session.description}</p> : null}
           </div>
           <div className="text-right shrink-0">

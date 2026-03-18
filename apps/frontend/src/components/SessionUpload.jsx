@@ -9,7 +9,6 @@ function SessionUpload({
   onComplete,
   onCancel,
   primaryRole = 'student',
-  currentStreakDays = 0,
   updatesCount = 0,
   onOpenUpdates,
   initialRecorderOpen = false,
@@ -191,11 +190,6 @@ function SessionUpload({
               <p className="text-xs text-blue-800 mt-1">Open feedback or review requests before your next practice clip.</p>
             </button>
           ) : null}
-          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">Current streak</p>
-            <p className="text-lg font-semibold text-emerald-900 mt-1">{currentStreakDays} day{currentStreakDays === 1 ? '' : 's'}</p>
-            <p className="text-xs text-emerald-800 mt-1">Keep the loop going by sending today’s clip.</p>
-          </div>
           <div className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-4">
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Start here</p>
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
