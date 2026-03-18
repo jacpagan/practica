@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
+from django.shortcuts import render
 from django.views.generic import TemplateView
 from rest_framework.routers import DefaultRouter
 from videos.views import (
@@ -20,6 +21,14 @@ router = DefaultRouter()
 router.register(r'sessions', SessionViewSet, basename='session')
 router.register(r'exercises', ExerciseViewSet, basename='exercise')
 router.register(r'spaces', SpaceViewSet, basename='space')
+
+
+def spa_index(request):
+    response = render(request, 'index.html')
+    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response['Pragma'] = 'no-cache'
+    response['Expires'] = '0'
+    return response
 
 urlpatterns = [
     path(settings.ADMIN_URL, admin.site.urls),
@@ -47,6 +56,6 @@ if settings.DEBUG:
 if settings.FRONTEND_DIR.exists():
     urlpatterns += [
         re_path(r'^(?!api/|admin/|health/|static/|media/|assets/).*$',
-                TemplateView.as_view(template_name='index.html'),
+                spa_index,
                 name='spa'),
     ]
