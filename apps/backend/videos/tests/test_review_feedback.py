@@ -6,13 +6,15 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
-from videos.models import Profile, ReviewFeedback, ReviewLink, Session
+from videos.models import Profile, ReviewFeedback, ReviewLink, Session, Space
 
 
 class ReviewFeedbackApiTests(APITestCase):
     def setUp(self):
         self.owner = User.objects.create_user(username='review-owner', password='pass1234')
+        self.teacher = User.objects.create_user(username='review-teacher', password='pass1234', email='teacher@example.com')
         Profile.objects.create(user=self.owner, display_name='Review Owner')
+        Profile.objects.create(user=self.teacher, display_name='Teacher Coach')
         self.session = Session.objects.create(
             user=self.owner,
             title='Review Session',
@@ -20,6 +22,9 @@ class ReviewFeedbackApiTests(APITestCase):
             video_file='sessions/review-owner.mp4',
             duration_seconds=120,
         )
+        self.space = Space.objects.create(name='Teacher Space', owner=self.teacher)
+        self.session.space = self.space
+        self.session.save(update_fields=['space'])
         self.link = ReviewLink.objects.create(
             session=self.session,
             token='review-token-123',
@@ -122,3 +127,24 @@ class ReviewFeedbackApiTests(APITestCase):
         delete_response = self.client.delete(f'/api/sessions/{self.session.id}/review-feedback/{item.id}/')
         self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(ReviewFeedback.objects.filter(id=item.id).exists())
+
+    def test_space_owner_can_leave_feedback_directly(self):
+        self._auth(self.teacher)
+
+        response = self.client.post(
+            f'/api/sessions/{self.session.id}/review-feedback/',
+            {'text': 'Focus on the groove at the start.', 'timestamp_seconds': 12},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['name'], 'Teacher Coach')
+        self.assertEqual(response.data['timestamp_seconds'], 12)
+
+    def test_session_detail_flags_teacher_can_review(self):
+        self._auth(self.teacher)
+
+        response = self.client.get(f'/api/sessions/{self.session.id}/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['can_review_feedback'])

@@ -21,6 +21,7 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
   }, [initialSession])
 
   const canEdit = Boolean(session?.can_edit)
+  const canReviewFeedback = Boolean(session?.can_review_feedback)
   const reviewFeedback = Array.isArray(session?.review_feedback) ? session.review_feedback : []
   const [activeReviewLink, setActiveReviewLink] = useState(session?.active_review_link || null)
   const [sharing, setSharing] = useState(false)
@@ -32,6 +33,9 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
   const [feedbackDraft, setFeedbackDraft] = useState({ text: '', timestamp_seconds: '' })
   const [savingFeedback, setSavingFeedback] = useState(false)
   const [deletingFeedbackId, setDeletingFeedbackId] = useState(null)
+  const [newFeedbackText, setNewFeedbackText] = useState('')
+  const [newFeedbackTimestamp, setNewFeedbackTimestamp] = useState('')
+  const [postingFeedback, setPostingFeedback] = useState(false)
 
   useEffect(() => {
     setActiveReviewLink(initialSession?.active_review_link || null)
@@ -254,6 +258,52 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
     }
   }
 
+  const useCurrentVideoTimeForNewFeedback = () => {
+    const video = videoRef.current
+    if (!video) return
+    setNewFeedbackTimestamp(String(Math.max(0, Math.round(video.currentTime || 0))))
+  }
+
+  const postFeedback = async () => {
+    if (!token || !session?.id || !canReviewFeedback) return
+    const payload = {
+      text: newFeedbackText.trim(),
+      timestamp_seconds: newFeedbackTimestamp === '' ? null : Number(newFeedbackTimestamp),
+    }
+    if (!payload.text) {
+      toast.error('Feedback text is required')
+      return
+    }
+    setPostingFeedback(true)
+    try {
+      const res = await fetch(`/api/sessions/${session.id}/review-feedback/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error('post-feedback')
+      const created = await res.json()
+      const nextSession = {
+        ...session,
+        review_feedback: [...reviewFeedback, created].sort((a, b) => {
+          const aTs = typeof a.timestamp_seconds === 'number' ? a.timestamp_seconds : Number.MAX_SAFE_INTEGER
+          const bTs = typeof b.timestamp_seconds === 'number' ? b.timestamp_seconds : Number.MAX_SAFE_INTEGER
+          if (aTs !== bTs) return aTs - bTs
+          return new Date(a.created_at) - new Date(b.created_at)
+        }),
+      }
+      setSession(nextSession)
+      onSessionUpdate?.(nextSession)
+      setNewFeedbackText('')
+      setNewFeedbackTimestamp('')
+      toast.success('Feedback added')
+    } catch {
+      toast.error('Could not add feedback')
+    } finally {
+      setPostingFeedback(false)
+    }
+  }
+
   const deleteFeedback = async (item) => {
     if (!token || !session?.id) return
     const accepted = await confirm?.({
@@ -414,9 +464,53 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
 
               <div className="border-t border-gray-100 pt-4">
                 <div className="flex items-center justify-between gap-3 mb-3">
-                  <h2 className="text-sm font-semibold text-gray-900">Public feedback</h2>
+                  <h2 className="text-sm font-semibold text-gray-900">Feedback</h2>
                   {reviewFeedback.length ? <span className="text-xs text-gray-400">{reviewFeedback.length} comment{reviewFeedback.length === 1 ? '' : 's'}</span> : null}
                 </div>
+
+                {canReviewFeedback ? (
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 mb-3 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Leave feedback</p>
+                        <p className="text-xs text-gray-500 mt-1">Add a timestamped note while watching the clip.</p>
+                      </div>
+                      <button type="button" onClick={useCurrentVideoTimeForNewFeedback} className="text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
+                        Use current time
+                      </button>
+                    </div>
+                    <textarea
+                      value={newFeedbackText}
+                      onChange={(e) => setNewFeedbackText(e.target.value)}
+                      rows={3}
+                      placeholder="What should the student focus on?"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none bg-white"
+                    />
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <label className="block text-xs text-gray-500 mb-1">Timestamp (seconds)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max={session.duration_seconds || undefined}
+                          step="1"
+                          value={newFeedbackTimestamp}
+                          onChange={(e) => setNewFeedbackTimestamp(e.target.value)}
+                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white"
+                          placeholder="Optional"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={postFeedback}
+                        disabled={postingFeedback}
+                        className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors self-end"
+                      >
+                        {postingFeedback ? 'Sending…' : 'Add feedback'}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
 
                 {reviewFeedback.length ? (
                   <div className="space-y-2">

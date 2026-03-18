@@ -246,6 +246,16 @@ def _can_modify_session(user, session):
     return can_edit_session(user, session)
 
 
+def _can_review_session_feedback(user, session):
+    if not user.is_authenticated:
+        return False
+    if user.is_staff or session.user_id == user.id:
+        return True
+    if session.space_id and getattr(session.space, 'owner_id', None) == user.id:
+        return True
+    return False
+
+
 def _browser_playable_source(filename):
     name = str(filename or '').strip().lower()
     return name.endswith(('.mp4', '.m4v', '.webm'))
@@ -1099,6 +1109,34 @@ class SessionViewSet(viewsets.ModelViewSet):
         ReviewLink.objects.filter(session=session, is_active=True).update(is_active=False)
         return Response({'ok': True})
 
+    @action(detail=True, methods=['post'], url_path='review-feedback')
+    def create_review_feedback(self, request, pk=None):
+        session = self.get_object()
+        if not _can_review_session_feedback(request.user, session):
+            raise PermissionDenied("You do not have permission to leave feedback on this session.")
+
+        link = session.review_links.filter(is_active=True, expires_at__gt=timezone.now()).order_by('-created_at').first()
+        if not link:
+            link = ReviewLink.objects.create(
+                session=session,
+                token=secrets.token_urlsafe(16),
+                created_by=request.user,
+                expires_at=timezone.now() + timedelta(days=30),
+                is_active=True,
+                allow_comments=True,
+            )
+
+        serializer = ReviewFeedbackSerializer(data=request.data, context={'session': session})
+        serializer.is_valid(raise_exception=True)
+        name = request.user.profile.display_name if hasattr(request.user, 'profile') and request.user.profile.display_name else request.user.username
+        item = serializer.save(
+            session=session,
+            review_link=link,
+            name=name,
+            email=request.user.email or '',
+        )
+        return Response(ReviewFeedbackSerializer(item).data, status=status.HTTP_201_CREATED)
+
     @action(detail=True, methods=['post'], url_path='retry-processing')
     def retry_processing(self, request, pk=None):
         session = self.get_object()
@@ -1114,8 +1152,8 @@ class SessionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['patch', 'delete'], url_path=r'review-feedback/(?P<feedback_id>[0-9]+)')
     def review_feedback_detail(self, request, pk=None, feedback_id=None):
         session = self.get_object()
-        if not can_edit_session(request.user, session):
-            raise PermissionDenied("You can only manage feedback on your own sessions.")
+        if not _can_review_session_feedback(request.user, session):
+            raise PermissionDenied("You do not have permission to manage feedback on this session.")
 
         feedback = get_object_or_404(ReviewFeedback, pk=feedback_id, session=session)
 
