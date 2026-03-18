@@ -6,12 +6,14 @@ import { ConfirmProvider } from './components/ConfirmDialog'
 import AuthForm from './components/AuthForm'
 import ReviewPage from './components/ReviewPage'
 import SessionLibrary from './components/SessionLibrary'
+import TeacherQueue from './components/TeacherQueue'
 import SessionUpload from './components/SessionUpload'
 import SessionDetail from './components/SessionDetail'
 
 const parseRoute = (pathname) => {
   if (pathname === '/' || pathname === '/upload') return { view: 'upload', sessionId: null }
   if (pathname === '/library') return { view: 'library', sessionId: null }
+  if (pathname === '/review') return { view: 'reviewQueue', sessionId: null }
   const reviewMatch = pathname.match(/^\/r\/(.+)$/)
   if (reviewMatch) return { view: 'review', token: reviewMatch[1] }
   const sessionMatch = pathname.match(/^\/sessions\/(\d+)$/)
@@ -22,6 +24,7 @@ const parseRoute = (pathname) => {
 const routePath = ({ view, sessionId, token }) => {
   if (view === 'upload') return '/upload'
   if (view === 'library') return '/library'
+  if (view === 'reviewQueue') return '/review'
   if (view === 'review' && token) return `/r/${token}`
   if (view === 'detail' && sessionId) return `/sessions/${sessionId}`
   return '/upload'
@@ -39,6 +42,12 @@ function AppContent() {
   const [sessionsLoading, setSessionsLoading] = useState(false)
   const [sessionsLoadingMore, setSessionsLoadingMore] = useState(false)
   const [sessionsNextUrl, setSessionsNextUrl] = useState(null)
+  const [detailReturnView, setDetailReturnView] = useState('upload')
+
+  const hasOwnedSpaces = useMemo(
+    () => Array.isArray(user?.spaces) && user.spaces.some((space) => space.role === 'owner'),
+    [user?.spaces],
+  )
 
 
   const navigate = useCallback((nextRoute, { replace = false } = {}) => {
@@ -84,7 +93,7 @@ function AppContent() {
 
   // Ensure we always land users on the upload screen after login
   useEffect(() => {
-    if (user && view !== 'detail' && view !== 'library') {
+    if (user && view !== 'detail' && view !== 'library' && view !== 'reviewQueue') {
       navigate({ view: 'upload', sessionId: null }, { replace: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -124,15 +133,16 @@ function AppContent() {
     }
   }, [token])
 
-  const openSession = useCallback((session) => {
+  const openSession = useCallback((session, returnView = view) => {
     if (!session?.id) return
+    setDetailReturnView(returnView)
     openSessionById(session.id)
-  }, [openSessionById])
+  }, [openSessionById, view])
 
   const goHome = useCallback(() => {
-    navigate({ view: 'upload', sessionId: null })
+    navigate({ view: detailReturnView || 'upload', sessionId: null })
     setSelectedSession(null)
-  }, [navigate])
+  }, [navigate, detailReturnView])
 
   const handleUploadComplete = (session) => {
     setSessions((current) => [session, ...current.filter((item) => item.id !== session.id)])
@@ -168,6 +178,11 @@ function AppContent() {
               <button onClick={() => navigate({ view: 'library', sessionId: null })} className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'library' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
                 Library
               </button>
+              {hasOwnedSpaces ? (
+                <button onClick={() => navigate({ view: 'reviewQueue', sessionId: null })} className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'reviewQueue' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
+                  Review
+                </button>
+              ) : null}
             </nav>
             <div className="flex items-center gap-2 border-l border-gray-100 pl-3">
               <span className="text-xs text-gray-400">{user.display_name}</span>
@@ -210,6 +225,14 @@ function AppContent() {
                 if (selectedSession?.id === session.id) setSelectedSession(null)
               }
             }}
+          />
+        )}
+
+        {view === 'reviewQueue' && (
+          <TeacherQueue
+            sessions={sessions}
+            sessionsLoading={sessionsLoading}
+            onOpenSession={openSession}
           />
         )}
 

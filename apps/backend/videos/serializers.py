@@ -468,10 +468,13 @@ class SessionListSerializer(serializers.ModelSerializer):
     space_id = serializers.IntegerField(source='space.id', read_only=True, default=None)
     chapter_count = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
+    review_feedback_count = serializers.SerializerMethodField()
     owner_name = serializers.SerializerMethodField()
     owner_id = serializers.IntegerField(source='user.id', read_only=True, default=None)
     has_unread = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
+    can_review_feedback = serializers.SerializerMethodField()
+    needs_review = serializers.SerializerMethodField()
     processing_status = serializers.CharField(read_only=True)
     processing_error = serializers.CharField(read_only=True)
     assets = SessionAssetSerializer(many=True, read_only=True)
@@ -485,7 +488,8 @@ class SessionListSerializer(serializers.ModelSerializer):
                   'processing_status', 'processing_error',
                   'space_id', 'space_name', 'tag_names',
                   'assets', 'is_space_main',
-                  'chapter_count', 'comment_count', 'owner_name', 'owner_id', 'has_unread',
+                  'chapter_count', 'comment_count', 'review_feedback_count', 'owner_name', 'owner_id', 'has_unread',
+                  'can_review_feedback', 'needs_review',
                   'can_edit']
         read_only_fields = ['id', 'recorded_at', 'created_at']
 
@@ -497,6 +501,9 @@ class SessionListSerializer(serializers.ModelSerializer):
 
     def get_comment_count(self, obj):
         return obj.comments.count()
+
+    def get_review_feedback_count(self, obj):
+        return obj.review_feedback.count()
 
     def get_owner_name(self, obj):
         if obj.user and hasattr(obj.user, 'profile') and obj.user.profile.display_name:
@@ -528,6 +535,19 @@ class SessionListSerializer(serializers.ModelSerializer):
         if not user:
             return False
         return user.is_staff or obj.user_id == user.id
+
+    def get_can_review_feedback(self, obj):
+        user = self._request_user()
+        if not user:
+            return False
+        if user.is_staff or obj.user_id == user.id:
+            return True
+        return bool(obj.space_id and getattr(obj.space, 'owner_id', None) == user.id)
+
+    def get_needs_review(self, obj):
+        if not self.get_can_review_feedback(obj) or self.get_can_edit(obj):
+            return False
+        return obj.review_feedback.count() == 0
 
     def get_is_space_main(self, obj):
         return bool(obj.space_id and getattr(obj.space, 'main_session_id', None) == obj.id)
