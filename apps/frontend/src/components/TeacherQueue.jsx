@@ -1,7 +1,7 @@
 import React from 'react'
 import { fmtDate } from '../utils'
 
-function TeacherQueue({ sessions = [], sessionsLoading = false, onOpenSession }) {
+function TeacherQueue({ primaryRole = 'teacher', sessions = [], sessionsLoading = false, onOpenSession }) {
   const now = Date.now()
   const reviewable = sessions
     .filter((session) => session.can_review_feedback && !session.can_edit)
@@ -72,7 +72,11 @@ function TeacherQueue({ sessions = [], sessionsLoading = false, onOpenSession })
       <div className="max-w-3xl mx-auto">
         <div className="mb-6 space-y-2">
           <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Review</h2>
-          <p className="text-sm text-gray-500">Open student clips, leave timestamped feedback, and keep the practice loop moving.</p>
+          <p className="text-sm text-gray-500">
+            {primaryRole === 'teacher_student'
+              ? 'This is your teacher inbox. It shows student clips that need your coaching; your own uploads stay in Record / Upload and Library.'
+              : 'Open student clips, leave timestamped feedback, and keep the practice loop moving.'}
+          </p>
           <div className="flex items-center gap-2 text-xs text-gray-500">
             <span className="rounded-full bg-gray-100 px-3 py-1">{reviewable.length} student clip{reviewable.length === 1 ? '' : 's'}</span>
             <span className="rounded-full bg-amber-100 text-amber-800 px-3 py-1">{needsReviewCount} need review</span>

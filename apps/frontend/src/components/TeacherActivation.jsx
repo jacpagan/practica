@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { useToast } from './Toast'
 
-function TeacherActivation({ token, onActivated }) {
+function TeacherActivation({ token, primaryRole = 'new', onActivated }) {
   const toast = useToast()
   const [groupName, setGroupName] = useState('')
   const [creating, setCreating] = useState(false)
@@ -71,8 +71,12 @@ function TeacherActivation({ token, onActivated }) {
     <div className="px-4 sm:px-6 py-8">
       <div className="max-w-xl mx-auto space-y-6">
         <div>
-          <h2 className="text-3xl font-semibold text-gray-900 tracking-tight">Start coaching between lessons</h2>
-          <p className="text-sm text-gray-500 mt-2">Create your first practice group, invite a student, and use Practica as your between-lessons review inbox.</p>
+          <h2 className="text-3xl font-semibold text-gray-900 tracking-tight">Set up your teacher workspace</h2>
+          <p className="text-sm text-gray-500 mt-2">
+            {primaryRole === 'new'
+              ? 'Practica supports two real roles: students send practice clips, and teachers review them between lessons. Start by creating your first teacher workspace.'
+              : 'Create your first practice group, invite a student, and use Practica as your between-lessons review inbox.'}
+          </p>
         </div>
 
         {!createdGroup ? (

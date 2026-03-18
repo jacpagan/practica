@@ -93,6 +93,10 @@ function AppContent() {
     )
   }, [sessions])
   const updatesCount = updates.length
+  const roleLabel = useMemo(() => {
+    const labels = Array.isArray(user?.role_labels) ? user.role_labels : []
+    return labels.join(' + ')
+  }, [user?.role_labels])
 
   const defaultHomeView = useMemo(() => {
     if (!hasOwnedSpaces && !hasJoinedGroups) return 'activate'
@@ -263,6 +267,7 @@ function AppContent() {
               ) : null}
             </nav>
             <div className="flex items-center gap-2 sm:border-l sm:border-gray-100 sm:pl-3">
+              {roleLabel ? <span className="hidden sm:inline-flex text-[11px] uppercase tracking-wide bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{roleLabel}</span> : null}
               <span className="text-xs text-gray-400">{user.display_name}</span>
               <button onClick={logout} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
                 Log out
@@ -317,6 +322,7 @@ function AppContent() {
         {view === 'activate' && (
           <TeacherActivation
             token={token}
+            primaryRole={user?.primary_role || 'new'}
             onActivated={async () => {
               await refreshUser()
               navigate({ view: 'reviewQueue', sessionId: null }, { replace: true })
@@ -328,6 +334,7 @@ function AppContent() {
             token={token}
             onComplete={handleUploadComplete}
             onCancel={goHome}
+            primaryRole={user?.primary_role || 'new'}
             currentStreakDays={user?.current_streak_days || 0}
             updatesCount={updatesCount}
             onOpenUpdates={() => navigate({ view: 'updates', sessionId: null })}
@@ -360,6 +367,7 @@ function AppContent() {
 
         {view === 'reviewQueue' && (
           <TeacherQueue
+            primaryRole={user?.primary_role || 'teacher'}
             sessions={sessions}
             sessionsLoading={sessionsLoading}
             onOpenSession={openSession}

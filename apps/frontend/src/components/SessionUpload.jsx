@@ -8,6 +8,7 @@ function SessionUpload({
   token,
   onComplete,
   onCancel,
+  primaryRole = 'student',
   currentStreakDays = 0,
   updatesCount = 0,
   onOpenUpdates,
@@ -144,8 +145,14 @@ function SessionUpload({
       <div className="max-w-lg mx-auto">
         <div className="mb-6 space-y-3">
           <div>
-            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Practice on your phone, fast</h2>
-            <p className="text-sm text-gray-500 mt-1">Pick a video, keep the title simple, and share it for feedback when you’re ready.</p>
+            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">
+              {primaryRole === 'teacher' || primaryRole === 'teacher_student' ? 'Teacher capture workspace' : 'Student practice submission'}
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              {primaryRole === 'teacher' || primaryRole === 'teacher_student'
+                ? 'Record examples, upload reference clips, or send your own takes while coaching students between lessons.'
+                : 'Record or upload your next practice clip so your teacher can review it between lessons.'}
+            </p>
           </div>
           {updatesCount ? (
             <button

@@ -69,6 +69,8 @@ class UserSerializer(serializers.ModelSerializer):
     spaces = serializers.SerializerMethodField()
     has_spaces = serializers.SerializerMethodField()
     joined_spaces_count = serializers.SerializerMethodField()
+    primary_role = serializers.SerializerMethodField()
+    role_labels = serializers.SerializerMethodField()
     current_streak_days = serializers.SerializerMethodField()
     last_practice_at = serializers.SerializerMethodField()
 
@@ -82,6 +84,8 @@ class UserSerializer(serializers.ModelSerializer):
             'spaces',
             'has_spaces',
             'joined_spaces_count',
+            'primary_role',
+            'role_labels',
             'current_streak_days',
             'last_practice_at',
         ]
@@ -103,6 +107,26 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_joined_spaces_count(self, obj):
         return obj.space_memberships.count()
+
+    def get_primary_role(self, obj):
+        owns = obj.owned_spaces.exists()
+        joins = obj.space_memberships.exists()
+        if owns and joins:
+            return 'teacher_student'
+        if owns:
+            return 'teacher'
+        if joins:
+            return 'student'
+        return 'new'
+
+    def get_role_labels(self, obj):
+        mapping = {
+            'teacher': ['Teacher'],
+            'student': ['Student'],
+            'teacher_student': ['Teacher', 'Student'],
+            'new': ['New user'],
+        }
+        return mapping.get(self.get_primary_role(obj), [])
 
     def get_current_streak_days(self, obj):
         dates = list(
