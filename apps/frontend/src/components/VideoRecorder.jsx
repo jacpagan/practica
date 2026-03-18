@@ -29,6 +29,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
   const [isMetronomeRunning, setIsMetronomeRunning] = useState(false)
   const [beatsPerBar, setBeatsPerBar] = useState(4)
   const [syncOffsetMs, setSyncOffsetMs] = useState(readSyncOffsetMs)
+  const [showTimingTools, setShowTimingTools] = useState(false)
   const [countInRemaining, setCountInRemaining] = useState(null)
 
   const liveRef = useRef(null)
@@ -417,75 +418,93 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
 
           <div className="p-4 bg-gray-950 space-y-4">
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-2 flex-wrap">
               <div className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/90">
                   {countInRemaining ? `Starting in ${countInRemaining}` : state === STATES.RECORDING ? 'Recording' : 'Camera ready'}
-                </div>
+              </div>
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={toggleMetronome}
-                  className={`rounded-full px-3 py-1.5 text-xs transition-colors ${metronomeEnabled ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
+                  onClick={() => setShowTimingTools((current) => !current)}
+                  className="rounded-full px-3 py-1.5 text-xs transition-colors bg-white/10 text-white/80 hover:bg-white/20"
                 >
-                  {metronomeEnabled ? 'Metronome on' : 'Metronome off'}
+                  Timing tools
                 </button>
-              </div>
-              <div className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/70">
-                {state === STATES.RECORDING ? fmtTimer(elapsed) : `Max ${fmtTimer(maxDuration)}`}
-              </div>
-            </div>
-
-            <div className="rounded-2xl bg-white/5 px-3 py-3 flex items-center gap-3">
-              <div className="min-w-0">
-                <p className="text-[11px] uppercase tracking-wide text-white/60">Tempo</p>
-                <p className="text-sm font-medium text-white">{bpm} BPM</p>
-              </div>
-              <input
-                type="range"
-                min="40"
-                max="240"
-                step="1"
-                value={bpm}
-                onChange={(e) => setBpm(Number(e.target.value))}
-                className="flex-1"
-              />
-              <select
-                value={beatsPerBar}
-                onChange={(e) => setBeatsPerBar(Number(e.target.value))}
-                className="bg-white/10 text-white text-sm rounded-lg px-2 py-2 border border-white/10"
-              >
-                {[2, 3, 4, 6].map((beats) => (
-                  <option key={beats} value={beats} className="text-gray-900">{beats}/4</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="rounded-2xl bg-white/5 px-3 py-3 space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-white/60">Sync recorded click</p>
-                  <p className="text-sm font-medium text-white">{syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs} ms</p>
+                <div className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/70">
+                  {state === STATES.RECORDING ? fmtTimer(elapsed) : `Max ${fmtTimer(maxDuration)}`}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSyncOffsetMs(0)}
-                  className="text-xs text-white/70 border border-white/10 rounded-lg px-3 py-2 hover:bg-white/10 transition-colors"
-                >
-                  Reset
-                </button>
               </div>
-              <input
-                type="range"
-                min="-120"
-                max="180"
-                step="5"
-                value={syncOffsetMs}
-                onChange={(e) => setSyncOffsetMs(Number(e.target.value))}
-                className="w-full"
-              />
-              <p className="text-[11px] text-white/55">If playback sounds late, move this left. If playback sounds early, move it right.</p>
             </div>
 
-            <p className="text-[11px] text-white/55">Turn the metronome on only if you want to hear and record it. When it’s on, recording starts after a one-bar count-in. Headphones give the cleanest result.</p>
+            {showTimingTools ? (
+              <div className="space-y-3">
+                <div className="rounded-2xl bg-white/5 px-3 py-3 flex items-center gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] uppercase tracking-wide text-white/60">Tempo</p>
+                    <p className="text-sm font-medium text-white">{bpm} BPM</p>
+                  </div>
+                  <input
+                    type="range"
+                    min="40"
+                    max="240"
+                    step="1"
+                    value={bpm}
+                    onChange={(e) => setBpm(Number(e.target.value))}
+                    className="flex-1"
+                  />
+                  <select
+                    value={beatsPerBar}
+                    onChange={(e) => setBeatsPerBar(Number(e.target.value))}
+                    className="bg-white/10 text-white text-sm rounded-lg px-2 py-2 border border-white/10"
+                  >
+                    {[2, 3, 4, 6].map((beats) => (
+                      <option key={beats} value={beats} className="text-gray-900">{beats}/4</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="rounded-2xl bg-white/5 px-3 py-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-white/60">Metronome</p>
+                    <p className="text-sm font-medium text-white">{metronomeEnabled ? 'On' : 'Off'}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={toggleMetronome}
+                    className={`rounded-xl px-4 py-2 text-sm transition-colors ${metronomeEnabled ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
+                  >
+                    {metronomeEnabled ? 'Turn off' : 'Turn on'}
+                  </button>
+                </div>
+
+                <div className="rounded-2xl bg-white/5 px-3 py-3 space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-white/60">Sync recorded click</p>
+                      <p className="text-sm font-medium text-white">{syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs} ms</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSyncOffsetMs(0)}
+                      className="text-xs text-white/70 border border-white/10 rounded-lg px-3 py-2 hover:bg-white/10 transition-colors"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                  <input
+                    type="range"
+                    min="-120"
+                    max="180"
+                    step="5"
+                    value={syncOffsetMs}
+                    onChange={(e) => setSyncOffsetMs(Number(e.target.value))}
+                    className="w-full"
+                  />
+                  <p className="text-[11px] text-white/55">If playback sounds late, move this left. If playback sounds early, move it right.</p>
+                </div>
+
+                <p className="text-[11px] text-white/55">Timing tools are optional. When the metronome is on, recording starts after a one-bar count-in. Headphones give the cleanest result.</p>
+              </div>
+            ) : null}
 
             {state === STATES.RECORDING ? (
               <div>
