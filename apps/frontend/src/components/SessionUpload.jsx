@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useConfirm } from './ConfirmDialog'
 import { useToast } from './Toast'
 import { createSessionUpload, fmtDate, isLikelyVideoFile, uploadErrorMessage, videoFileAccept } from '../utils'
+import VideoRecorder from './VideoRecorder'
 
 function SessionUpload({
   token,
@@ -24,6 +25,8 @@ function SessionUpload({
   const [uploadProgress, setUploadProgress] = useState(null)
   const [deletingSessionId, setDeletingSessionId] = useState(null)
   const [showNotes, setShowNotes] = useState(false)
+  const [showRecorder, setShowRecorder] = useState(false)
+  const [showSessionList, setShowSessionList] = useState(false)
   const dropRef = useRef(null)
   const inputRef = useRef(null)
   const captureInputRef = useRef(null)
@@ -107,6 +110,31 @@ function SessionUpload({
   const openLibrary = () => libraryInputRef.current?.click()
   const openFiles = () => inputRef.current?.click()
 
+  const startRecording = () => {
+    if (typeof window !== 'undefined' && window.MediaRecorder && navigator.mediaDevices?.getUserMedia) {
+      setShowRecorder(true)
+      return
+    }
+    openCamera()
+  }
+
+  const handleRecorded = (file) => {
+    setShowRecorder(false)
+    if (!isLikelyVideoFile(file)) {
+      toast.error('Recorded file is not in a supported video format')
+      return
+    }
+    setVideoFile(file)
+    if (!title.trim()) {
+      const stamp = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      setTitle(`Practice ${stamp}`)
+    }
+  }
+
+  const clearSelectedVideo = () => {
+    setVideoFile(null)
+  }
+
   const handleDeleteSession = async (session) => {
     if (!session?.id || !session?.can_edit || !token) return
     const accepted = await confirm?.({
@@ -145,7 +173,7 @@ function SessionUpload({
           <div className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-4">
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Start here</p>
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <button type="button" onClick={openCamera} className="rounded-2xl bg-gray-900 text-white px-4 py-3 text-sm font-medium hover:bg-gray-800 transition-colors">
+              <button type="button" onClick={startRecording} className="rounded-2xl bg-gray-900 text-white px-4 py-3 text-sm font-medium hover:bg-gray-800 transition-colors">
                 Record now
               </button>
               <button type="button" onClick={openLibrary} className="rounded-2xl border border-gray-200 bg-white text-gray-900 px-4 py-3 text-sm font-medium hover:bg-gray-50 transition-colors">
@@ -158,6 +186,22 @@ function SessionUpload({
             <p className="text-xs text-gray-500 mt-3">Supports `.mov`, `.mp4`, and `.webm`. Large phone videos upload more reliably now.</p>
           </div>
         </div>
+
+        {showRecorder ? (
+          <div className="mb-5 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Record inside Practica</h3>
+                <p className="text-xs text-gray-500 mt-1">Works best on phones and laptops with camera permission enabled.</p>
+              </div>
+              <button type="button" onClick={() => setShowRecorder(false)} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
+                Close
+              </button>
+            </div>
+            <VideoRecorder onRecorded={handleRecorded} onCancel={() => setShowRecorder(false)} maxDuration={300} />
+          </div>
+        ) : null}
+
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm text-gray-600 mb-1.5">Title</label>
@@ -184,17 +228,28 @@ function SessionUpload({
             <label className="block text-sm text-gray-600 mb-2">Video</label>
             <div
               ref={dropRef}
-              onClick={openFiles}
-              className="cursor-pointer rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center hover:bg-gray-100 transition-colors"
+              onClick={() => { if (!videoFile) openFiles() }}
+              className={`rounded-2xl border ${videoFile ? 'border-gray-200 bg-white' : 'border-dashed border-gray-300 bg-gray-50 cursor-pointer hover:bg-gray-100'} p-6 text-center transition-colors`}
             >
-              <p className="text-sm font-medium text-gray-900">Drag & drop your video here</p>
-              <p className="text-xs text-gray-500 mt-1">or click to choose a file (supports .mov, .mp4, .webm; max 2GB)</p>
               {videoFile ? (
-                <div className="mt-3 rounded-xl bg-white border border-gray-200 px-3 py-2 text-left">
+                <div className="rounded-xl bg-white px-1 text-left">
                   <p className="text-xs text-gray-500">Selected video</p>
-                  <p className="text-sm text-gray-900 font-medium mt-0.5 truncate">{videoFile.name}</p>
+                  <p className="text-sm text-gray-900 font-medium mt-0.5 break-words">{videoFile.name}</p>
+                  <div className="flex items-center gap-2 mt-3">
+                    <button type="button" onClick={openFiles} className="text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors">
+                      Replace
+                    </button>
+                    <button type="button" onClick={clearSelectedVideo} className="text-xs text-red-600 hover:text-red-700 transition-colors">
+                      Remove
+                    </button>
+                  </div>
                 </div>
-              ) : null}
+              ) : (
+                <>
+                  <p className="text-sm font-medium text-gray-900">Drag & drop your video here</p>
+                  <p className="text-xs text-gray-500 mt-1">or tap to choose a file (supports .mov, .mp4, .webm; max 2GB)</p>
+                </>
+              )}
               <input
                 ref={inputRef}
                 type="file"
@@ -246,10 +301,15 @@ function SessionUpload({
               <h3 className="text-sm font-semibold text-gray-900">Practice entries</h3>
               <p className="text-xs text-gray-400 mt-1">Open, edit, or delete entries you created.</p>
             </div>
-            {sessionsLoading ? <span className="text-xs text-gray-400">Loading…</span> : null}
+            <div className="flex items-center gap-3">
+              {sessionsLoading ? <span className="text-xs text-gray-400">Loading…</span> : null}
+              <button type="button" onClick={() => setShowSessionList((current) => !current)} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
+                {showSessionList ? 'Hide' : 'Show'}
+              </button>
+            </div>
           </div>
 
-          {sessions.length ? (
+          {showSessionList && sessions.length ? (
             <div className="space-y-2">
               {sessions.map((session) => (
                 <div
@@ -299,12 +359,12 @@ function SessionUpload({
                 </button>
               ) : null}
             </div>
-          ) : (
+          ) : showSessionList ? (
             <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-5 text-center">
               <p className="text-sm text-gray-600">No practice entries yet.</p>
               <p className="text-xs text-gray-400 mt-1">Upload your first video to start a simple review-ready journal.</p>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
