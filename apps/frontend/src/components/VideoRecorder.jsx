@@ -29,6 +29,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
   const [isMetronomeRunning, setIsMetronomeRunning] = useState(false)
   const [beatsPerBar, setBeatsPerBar] = useState(4)
   const [syncOffsetMs, setSyncOffsetMs] = useState(readSyncOffsetMs)
+  const [countInRemaining, setCountInRemaining] = useState(null)
 
   const liveRef = useRef(null)
   const playbackRef = useRef(null)
@@ -38,6 +39,8 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
   const chunksRef = useRef([])
   const timerRef = useRef(null)
   const metronomeTimerRef = useRef(null)
+  const countInIntervalRef = useRef(null)
+  const countInTimeoutRef = useRef(null)
   const blobUrlRef = useRef(null)
   const audioContextRef = useRef(null)
   const audioDestinationRef = useRef(null)
@@ -67,6 +70,18 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
   }, [])
 
+  const cancelCountIn = useCallback(() => {
+    if (countInIntervalRef.current) {
+      clearInterval(countInIntervalRef.current)
+      countInIntervalRef.current = null
+    }
+    if (countInTimeoutRef.current) {
+      clearTimeout(countInTimeoutRef.current)
+      countInTimeoutRef.current = null
+    }
+    setCountInRemaining(null)
+  }, [])
+
   const stopMetronome = useCallback(() => {
     if (metronomeTimerRef.current) {
       clearInterval(metronomeTimerRef.current)
@@ -85,11 +100,12 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
 
   const cleanup = useCallback(() => {
     stopTimer()
+    cancelCountIn()
     stopMetronome()
     stopStream()
     closeAudioContext()
     if (blobUrlRef.current) { URL.revokeObjectURL(blobUrlRef.current); blobUrlRef.current = null }
-  }, [closeAudioContext, stopMetronome, stopTimer, stopStream])
+  }, [cancelCountIn, closeAudioContext, stopMetronome, stopTimer, stopStream])
 
   useEffect(() => cleanup, [cleanup])
 
@@ -234,7 +250,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
 
   // ── Recording ──
 
-  const startRecording = () => {
+  const startActualRecording = () => {
     if (!streamRef.current) return
 
     if (!audioDestinationRef.current) {
@@ -263,6 +279,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
       if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
       blobUrlRef.current = URL.createObjectURL(blob)
       setRecordedFile(file)
+      cancelCountIn()
       stopStream()
       setState(STATES.RECORDED)
     }
@@ -278,8 +295,36 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
     }, 250)
   }
 
+  const startRecording = () => {
+    if (!streamRef.current) return
+    if (!metronomeEnabled) {
+      startActualRecording()
+      return
+    }
+
+    cancelCountIn()
+    stopMetronome()
+    const beatDurationMs = Math.max(150, Math.round((60_000) / Math.max(30, Math.min(260, bpm))))
+    setCountInRemaining(beatsPerBar)
+    startMetronome()
+
+    countInIntervalRef.current = setInterval(() => {
+      setCountInRemaining((current) => {
+        if (current === null) return null
+        const next = current - 1
+        return next > 0 ? next : null
+      })
+    }, beatDurationMs)
+
+    countInTimeoutRef.current = setTimeout(() => {
+      cancelCountIn()
+      startActualRecording()
+    }, beatDurationMs * beatsPerBar)
+  }
+
   const stopRecording = () => {
     stopTimer()
+    cancelCountIn()
     if (recorderRef.current?.state === 'recording') recorderRef.current.stop()
   }
 
@@ -293,6 +338,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
     setRecordedFile(null)
     if (blobUrlRef.current) { URL.revokeObjectURL(blobUrlRef.current); blobUrlRef.current = null }
     setElapsed(0)
+    cancelCountIn()
     openCamera()
   }
 
@@ -372,8 +418,8 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
           <div className="p-4 bg-gray-950 space-y-4">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/90">
-                  {state === STATES.RECORDING ? 'Recording' : 'Camera ready'}
+              <div className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/90">
+                  {countInRemaining ? `Starting in ${countInRemaining}` : state === STATES.RECORDING ? 'Recording' : 'Camera ready'}
                 </div>
                 <button
                   type="button"
@@ -439,7 +485,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
               <p className="text-[11px] text-white/55">If playback sounds late, move this left. If playback sounds early, move it right.</p>
             </div>
 
-            <p className="text-[11px] text-white/55">Turn the metronome on only if you want to hear and record it. Headphones give the cleanest result.</p>
+            <p className="text-[11px] text-white/55">Turn the metronome on only if you want to hear and record it. When it’s on, recording starts after a one-bar count-in. Headphones give the cleanest result.</p>
 
             {state === STATES.RECORDING ? (
               <div>
@@ -462,7 +508,8 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
                     </svg>
                   </button>
                   <button onClick={startRecording}
-                    className="w-20 h-20 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-90 shadow-lg shadow-red-500/30 border-4 border-white/20">
+                    disabled={Boolean(countInRemaining)}
+                    className="w-20 h-20 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-90 shadow-lg shadow-red-500/30 border-4 border-white/20 disabled:opacity-60 disabled:scale-100">
                     <div className="w-8 h-8 bg-white rounded-full" />
                   </button>
                   <div className="w-12" />
