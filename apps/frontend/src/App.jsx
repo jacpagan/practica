@@ -48,6 +48,14 @@ function AppContent() {
     () => Array.isArray(user?.spaces) && user.spaces.some((space) => space.role === 'owner'),
     [user?.spaces],
   )
+  const libraryUnreadCount = useMemo(
+    () => sessions.filter((session) => session.can_edit && session.has_unread).length,
+    [sessions],
+  )
+  const reviewQueueCount = useMemo(
+    () => sessions.filter((session) => session.can_review_feedback && !session.can_edit && (session.needs_review || session.has_unread)).length,
+    [sessions],
+  )
 
 
   const navigate = useCallback((nextRoute, { replace = false } = {}) => {
@@ -78,6 +86,13 @@ function AppContent() {
       if (!res.ok) throw new Error('session')
       const data = await res.json()
       setSelectedSession(data)
+      if (token) {
+        fetch(`/api/sessions/${sessionId}/mark_seen/`, {
+          method: 'POST',
+          headers: { Authorization: `Token ${token}` },
+        }).catch(() => {})
+        setSessions((current) => current.map((item) => item.id === sessionId ? { ...item, has_unread: false } : item))
+      }
       if (updateUrl) navigate({ view: 'detail', sessionId: data.id })
     } catch {
       toast.error('Could not load session')
@@ -147,6 +162,7 @@ function AppContent() {
   const handleUploadComplete = (session) => {
     setSessions((current) => [session, ...current.filter((item) => item.id !== session.id)])
     setSelectedSession(session)
+    refreshUser()
     navigate({ view: 'detail', sessionId: session.id })
   }
 
@@ -176,11 +192,11 @@ function AppContent() {
                 Record / Upload
               </button>
               <button onClick={() => navigate({ view: 'library', sessionId: null })} className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'library' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
-                Library
+                Library{libraryUnreadCount ? ` • ${libraryUnreadCount}` : ''}
               </button>
               {hasOwnedSpaces ? (
                 <button onClick={() => navigate({ view: 'reviewQueue', sessionId: null })} className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'reviewQueue' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
-                  Review
+                  Review{reviewQueueCount ? ` • ${reviewQueueCount}` : ''}
                 </button>
               ) : null}
             </nav>
@@ -204,14 +220,14 @@ function AppContent() {
               onClick={() => navigate({ view: 'library', sessionId: null })}
               className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'library' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
             >
-              Library
+              Library{libraryUnreadCount ? ` • ${libraryUnreadCount}` : ''}
             </button>
             {hasOwnedSpaces ? (
               <button
                 onClick={() => navigate({ view: 'reviewQueue', sessionId: null })}
                 className={`text-sm px-3 py-2.5 rounded-xl transition-colors col-span-2 ${view === 'reviewQueue' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
               >
-                Review
+                Review{reviewQueueCount ? ` • ${reviewQueueCount}` : ''}
               </button>
             ) : null}
           </nav>
@@ -227,6 +243,7 @@ function AppContent() {
             token={token}
             onComplete={handleUploadComplete}
             onCancel={goHome}
+            currentStreakDays={user?.current_streak_days || 0}
           />
         )}
 

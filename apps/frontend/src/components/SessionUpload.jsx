@@ -8,6 +8,7 @@ function SessionUpload({
   token,
   onComplete,
   onCancel,
+  currentStreakDays = 0,
 }) {
   const toast = useToast()
   const confirm = useConfirm()
@@ -135,6 +136,11 @@ function SessionUpload({
           <div>
             <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Practice on your phone, fast</h2>
             <p className="text-sm text-gray-500 mt-1">Pick a video, keep the title simple, and share it for feedback when you’re ready.</p>
+          </div>
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">Current streak</p>
+            <p className="text-lg font-semibold text-emerald-900 mt-1">{currentStreakDays} day{currentStreakDays === 1 ? '' : 's'}</p>
+            <p className="text-xs text-emerald-800 mt-1">Keep the loop going by sending today’s clip.</p>
           </div>
           <div className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-4">
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Start here</p>

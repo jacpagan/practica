@@ -68,6 +68,8 @@ class UserSerializer(serializers.ModelSerializer):
     spaces = serializers.SerializerMethodField()
     has_spaces = serializers.SerializerMethodField()
     joined_spaces_count = serializers.SerializerMethodField()
+    current_streak_days = serializers.SerializerMethodField()
+    last_practice_at = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -79,6 +81,8 @@ class UserSerializer(serializers.ModelSerializer):
             'spaces',
             'has_spaces',
             'joined_spaces_count',
+            'current_streak_days',
+            'last_practice_at',
         ]
         read_only_fields = ['id']
 
@@ -98,6 +102,37 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_joined_spaces_count(self, obj):
         return obj.space_memberships.count()
+
+    def get_current_streak_days(self, obj):
+        dates = list(
+            obj.sessions.order_by('-recorded_at')
+            .values_list('recorded_at', flat=True)
+        )
+        unique_days = []
+        seen = set()
+        for dt in dates:
+            if not dt:
+                continue
+            day = timezone.localtime(dt).date() if timezone.is_aware(dt) else dt.date()
+            if day in seen:
+                continue
+            seen.add(day)
+            unique_days.append(day)
+        if not unique_days:
+            return 0
+        streak = 1
+        previous = unique_days[0]
+        for day in unique_days[1:]:
+            if (previous - day).days == 1:
+                streak += 1
+                previous = day
+                continue
+            break
+        return streak
+
+    def get_last_practice_at(self, obj):
+        latest = obj.sessions.order_by('-recorded_at').values_list('recorded_at', flat=True).first()
+        return latest.isoformat() if latest else None
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -469,6 +504,7 @@ class SessionListSerializer(serializers.ModelSerializer):
     chapter_count = serializers.SerializerMethodField()
     comment_count = serializers.SerializerMethodField()
     review_feedback_count = serializers.SerializerMethodField()
+    student_streak_days = serializers.SerializerMethodField()
     owner_name = serializers.SerializerMethodField()
     owner_id = serializers.IntegerField(source='user.id', read_only=True, default=None)
     has_unread = serializers.SerializerMethodField()
@@ -488,7 +524,7 @@ class SessionListSerializer(serializers.ModelSerializer):
                   'processing_status', 'processing_error',
                   'space_id', 'space_name', 'tag_names',
                   'assets', 'is_space_main',
-                  'chapter_count', 'comment_count', 'review_feedback_count', 'owner_name', 'owner_id', 'has_unread',
+                  'chapter_count', 'comment_count', 'review_feedback_count', 'student_streak_days', 'owner_name', 'owner_id', 'has_unread',
                   'can_review_feedback', 'needs_review',
                   'can_edit']
         read_only_fields = ['id', 'recorded_at', 'created_at']
@@ -505,6 +541,36 @@ class SessionListSerializer(serializers.ModelSerializer):
     def get_review_feedback_count(self, obj):
         return obj.review_feedback.count()
 
+    def get_student_streak_days(self, obj):
+        if not obj.user_id:
+            return 0
+        dates = list(
+            Session.objects.filter(user_id=obj.user_id)
+            .order_by('-recorded_at')
+            .values_list('recorded_at', flat=True)
+        )
+        unique_days = []
+        seen = set()
+        for dt in dates:
+            if not dt:
+                continue
+            day = timezone.localtime(dt).date() if timezone.is_aware(dt) else dt.date()
+            if day in seen:
+                continue
+            seen.add(day)
+            unique_days.append(day)
+        if not unique_days:
+            return 0
+        streak = 1
+        previous = unique_days[0]
+        for day in unique_days[1:]:
+            if (previous - day).days == 1:
+                streak += 1
+                previous = day
+                continue
+            break
+        return streak
+
     def get_owner_name(self, obj):
         if obj.user and hasattr(obj.user, 'profile') and obj.user.profile.display_name:
             return obj.user.profile.display_name
@@ -514,13 +580,19 @@ class SessionListSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if not request or not request.user.is_authenticated:
             return False
+        latest_timestamps = []
         comments = obj.comments.all()
-        if not comments:
+        feedback = obj.review_feedback.all()
+        if comments:
+            latest_timestamps.append(max(c.created_at for c in comments))
+        if feedback:
+            latest_timestamps.append(max(f.created_at for f in feedback))
+        if not latest_timestamps:
             return False
-        latest_comment = max(c.created_at for c in comments)
+        latest_activity = max(latest_timestamps)
         try:
             last_seen = obj.last_seen_by.get(user=request.user)
-            return latest_comment > last_seen.seen_at
+            return latest_activity > last_seen.seen_at
         except SessionLastSeen.DoesNotExist:
             return True
 

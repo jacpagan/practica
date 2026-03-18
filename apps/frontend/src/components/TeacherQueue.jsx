@@ -10,6 +10,7 @@ function TeacherQueue({ sessions = [], sessionsLoading = false, onOpenSession })
     })
 
   const needsReviewCount = reviewable.filter((session) => session.needs_review).length
+  const unreadCount = reviewable.filter((session) => session.has_unread).length
 
   return (
     <div className="px-4 sm:px-6 py-6">
@@ -20,6 +21,7 @@ function TeacherQueue({ sessions = [], sessionsLoading = false, onOpenSession })
           <div className="flex items-center gap-2 text-xs text-gray-500">
             <span className="rounded-full bg-gray-100 px-3 py-1">{reviewable.length} student clip{reviewable.length === 1 ? '' : 's'}</span>
             <span className="rounded-full bg-amber-100 text-amber-800 px-3 py-1">{needsReviewCount} need review</span>
+            <span className="rounded-full bg-blue-100 text-blue-800 px-3 py-1">{unreadCount} new updates</span>
           </div>
         </div>
 
@@ -49,6 +51,10 @@ function TeacherQueue({ sessions = [], sessionsLoading = false, onOpenSession })
                       {session.space_name ? ` · ${session.space_name}` : ''}
                       {` · ${fmtDate(session.recorded_at || session.created_at)}`}
                     </p>
+                    <div className="flex items-center gap-2 flex-wrap mt-2">
+                      <span className="text-[11px] uppercase tracking-wide bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">{session.student_streak_days || 0} day streak</span>
+                      {session.has_unread ? <span className="text-[11px] uppercase tracking-wide bg-blue-100 text-blue-800 px-2 py-1 rounded-full">New activity</span> : null}
+                    </div>
                     {session.description ? <p className="text-xs text-gray-500 mt-2 line-clamp-2">{session.description}</p> : null}
                   </div>
                   <div className="text-right shrink-0">
