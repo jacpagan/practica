@@ -11,6 +11,8 @@ function SessionUpload({
   currentStreakDays = 0,
   updatesCount = 0,
   onOpenUpdates,
+  initialRecorderOpen = false,
+  onRecorderOpenHandled,
 }) {
   const toast = useToast()
   const confirm = useConfirm()
@@ -30,6 +32,12 @@ function SessionUpload({
     const now = new Date()
     return `Practice ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
   }
+
+  useEffect(() => {
+    if (!initialRecorderOpen) return
+    setShowRecorder(true)
+    onRecorderOpenHandled?.()
+  }, [initialRecorderOpen, onRecorderOpenHandled])
 
   useEffect(() => {
     const el = dropRef.current

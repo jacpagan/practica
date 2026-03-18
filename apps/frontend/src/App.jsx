@@ -46,6 +46,8 @@ function AppContent() {
   const [sessionsLoadingMore, setSessionsLoadingMore] = useState(false)
   const [sessionsNextUrl, setSessionsNextUrl] = useState(null)
   const [detailReturnView, setDetailReturnView] = useState('upload')
+  const [openRecorderOnUpload, setOpenRecorderOnUpload] = useState(false)
+  const [justUploadedSessionId, setJustUploadedSessionId] = useState(null)
 
   const hasOwnedSpaces = useMemo(
     () => Array.isArray(user?.spaces) && user.spaces.some((space) => space.role === 'owner'),
@@ -182,23 +184,34 @@ function AppContent() {
   const openSession = useCallback((session, returnView = view) => {
     if (!session?.id) return
     setDetailReturnView(returnView)
+    setOpenRecorderOnUpload(false)
     openSessionById(session.id)
   }, [openSessionById, view])
 
   const goHome = useCallback(() => {
     navigate({ view: detailReturnView || 'upload', sessionId: null })
     setSelectedSession(null)
+    setJustUploadedSessionId(null)
   }, [navigate, detailReturnView])
 
   const handleUploadComplete = (session) => {
     setSessions((current) => [session, ...current.filter((item) => item.id !== session.id)])
     setSelectedSession(session)
+    setJustUploadedSessionId(session.id)
+    setOpenRecorderOnUpload(false)
     refreshUser()
     navigate({ view: 'detail', sessionId: session.id })
   }
 
+  const handleRecordAnother = useCallback(() => {
+    setSelectedSession(null)
+    setJustUploadedSessionId(null)
+    setOpenRecorderOnUpload(true)
+    navigate({ view: 'upload', sessionId: null })
+  }, [navigate])
+
   useEffect(() => {
-    if (!user || (view !== 'upload' && view !== 'library')) return
+    if (!user || (view !== 'upload' && view !== 'library' && view !== 'reviewQueue' && view !== 'updates')) return
     loadSessions({ url: '/api/sessions/', append: false })
   }, [user, view, loadSessions])
 
@@ -286,6 +299,8 @@ function AppContent() {
             currentStreakDays={user?.current_streak_days || 0}
             updatesCount={updatesCount}
             onOpenUpdates={() => navigate({ view: 'updates', sessionId: null })}
+            initialRecorderOpen={openRecorderOnUpload}
+            onRecorderOpenHandled={() => setOpenRecorderOnUpload(false)}
           />
         )}
 
@@ -331,6 +346,8 @@ function AppContent() {
             session={selectedSession}
             token={token}
             onBack={goHome}
+            justUploaded={selectedSession.id === justUploadedSessionId}
+            onRecordAnother={handleRecordAnother}
             onSessionUpdate={(sessionData) => {
               setSelectedSession(sessionData)
               setSessions((current) => current.map((item) => (

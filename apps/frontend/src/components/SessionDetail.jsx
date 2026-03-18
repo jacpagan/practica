@@ -3,7 +3,7 @@ import { fmtTimer, preferredSessionVideoUrl, videoUrl } from '../utils'
 import { useConfirm } from './ConfirmDialog'
 import { useToast } from './Toast'
 
-function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate, onSessionDelete }) {
+function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate, onSessionDelete, justUploaded = false, onRecordAnother }) {
   const toast = useToast()
   const confirm = useConfirm()
   const videoRef = useRef(null)
@@ -418,6 +418,36 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
                 </div>
               ) : null}
 
+              {justUploaded ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4">
+                  <p className="text-sm font-medium text-emerald-900">Your clip is saved.</p>
+                  <p className="text-sm text-emerald-800 mt-1">Next best moves: watch it, share it for feedback, or record another attempt.</p>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <button
+                      type="button"
+                      onClick={() => videoRef.current?.play?.().catch?.(() => {})}
+                      className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors"
+                    >
+                      Watch clip
+                    </button>
+                    <button
+                      type="button"
+                      onClick={activeReviewLink ? copyShareLink : createShare}
+                      className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors"
+                    >
+                      {activeReviewLink ? 'Copy review link' : 'Share for feedback'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onRecordAnother}
+                      className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors"
+                    >
+                      Record another
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
                 {session.description ? <p className="text-sm text-gray-600">{session.description}</p> : null}
 
               <div className="flex flex-wrap gap-2 text-xs text-gray-500">
@@ -467,6 +497,22 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
                   <h2 className="text-sm font-semibold text-gray-900">Feedback</h2>
                   {reviewFeedback.length ? <span className="text-xs text-gray-400">{reviewFeedback.length} comment{reviewFeedback.length === 1 ? '' : 's'}</span> : null}
                 </div>
+
+                {canEdit && reviewFeedback.length ? (
+                  <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-4 mb-3">
+                    <p className="text-sm font-medium text-blue-900">Ready for the next attempt?</p>
+                    <p className="text-sm text-blue-800 mt-1">You’ve got feedback on this clip. Record an updated take while the notes are fresh.</p>
+                    <div className="mt-3">
+                      <button
+                        type="button"
+                        onClick={onRecordAnother}
+                        className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors"
+                      >
+                        Record next attempt
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
 
                 {canReviewFeedback ? (
                   <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 mb-3 space-y-3">

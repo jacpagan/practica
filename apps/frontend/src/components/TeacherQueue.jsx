@@ -2,11 +2,18 @@ import React from 'react'
 import { fmtDate } from '../utils'
 
 function TeacherQueue({ sessions = [], sessionsLoading = false, onOpenSession }) {
+  const now = Date.now()
   const reviewable = sessions
     .filter((session) => session.can_review_feedback && !session.can_edit)
     .sort((left, right) => {
+      const leftRecordedAt = new Date(left.recorded_at || left.created_at).getTime()
+      const rightRecordedAt = new Date(right.recorded_at || right.created_at).getTime()
+      const leftStale = now - leftRecordedAt > 3 * 24 * 60 * 60 * 1000
+      const rightStale = now - rightRecordedAt > 3 * 24 * 60 * 60 * 1000
+      if (left.has_unread !== right.has_unread) return left.has_unread ? -1 : 1
       if (left.needs_review !== right.needs_review) return left.needs_review ? -1 : 1
-      return new Date(right.recorded_at || right.created_at) - new Date(left.recorded_at || left.created_at)
+      if (leftStale !== rightStale) return leftStale ? -1 : 1
+      return leftRecordedAt - rightRecordedAt
     })
 
   const needsReviewCount = reviewable.filter((session) => session.needs_review).length
@@ -29,7 +36,10 @@ function TeacherQueue({ sessions = [], sessionsLoading = false, onOpenSession })
           <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading review queue…</div>
         ) : reviewable.length ? (
           <div className="space-y-2">
-            {reviewable.map((session) => (
+            {reviewable.map((session) => {
+              const recordedAt = new Date(session.recorded_at || session.created_at)
+              const stale = now - recordedAt.getTime() > 3 * 24 * 60 * 60 * 1000
+              return (
               <button
                 key={session.id}
                 type="button"
@@ -40,7 +50,9 @@ function TeacherQueue({ sessions = [], sessionsLoading = false, onOpenSession })
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-medium text-gray-900 line-clamp-1">{session.title}</p>
-                      {session.needs_review ? (
+                      {session.has_unread ? (
+                        <span className="text-[11px] uppercase tracking-wide bg-blue-100 text-blue-800 px-2 py-1 rounded-full">New activity</span>
+                      ) : session.needs_review ? (
                         <span className="text-[11px] uppercase tracking-wide bg-amber-100 text-amber-800 px-2 py-1 rounded-full">Needs review</span>
                       ) : (
                         <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-600 px-2 py-1 rounded-full">Reviewed</span>
@@ -53,7 +65,7 @@ function TeacherQueue({ sessions = [], sessionsLoading = false, onOpenSession })
                     </p>
                     <div className="flex items-center gap-2 flex-wrap mt-2">
                       <span className="text-[11px] uppercase tracking-wide bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">{session.student_streak_days || 0} day streak</span>
-                      {session.has_unread ? <span className="text-[11px] uppercase tracking-wide bg-blue-100 text-blue-800 px-2 py-1 rounded-full">New activity</span> : null}
+                      {stale ? <span className="text-[11px] uppercase tracking-wide bg-rose-100 text-rose-800 px-2 py-1 rounded-full">Stale</span> : null}
                     </div>
                     {session.description ? <p className="text-xs text-gray-500 mt-2 line-clamp-2">{session.description}</p> : null}
                   </div>
@@ -63,7 +75,8 @@ function TeacherQueue({ sessions = [], sessionsLoading = false, onOpenSession })
                   </div>
                 </div>
               </button>
-            ))}
+              )
+            })}
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-8 text-center">
