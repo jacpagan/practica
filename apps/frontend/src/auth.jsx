@@ -81,7 +81,7 @@ export function AuthProvider({ children }) {
     })
     if (!joinRes.ok) {
       const joinError = await joinRes.json().catch(() => ({}))
-      throw new Error(joinError.error || 'Could not join this practice group')
+      throw new Error(joinError.error || 'Could not join this teacher invite')
     }
 
     persistToken(loginData.token)
