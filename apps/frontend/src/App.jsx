@@ -7,6 +7,7 @@ import AuthForm from './components/AuthForm'
 import ReviewPage from './components/ReviewPage'
 import SessionLibrary from './components/SessionLibrary'
 import TeacherQueue from './components/TeacherQueue'
+import UpdatesFeed from './components/UpdatesFeed'
 import SessionUpload from './components/SessionUpload'
 import SessionDetail from './components/SessionDetail'
 
@@ -14,6 +15,7 @@ const parseRoute = (pathname) => {
   if (pathname === '/' || pathname === '/upload') return { view: 'upload', sessionId: null }
   if (pathname === '/library') return { view: 'library', sessionId: null }
   if (pathname === '/review') return { view: 'reviewQueue', sessionId: null }
+  if (pathname === '/updates') return { view: 'updates', sessionId: null }
   const reviewMatch = pathname.match(/^\/r\/(.+)$/)
   if (reviewMatch) return { view: 'review', token: reviewMatch[1] }
   const sessionMatch = pathname.match(/^\/sessions\/(\d+)$/)
@@ -25,6 +27,7 @@ const routePath = ({ view, sessionId, token }) => {
   if (view === 'upload') return '/upload'
   if (view === 'library') return '/library'
   if (view === 'reviewQueue') return '/review'
+  if (view === 'updates') return '/updates'
   if (view === 'review' && token) return `/r/${token}`
   if (view === 'detail' && sessionId) return `/sessions/${sessionId}`
   return '/upload'
@@ -56,6 +59,34 @@ function AppContent() {
     () => sessions.filter((session) => session.can_review_feedback && !session.can_edit && (session.needs_review || session.has_unread)).length,
     [sessions],
   )
+  const updates = useMemo(() => {
+    const feedbackItems = sessions
+      .filter((session) => session.can_edit && session.has_unread)
+      .map((session) => ({
+        kind: 'feedback',
+        session,
+        title: `New feedback on “${session.title}”`,
+        subtitle: `${session.review_feedback_count || 0} feedback comment${session.review_feedback_count === 1 ? '' : 's'} waiting for you.`,
+        badge: 'Feedback',
+      }))
+
+    const reviewItems = sessions
+      .filter((session) => session.can_review_feedback && !session.can_edit && (session.needs_review || session.has_unread))
+      .map((session) => ({
+        kind: 'review',
+        session,
+        title: session.needs_review ? `Review ${session.owner_name || 'student'}’s clip` : `${session.owner_name || 'Student'} updated “${session.title}”`,
+        subtitle: session.needs_review
+          ? 'This student clip is waiting for your coaching.'
+          : 'There is new activity on this student clip.',
+        badge: session.needs_review ? 'Needs review' : 'New activity',
+      }))
+
+    return [...feedbackItems, ...reviewItems].sort(
+      (left, right) => new Date(right.session.recorded_at || right.session.created_at) - new Date(left.session.recorded_at || left.session.created_at),
+    )
+  }, [sessions])
+  const updatesCount = updates.length
 
 
   const navigate = useCallback((nextRoute, { replace = false } = {}) => {
@@ -108,7 +139,7 @@ function AppContent() {
 
   // Ensure we always land users on the upload screen after login
   useEffect(() => {
-    if (user && view !== 'detail' && view !== 'library' && view !== 'reviewQueue') {
+    if (user && view !== 'detail' && view !== 'library' && view !== 'reviewQueue' && view !== 'updates') {
       navigate({ view: 'upload', sessionId: null }, { replace: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -194,6 +225,9 @@ function AppContent() {
               <button onClick={() => navigate({ view: 'library', sessionId: null })} className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'library' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
                 Library{libraryUnreadCount ? ` • ${libraryUnreadCount}` : ''}
               </button>
+              <button onClick={() => navigate({ view: 'updates', sessionId: null })} className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'updates' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
+                Updates{updatesCount ? ` • ${updatesCount}` : ''}
+              </button>
               {hasOwnedSpaces ? (
                 <button onClick={() => navigate({ view: 'reviewQueue', sessionId: null })} className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'reviewQueue' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
                   Review{reviewQueueCount ? ` • ${reviewQueueCount}` : ''}
@@ -222,6 +256,12 @@ function AppContent() {
             >
               Library{libraryUnreadCount ? ` • ${libraryUnreadCount}` : ''}
             </button>
+            <button
+              onClick={() => navigate({ view: 'updates', sessionId: null })}
+              className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'updates' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+            >
+              Updates{updatesCount ? ` • ${updatesCount}` : ''}
+            </button>
             {hasOwnedSpaces ? (
               <button
                 onClick={() => navigate({ view: 'reviewQueue', sessionId: null })}
@@ -244,6 +284,8 @@ function AppContent() {
             onComplete={handleUploadComplete}
             onCancel={goHome}
             currentStreakDays={user?.current_streak_days || 0}
+            updatesCount={updatesCount}
+            onOpenUpdates={() => navigate({ view: 'updates', sessionId: null })}
           />
         )}
 
@@ -273,6 +315,13 @@ function AppContent() {
           <TeacherQueue
             sessions={sessions}
             sessionsLoading={sessionsLoading}
+            onOpenSession={openSession}
+          />
+        )}
+
+        {view === 'updates' && (
+          <UpdatesFeed
+            items={updates}
             onOpenSession={openSession}
           />
         )}

@@ -9,6 +9,8 @@ function SessionUpload({
   onComplete,
   onCancel,
   currentStreakDays = 0,
+  updatesCount = 0,
+  onOpenUpdates,
 }) {
   const toast = useToast()
   const confirm = useConfirm()
@@ -137,6 +139,17 @@ function SessionUpload({
             <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Practice on your phone, fast</h2>
             <p className="text-sm text-gray-500 mt-1">Pick a video, keep the title simple, and share it for feedback when you’re ready.</p>
           </div>
+          {updatesCount ? (
+            <button
+              type="button"
+              onClick={onOpenUpdates}
+              className="w-full text-left rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 hover:bg-blue-100 transition-colors"
+            >
+              <p className="text-xs font-medium uppercase tracking-wide text-blue-700">Updates</p>
+              <p className="text-sm font-semibold text-blue-900 mt-1">{updatesCount} item{updatesCount === 1 ? '' : 's'} need your attention</p>
+              <p className="text-xs text-blue-800 mt-1">Open feedback or review requests before your next practice clip.</p>
+            </button>
+          ) : null}
           <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
             <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">Current streak</p>
             <p className="text-lg font-semibold text-emerald-900 mt-1">{currentStreakDays} day{currentStreakDays === 1 ? '' : 's'}</p>
