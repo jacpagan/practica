@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { fmtTimer, preferredSessionVideoUrl } from '../utils'
+import { useAuth } from '../auth'
 
 function ReviewPage() {
+  const { user, token: authToken } = useAuth()
   const videoRef = useRef(null)
-  const token = useMemo(() => {
+  const reviewToken = useMemo(() => {
     const m = window.location.pathname.match(/^\/r\/(.+)$/)
     return m ? m[1] : ''
   }, [])
@@ -26,7 +28,7 @@ function ReviewPage() {
       setLoading(true)
       setError('')
       try {
-        const res = await fetch(`/api/review/${token}/`)
+        const res = await fetch(`/api/review/${reviewToken}/`)
         if (!res.ok) throw new Error('invalid')
         const data = await res.json()
         if (!cancelled) {
@@ -41,7 +43,7 @@ function ReviewPage() {
     }
     load()
     return () => { cancelled = true }
-  }, [token])
+  }, [reviewToken])
 
   useEffect(() => {
     const knownDuration = Math.round(Number(session?.duration_seconds || 0))
@@ -57,7 +59,7 @@ function ReviewPage() {
 
   const loadFeedback = async () => {
     try {
-      const res = await fetch(`/api/review/${token}/feedback/`)
+      const res = await fetch(`/api/review/${reviewToken}/feedback/`)
       if (res.ok) setFeedback(await res.json())
     } catch {}
   }
@@ -69,12 +71,15 @@ function ReviewPage() {
     if (!text.trim()) return
     setSubmitting(true)
     try {
-      const res = await fetch(`/api/review/${token}/feedback/`, {
+      const res = await fetch(`/api/review/${reviewToken}/feedback/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Token ${authToken}` } : {}),
+        },
         body: JSON.stringify({
-          name: name.trim(),
-          email: email.trim(),
+          name: user ? '' : name.trim(),
+          email: user ? '' : email.trim(),
           timestamp_seconds: typeof selectedTimestampSeconds === 'number' ? selectedTimestampSeconds : null,
           text: text.trim(),
         }),
@@ -133,12 +138,19 @@ function ReviewPage() {
           <div className="rounded-xl border border-gray-200 p-4 space-y-3">
             <p className="text-sm font-semibold text-gray-900">Leave feedback</p>
             <form onSubmit={submit} className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name (optional)"
-                  className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (optional)"
-                  className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
-              </div>
+              {user ? (
+                <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Commenting as</p>
+                  <p className="text-sm font-medium text-gray-900 mt-1">{user.display_name || user.username}</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name (optional)"
+                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
+                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (optional)"
+                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
+                </div>
+              )}
               <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-3 space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>

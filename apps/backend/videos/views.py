@@ -949,7 +949,16 @@ def review_link_feedback(request, token):
 
     serializer = ReviewFeedbackSerializer(data=request.data, context={'session': link.session})
     serializer.is_valid(raise_exception=True)
-    item = serializer.save(session=link.session, review_link=link)
+    if getattr(request.user, 'is_authenticated', False):
+        name = request.user.profile.display_name if hasattr(request.user, 'profile') and request.user.profile.display_name else request.user.username
+        item = serializer.save(
+            session=link.session,
+            review_link=link,
+            name=name,
+            email=request.user.email or '',
+        )
+    else:
+        item = serializer.save(session=link.session, review_link=link)
     return Response(ReviewFeedbackSerializer(item).data, status=status.HTTP_201_CREATED)
 
 
