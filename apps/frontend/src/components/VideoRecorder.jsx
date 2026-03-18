@@ -328,7 +328,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
 
       {/* ── LIVE PREVIEW / RECORDING ── */}
       {(state === STATES.PREVIEWING || state === STATES.RECORDING) && (
-        <div className="relative">
+        <div className="bg-gray-950">
           <video
             ref={setLiveRef}
             autoPlay
@@ -338,26 +338,26 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
             style={{ transform: 'scaleX(-1)' }}
           />
 
-          <div className="absolute inset-x-0 top-0 p-4 flex items-start justify-between pointer-events-none">
-            <div className="flex items-start gap-2 pointer-events-auto">
-              <div className="rounded-full bg-black/45 backdrop-blur-sm px-3 py-1.5 text-xs text-white/90">
-                {state === STATES.RECORDING ? 'Recording' : 'Camera ready'}
+          <div className="p-4 bg-gray-950 space-y-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/90">
+                  {state === STATES.RECORDING ? 'Recording' : 'Camera ready'}
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleMetronome}
+                  className={`rounded-full px-3 py-1.5 text-xs transition-colors ${metronomeEnabled ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
+                >
+                  {metronomeEnabled ? 'Metronome on' : 'Metronome off'}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={toggleMetronome}
-                className={`rounded-full backdrop-blur-sm px-3 py-1.5 text-xs transition-colors ${metronomeEnabled ? 'bg-emerald-500/85 text-white' : 'bg-black/45 text-white/80 hover:bg-black/60'}`}
-              >
-                {metronomeEnabled ? 'Metronome on' : 'Metronome off'}
-              </button>
+              <div className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/70">
+                {state === STATES.RECORDING ? fmtTimer(elapsed) : `Max ${fmtTimer(maxDuration)}`}
+              </div>
             </div>
-            <div className="rounded-full bg-black/45 backdrop-blur-sm px-3 py-1.5 text-xs text-white/70 pointer-events-auto">
-              Max {fmtTimer(maxDuration)}
-            </div>
-          </div>
 
-          <div className="absolute top-14 left-4 right-4 pointer-events-auto">
-            <div className="rounded-2xl bg-black/45 backdrop-blur-sm px-3 py-3 flex items-center gap-3">
+            <div className="rounded-2xl bg-white/5 px-3 py-3 flex items-center gap-3">
               <div className="min-w-0">
                 <p className="text-[11px] uppercase tracking-wide text-white/60">Tempo</p>
                 <p className="text-sm font-medium text-white">{bpm} BPM</p>
@@ -381,51 +381,42 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
                 ))}
               </select>
             </div>
-            <p className="mt-2 text-[11px] text-white/55">Turn the metronome on only if you want to hear and record it. Headphones give the cleanest result.</p>
-          </div>
 
-          {/* Recording indicator */}
-          {state === STATES.RECORDING && (
-            <div className="absolute top-3 left-3 flex items-center gap-2 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5">
-              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              <span className="text-xs text-white font-mono font-medium">{fmtTimer(elapsed)}</span>
-            </div>
-          )}
+            <p className="text-[11px] text-white/55">Turn the metronome on only if you want to hear and record it. Headphones give the cleanest result.</p>
 
-          {/* Duration progress bar */}
-          {state === STATES.RECORDING && (
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
-              <div
-                className="h-full bg-red-500 transition-all duration-300 ease-linear"
-                style={{ width: `${timerProgress * 100}%` }}
-              />
-            </div>
-          )}
+            {state === STATES.RECORDING ? (
+              <div>
+                <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-red-500 transition-all duration-300 ease-linear"
+                    style={{ width: `${timerProgress * 100}%` }}
+                  />
+                </div>
+              </div>
+            ) : null}
 
-          {/* Controls overlay */}
-          <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-3 px-4">
-            {state === STATES.PREVIEWING && (
-              <>
-                <button onClick={handleCancel}
-                  className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-sm hover:bg-black/60 flex items-center justify-center transition-all">
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-                <button onClick={startRecording}
+            <div className="flex items-center justify-center gap-3">
+              {state === STATES.PREVIEWING ? (
+                <>
+                  <button onClick={handleCancel}
+                    className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                  <button onClick={startRecording}
+                    className="w-20 h-20 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-90 shadow-lg shadow-red-500/30 border-4 border-white/20">
+                    <div className="w-8 h-8 bg-white rounded-full" />
+                  </button>
+                  <div className="w-12" />
+                </>
+              ) : (
+                <button onClick={stopRecording}
                   className="w-20 h-20 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-90 shadow-lg shadow-red-500/30 border-4 border-white/20">
-                  <div className="w-8 h-8 bg-white rounded-full" />
+                  <div className="w-7 h-7 bg-white rounded-sm" />
                 </button>
-                <div className="w-12" />
-              </>
-            )}
-
-            {state === STATES.RECORDING && (
-              <button onClick={stopRecording}
-                className="w-20 h-20 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-90 shadow-lg shadow-red-500/30 border-4 border-white/20">
-                <div className="w-7 h-7 bg-white rounded-sm" />
-              </button>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}
