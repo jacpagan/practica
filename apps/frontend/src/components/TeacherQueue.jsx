@@ -23,6 +23,7 @@ function TeacherQueue({ primaryRole = 'teacher', sessions = [], sessionsLoading 
 
   const needsReviewCount = needsAttention.filter((session) => session.needs_review).length
   const unreadCount = needsAttention.filter((session) => session.has_unread).length
+  const nextToReview = needsAttention[0] || null
 
   const renderSessionRow = (session) => {
     const recordedAt = new Date(session.recorded_at || session.created_at)
@@ -83,6 +84,25 @@ function TeacherQueue({ primaryRole = 'teacher', sessions = [], sessionsLoading 
             <span className="rounded-full bg-blue-100 text-blue-800 px-3 py-1">{unreadCount} new updates</span>
           </div>
         </div>
+
+        {nextToReview ? (
+          <div className="rounded-3xl border border-gray-900 bg-gray-900 text-white px-5 py-5 mb-6">
+            <p className="text-xs font-medium uppercase tracking-wide text-white/70">Next action</p>
+            <p className="text-xl font-semibold mt-1">Review {nextToReview.owner_name || 'your student'}’s latest clip</p>
+            <p className="text-sm text-white/75 mt-2">
+              {nextToReview.has_unread
+                ? 'There is new activity waiting for you on this clip.'
+                : 'This student clip is waiting for your first round of coaching.'}
+            </p>
+            <button
+              type="button"
+              onClick={() => onOpenSession?.(nextToReview, 'review')}
+              className="mt-4 rounded-2xl bg-white text-gray-900 px-4 py-3 text-sm font-medium hover:bg-gray-100 transition-colors"
+            >
+              Open next review
+            </button>
+          </div>
+        ) : null}
 
         {sessionsLoading ? (
           <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading review queue…</div>

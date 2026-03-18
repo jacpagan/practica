@@ -126,6 +126,20 @@ function SessionUpload({
     openCamera()
   }
 
+  const primaryAction = updatesCount > 0
+    ? {
+        label: 'See feedback first',
+        helper: 'You have updates waiting. Review them before sending your next clip.',
+        onClick: onOpenUpdates,
+        tone: 'secondary',
+      }
+    : {
+        label: 'Send today’s clip',
+        helper: 'The faster path is usually: record now, upload, and wait for feedback.',
+        onClick: startRecording,
+        tone: 'primary',
+      }
+
   const handleRecorded = (file) => {
     setShowRecorder(false)
     if (!isLikelyVideoFile(file)) {
@@ -153,6 +167,18 @@ function SessionUpload({
                 ? 'Record examples, upload reference clips, or send your own takes while coaching students between lessons.'
                 : 'Record or upload your next practice clip so your teacher can review it between lessons.'}
             </p>
+          </div>
+          <div className={`rounded-3xl border px-4 py-4 ${primaryAction.tone === 'primary' ? 'border-gray-900 bg-gray-900 text-white' : 'border-blue-100 bg-blue-50'}`}>
+            <p className={`text-xs font-medium uppercase tracking-wide ${primaryAction.tone === 'primary' ? 'text-white/70' : 'text-blue-700'}`}>Next action</p>
+            <p className={`text-lg font-semibold mt-1 ${primaryAction.tone === 'primary' ? 'text-white' : 'text-blue-900'}`}>{primaryAction.label}</p>
+            <p className={`text-sm mt-2 ${primaryAction.tone === 'primary' ? 'text-white/75' : 'text-blue-800'}`}>{primaryAction.helper}</p>
+            <button
+              type="button"
+              onClick={primaryAction.onClick}
+              className={`mt-4 w-full rounded-2xl py-3 text-sm font-medium transition-colors ${primaryAction.tone === 'primary' ? 'bg-white text-gray-900 hover:bg-gray-100' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+            >
+              {primaryAction.label}
+            </button>
           </div>
           {updatesCount ? (
             <button
