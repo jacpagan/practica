@@ -90,6 +90,11 @@ function AppContent() {
   }, [sessions])
   const updatesCount = updates.length
 
+  const defaultHomeView = useMemo(() => {
+    if (hasOwnedSpaces) return 'reviewQueue'
+    return 'upload'
+  }, [hasOwnedSpaces])
+
 
   const navigate = useCallback((nextRoute, { replace = false } = {}) => {
     setView(nextRoute.view)
@@ -142,10 +147,10 @@ function AppContent() {
   // Ensure we always land users on the upload screen after login
   useEffect(() => {
     if (user && view !== 'detail' && view !== 'library' && view !== 'reviewQueue' && view !== 'updates' && view !== 'review') {
-      navigate({ view: 'upload', sessionId: null }, { replace: true })
+      navigate({ view: defaultHomeView, sessionId: null }, { replace: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user])
+  }, [user, defaultHomeView])
 
   useEffect(() => {
     if (!user) return
@@ -189,10 +194,10 @@ function AppContent() {
   }, [openSessionById, view])
 
   const goHome = useCallback(() => {
-    navigate({ view: detailReturnView || 'upload', sessionId: null })
+    navigate({ view: detailReturnView || defaultHomeView, sessionId: null })
     setSelectedSession(null)
     setJustUploadedSessionId(null)
-  }, [navigate, detailReturnView])
+  }, [navigate, detailReturnView, defaultHomeView])
 
   const handleUploadComplete = (session) => {
     setSessions((current) => [session, ...current.filter((item) => item.id !== session.id)])
