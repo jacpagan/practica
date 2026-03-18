@@ -141,7 +141,7 @@ function AppContent() {
 
   // Ensure we always land users on the upload screen after login
   useEffect(() => {
-    if (user && view !== 'detail' && view !== 'library' && view !== 'reviewQueue' && view !== 'updates') {
+    if (user && view !== 'detail' && view !== 'library' && view !== 'reviewQueue' && view !== 'updates' && view !== 'review') {
       navigate({ view: 'upload', sessionId: null }, { replace: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
