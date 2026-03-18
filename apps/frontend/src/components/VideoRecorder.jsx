@@ -13,14 +13,21 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
   const [state, setState] = useState(STATES.IDLE)
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState(null)
+  const [bpm, setBpm] = useState(80)
+  const [isMetronomeRunning, setIsMetronomeRunning] = useState(false)
 
   const liveRef = useRef(null)
   const playbackRef = useRef(null)
   const streamRef = useRef(null)
+  const mixedStreamRef = useRef(null)
   const recorderRef = useRef(null)
   const chunksRef = useRef([])
   const timerRef = useRef(null)
+  const metronomeTimerRef = useRef(null)
   const blobUrlRef = useRef(null)
+  const audioContextRef = useRef(null)
+  const audioDestinationRef = useRef(null)
+  const beatRef = useRef(0)
   const [recordedFile, setRecordedFile] = useState(null)
   const isCaptureMode = state === STATES.PREVIEWING || state === STATES.RECORDING || state === STATES.RECORDED
 
@@ -29,17 +36,36 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach(t => t.stop())
     streamRef.current = null
+    mixedStreamRef.current = null
   }, [])
 
   const stopTimer = useCallback(() => {
     if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
   }, [])
 
+  const stopMetronome = useCallback(() => {
+    if (metronomeTimerRef.current) {
+      clearInterval(metronomeTimerRef.current)
+      metronomeTimerRef.current = null
+    }
+    setIsMetronomeRunning(false)
+  }, [])
+
+  const closeAudioContext = useCallback(() => {
+    const ctx = audioContextRef.current
+    audioContextRef.current = null
+    audioDestinationRef.current = null
+    if (!ctx) return
+    try { ctx.close() } catch {}
+  }, [])
+
   const cleanup = useCallback(() => {
     stopTimer()
+    stopMetronome()
     stopStream()
+    closeAudioContext()
     if (blobUrlRef.current) { URL.revokeObjectURL(blobUrlRef.current); blobUrlRef.current = null }
-  }, [stopTimer, stopStream])
+  }, [closeAudioContext, stopMetronome, stopTimer, stopStream])
 
   useEffect(() => cleanup, [cleanup])
 
@@ -60,6 +86,89 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
     }
   }, [])
 
+  const ensureAudioMix = useCallback(async (stream) => {
+    if (typeof window === 'undefined') return null
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext
+    if (!AudioContextClass) return null
+
+    let audioContext = audioContextRef.current
+    let destination = audioDestinationRef.current
+    if (!audioContext || !destination) {
+      audioContext = new AudioContextClass()
+      destination = audioContext.createMediaStreamDestination()
+      audioContextRef.current = audioContext
+      audioDestinationRef.current = destination
+
+      const audioTracks = stream?.getAudioTracks?.() || []
+      if (audioTracks.length) {
+        const micStream = new MediaStream(audioTracks)
+        const micSource = audioContext.createMediaStreamSource(micStream)
+        const micGain = audioContext.createGain()
+        micGain.gain.value = 1
+        micSource.connect(micGain)
+        micGain.connect(destination)
+      }
+    }
+
+    if (audioContext.state === 'suspended') {
+      try { await audioContext.resume() } catch {}
+    }
+
+    const tracks = [...(stream?.getVideoTracks?.() || [])]
+    const mixedAudioTrack = destination.stream.getAudioTracks()[0]
+    if (mixedAudioTrack) tracks.push(mixedAudioTrack)
+    mixedStreamRef.current = new MediaStream(tracks)
+    return mixedStreamRef.current
+  }, [])
+
+  const playTick = useCallback(async () => {
+    const audioContext = audioContextRef.current
+    const destination = audioDestinationRef.current
+    if (!audioContext || !destination) return
+    if (audioContext.state === 'suspended') {
+      try { await audioContext.resume() } catch {}
+    }
+
+    const isAccent = beatRef.current % 4 === 0
+    beatRef.current += 1
+    const oscillator = audioContext.createOscillator()
+    const gain = audioContext.createGain()
+    oscillator.type = 'square'
+    oscillator.frequency.value = isAccent ? 1568 : 988
+    gain.gain.setValueAtTime(isAccent ? 0.16 : 0.11, audioContext.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.05)
+    oscillator.connect(gain)
+    gain.connect(destination)
+    gain.connect(audioContext.destination)
+    oscillator.start(audioContext.currentTime)
+    oscillator.stop(audioContext.currentTime + 0.055)
+  }, [])
+
+  const startMetronome = useCallback(async () => {
+    if (!streamRef.current) return
+    await ensureAudioMix(streamRef.current)
+    stopMetronome()
+    beatRef.current = 0
+    await playTick()
+    metronomeTimerRef.current = setInterval(() => {
+      playTick()
+    }, Math.max(150, Math.round((60_000) / Math.max(30, Math.min(260, bpm)))))
+    setIsMetronomeRunning(true)
+  }, [bpm, ensureAudioMix, playTick, stopMetronome])
+
+  const toggleMetronome = useCallback(async () => {
+    if (isMetronomeRunning) {
+      stopMetronome()
+      return
+    }
+    await startMetronome()
+  }, [isMetronomeRunning, startMetronome, stopMetronome])
+
+  useEffect(() => {
+    if (!isMetronomeRunning) return
+    startMetronome()
+  }, [bpm, isMetronomeRunning, startMetronome])
+
   // ── Camera ──
 
   const openCamera = async () => {
@@ -72,6 +181,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
         audio: true,
       })
       streamRef.current = stream
+      await ensureAudioMix(stream)
       setState(STATES.PREVIEWING)
       // Attach after state change triggers re-render with video element
       requestAnimationFrame(() => attachStream())
@@ -88,10 +198,15 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
   const startRecording = () => {
     if (!streamRef.current) return
 
+    if (!audioDestinationRef.current) {
+      ensureAudioMix(streamRef.current)
+    }
+
     const mimeType = pickRecorderMimeType()
+    const recorderStream = mixedStreamRef.current || streamRef.current
     const recorder = mimeType
-      ? new MediaRecorder(streamRef.current, { mimeType })
-      : new MediaRecorder(streamRef.current)
+      ? new MediaRecorder(recorderStream, { mimeType })
+      : new MediaRecorder(recorderStream)
     recorderRef.current = recorder
     chunksRef.current = []
     setElapsed(0)
@@ -109,10 +224,12 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
       if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
       blobUrlRef.current = URL.createObjectURL(blob)
       setRecordedFile(file)
+      stopMetronome()
       stopStream()
       setState(STATES.RECORDED)
     }
 
+    if (!isMetronomeRunning) startMetronome()
     recorder.start(500)
     setState(STATES.RECORDING)
 
@@ -139,6 +256,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
     setRecordedFile(null)
     if (blobUrlRef.current) { URL.revokeObjectURL(blobUrlRef.current); blobUrlRef.current = null }
     setElapsed(0)
+    stopMetronome()
     openCamera()
   }
 
@@ -216,11 +334,38 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
           />
 
           <div className="absolute inset-x-0 top-0 p-4 flex items-start justify-between pointer-events-none">
-            <div className="rounded-full bg-black/45 backdrop-blur-sm px-3 py-1.5 text-xs text-white/90 pointer-events-auto">
-              {state === STATES.RECORDING ? 'Recording' : 'Camera ready'}
+            <div className="flex items-start gap-2 pointer-events-auto">
+              <div className="rounded-full bg-black/45 backdrop-blur-sm px-3 py-1.5 text-xs text-white/90">
+                {state === STATES.RECORDING ? 'Recording' : 'Camera ready'}
+              </div>
+              <button
+                type="button"
+                onClick={toggleMetronome}
+                className={`rounded-full backdrop-blur-sm px-3 py-1.5 text-xs transition-colors ${isMetronomeRunning ? 'bg-emerald-500/85 text-white' : 'bg-black/45 text-white/80 hover:bg-black/60'}`}
+              >
+                {isMetronomeRunning ? 'Metronome on' : 'Metronome off'}
+              </button>
             </div>
             <div className="rounded-full bg-black/45 backdrop-blur-sm px-3 py-1.5 text-xs text-white/70 pointer-events-auto">
               Max {fmtTimer(maxDuration)}
+            </div>
+          </div>
+
+          <div className="absolute top-14 left-4 right-4 pointer-events-auto">
+            <div className="rounded-2xl bg-black/45 backdrop-blur-sm px-3 py-3 flex items-center gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] uppercase tracking-wide text-white/60">Tempo</p>
+                <p className="text-sm font-medium text-white">{bpm} BPM</p>
+              </div>
+              <input
+                type="range"
+                min="40"
+                max="240"
+                step="1"
+                value={bpm}
+                onChange={(e) => setBpm(Number(e.target.value))}
+                className="flex-1"
+              />
             </div>
           </div>
 
