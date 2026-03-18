@@ -14,7 +14,9 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState(null)
   const [bpm, setBpm] = useState(80)
+  const [metronomeEnabled, setMetronomeEnabled] = useState(false)
   const [isMetronomeRunning, setIsMetronomeRunning] = useState(false)
+  const [beatsPerBar, setBeatsPerBar] = useState(4)
 
   const liveRef = useRef(null)
   const playbackRef = useRef(null)
@@ -129,7 +131,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
       try { await audioContext.resume() } catch {}
     }
 
-    const isAccent = beatRef.current % 4 === 0
+    const isAccent = beatRef.current % beatsPerBar === 0
     beatRef.current += 1
     const oscillator = audioContext.createOscillator()
     const gain = audioContext.createGain()
@@ -142,7 +144,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
     gain.connect(audioContext.destination)
     oscillator.start(audioContext.currentTime)
     oscillator.stop(audioContext.currentTime + 0.055)
-  }, [])
+  }, [beatsPerBar])
 
   const startMetronome = useCallback(async () => {
     if (!streamRef.current) return
@@ -156,18 +158,24 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
     setIsMetronomeRunning(true)
   }, [bpm, ensureAudioMix, playTick, stopMetronome])
 
-  const toggleMetronome = useCallback(async () => {
-    if (isMetronomeRunning) {
-      stopMetronome()
-      return
-    }
-    await startMetronome()
-  }, [isMetronomeRunning, startMetronome, stopMetronome])
+  const toggleMetronome = useCallback(() => {
+    setMetronomeEnabled((current) => !current)
+  }, [])
 
   useEffect(() => {
-    if (!isMetronomeRunning) return
+    const captureActive = state === STATES.PREVIEWING || state === STATES.RECORDING
+    if (!captureActive) {
+      stopMetronome()
+      return undefined
+    }
+    if (!metronomeEnabled) {
+      stopMetronome()
+      return undefined
+    }
+
     startMetronome()
-  }, [bpm, isMetronomeRunning, startMetronome])
+    return () => stopMetronome()
+  }, [bpm, metronomeEnabled, startMetronome, state, stopMetronome])
 
   // ── Camera ──
 
@@ -224,12 +232,10 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
       if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
       blobUrlRef.current = URL.createObjectURL(blob)
       setRecordedFile(file)
-      stopMetronome()
       stopStream()
       setState(STATES.RECORDED)
     }
 
-    if (!isMetronomeRunning) startMetronome()
     recorder.start(500)
     setState(STATES.RECORDING)
 
@@ -256,7 +262,6 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
     setRecordedFile(null)
     if (blobUrlRef.current) { URL.revokeObjectURL(blobUrlRef.current); blobUrlRef.current = null }
     setElapsed(0)
-    stopMetronome()
     openCamera()
   }
 
@@ -341,9 +346,9 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
               <button
                 type="button"
                 onClick={toggleMetronome}
-                className={`rounded-full backdrop-blur-sm px-3 py-1.5 text-xs transition-colors ${isMetronomeRunning ? 'bg-emerald-500/85 text-white' : 'bg-black/45 text-white/80 hover:bg-black/60'}`}
+                className={`rounded-full backdrop-blur-sm px-3 py-1.5 text-xs transition-colors ${metronomeEnabled ? 'bg-emerald-500/85 text-white' : 'bg-black/45 text-white/80 hover:bg-black/60'}`}
               >
-                {isMetronomeRunning ? 'Metronome on' : 'Metronome off'}
+                {metronomeEnabled ? 'Metronome on' : 'Metronome off'}
               </button>
             </div>
             <div className="rounded-full bg-black/45 backdrop-blur-sm px-3 py-1.5 text-xs text-white/70 pointer-events-auto">
@@ -366,7 +371,17 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
                 onChange={(e) => setBpm(Number(e.target.value))}
                 className="flex-1"
               />
+              <select
+                value={beatsPerBar}
+                onChange={(e) => setBeatsPerBar(Number(e.target.value))}
+                className="bg-white/10 text-white text-sm rounded-lg px-2 py-2 border border-white/10"
+              >
+                {[2, 3, 4, 6].map((beats) => (
+                  <option key={beats} value={beats} className="text-gray-900">{beats}/4</option>
+                ))}
+              </select>
             </div>
+            <p className="mt-2 text-[11px] text-white/55">Turn the metronome on only if you want to hear and record it. Headphones give the cleanest result.</p>
           </div>
 
           {/* Recording indicator */}
