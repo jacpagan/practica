@@ -22,6 +22,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
   const timerRef = useRef(null)
   const blobUrlRef = useRef(null)
   const [recordedFile, setRecordedFile] = useState(null)
+  const isCaptureMode = state === STATES.PREVIEWING || state === STATES.RECORDING || state === STATES.RECORDED
 
   // ── Cleanup ──
 
@@ -162,7 +163,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
   // ── Render ──
 
   return (
-    <div className="rounded-2xl overflow-hidden bg-gray-950 relative">
+    <div className={`overflow-hidden bg-gray-950 relative ${isCaptureMode ? 'rounded-[28px] shadow-2xl' : 'rounded-2xl'}`}>
       {/* ── IDLE STATE ── */}
       {state === STATES.IDLE && (
         <div className="aspect-video flex flex-col items-center justify-center gap-3 px-4">
@@ -214,6 +215,15 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
             style={{ transform: 'scaleX(-1)' }}
           />
 
+          <div className="absolute inset-x-0 top-0 p-4 flex items-start justify-between pointer-events-none">
+            <div className="rounded-full bg-black/45 backdrop-blur-sm px-3 py-1.5 text-xs text-white/90 pointer-events-auto">
+              {state === STATES.RECORDING ? 'Recording' : 'Camera ready'}
+            </div>
+            <div className="rounded-full bg-black/45 backdrop-blur-sm px-3 py-1.5 text-xs text-white/70 pointer-events-auto">
+              Max {fmtTimer(maxDuration)}
+            </div>
+          </div>
+
           {/* Recording indicator */}
           {state === STATES.RECORDING && (
             <div className="absolute top-3 left-3 flex items-center gap-2 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5">
@@ -233,27 +243,27 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
           )}
 
           {/* Controls overlay */}
-          <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-3">
+          <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-3 px-4">
             {state === STATES.PREVIEWING && (
               <>
                 <button onClick={handleCancel}
-                  className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm hover:bg-black/60 flex items-center justify-center transition-all">
+                  className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-sm hover:bg-black/60 flex items-center justify-center transition-all">
                   <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
                 <button onClick={startRecording}
-                  className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-90 shadow-lg shadow-red-500/30">
-                  <div className="w-6 h-6 bg-white rounded-full" />
+                  className="w-20 h-20 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-90 shadow-lg shadow-red-500/30 border-4 border-white/20">
+                  <div className="w-8 h-8 bg-white rounded-full" />
                 </button>
-                <div className="w-10" />
+                <div className="w-12" />
               </>
             )}
 
             {state === STATES.RECORDING && (
               <button onClick={stopRecording}
-                className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-90 shadow-lg shadow-red-500/30">
-                <div className="w-5 h-5 bg-white rounded-sm" />
+                className="w-20 h-20 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-90 shadow-lg shadow-red-500/30 border-4 border-white/20">
+                <div className="w-7 h-7 bg-white rounded-sm" />
               </button>
             )}
           </div>
@@ -272,24 +282,23 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
           />
 
           {/* Actions bar */}
-          <div className="p-3 flex items-center justify-between bg-gray-900">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-white/50 font-mono">{fmtTimer(elapsed)}</span>
-              <span className="text-xs text-white/30">·</span>
-              <span className="text-xs text-white/50">{(recordedFile.size / 1024 / 1024).toFixed(1)} MB</span>
+          <div className="p-4 bg-gray-900 space-y-3">
+            <div>
+              <p className="text-sm font-medium text-white">Recording ready</p>
+              <p className="text-xs text-white/50 mt-1">{fmtTimer(elapsed)} · {(recordedFile.size / 1024 / 1024).toFixed(1)} MB</p>
             </div>
             <div className="flex items-center gap-2">
               <button onClick={handleReRecord}
-                className="text-xs text-white/50 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/10 transition-all">
+                className="flex-1 text-sm text-white/70 hover:text-white px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all">
                 Re-record
               </button>
               <button onClick={handleCancel}
-                className="text-xs text-white/50 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/10 transition-all">
+                className="flex-1 text-sm text-white/70 hover:text-white px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all">
                 Discard
               </button>
               <button onClick={handleUse}
-                className="text-xs font-medium text-gray-900 bg-white hover:bg-gray-100 px-4 py-1.5 rounded-lg transition-all active:scale-95">
-                Use this
+                className="flex-1 text-sm font-medium text-gray-900 bg-white hover:bg-gray-100 px-4 py-3 rounded-xl transition-all active:scale-95">
+                Use this video
               </button>
             </div>
           </div>
