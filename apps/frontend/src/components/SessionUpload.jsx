@@ -23,6 +23,11 @@ function SessionUpload({
   const captureInputRef = useRef(null)
   const libraryInputRef = useRef(null)
 
+  const defaultPracticeTitle = () => {
+    const now = new Date()
+    return `Practice ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+  }
+
   useEffect(() => {
     const el = dropRef.current
     if (!el) return
@@ -60,7 +65,7 @@ function SessionUpload({
         return
       }
       setVideoFile(file)
-      if (!title.trim()) setTitle(file.name.replace(/\.[^.]+$/, ''))
+      if (!title.trim()) setTitle(defaultPracticeTitle())
     }
   }
 
@@ -116,10 +121,7 @@ function SessionUpload({
       return
     }
     setVideoFile(file)
-    if (!title.trim()) {
-      const stamp = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      setTitle(`Practice ${stamp}`)
-    }
+    if (!title.trim()) setTitle(defaultPracticeTitle())
   }
 
   const clearSelectedVideo = () => {
