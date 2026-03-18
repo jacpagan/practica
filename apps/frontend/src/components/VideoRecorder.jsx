@@ -33,6 +33,15 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
   const [recordedFile, setRecordedFile] = useState(null)
   const isCaptureMode = state === STATES.PREVIEWING || state === STATES.RECORDING || state === STATES.RECORDED
 
+  const metronomeRecordDelaySeconds = useCallback(() => {
+    const ctx = audioContextRef.current
+    if (!ctx) return 0.06
+    const outputLatency = Number(ctx.outputLatency || 0)
+    const baseLatency = Number(ctx.baseLatency || 0)
+    const inferred = Math.max(outputLatency, baseLatency, 0.06)
+    return Math.min(Math.max(inferred, 0.02), 0.2)
+  }, [])
+
   // ── Cleanup ──
 
   const stopStream = useCallback(() => {
@@ -135,16 +144,19 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
     beatRef.current += 1
     const oscillator = audioContext.createOscillator()
     const gain = audioContext.createGain()
+    const recordDelay = audioContext.createDelay(1)
     oscillator.type = 'square'
     oscillator.frequency.value = isAccent ? 1568 : 988
     gain.gain.setValueAtTime(isAccent ? 0.16 : 0.11, audioContext.currentTime)
     gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.05)
+    recordDelay.delayTime.value = metronomeRecordDelaySeconds()
     oscillator.connect(gain)
-    gain.connect(destination)
     gain.connect(audioContext.destination)
+    gain.connect(recordDelay)
+    recordDelay.connect(destination)
     oscillator.start(audioContext.currentTime)
     oscillator.stop(audioContext.currentTime + 0.055)
-  }, [beatsPerBar])
+  }, [beatsPerBar, metronomeRecordDelaySeconds])
 
   const startMetronome = useCallback(async () => {
     if (!streamRef.current) return
