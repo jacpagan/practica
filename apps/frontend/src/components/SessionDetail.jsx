@@ -381,47 +381,13 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
                   <h1 className="text-lg font-semibold text-gray-900">{session.title}</h1>
                   <p className="text-xs text-gray-400 mt-1">{session.owner?.display_name || 'You'}</p>
                 </div>
-                {canEdit ? (
-                  <div className="flex items-center gap-2">
-                    {activeReviewLink ? (
-                      <>
-                        <button onClick={copyShareLink} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
-                          Copy review link
-                        </button>
-                        <button onClick={revokeShareLink} disabled={revokingShare} className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50 transition-colors">
-                          {revokingShare ? 'Revoking…' : 'Revoke link'}
-                        </button>
-                      </>
-                    ) : (
-                      <button onClick={createShare} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
-                        {sharing ? 'Sharing…' : 'Share for review'}
-                      </button>
-                    )}
-                    <button onClick={refreshSession} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
-                      {refreshing ? 'Refreshing…' : 'Refresh'}
-                    </button>
-                    <button onClick={startEditing} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">Edit</button>
-                    <button onClick={deleteSession} disabled={deleting} className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50 transition-colors">
-                      {deleting ? 'Deleting…' : 'Delete'}
-                    </button>
-                  </div>
-                ) : null}
+                {canEdit ? null : null}
               </div>
-
-              {activeReviewLink?.url ? (
-                <div className="rounded-md bg-gray-50 border border-gray-200 px-3 py-2">
-                  <p className="text-xs text-gray-700">Share this URL for feedback:</p>
-                  <p className="text-xs text-blue-700 break-all">{activeReviewLink.url}</p>
-                  {activeReviewLink.expires_at ? (
-                    <p className="text-[11px] text-gray-400 mt-1">Expires {new Date(activeReviewLink.expires_at).toLocaleString()}</p>
-                  ) : null}
-                </div>
-              ) : null}
 
               {justUploaded ? (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4">
                   <p className="text-sm font-medium text-emerald-900">Your clip is saved.</p>
-                  <p className="text-sm text-emerald-800 mt-1">Next best moves: watch it, share it for feedback, or record another attempt.</p>
+                  <p className="text-sm text-emerald-800 mt-1">Next best moves: watch it or record another attempt.</p>
                   <div className="flex flex-wrap gap-2 mt-3">
                     <button
                       type="button"
@@ -429,13 +395,6 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
                       className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors"
                     >
                       Watch clip
-                    </button>
-                    <button
-                      type="button"
-                      onClick={activeReviewLink ? copyShareLink : createShare}
-                      className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors"
-                    >
-                      {activeReviewLink ? 'Copy review link' : 'Share for feedback'}
                     </button>
                     <button
                       type="button"
@@ -615,21 +574,7 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
                         ) : (
                           <>
                             <p className="text-sm text-gray-700 mt-2 whitespace-pre-wrap">{item.text}</p>
-                            {canEdit ? (
-                              <div className="flex items-center gap-3 mt-2">
-                                <button type="button" onClick={() => startEditingFeedback(item)} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => deleteFeedback(item)}
-                                  disabled={deletingFeedbackId === item.id}
-                                  className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50 transition-colors"
-                                >
-                                  {deletingFeedbackId === item.id ? 'Deleting…' : 'Delete'}
-                                </button>
-                              </div>
-                            ) : null}
+                            {canEdit ? null : null}
                           </>
                         )}
                         <p className="text-xs text-gray-400 mt-2">{new Date(item.created_at).toLocaleString()}</p>
@@ -638,8 +583,8 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
                   </div>
                 ) : (
                   <div className="rounded-xl border border-dashed border-gray-200 px-4 py-4 text-center">
-                    <p className="text-sm text-gray-600">No public feedback yet.</p>
-                    <p className="text-xs text-gray-400 mt-1">Share the review link and comments left there will show up here.</p>
+                    <p className="text-sm text-gray-600">No feedback yet.</p>
+                    <p className="text-xs text-gray-400 mt-1">Once feedback is added, it will show up here.</p>
                   </div>
                 )}
               </div>
@@ -647,28 +592,6 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
           )}
         </div>
       </div>
-
-      {canEdit ? (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white/95 backdrop-blur px-4 py-3 sm:hidden">
-          <div className="max-w-3xl mx-auto flex items-center gap-2">
-            {activeReviewLink ? (
-              <button onClick={copyShareLink} className="flex-1 rounded-xl bg-gray-900 text-white py-3 text-sm font-medium hover:bg-gray-800 transition-colors">
-                Copy review link
-              </button>
-            ) : (
-              <button onClick={createShare} disabled={sharing} className="flex-1 rounded-xl bg-gray-900 text-white py-3 text-sm font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                {sharing ? 'Sharing…' : 'Share for feedback'}
-              </button>
-            )}
-            <button onClick={startEditing} className="rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-              Edit
-            </button>
-            <button onClick={deleteSession} disabled={deleting} className="rounded-xl border border-red-200 px-4 py-3 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors">
-              {deleting ? '…' : 'Delete'}
-            </button>
-          </div>
-        </div>
-      ) : null}
     </div>
   )
 }

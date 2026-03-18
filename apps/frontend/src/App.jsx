@@ -5,7 +5,6 @@ import { ToastProvider, useToast } from './components/Toast'
 import { ConfirmProvider } from './components/ConfirmDialog'
 import AuthForm from './components/AuthForm'
 import ReviewPage from './components/ReviewPage'
-import SessionLibrary from './components/SessionLibrary'
 import TeacherQueue from './components/TeacherQueue'
 import TeacherActivation from './components/TeacherActivation'
 import SessionUpload from './components/SessionUpload'
@@ -14,9 +13,7 @@ import SessionDetail from './components/SessionDetail'
 const parseRoute = (pathname) => {
   if (pathname === '/activate') return { view: 'activate', sessionId: null }
   if (pathname === '/' || pathname === '/upload') return { view: 'upload', sessionId: null }
-  if (pathname === '/library') return { view: 'library', sessionId: null }
   if (pathname === '/review') return { view: 'reviewQueue', sessionId: null }
-  if (pathname === '/updates') return { view: 'updates', sessionId: null }
   const reviewMatch = pathname.match(/^\/r\/(.+)$/)
   if (reviewMatch) return { view: 'review', token: reviewMatch[1] }
   const sessionMatch = pathname.match(/^\/sessions\/(\d+)$/)
@@ -27,9 +24,7 @@ const parseRoute = (pathname) => {
 const routePath = ({ view, sessionId, token }) => {
   if (view === 'activate') return '/activate'
   if (view === 'upload') return '/upload'
-  if (view === 'library') return '/library'
   if (view === 'reviewQueue') return '/review'
-  if (view === 'updates') return '/updates'
   if (view === 'review' && token) return `/r/${token}`
   if (view === 'detail' && sessionId) return `/sessions/${sessionId}`
   return '/upload'
@@ -230,7 +225,7 @@ function AppContent() {
   }, [navigate])
 
   useEffect(() => {
-    if (!user || (view !== 'upload' && view !== 'library' && view !== 'reviewQueue' && view !== 'updates')) return
+    if (!user || (view !== 'upload' && view !== 'reviewQueue')) return
     loadSessions({ url: '/api/sessions/', append: false })
   }, [user, view, loadSessions])
 
@@ -344,28 +339,6 @@ function AppContent() {
             onOpenNextFeedback={() => nextStudentUpdate ? openSession(nextStudentUpdate, 'upload') : null}
             initialRecorderOpen={openRecorderOnUpload}
             onRecorderOpenHandled={() => setOpenRecorderOnUpload(false)}
-          />
-        )}
-
-        {view === 'library' && (
-          <SessionLibrary
-            sessions={sessions}
-            sessionsLoading={sessionsLoading}
-            sessionsLoadingMore={sessionsLoadingMore}
-            hasMoreSessions={Boolean(sessionsNextUrl)}
-            onLoadMoreSessions={() => sessionsNextUrl ? loadSessions({ url: sessionsNextUrl, append: true }) : null}
-            onOpenSession={openSession}
-            onDeleteSession={async (session) => {
-              if (!session?.id || !token || !session?.can_edit) return
-              const res = await fetch(`/api/sessions/${session.id}/`, {
-                method: 'DELETE',
-                headers: { Authorization: `Token ${token}` },
-              })
-              if (res.ok) {
-                setSessions((current) => current.filter((item) => item.id !== session.id))
-                if (selectedSession?.id === session.id) setSelectedSession(null)
-              }
-            }}
           />
         )}
 
