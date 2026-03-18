@@ -97,6 +97,8 @@ function AppContent() {
     const labels = Array.isArray(user?.role_labels) ? user.role_labels : []
     return labels.join(' + ')
   }, [user?.role_labels])
+  const primaryRole = user?.primary_role || 'new'
+  const showLibraryNav = sessions.length > 0 || view === 'library'
 
   const defaultHomeView = useMemo(() => {
     if (!hasOwnedSpaces && !hasJoinedGroups) return 'activate'
@@ -251,18 +253,24 @@ function AppContent() {
                   Start
                 </button>
               ) : null}
-              <button onClick={() => navigate({ view: 'upload', sessionId: null })} className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'upload' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
-                Record / Upload
-              </button>
-              <button onClick={() => navigate({ view: 'library', sessionId: null })} className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'library' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
-                Library{libraryUnreadCount ? ` • ${libraryUnreadCount}` : ''}
-              </button>
-              <button onClick={() => navigate({ view: 'updates', sessionId: null })} className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'updates' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
-                Updates{updatesCount ? ` • ${updatesCount}` : ''}
-              </button>
-              {hasOwnedSpaces ? (
+              {(primaryRole === 'student' || primaryRole === 'new') ? (
+                <button onClick={() => navigate({ view: 'upload', sessionId: null })} className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'upload' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
+                  Practice{updatesCount ? ` • ${updatesCount}` : ''}
+                </button>
+              ) : null}
+              {(primaryRole === 'teacher' || primaryRole === 'teacher_student') ? (
                 <button onClick={() => navigate({ view: 'reviewQueue', sessionId: null })} className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'reviewQueue' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
                   Review{reviewQueueCount ? ` • ${reviewQueueCount}` : ''}
+                </button>
+              ) : null}
+              {primaryRole === 'teacher_student' ? (
+                <button onClick={() => navigate({ view: 'upload', sessionId: null })} className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'upload' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
+                  Practice{updatesCount ? ` • ${updatesCount}` : ''}
+                </button>
+              ) : null}
+              {showLibraryNav ? (
+                <button onClick={() => navigate({ view: 'library', sessionId: null })} className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'library' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
+                  Library{libraryUnreadCount ? ` • ${libraryUnreadCount}` : ''}
                 </button>
               ) : null}
             </nav>
@@ -285,30 +293,36 @@ function AppContent() {
                 Start
               </button>
             ) : null}
-            <button
-              onClick={() => navigate({ view: 'upload', sessionId: null })}
-              className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'upload' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
-            >
-              Record / Upload
-            </button>
-            <button
-              onClick={() => navigate({ view: 'library', sessionId: null })}
-              className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'library' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
-            >
-              Library{libraryUnreadCount ? ` • ${libraryUnreadCount}` : ''}
-            </button>
-            <button
-              onClick={() => navigate({ view: 'updates', sessionId: null })}
-              className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'updates' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
-            >
-              Updates{updatesCount ? ` • ${updatesCount}` : ''}
-            </button>
-            {hasOwnedSpaces ? (
+            {(primaryRole === 'student' || primaryRole === 'new') ? (
+              <button
+                onClick={() => navigate({ view: 'upload', sessionId: null })}
+                className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'upload' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+              >
+                Practice{updatesCount ? ` • ${updatesCount}` : ''}
+              </button>
+            ) : null}
+            {(primaryRole === 'teacher' || primaryRole === 'teacher_student') ? (
               <button
                 onClick={() => navigate({ view: 'reviewQueue', sessionId: null })}
-                className={`text-sm px-3 py-2.5 rounded-xl transition-colors col-span-2 ${view === 'reviewQueue' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+                className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'reviewQueue' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
               >
                 Review{reviewQueueCount ? ` • ${reviewQueueCount}` : ''}
+              </button>
+            ) : null}
+            {primaryRole === 'teacher_student' ? (
+              <button
+                onClick={() => navigate({ view: 'upload', sessionId: null })}
+                className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'upload' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+              >
+                Practice{updatesCount ? ` • ${updatesCount}` : ''}
+              </button>
+            ) : null}
+            {showLibraryNav ? (
+              <button
+                onClick={() => navigate({ view: 'library', sessionId: null })}
+                className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${(view === 'library' || view === 'updates') ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'} ${primaryRole === 'teacher' && !defaultHomeView.includes('activate') ? 'col-span-2' : ''}`}
+              >
+                Library{libraryUnreadCount ? ` • ${libraryUnreadCount}` : ''}
               </button>
             ) : null}
           </nav>
