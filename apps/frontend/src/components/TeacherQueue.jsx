@@ -44,7 +44,11 @@ function TeacherQueue({ sessions = [], sessionsLoading = false, onOpenSession })
                         <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-600 px-2 py-1 rounded-full">Reviewed</span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">{session.owner_name || 'Student'} · {session.space_name || 'No space'} · {fmtDate(session.recorded_at || session.created_at)}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {session.owner_name || 'Student'}
+                      {session.space_name ? ` · ${session.space_name}` : ''}
+                      {` · ${fmtDate(session.recorded_at || session.created_at)}`}
+                    </p>
                     {session.description ? <p className="text-xs text-gray-500 mt-2 line-clamp-2">{session.description}</p> : null}
                   </div>
                   <div className="text-right shrink-0">

@@ -15,14 +15,14 @@ function AuthForm() {
   // Check if URL has an invite slug (e.g. /join/abc123)
   const pathMatch = window.location.pathname.match(/^\/join\/(.+)$/)
   const [inviteSlug] = useState(pathMatch ? pathMatch[1] : '')
-  const [spaceInfo, setSpaceInfo] = useState(null)
+  const [groupInfo, setGroupInfo] = useState(null)
 
-  // Fetch space info if we have a slug
+  // Fetch invite info if we have a slug
   useEffect(() => {
     if (inviteSlug) {
       fetch(`/api/space-info/${inviteSlug}/`)
         .then(r => r.ok ? r.json() : null)
-        .then(data => { if (data) { setSpaceInfo(data); setMode('register') } })
+        .then(data => { if (data) { setGroupInfo(data); setMode('register') } })
         .catch(() => {})
     }
   }, [inviteSlug])
@@ -57,12 +57,12 @@ function AuthForm() {
       <div className="w-full max-w-sm">
         <h1 className="text-2xl font-semibold text-gray-900 text-center mb-1">Practica</h1>
 
-        {spaceInfo ? (
+        {groupInfo ? (
           <p className="text-sm text-gray-500 text-center mb-8">
-            Join <span className="font-medium text-gray-900">{spaceInfo.owner}</span>'s <span className="font-medium text-gray-900">{spaceInfo.name}</span> space
+            Join <span className="font-medium text-gray-900">{groupInfo.owner}</span>'s <span className="font-medium text-gray-900">{groupInfo.name}</span> practice group
           </p>
         ) : (
-          <p className="text-sm text-gray-400 text-center mb-8">Your practice, tracked.</p>
+          <p className="text-sm text-gray-400 text-center mb-8">Record, review, improve.</p>
         )}
 
         {/* Tabs */}
@@ -85,7 +85,7 @@ function AuthForm() {
                 placeholder="ABCD1234"
                 className="w-full px-3 py-2 text-sm font-mono text-center uppercase tracking-widest border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
                 maxLength={8} />
-              <p className="text-xs text-gray-400 mt-1">Use this if you were invited to an existing space.</p>
+              <p className="text-xs text-gray-400 mt-1">Use this if a teacher invited you to an existing practice group.</p>
             </div>
           )}
 
@@ -116,7 +116,7 @@ function AuthForm() {
 
           <button type="submit" disabled={loading}
             className="w-full text-sm font-medium text-white bg-gray-900 rounded-lg py-2.5 hover:bg-gray-800 disabled:opacity-40 transition-colors">
-            {loading ? 'Loading...' : mode === 'login' ? 'Log in' : inviteSlug ? `Join ${spaceInfo?.name || 'space'}` : 'Create account'}
+            {loading ? 'Loading...' : mode === 'login' ? 'Log in' : inviteSlug ? `Join ${groupInfo?.name || 'group'}` : 'Create account'}
           </button>
         </form>
       </div>
