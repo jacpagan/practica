@@ -9,6 +9,17 @@ const STATES = {
   RECORDED: 'recorded',
 }
 
+const METRONOME_SYNC_KEY = 'practica.metronome.syncOffsetMs.v1'
+
+const readSyncOffsetMs = () => {
+  try {
+    const raw = window.localStorage.getItem(METRONOME_SYNC_KEY)
+    const parsed = Number(raw)
+    if (Number.isFinite(parsed)) return Math.max(-120, Math.min(180, parsed))
+  } catch {}
+  return 0
+}
+
 function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
   const [state, setState] = useState(STATES.IDLE)
   const [elapsed, setElapsed] = useState(0)
@@ -17,6 +28,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
   const [metronomeEnabled, setMetronomeEnabled] = useState(false)
   const [isMetronomeRunning, setIsMetronomeRunning] = useState(false)
   const [beatsPerBar, setBeatsPerBar] = useState(4)
+  const [syncOffsetMs, setSyncOffsetMs] = useState(readSyncOffsetMs)
 
   const liveRef = useRef(null)
   const playbackRef = useRef(null)
@@ -39,8 +51,9 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
     const outputLatency = Number(ctx.outputLatency || 0)
     const baseLatency = Number(ctx.baseLatency || 0)
     const inferred = Math.max(outputLatency, baseLatency, 0.06)
-    return Math.min(Math.max(inferred, 0.02), 0.2)
-  }, [])
+    const adjusted = inferred + (syncOffsetMs / 1000)
+    return Math.min(Math.max(adjusted, 0), 0.25)
+  }, [syncOffsetMs])
 
   // ── Cleanup ──
 
@@ -79,6 +92,12 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
   }, [closeAudioContext, stopMetronome, stopTimer, stopStream])
 
   useEffect(() => cleanup, [cleanup])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(METRONOME_SYNC_KEY, String(syncOffsetMs))
+    } catch {}
+  }, [syncOffsetMs])
 
   // Attach stream to video element whenever the ref or stream changes
   const attachStream = useCallback(() => {
@@ -392,6 +411,32 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
                   <option key={beats} value={beats} className="text-gray-900">{beats}/4</option>
                 ))}
               </select>
+            </div>
+
+            <div className="rounded-2xl bg-white/5 px-3 py-3 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-white/60">Sync recorded click</p>
+                  <p className="text-sm font-medium text-white">{syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs} ms</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSyncOffsetMs(0)}
+                  className="text-xs text-white/70 border border-white/10 rounded-lg px-3 py-2 hover:bg-white/10 transition-colors"
+                >
+                  Reset
+                </button>
+              </div>
+              <input
+                type="range"
+                min="-120"
+                max="180"
+                step="5"
+                value={syncOffsetMs}
+                onChange={(e) => setSyncOffsetMs(Number(e.target.value))}
+                className="w-full"
+              />
+              <p className="text-[11px] text-white/55">If playback sounds late, move this left. If playback sounds early, move it right.</p>
             </div>
 
             <p className="text-[11px] text-white/55">Turn the metronome on only if you want to hear and record it. Headphones give the cleanest result.</p>
