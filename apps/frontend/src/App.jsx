@@ -184,13 +184,37 @@ function AppContent() {
                 </button>
               ) : null}
             </nav>
-            <div className="flex items-center gap-2 border-l border-gray-100 pl-3">
+            <div className="flex items-center gap-2 sm:border-l sm:border-gray-100 sm:pl-3">
               <span className="text-xs text-gray-400">{user.display_name}</span>
               <button onClick={logout} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
                 Log out
               </button>
             </div>
           </div>
+        </div>
+        <div className="max-w-5xl mx-auto mt-3 sm:hidden">
+          <nav className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => navigate({ view: 'upload', sessionId: null })}
+              className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'upload' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+            >
+              Record / Upload
+            </button>
+            <button
+              onClick={() => navigate({ view: 'library', sessionId: null })}
+              className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'library' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+            >
+              Library
+            </button>
+            {hasOwnedSpaces ? (
+              <button
+                onClick={() => navigate({ view: 'reviewQueue', sessionId: null })}
+                className={`text-sm px-3 py-2.5 rounded-xl transition-colors col-span-2 ${view === 'reviewQueue' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+              >
+                Review
+              </button>
+            ) : null}
+          </nav>
         </div>
       </header>
 
