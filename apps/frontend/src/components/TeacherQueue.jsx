@@ -106,22 +106,15 @@ function TeacherQueue({ primaryRole = 'teacher', sessions = [], sessionsLoading 
         {sessionsLoading ? (
           <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading review queue…</div>
         ) : reviewable.length ? (
-          <div className="space-y-6">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-gray-900">Needs your attention</h3>
-                <span className="text-xs text-gray-400">{needsAttention.length}</span>
-              </div>
-              {needsAttention.length ? <div className="space-y-2">{needsAttention.map(renderSessionRow)}</div> : <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-500">Nothing urgent right now.</div>}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-900">Needs your attention</h3>
+              <span className="text-xs text-gray-400">{needsAttention.length}</span>
             </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-gray-900">Recent coaching by you</h3>
-                <span className="text-xs text-gray-400">{coachedByYou.length}</span>
-              </div>
-              {coachedByYou.length ? <div className="space-y-2">{coachedByYou.map(renderSessionRow)}</div> : <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-500">Your reviewed student clips will show up here.</div>}
-            </div>
+            {needsAttention.length ? <div className="space-y-2">{needsAttention.map(renderSessionRow)}</div> : <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-500">Nothing urgent right now.</div>}
+            {coachedByYou.length ? (
+              <p className="text-xs text-gray-400 mt-4">You already coached {coachedByYou.length} student clip{coachedByYou.length === 1 ? '' : 's'} recently.</p>
+            ) : null}
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-8 text-center">

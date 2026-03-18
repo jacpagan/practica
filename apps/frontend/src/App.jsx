@@ -8,7 +8,6 @@ import ReviewPage from './components/ReviewPage'
 import SessionLibrary from './components/SessionLibrary'
 import TeacherQueue from './components/TeacherQueue'
 import TeacherActivation from './components/TeacherActivation'
-import UpdatesFeed from './components/UpdatesFeed'
 import SessionUpload from './components/SessionUpload'
 import SessionDetail from './components/SessionDetail'
 
@@ -93,12 +92,16 @@ function AppContent() {
     )
   }, [sessions])
   const updatesCount = updates.length
+  const nextStudentUpdate = useMemo(() => {
+    return sessions
+      .filter((session) => session.can_edit && session.has_unread)
+      .sort((left, right) => new Date(right.recorded_at || right.created_at) - new Date(left.recorded_at || left.created_at))[0] || null
+  }, [sessions])
   const roleLabel = useMemo(() => {
     const labels = Array.isArray(user?.role_labels) ? user.role_labels : []
     return labels.join(' + ')
   }, [user?.role_labels])
   const primaryRole = user?.primary_role || 'new'
-  const showLibraryNav = sessions.length > 0 || view === 'library'
 
   const defaultHomeView = useMemo(() => {
     if (!hasOwnedSpaces && !hasJoinedGroups) return 'activate'
@@ -268,11 +271,6 @@ function AppContent() {
                   Practice{updatesCount ? ` • ${updatesCount}` : ''}
                 </button>
               ) : null}
-              {showLibraryNav ? (
-                <button onClick={() => navigate({ view: 'library', sessionId: null })} className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'library' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
-                  Library{libraryUnreadCount ? ` • ${libraryUnreadCount}` : ''}
-                </button>
-              ) : null}
             </nav>
             <div className="flex items-center gap-2 sm:border-l sm:border-gray-100 sm:pl-3">
               {roleLabel ? <span className="hidden sm:inline-flex text-[11px] uppercase tracking-wide bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{roleLabel}</span> : null}
@@ -317,14 +315,6 @@ function AppContent() {
                 Practice{updatesCount ? ` • ${updatesCount}` : ''}
               </button>
             ) : null}
-            {showLibraryNav ? (
-              <button
-                onClick={() => navigate({ view: 'library', sessionId: null })}
-                className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${(view === 'library' || view === 'updates') ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'} ${primaryRole === 'teacher' && !defaultHomeView.includes('activate') ? 'col-span-2' : ''}`}
-              >
-                Library{libraryUnreadCount ? ` • ${libraryUnreadCount}` : ''}
-              </button>
-            ) : null}
           </nav>
         </div>
       </header>
@@ -350,7 +340,8 @@ function AppContent() {
             onCancel={goHome}
             primaryRole={user?.primary_role || 'new'}
             updatesCount={updatesCount}
-            onOpenUpdates={() => navigate({ view: 'updates', sessionId: null })}
+            nextFeedbackSessionTitle={nextStudentUpdate?.title || ''}
+            onOpenNextFeedback={() => nextStudentUpdate ? openSession(nextStudentUpdate, 'upload') : null}
             initialRecorderOpen={openRecorderOnUpload}
             onRecorderOpenHandled={() => setOpenRecorderOnUpload(false)}
           />
@@ -383,13 +374,6 @@ function AppContent() {
             primaryRole={user?.primary_role || 'teacher'}
             sessions={sessions}
             sessionsLoading={sessionsLoading}
-            onOpenSession={openSession}
-          />
-        )}
-
-        {view === 'updates' && (
-          <UpdatesFeed
-            items={updates}
             onOpenSession={openSession}
           />
         )}

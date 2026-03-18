@@ -10,7 +10,8 @@ function SessionUpload({
   onCancel,
   primaryRole = 'student',
   updatesCount = 0,
-  onOpenUpdates,
+  nextFeedbackSessionTitle = '',
+  onOpenNextFeedback,
   initialRecorderOpen = false,
   onRecorderOpenHandled,
 }) {
@@ -127,9 +128,11 @@ function SessionUpload({
 
   const primaryAction = updatesCount > 0
     ? {
-        label: 'See feedback first',
-        helper: 'You have updates waiting. Review them before sending your next clip.',
-        onClick: onOpenUpdates,
+        label: 'Open latest feedback',
+        helper: nextFeedbackSessionTitle
+          ? `Your latest feedback is on “${nextFeedbackSessionTitle}”. Review it before sending your next clip.`
+          : 'You have feedback waiting. Review it before sending your next clip.',
+        onClick: onOpenNextFeedback,
         tone: 'secondary',
       }
     : {
@@ -179,17 +182,6 @@ function SessionUpload({
               {primaryAction.label}
             </button>
           </div>
-          {updatesCount ? (
-            <button
-              type="button"
-              onClick={onOpenUpdates}
-              className="w-full text-left rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 hover:bg-blue-100 transition-colors"
-            >
-              <p className="text-xs font-medium uppercase tracking-wide text-blue-700">Updates</p>
-              <p className="text-sm font-semibold text-blue-900 mt-1">{updatesCount} item{updatesCount === 1 ? '' : 's'} need your attention</p>
-              <p className="text-xs text-blue-800 mt-1">Open feedback or review requests before your next practice clip.</p>
-            </button>
-          ) : null}
           <div className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-4">
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Start here</p>
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
