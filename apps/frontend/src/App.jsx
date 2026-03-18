@@ -5,11 +5,13 @@ import { ToastProvider, useToast } from './components/Toast'
 import { ConfirmProvider } from './components/ConfirmDialog'
 import AuthForm from './components/AuthForm'
 import ReviewPage from './components/ReviewPage'
+import SessionLibrary from './components/SessionLibrary'
 import SessionUpload from './components/SessionUpload'
 import SessionDetail from './components/SessionDetail'
 
 const parseRoute = (pathname) => {
   if (pathname === '/' || pathname === '/upload') return { view: 'upload', sessionId: null }
+  if (pathname === '/library') return { view: 'library', sessionId: null }
   const reviewMatch = pathname.match(/^\/r\/(.+)$/)
   if (reviewMatch) return { view: 'review', token: reviewMatch[1] }
   const sessionMatch = pathname.match(/^\/sessions\/(\d+)$/)
@@ -19,6 +21,7 @@ const parseRoute = (pathname) => {
 
 const routePath = ({ view, sessionId, token }) => {
   if (view === 'upload') return '/upload'
+  if (view === 'library') return '/library'
   if (view === 'review' && token) return `/r/${token}`
   if (view === 'detail' && sessionId) return `/sessions/${sessionId}`
   return '/upload'
@@ -81,7 +84,7 @@ function AppContent() {
 
   // Ensure we always land users on the upload screen after login
   useEffect(() => {
-    if (user && view !== 'detail') {
+    if (user && view !== 'detail' && view !== 'library') {
       navigate({ view: 'upload', sessionId: null }, { replace: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -138,7 +141,7 @@ function AppContent() {
   }
 
   useEffect(() => {
-    if (!user || view !== 'upload') return
+    if (!user || (view !== 'upload' && view !== 'library')) return
     loadSessions({ url: '/api/sessions/', append: false })
   }, [user, view, loadSessions])
 
@@ -158,6 +161,14 @@ function AppContent() {
             Practica
           </button>
           <div className="flex items-center gap-3">
+            <nav className="hidden sm:flex items-center gap-2">
+              <button onClick={() => navigate({ view: 'upload', sessionId: null })} className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'upload' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
+                Record / Upload
+              </button>
+              <button onClick={() => navigate({ view: 'library', sessionId: null })} className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'library' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
+                Library
+              </button>
+            </nav>
             <div className="flex items-center gap-2 border-l border-gray-100 pl-3">
               <span className="text-xs text-gray-400">{user.display_name}</span>
               <button onClick={logout} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
@@ -177,15 +188,27 @@ function AppContent() {
             token={token}
             onComplete={handleUploadComplete}
             onCancel={goHome}
+          />
+        )}
+
+        {view === 'library' && (
+          <SessionLibrary
             sessions={sessions}
             sessionsLoading={sessionsLoading}
             sessionsLoadingMore={sessionsLoadingMore}
             hasMoreSessions={Boolean(sessionsNextUrl)}
             onLoadMoreSessions={() => sessionsNextUrl ? loadSessions({ url: sessionsNextUrl, append: true }) : null}
             onOpenSession={openSession}
-            onDeleteSession={(sessionId) => {
-              setSessions((current) => current.filter((item) => item.id !== sessionId))
-              if (selectedSession?.id === sessionId) setSelectedSession(null)
+            onDeleteSession={async (session) => {
+              if (!session?.id || !token || !session?.can_edit) return
+              const res = await fetch(`/api/sessions/${session.id}/`, {
+                method: 'DELETE',
+                headers: { Authorization: `Token ${token}` },
+              })
+              if (res.ok) {
+                setSessions((current) => current.filter((item) => item.id !== session.id))
+                if (selectedSession?.id === session.id) setSelectedSession(null)
+              }
             }}
           />
         )}

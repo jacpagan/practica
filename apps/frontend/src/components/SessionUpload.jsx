@@ -8,13 +8,6 @@ function SessionUpload({
   token,
   onComplete,
   onCancel,
-  sessions = [],
-  sessionsLoading = false,
-  sessionsLoadingMore = false,
-  hasMoreSessions = false,
-  onLoadMoreSessions,
-  onOpenSession,
-  onDeleteSession,
 }) {
   const toast = useToast()
   const confirm = useConfirm()
@@ -23,10 +16,8 @@ function SessionUpload({
   const [videoFile, setVideoFile] = useState(null)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(null)
-  const [deletingSessionId, setDeletingSessionId] = useState(null)
   const [showNotes, setShowNotes] = useState(false)
   const [showRecorder, setShowRecorder] = useState(false)
-  const [showSessionList, setShowSessionList] = useState(false)
   const dropRef = useRef(null)
   const inputRef = useRef(null)
   const captureInputRef = useRef(null)
@@ -133,33 +124,6 @@ function SessionUpload({
 
   const clearSelectedVideo = () => {
     setVideoFile(null)
-  }
-
-  const handleDeleteSession = async (session) => {
-    if (!session?.id || !session?.can_edit || !token) return
-    const accepted = await confirm?.({
-      title: 'Delete practice entry?',
-      message: 'This permanently deletes the video and its session details. This cannot be undone.',
-      confirmLabel: 'Delete',
-      cancelLabel: 'Keep',
-      tone: 'danger',
-    })
-    if (!accepted) return
-
-    setDeletingSessionId(session.id)
-    try {
-      const res = await fetch(`/api/sessions/${session.id}/`, {
-        method: 'DELETE',
-        headers: { Authorization: `Token ${token}` },
-      })
-      if (!res.ok) throw new Error('delete')
-      toast.success('Practice entry deleted')
-      onDeleteSession?.(session.id)
-    } catch {
-      toast.error('Could not delete practice entry')
-    } finally {
-      setDeletingSessionId(null)
-    }
   }
 
   return (
@@ -295,77 +259,6 @@ function SessionUpload({
           )}
         </form>
 
-        <div className="mt-8 border-t border-gray-100 pt-6">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900">Practice entries</h3>
-              <p className="text-xs text-gray-400 mt-1">Open, edit, or delete entries you created.</p>
-            </div>
-            <div className="flex items-center gap-3">
-              {sessionsLoading ? <span className="text-xs text-gray-400">Loading…</span> : null}
-              <button type="button" onClick={() => setShowSessionList((current) => !current)} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
-                {showSessionList ? 'Hide' : 'Show'}
-              </button>
-            </div>
-          </div>
-
-          {showSessionList && sessions.length ? (
-            <div className="space-y-2">
-              {sessions.map((session) => (
-                <div
-                  key={session.id}
-                  className="rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <button type="button" onClick={() => onOpenSession?.(session)} className="flex-1 text-left min-w-0">
-                      <p className="text-sm font-medium text-gray-900 line-clamp-1">{session.title}</p>
-                      <p className="text-xs text-gray-500 mt-1">{fmtDate(session.recorded_at || session.created_at)}</p>
-                    </button>
-                    <div className="flex items-center gap-2 pl-2">
-                      <span className="text-[11px] uppercase tracking-wide text-gray-400">
-                        {session.processing_status === 'ready' ? 'Ready' : session.processing_status || 'Saved'}
-                      </span>
-                      <button type="button" onClick={() => onOpenSession?.(session)} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
-                        Open
-                      </button>
-                      {session.can_edit ? (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteSession(session)}
-                          disabled={deletingSessionId === session.id}
-                          className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50 transition-colors"
-                        >
-                          {deletingSessionId === session.id ? 'Deleting…' : 'Delete'}
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                  {session.description ? (
-                    <p className="text-xs text-gray-500 mt-2 line-clamp-2">{session.description}</p>
-                  ) : null}
-                  {session.processing_status === 'failed' && session.processing_error ? (
-                    <p className="text-xs text-red-600 mt-2 line-clamp-2">{session.processing_error}</p>
-                  ) : null}
-                </div>
-              ))}
-              {hasMoreSessions ? (
-                <button
-                  type="button"
-                  onClick={() => onLoadMoreSessions?.()}
-                  disabled={sessionsLoadingMore}
-                  className="w-full text-sm text-gray-600 border border-gray-200 rounded-xl py-2.5 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                >
-                  {sessionsLoadingMore ? 'Loading…' : 'Load more'}
-                </button>
-              ) : null}
-            </div>
-          ) : showSessionList ? (
-            <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-5 text-center">
-              <p className="text-sm text-gray-600">No practice entries yet.</p>
-              <p className="text-xs text-gray-400 mt-1">Upload your first video to start a simple review-ready journal.</p>
-            </div>
-          ) : null}
-        </div>
       </div>
     </div>
   )
