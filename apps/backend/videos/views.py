@@ -3,12 +3,10 @@ import uuid
 import math
 import logging
 import os
-from datetime import date, timedelta
-from zoneinfo import ZoneInfo
+from datetime import timedelta
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse, HttpResponse, Http404
 from django.db import connection, transaction
-from django.db.models import Q
 from django.utils import timezone
 from django.conf import settings
 from django.contrib.auth import authenticate
@@ -21,114 +19,31 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import PermissionDenied
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
 from .models import (
-    Exercise, Session, Chapter, Comment, InviteCode, SessionLastSeen,
-    Tag, Space, SpaceMember, MultipartSessionUpload, ExerciseReferenceClip, SessionAsset,
-    PracticePlan, PracticePlanItem, DailyCheckIn, DailyCheckInItem,
+    Session, Chapter, VideoFeedback, SessionLastSeen, Exercise,
+    Tag, MultipartSessionUpload, SessionAsset,
     ReviewLink,
 )
 from .serializers import (
-    UserSerializer, RegisterSerializer, SpaceSerializer,
-    ExerciseSerializer, SessionSerializer, SessionListSerializer,
-    ChapterSerializer, ProgressChapterSerializer, TagSerializer,
-    ExerciseReferenceClipSerializer,
-    PracticePlanSerializer, PracticePlanItemSerializer,
-    DailyCheckInSerializer,
-    PublicSessionSerializer, ReviewLinkSerializer, ReviewFeedbackSerializer,
+    UserSerializer, RegisterSerializer,
+    SessionSerializer, SessionListSerializer,
+    ChapterSerializer,
+    PublicSessionSerializer, ReviewLinkSerializer, ReviewVideoFeedbackSerializer,
 )
 from .services.media_pipeline import enqueue_session_processing, enqueue_local_session_transcode, apply_processing_update
 
 logger = logging.getLogger(__name__)
 
-logger = logging.getLogger(__name__)
-
 
 def _visible_sessions_qs(user):
-    """Sessions visible in spaces you belong to/own, plus your own sessions."""
+    """Private library sessions for the authenticated user."""
     if not user.is_authenticated:
         return Session.objects.none()
-    return Session.objects.filter(
-        Q(user=user) |
-        Q(space__owner=user) |
-        Q(space__members__user=user)
-    ).distinct()
-
-
-def can_post_to_space(user, space):
-    if not user.is_authenticated:
-        return False
-    if user.is_staff or space.owner_id == user.id:
-        return True
-    return SpaceMember.objects.filter(space=space, user=user).exists()
-
-
-def can_view_space(user, space):
-    if not user.is_authenticated:
-        return False
-    if user.is_staff or space.owner_id == user.id:
-        return True
-    return SpaceMember.objects.filter(space=space, user=user).exists()
-
-
-def _active_practice_plan(space):
-    return (
-        space.practice_plans.filter(is_active=True)
-        .select_related('created_by', 'created_by__profile')
-        .prefetch_related('items__exercise', 'items__reference_clip')
-        .order_by('-updated_at', '-id')
-        .first()
-    )
-
-
-def _plan_zoneinfo(plan):
-    tz_name = (getattr(plan, 'timezone', '') or 'America/Los_Angeles').strip()
-    try:
-        return ZoneInfo(tz_name)
-    except Exception:
-        return ZoneInfo('America/Los_Angeles')
-
-
-def _plan_today(plan):
-    return timezone.now().astimezone(_plan_zoneinfo(plan)).date()
-
-
-def _plan_active_on_date(plan, target_date):
-    if not plan:
-        return False
-    if plan.start_date and target_date < plan.start_date:
-        return False
-    if plan.end_date and target_date > plan.end_date:
-        return False
-    return True
-
-
-def _item_scheduled_for_date(item, target_date):
-    schedule = item.schedule_json or {}
-    schedule_type = (schedule.get('type') or 'daily').strip()
-    if schedule_type == 'days_of_week':
-        try:
-            days = {int(day) for day in (schedule.get('days') or [])}
-        except (TypeError, ValueError):
-            return False
-        return target_date.isoweekday() in days
-    return True
-
-
-def _scheduled_plan_items_for_date(plan, target_date):
-    if not plan or not _plan_active_on_date(plan, target_date):
-        return []
-    return [item for item in plan.items.all() if _item_scheduled_for_date(item, target_date)]
-
-
-def _parse_iso_date(value, label='date'):
-    try:
-        return date.fromisoformat(str(value))
-    except (TypeError, ValueError):
-        raise ValidationError({label: 'Use YYYY-MM-DD.'})
+    return Session.objects.filter(user=user)
 
 
 def can_edit_session(user, session):
@@ -211,15 +126,6 @@ def _is_allowed_video_upload(content_type, filename=''):
     return False
 
 
-def _resolve_space_for_create(user, space_id):
-    if not space_id:
-        return None
-    space = get_object_or_404(Space, pk=space_id)
-    if not can_post_to_space(user, space):
-        raise PermissionDenied("You can only post to spaces you belong to.")
-    return space
-
-
 def _attach_tags_to_session(session, raw_tags):
     for name in _parse_tag_names(raw_tags):
         tag, _ = Tag.objects.get_or_create(name__iexact=name, defaults={'name': name})
@@ -229,31 +135,11 @@ def _attach_tags_to_session(session, raw_tags):
 def _can_view_session(user, session):
     if not user.is_authenticated:
         return False
-    if user.is_staff:
-        return True
-    if session.user_id == user.id:
-        return True
-    if session.space_id:
-        return Space.objects.filter(
-            pk=session.space_id
-        ).filter(
-            Q(owner=user) | Q(members__user=user)
-        ).exists()
-    return False
+    return user.is_staff or session.user_id == user.id
 
 
 def _can_modify_session(user, session):
     return can_edit_session(user, session)
-
-
-def _can_review_session_feedback(user, session):
-    if not user.is_authenticated:
-        return False
-    if user.is_staff or session.user_id == user.id:
-        return True
-    if session.space_id and getattr(session.space, 'owner_id', None) == user.id:
-        return True
-    return False
 
 
 def _browser_playable_source(filename):
@@ -382,548 +268,12 @@ def client_error_view(request):
     return Response({'ok': True}, status=status.HTTP_202_ACCEPTED)
 
 
-# ── Tag views ───────────────────────────────────────────────────────
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def tag_list(request):
-    q = request.query_params.get('q', '').strip()
-    tags = Tag.objects.all()
-    if q:
-        tags = tags.filter(name__icontains=q)
-    return Response(TagSerializer(tags[:20], many=True).data)
-
-
-# ── Space views ─────────────────────────────────────────────────────
-
-@method_decorator(csrf_exempt, name='dispatch')
-class SpaceViewSet(viewsets.ModelViewSet):
-    serializer_class = SpaceSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        """Spaces you own + spaces you follow."""
-        user = self.request.user
-        owned = Space.objects.filter(owner=user)
-        following_ids = SpaceMember.objects.filter(user=user).values_list('space_id', flat=True)
-        following = Space.objects.filter(id__in=following_ids)
-        return (owned | following).distinct().select_related('main_session').prefetch_related(
-            'members', 'members__user', 'members__user__profile'
-        )
-
-    def get_serializer_context(self):
-        ctx = super().get_serializer_context()
-        ctx['request'] = self.request
-        return ctx
-
-    def perform_create(self, serializer):
-        serializer.save(owner=self.request.user)
-
-    def _ensure_space_owner(self, space):
-        if space.owner_id != self.request.user.id:
-            raise PermissionDenied("Only the space owner can modify this space.")
-
-    def _resolve_space_user(self, space, user_id=None):
-        if self.request.user.is_staff or space.owner_id == self.request.user.id:
-            if not user_id:
-                return None
-            target_user = get_object_or_404(User, pk=user_id)
-            if target_user.id != space.owner_id and not SpaceMember.objects.filter(space=space, user=target_user).exists():
-                raise ValidationError({'user': 'User is not a member of this space.'})
-            return target_user
-
-        if not can_view_space(self.request.user, space):
-            raise PermissionDenied("You do not have access to this space.")
-        if user_id and str(self.request.user.id) != str(user_id):
-            raise PermissionDenied("You can only access your own check-ins.")
-        return self.request.user
-
-    def perform_update(self, serializer):
-        self._ensure_space_owner(serializer.instance)
-        serializer.save()
-
-    def perform_destroy(self, instance):
-        self._ensure_space_owner(instance)
-        instance.delete()
-
-    @action(detail=True, methods=['get'], url_path='plan/active')
-    def active_plan(self, request, pk=None):
-        space = self.get_object()
-        if not can_view_space(request.user, space):
-            raise PermissionDenied("You do not have access to this space.")
-        plan = _active_practice_plan(space)
-        if not plan:
-            return Response(None)
-        serializer = PracticePlanSerializer(plan, context={'request': request})
-        return Response(serializer.data)
-
-    @action(detail=True, methods=['post'], url_path='plan')
-    def create_plan(self, request, pk=None):
-        space = self.get_object()
-        self._ensure_space_owner(space)
-        serializer = PracticePlanSerializer(data=request.data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
-        with transaction.atomic():
-            if serializer.validated_data.get('is_active', True):
-                space.practice_plans.filter(is_active=True).update(is_active=False)
-            plan = serializer.save(space=space, created_by=request.user)
-        return Response(PracticePlanSerializer(plan, context={'request': request}).data, status=status.HTTP_201_CREATED)
-
-    @action(detail=True, methods=['patch'], url_path=r'plan/(?P<plan_id>[0-9]+)')
-    def update_plan(self, request, pk=None, plan_id=None):
-        space = self.get_object()
-        self._ensure_space_owner(space)
-        plan = get_object_or_404(PracticePlan, pk=plan_id, space=space)
-        serializer = PracticePlanSerializer(plan, data=request.data, partial=True, context={'request': request})
-        serializer.is_valid(raise_exception=True)
-        with transaction.atomic():
-            if serializer.validated_data.get('is_active') is True:
-                space.practice_plans.exclude(pk=plan.id).filter(is_active=True).update(is_active=False)
-            plan = serializer.save()
-        return Response(PracticePlanSerializer(plan, context={'request': request}).data)
-
-    @action(detail=True, methods=['post'], url_path=r'plan/(?P<plan_id>[0-9]+)/items')
-    def add_plan_item(self, request, pk=None, plan_id=None):
-        space = self.get_object()
-        self._ensure_space_owner(space)
-        plan = get_object_or_404(PracticePlan, pk=plan_id, space=space)
-        serializer = PracticePlanItemSerializer(data=request.data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
-        reference_clip = serializer.validated_data.get('reference_clip')
-        exercise = serializer.validated_data.get('exercise')
-        if reference_clip and reference_clip.exercise_id != exercise.id:
-            raise ValidationError({'reference_clip': 'Reference clip must belong to the selected exercise.'})
-        item = serializer.save(plan=plan)
-        return Response(PracticePlanItemSerializer(item, context={'request': request}).data, status=status.HTTP_201_CREATED)
-
-    @action(detail=True, methods=['patch', 'delete'], url_path=r'plan/items/(?P<item_id>[0-9]+)')
-    def plan_item_detail(self, request, pk=None, item_id=None):
-        space = self.get_object()
-        self._ensure_space_owner(space)
-        item = get_object_or_404(PracticePlanItem.objects.select_related('plan'), pk=item_id, plan__space=space)
-        if request.method == 'DELETE':
-            item.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-
-        serializer = PracticePlanItemSerializer(item, data=request.data, partial=True, context={'request': request})
-        serializer.is_valid(raise_exception=True)
-        reference_clip = serializer.validated_data.get('reference_clip', item.reference_clip)
-        exercise = serializer.validated_data.get('exercise', item.exercise)
-        if reference_clip and reference_clip.exercise_id != exercise.id:
-            raise ValidationError({'reference_clip': 'Reference clip must belong to the selected exercise.'})
-        updated = serializer.save()
-        return Response(PracticePlanItemSerializer(updated, context={'request': request}).data)
-
-    @action(detail=True, methods=['get'], url_path='checkins')
-    def checkins(self, request, pk=None):
-        space = self.get_object()
-        user_filter = request.query_params.get('user')
-        target_user = self._resolve_space_user(space, user_filter)
-
-        checkins = DailyCheckIn.objects.filter(space=space).select_related(
-            'user', 'user__profile', 'plan', 'linked_session'
-        ).prefetch_related(
-            'items__plan_item__exercise', 'items__plan_item__reference_clip'
-        )
-        if target_user is not None:
-            checkins = checkins.filter(user=target_user)
-
-        from_value = request.query_params.get('from')
-        to_value = request.query_params.get('to')
-        if from_value:
-            checkins = checkins.filter(date__gte=_parse_iso_date(from_value, 'from'))
-        if to_value:
-            checkins = checkins.filter(date__lte=_parse_iso_date(to_value, 'to'))
-
-        serializer = DailyCheckInSerializer(checkins.order_by('-date', '-updated_at'), many=True, context={'request': request})
-        return Response(serializer.data)
-
-    @action(detail=True, methods=['get'], url_path='checkins/today')
-    def today_checkin(self, request, pk=None):
-        space = self.get_object()
-        if not can_view_space(request.user, space):
-            raise PermissionDenied("You do not have access to this space.")
-
-        plan = _active_practice_plan(space)
-        today = _plan_today(plan)
-        checkin = DailyCheckIn.objects.filter(space=space, user=request.user, date=today).select_related(
-            'user', 'user__profile', 'plan', 'linked_session'
-        ).prefetch_related(
-            'items__plan_item__exercise', 'items__plan_item__reference_clip'
-        ).first()
-        plan_items = _scheduled_plan_items_for_date(plan, today)
-        return Response({
-            'date': today.isoformat(),
-            'plan': PracticePlanSerializer(plan, context={'request': request}).data if plan else None,
-            'plan_items': PracticePlanItemSerializer(plan_items, many=True, context={'request': request}).data,
-            'checkin': DailyCheckInSerializer(checkin, context={'request': request}).data if checkin else None,
-        })
-
-    @action(detail=True, methods=['post'], url_path='checkins/upsert')
-    def upsert_checkin(self, request, pk=None):
-        space = self.get_object()
-        if not can_view_space(request.user, space):
-            raise PermissionDenied("You do not have access to this space.")
-
-        payload = request.data or {}
-        active_plan = _active_practice_plan(space)
-        target_date = _parse_iso_date(payload.get('date'), 'date') if payload.get('date') else _plan_today(active_plan)
-        items_payload = payload.get('items') if isinstance(payload.get('items'), list) else None
-
-        existing = DailyCheckIn.objects.filter(space=space, user=request.user, date=target_date).first()
-        plan = existing.plan if existing and existing.plan_id else active_plan
-
-        status_value = payload.get('status') or (existing.status if existing else DailyCheckIn.STATUS_PARTIAL)
-        allowed_statuses = {choice[0] for choice in DailyCheckIn.STATUS_CHOICES}
-        if status_value not in allowed_statuses:
-            raise ValidationError({'status': f'Status must be one of: {", ".join(sorted(allowed_statuses))}.'})
-
-        total_minutes = payload.get('total_minutes', existing.total_minutes if existing else None)
-        if total_minutes in ('', None):
-            total_minutes = None
-        else:
-            try:
-                total_minutes = int(total_minutes)
-            except (TypeError, ValueError):
-                raise ValidationError({'total_minutes': 'Use a whole number of minutes.'})
-
-        linked_session = existing.linked_session if existing else None
-        linked_session_id = payload.get('linked_session_id')
-        if linked_session_id in ('', None):
-            linked_session = None
-        elif linked_session_id is not None:
-            linked_session = get_object_or_404(Session, pk=linked_session_id, user=request.user, space=space)
-
-        with transaction.atomic():
-            checkin, created = DailyCheckIn.objects.get_or_create(
-                space=space,
-                user=request.user,
-                date=target_date,
-                defaults={
-                    'plan': plan,
-                    'status': status_value,
-                    'total_minutes': total_minutes,
-                    'notes': (payload.get('notes') or '').strip(),
-                    'linked_session': linked_session,
-                },
-            )
-
-            if not created:
-                checkin.plan = plan
-                checkin.status = status_value
-                checkin.total_minutes = total_minutes
-                checkin.notes = (payload.get('notes', checkin.notes) or '').strip()
-                checkin.linked_session = linked_session
-                checkin.save()
-
-            if items_payload is not None:
-                prepared_items = []
-                for item_payload in items_payload:
-                    plan_item_id = item_payload.get('plan_item_id') or item_payload.get('plan_item')
-                    if not plan_item_id:
-                        raise ValidationError({'items': 'Each item requires plan_item_id.'})
-                    plan_item = get_object_or_404(
-                        PracticePlanItem.objects.select_related('plan', 'exercise'),
-                        pk=plan_item_id,
-                        plan__space=space,
-                    )
-                    if plan and plan_item.plan_id != plan.id:
-                        raise ValidationError({'items': 'All item rows must belong to the selected plan.'})
-                    if plan is None:
-                        plan = plan_item.plan
-
-                    minutes_value = item_payload.get('minutes')
-                    reps_value = item_payload.get('reps')
-                    for key, value in [('minutes', minutes_value), ('reps', reps_value)]:
-                        if value in ('', None):
-                            continue
-                        try:
-                            int(value)
-                        except (TypeError, ValueError):
-                            raise ValidationError({'items': f'Item {key} must be a whole number.'})
-
-                    prepared_items.append({
-                        'plan_item': plan_item,
-                        'completed': bool(item_payload.get('completed')),
-                        'minutes': None if minutes_value in ('', None) else int(minutes_value),
-                        'reps': None if reps_value in ('', None) else int(reps_value),
-                        'notes': (item_payload.get('notes') or '').strip(),
-                    })
-
-                if checkin.plan_id != (plan.id if plan else None):
-                    checkin.plan = plan
-                    checkin.save(update_fields=['plan', 'updated_at'])
-
-                checkin.items.all().delete()
-                for prepared in prepared_items:
-                    DailyCheckInItem.objects.create(checkin=checkin, **prepared)
-
-        refreshed = DailyCheckIn.objects.filter(pk=checkin.pk).select_related(
-            'user', 'user__profile', 'plan', 'linked_session'
-        ).prefetch_related(
-            'items__plan_item__exercise', 'items__plan_item__reference_clip'
-        ).get()
-        return Response(DailyCheckInSerializer(refreshed, context={'request': request}).data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
-
-    @action(detail=True, methods=['get'], url_path='adherence')
-    def adherence(self, request, pk=None):
-        space = self.get_object()
-        self._ensure_space_owner(space)
-
-        try:
-            window_days = int(request.query_params.get('window_days', 30))
-        except (TypeError, ValueError):
-            raise ValidationError({'window_days': 'Use 7 or 30.'})
-        if window_days not in (7, 30):
-            raise ValidationError({'window_days': 'Use 7 or 30.'})
-
-        plan = _active_practice_plan(space)
-        today = _plan_today(plan)
-        start_date = today - timedelta(days=window_days - 1)
-        members = list(space.members.select_related('user', 'user__profile').all())
-        member_ids = [member.user_id for member in members]
-        checkins = DailyCheckIn.objects.filter(
-            space=space,
-            user_id__in=member_ids,
-            date__gte=start_date,
-            date__lte=today,
-        ).select_related('user', 'user__profile')
-
-        checkins_by_user = {}
-        for checkin in checkins:
-            checkins_by_user.setdefault(checkin.user_id, {})[checkin.date] = checkin
-
-        def expected_dates_for_window():
-            dates = []
-            current = start_date
-            while current <= today:
-                if plan:
-                    if _scheduled_plan_items_for_date(plan, current):
-                        dates.append(current)
-                else:
-                    dates.append(current)
-                current += timedelta(days=1)
-            return dates
-
-        expected_dates = expected_dates_for_window()
-
-        def compute_streaks(statuses):
-            best = 0
-            current = 0
-            for status_value in statuses:
-                if status_value == DailyCheckIn.STATUS_COMPLETE:
-                    current += 1
-                    best = max(best, current)
-                else:
-                    current = 0
-            current_streak = 0
-            for status_value in reversed(statuses):
-                if status_value == DailyCheckIn.STATUS_COMPLETE:
-                    current_streak += 1
-                else:
-                    break
-            return current_streak, best
-
-        response_members = []
-        for member in members:
-            user = member.user
-            display_name = user.profile.display_name if hasattr(user, 'profile') and user.profile.display_name else user.username
-            by_date = checkins_by_user.get(user.id, {})
-
-            status_timeline = []
-            missed_dates = []
-            completed_days = 0
-            for target in expected_dates:
-                checkin = by_date.get(target)
-                if checkin:
-                    status_value = checkin.status
-                else:
-                    status_value = DailyCheckIn.STATUS_MISSED
-                status_timeline.append(status_value)
-                if status_value == DailyCheckIn.STATUS_COMPLETE:
-                    completed_days += 1
-                if status_value == DailyCheckIn.STATUS_MISSED:
-                    missed_dates.append(target.isoformat())
-
-            streak_current, streak_best = compute_streaks(status_timeline)
-            ordered_actual_dates = sorted(by_date.keys())
-            last_checkin_date = ordered_actual_dates[-1].isoformat() if ordered_actual_dates else None
-
-            last_7_days_summary = []
-            summary_start = today - timedelta(days=6)
-            current = summary_start
-            while current <= today:
-                checkin = by_date.get(current)
-                scheduled = (not plan) or bool(_scheduled_plan_items_for_date(plan, current))
-                last_7_days_summary.append({
-                    'date': current.isoformat(),
-                    'scheduled': scheduled,
-                    'status': checkin.status if checkin else (DailyCheckIn.STATUS_MISSED if scheduled else None),
-                })
-                current += timedelta(days=1)
-
-            total_days = len(expected_dates)
-            completion_rate = round((completed_days / total_days), 3) if total_days else None
-            response_members.append({
-                'user_id': user.id,
-                'display_name': display_name,
-                'completion_rate': completion_rate,
-                'streak_current': streak_current,
-                'streak_best': streak_best,
-                'missed_dates': missed_dates,
-                'last_checkin_date': last_checkin_date,
-                'last_7_days_summary': last_7_days_summary,
-            })
-
-        return Response({
-            'space_id': space.id,
-            'window_days': window_days,
-            'from': start_date.isoformat(),
-            'to': today.isoformat(),
-            'plan_id': plan.id if plan else None,
-            'members': response_members,
-        })
-
-    @action(detail=True, methods=['post'])
-    def invite(self, request, pk=None):
-        """Generate an invite code for this space."""
-        space = self.get_object()
-        if space.owner != request.user:
-            return Response({'error': 'Only the space owner can invite'}, status=status.HTTP_403_FORBIDDEN)
-        code = secrets.token_hex(4).upper()
-        InviteCode.objects.create(code=code, created_by=request.user, space=space)
-        return Response({'code': code, 'space': space.name}, status=status.HTTP_201_CREATED)
-
-    @action(detail=True, methods=['delete'], url_path='members/(?P<user_id>[0-9]+)')
-    def remove_member(self, request, pk=None, user_id=None):
-        """Remove a member from this space."""
-        space = self.get_object()
-        if space.owner != request.user:
-            return Response({'error': 'Only the space owner can remove members'}, status=status.HTTP_403_FORBIDDEN)
-        deleted = SpaceMember.objects.filter(space=space, user_id=user_id).delete()
-        if deleted[0] == 0:
-            return Response({'error': 'Member not found'}, status=status.HTTP_404_NOT_FOUND)
-        return Response(SpaceSerializer(space).data)
-
-    @action(detail=True, methods=['post'], url_path='set-main-session')
-    def set_main_session(self, request, pk=None):
-        space = self.get_object()
-        if space.owner_id != request.user.id:
-            return Response({'error': 'Only the space owner can set MAIN video'}, status=status.HTTP_403_FORBIDDEN)
-
-        try:
-            session_id = int(request.data.get('session_id'))
-        except (TypeError, ValueError):
-            return Response({'error': 'session_id is required'}, status=status.HTTP_400_BAD_REQUEST)
-
-        session = get_object_or_404(Session, pk=session_id)
-        if session.space_id != space.id:
-            return Response({'error': 'Session must belong to this space'}, status=status.HTTP_400_BAD_REQUEST)
-
-        space.main_session = session
-        space.save(update_fields=['main_session'])
-        return Response(SpaceSerializer(space, context={'request': request}).data)
-
-
-@csrf_exempt
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def join_space(request, slug):
-    """Join a space by its permanent invite slug."""
-    try:
-        space = Space.objects.get(invite_slug=slug)
-    except Space.DoesNotExist:
-        return Response({'error': 'Space not found'}, status=status.HTTP_404_NOT_FOUND)
-
-    if space.owner == request.user:
-        return Response({'error': 'You own this space'}, status=status.HTTP_400_BAD_REQUEST)
-
-    _, created = SpaceMember.objects.get_or_create(space=space, user=request.user)
-    return Response({
-        'message': f'Joined {space.name}' if created else f'Already in {space.name}',
-        'space': SpaceSerializer(space, context={'request': request}).data,
-    })
+# ── Legacy product surfaces removed ─────────────────────────────────
 
 
 @csrf_exempt
 @api_view(['GET'])
-@permission_classes([AllowAny])
-def space_info(request, slug):
-    """Get basic info about a space from its invite slug (for signup page)."""
-    try:
-        space = Space.objects.get(invite_slug=slug)
-    except Space.DoesNotExist:
-        return Response({'error': 'Space not found'}, status=status.HTTP_404_NOT_FOUND)
-
-    owner_name = space.owner.profile.display_name if hasattr(space.owner, 'profile') and space.owner.profile.display_name else space.owner.username
-    return Response({
-        'name': space.name,
-        'owner': owner_name,
-        'invite_slug': space.invite_slug,
-    })
-
-
-# ── Invite views (legacy support + space-scoped) ────────────────────
-
-@csrf_exempt
-@api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def create_invite(request):
-    """Generate a general invite code (for backward compatibility)."""
-    space_id = request.data.get('space_id')
-    space = None
-    if space_id:
-        space = get_object_or_404(Space, pk=space_id, owner=request.user)
-    code = secrets.token_hex(4).upper()
-    InviteCode.objects.create(code=code, created_by=request.user, space=space)
-    return Response({'code': code, 'space': space.name if space else None}, status=status.HTTP_201_CREATED)
-
-
-@csrf_exempt
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def accept_invite(request):
-    code = request.data.get('code', '').strip().upper()
-    if not code:
-        return Response({'error': 'Code required'}, status=status.HTTP_400_BAD_REQUEST)
-
-    with transaction.atomic():
-        try:
-            invite = InviteCode.objects.select_for_update().get(code=code, used_by__isnull=True)
-        except InviteCode.DoesNotExist:
-            return Response({'error': 'Invalid or already used code'}, status=status.HTTP_404_NOT_FOUND)
-
-        if invite.created_by == request.user:
-            return Response({'error': 'Cannot use your own invite code'}, status=status.HTTP_400_BAD_REQUEST)
-
-        invite.used_by = request.user
-        invite.used_at = timezone.now()
-        invite.save()
-
-        if invite.space:
-            SpaceMember.objects.get_or_create(space=invite.space, user=request.user)
-
-    return Response({
-        'message': 'Linked successfully',
-        'space': invite.space.name if invite.space else None,
-        'user': UserSerializer(request.user).data,
-    })
-
-
-def _active_review_link_or_404(token):
-    link = get_object_or_404(
-        ReviewLink.objects.select_related('session'),
-        token=token,
-        is_active=True,
-    )
-    if link.expires_at <= timezone.now():
-        raise Http404('Review link expired')
-    return link
-
-
-@csrf_exempt
-@api_view(['GET'])
-@permission_classes([AllowAny])
 def review_link_info(request, token):
     link = _active_review_link_or_404(token)
     ReviewLink.objects.filter(pk=link.pk).update(last_accessed_at=timezone.now())
@@ -936,96 +286,37 @@ def review_link_info(request, token):
 
 @csrf_exempt
 @api_view(['GET', 'POST'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def review_link_feedback(request, token):
     link = _active_review_link_or_404(token)
 
     if request.method == 'GET':
-        feedback = link.feedback.all().order_by('timestamp_seconds', 'created_at')
-        return Response(ReviewFeedbackSerializer(feedback, many=True).data)
+        feedback = link.session.video_feedback.select_related('user', 'user__profile').order_by('timestamp_seconds', 'created_at')
+        return Response(ReviewVideoFeedbackSerializer(feedback, many=True, context={'request': request, 'session': link.session}).data)
 
-    if not link.allow_comments:
-        return Response({'error': 'Comments are disabled for this link'}, status=status.HTTP_403_FORBIDDEN)
+    if not link.allow_video_feedback:
+        return Response({'error': 'Video feedback is disabled for this link'}, status=status.HTTP_403_FORBIDDEN)
 
-    serializer = ReviewFeedbackSerializer(data=request.data, context={'session': link.session})
+    serializer = ReviewVideoFeedbackSerializer(data=request.data, context={'request': request, 'session': link.session})
     serializer.is_valid(raise_exception=True)
-    if getattr(request.user, 'is_authenticated', False):
-        name = request.user.profile.display_name if hasattr(request.user, 'profile') and request.user.profile.display_name else request.user.username
-        item = serializer.save(
-            session=link.session,
-            review_link=link,
-            author_user=request.user,
-            name=name,
-            email=request.user.email or '',
-        )
-    else:
-        item = serializer.save(session=link.session, review_link=link)
-    return Response(ReviewFeedbackSerializer(item).data, status=status.HTTP_201_CREATED)
+    video_file = request.FILES.get('feedback_video')
+    if not video_file:
+        return Response({'error': 'Feedback video is required'}, status=status.HTTP_400_BAD_REQUEST)
+    if video_file and not str(video_file.content_type or '').startswith('video/'):
+        return Response({'error': 'Only video files allowed'}, status=status.HTTP_400_BAD_REQUEST)
 
-
-# ── Exercise views ──────────────────────────────────────────────────
-
-@method_decorator(csrf_exempt, name='dispatch')
-class ExerciseViewSet(viewsets.ModelViewSet):
-    queryset = Exercise.objects.all()
-    serializer_class = ExerciseSerializer
-    permission_classes = [IsAuthenticated]
-
-    @action(detail=True, methods=['get'])
-    def progress(self, request, pk=None):
-        exercise = self.get_object()
-        visible_qs = _visible_sessions_qs(request.user)
-        qs = (
-            exercise.chapters
-            .select_related('session')
-            .filter(session__in=visible_qs)
-            .order_by('session__recorded_at')
-        )
-        serializer = ProgressChapterSerializer(qs, many=True)
-        reference_clips = ExerciseReferenceClip.objects.filter(
-            user=request.user,
-            exercise=exercise,
-        ).order_by('-created_at')
-        clip_serializer = ExerciseReferenceClipSerializer(reference_clips, many=True)
-        return Response({
-            'exercise': ExerciseSerializer(exercise).data,
-            'chapters': serializer.data,
-            'reference_clips': clip_serializer.data,
-        })
-
-    @action(detail=True, methods=['get', 'post'], url_path='reference-clips')
-    def reference_clips(self, request, pk=None):
-        exercise = self.get_object()
-        if request.method == 'GET':
-            clips = ExerciseReferenceClip.objects.filter(
-                user=request.user,
-                exercise=exercise,
-            ).order_by('-created_at')
-            return Response(ExerciseReferenceClipSerializer(clips, many=True).data)
-
-        serializer = ExerciseReferenceClipSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        clip = serializer.save(user=request.user, exercise=exercise)
-        return Response(ExerciseReferenceClipSerializer(clip).data, status=status.HTTP_201_CREATED)
-
-    @action(detail=True, methods=['patch', 'delete'], url_path=r'reference-clips/(?P<clip_id>[0-9]+)')
-    def reference_clip_detail(self, request, pk=None, clip_id=None):
-        exercise = self.get_object()
-        clip = get_object_or_404(
-            ExerciseReferenceClip,
-            pk=clip_id,
-            exercise=exercise,
-            user=request.user,
-        )
-
-        if request.method == 'DELETE':
-            clip.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-
-        serializer = ExerciseReferenceClipSerializer(clip, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        updated = serializer.save()
-        return Response(ExerciseReferenceClipSerializer(updated).data)
+    item = VideoFeedback.objects.create(
+        session=link.session,
+        user=request.user,
+        timestamp_seconds=serializer.validated_data.get('timestamp_seconds'),
+        text=str(serializer.validated_data.get('text', '')).strip(),
+        feedback_video=video_file,
+        is_legacy_text_feedback=False,
+    )
+    return Response(
+        ReviewVideoFeedbackSerializer(item, context={'request': request, 'session': link.session}).data,
+        status=status.HTTP_201_CREATED,
+    )
 
 
 # ── Session views ───────────────────────────────────────────────────
@@ -1037,13 +328,9 @@ class SessionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = _visible_sessions_qs(self.request.user).prefetch_related(
             'chapters', 'chapters__exercise',
-            'comments', 'comments__user', 'comments__user__profile',
+            'video_feedback', 'video_feedback__user', 'video_feedback__user__profile',
             'last_seen_by', 'tags', 'assets',
-        ).select_related('user', 'user__profile', 'space', 'space__main_session')
-
-        space_id = self.request.query_params.get('space')
-        if space_id:
-            qs = qs.filter(space_id=space_id)
+        ).select_related('user', 'user__profile')
 
         tag = self.request.query_params.get('tag')
         if tag:
@@ -1062,26 +349,14 @@ class SessionViewSet(viewsets.ModelViewSet):
         return SessionSerializer
 
     def perform_create(self, serializer):
-        space_id = self.request.data.get('space')
-        space = _resolve_space_for_create(self.request.user, space_id)
-        session = serializer.save(user=self.request.user, space=space)
+        session = serializer.save(user=self.request.user)
         _attach_tags_to_session(session, self.request.data.get('tags', ''))
         _start_processing_pipeline(session)
 
     def perform_update(self, serializer):
         if not can_edit_session(self.request.user, serializer.instance):
             raise PermissionDenied("You can only edit your own sessions.")
-        space_id = self.request.data.get('space')
-        space = None
-        if space_id:
-            space = get_object_or_404(Space, pk=space_id)
-            if not can_post_to_space(self.request.user, space):
-                raise PermissionDenied("You can only move a session to a space you belong to.")
-        elif space_id == '' or (space_id is None and 'space' in self.request.data):
-            space = None
-        else:
-            space = serializer.instance.space
-        serializer.save(space=space)
+        serializer.save()
 
     def perform_destroy(self, instance):
         if not can_edit_session(self.request.user, instance):
@@ -1104,7 +379,7 @@ class SessionViewSet(viewsets.ModelViewSet):
             created_by=request.user,
             expires_at=expires_at,
             is_active=True,
-            allow_comments=True,
+            allow_video_feedback=True,
         )
         return Response(ReviewLinkSerializer(link, context={'request': request}).data, status=status.HTTP_201_CREATED)
 
@@ -1115,35 +390,6 @@ class SessionViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("You can only revoke your own sessions' links.")
         ReviewLink.objects.filter(session=session, is_active=True).update(is_active=False)
         return Response({'ok': True})
-
-    @action(detail=True, methods=['post'], url_path='review-feedback')
-    def create_review_feedback(self, request, pk=None):
-        session = self.get_object()
-        if not _can_review_session_feedback(request.user, session):
-            raise PermissionDenied("You do not have permission to leave feedback on this session.")
-
-        link = session.review_links.filter(is_active=True, expires_at__gt=timezone.now()).order_by('-created_at').first()
-        if not link:
-            link = ReviewLink.objects.create(
-                session=session,
-                token=secrets.token_urlsafe(16),
-                created_by=request.user,
-                expires_at=timezone.now() + timedelta(days=30),
-                is_active=True,
-                allow_comments=True,
-            )
-
-        serializer = ReviewFeedbackSerializer(data=request.data, context={'session': session})
-        serializer.is_valid(raise_exception=True)
-        name = request.user.profile.display_name if hasattr(request.user, 'profile') and request.user.profile.display_name else request.user.username
-        item = serializer.save(
-            session=session,
-            review_link=link,
-            author_user=request.user,
-            name=name,
-            email=request.user.email or '',
-        )
-        return Response(ReviewFeedbackSerializer(item).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'], url_path='retry-processing')
     def retry_processing(self, request, pk=None):
@@ -1156,23 +402,6 @@ class SessionViewSet(viewsets.ModelViewSet):
         session.refresh_from_db()
         serializer = self.get_serializer(session)
         return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
-
-    @action(detail=True, methods=['patch', 'delete'], url_path=r'review-feedback/(?P<feedback_id>[0-9]+)')
-    def review_feedback_detail(self, request, pk=None, feedback_id=None):
-        session = self.get_object()
-        if not _can_review_session_feedback(request.user, session):
-            raise PermissionDenied("You do not have permission to manage feedback on this session.")
-
-        feedback = get_object_or_404(ReviewFeedback, pk=feedback_id, session=session)
-
-        if request.method == 'DELETE':
-            feedback.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-
-        serializer = ReviewFeedbackSerializer(feedback, data=request.data, partial=True, context={'session': session})
-        serializer.is_valid(raise_exception=True)
-        updated = serializer.save()
-        return Response(ReviewFeedbackSerializer(updated).data)
 
     @action(detail=False, methods=['post'], url_path='multipart/initiate')
     def multipart_initiate(self, request):
@@ -1209,11 +438,6 @@ class SessionViewSet(viewsets.ModelViewSet):
         except (TypeError, ValueError):
             return Response({'error': 'Invalid duration'}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            space = _resolve_space_for_create(request.user, request.data.get('space'))
-        except PermissionDenied as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
-
         tags_csv = ','.join(_parse_tag_names(request.data.get('tags', [])))
         expires_at = timezone.now() + timedelta(hours=24)
 
@@ -1230,7 +454,6 @@ class SessionViewSet(viewsets.ModelViewSet):
 
         upload = MultipartSessionUpload.objects.create(
             user=request.user,
-            space=space,
             status=MultipartSessionUpload.STATUS_INITIATED,
             title=title,
             description=str(request.data.get('description', '')).strip(),
@@ -1385,12 +608,8 @@ class SessionViewSet(viewsets.ModelViewSet):
             except (BotoCoreError, ClientError):
                 return Response({'error': 'Could not finalize multipart upload'}, status=status.HTTP_502_BAD_GATEWAY)
 
-            if upload.space_id and not can_post_to_space(request.user, upload.space):
-                return Response({'error': 'You can only post to spaces you belong to.'}, status=status.HTTP_403_FORBIDDEN)
-
             session = Session.objects.create(
                 user=request.user,
-                space=upload.space,
                 title=upload.title,
                 description=upload.description,
                 reference_title=upload.reference_title,
@@ -1563,8 +782,8 @@ class SessionViewSet(viewsets.ModelViewSet):
         session.refresh_from_db()
         return Response(SessionSerializer(session).data)
 
-    @action(detail=True, methods=['post'])
-    def add_comment(self, request, pk=None):
+    @action(detail=True, methods=['post'], url_path='video-feedback')
+    def add_video_feedback(self, request, pk=None):
         session = self.get_object()
         if not _can_view_session(request.user, session):
             return Response({'error': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
@@ -1576,14 +795,14 @@ class SessionViewSet(viewsets.ModelViewSet):
                 timestamp = max(0, int(ts))
             except (ValueError, TypeError):
                 pass
-        video_file = request.FILES.get('video_reply')
+        video_file = request.FILES.get('feedback_video')
         if not video_file:
-            return Response({'error': 'Comment video is required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Feedback video is required'}, status=status.HTTP_400_BAD_REQUEST)
         if video_file and not video_file.content_type.startswith('video/'):
             return Response({'error': 'Only video files allowed'}, status=status.HTTP_400_BAD_REQUEST)
-        Comment.objects.create(
+        VideoFeedback.objects.create(
             session=session, user=request.user,
-            timestamp_seconds=timestamp, text=text, video_reply=video_file, legacy_text_only=False,
+            timestamp_seconds=timestamp, text=text, feedback_video=video_file, is_legacy_text_feedback=False,
         )
         session.refresh_from_db()
         return Response(SessionSerializer(session).data, status=status.HTTP_201_CREATED)
@@ -1597,106 +816,17 @@ class SessionViewSet(viewsets.ModelViewSet):
         )
         return Response({'status': 'ok'})
 
-    @action(detail=True, methods=['delete'], url_path='comments/(?P<comment_id>[0-9]+)')
-    def remove_comment(self, request, pk=None, comment_id=None):
+    @action(detail=True, methods=['delete'], url_path='video-feedback/(?P<feedback_id>[0-9]+)')
+    def remove_video_feedback(self, request, pk=None, feedback_id=None):
         session = self.get_object()
         if not _can_view_session(request.user, session):
             return Response({'error': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
-        comment = get_object_or_404(Comment, pk=comment_id, session=session)
-        if request.user != comment.user and not request.user.is_staff:
+        feedback = get_object_or_404(VideoFeedback, pk=feedback_id, session=session)
+        if request.user != feedback.user and not request.user.is_staff:
             return Response({'error': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
-        comment.delete()
+        feedback.delete()
         session.refresh_from_db()
         return Response(SessionSerializer(session).data)
-
-
-# ── Coach metrics views ────────────────────────────────────────────
-
-def _metric_value(value):
-    if value is None:
-        return None
-    if hasattr(value, 'quantize'):
-        return float(value)
-    return value
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def coach_metrics_summary(request):
-    if not _coach_metrics_enabled():
-        return Response({'error': 'Coach metrics are disabled'}, status=status.HTTP_404_NOT_FOUND)
-    if not _coach_metrics_user_allowed(request.user):
-        return Response({'error': 'Coach metrics are disabled'}, status=status.HTTP_404_NOT_FOUND)
-
-    raw_window_days = request.query_params.get('window_days', '30')
-    try:
-        window_days = int(raw_window_days)
-    except (TypeError, ValueError):
-        return Response({'error': 'window_days must be 7 or 30'}, status=status.HTTP_400_BAD_REQUEST)
-    if window_days not in (7, 30):
-        return Response({'error': 'window_days must be 7 or 30'}, status=status.HTTP_400_BAD_REQUEST)
-
-    today = timezone.now().date()
-    latest_metric = (
-        CoachDailyMetric.objects
-        .filter(coach=request.user, date__lte=today)
-        .order_by('-date')
-        .first()
-    )
-
-    metric_rows = []
-    if latest_metric:
-        trend_start = latest_metric.date - timedelta(days=window_days - 1)
-        metric_rows = list(
-            CoachDailyMetric.objects.filter(
-                coach=request.user,
-                date__gte=trend_start,
-                date__lte=latest_metric.date,
-            ).order_by('date')
-        )
-
-    summary = {
-        'active_students_30d': latest_metric.active_students_30d if latest_metric else 0,
-        'coach_comments_7d': latest_metric.coach_comments_7d if latest_metric else 0,
-        'coach_comments_30d': latest_metric.coach_comments_30d if latest_metric else 0,
-        'median_time_to_first_coach_comment_hours_30d': _metric_value(
-            latest_metric.median_time_to_first_coach_comment_hours_30d if latest_metric else None
-        ),
-        'estimated_time_saved_hours_30d': _metric_value(
-            latest_metric.estimated_time_saved_hours_30d if latest_metric else 0
-        ),
-    }
-
-    response = {
-        'coach_user_id': request.user.id,
-        'window_days': window_days,
-        'generated_at': timezone.now().isoformat(),
-        'summary': summary,
-        'trends': {
-            'active_students_30d': [{'date': str(m.date), 'value': m.active_students_30d} for m in metric_rows],
-            'coach_comments_7d': [{'date': str(m.date), 'value': m.coach_comments_7d} for m in metric_rows],
-            'coach_comments_30d': [{'date': str(m.date), 'value': m.coach_comments_30d} for m in metric_rows],
-            'median_time_to_first_coach_comment_hours_30d': [
-                {'date': str(m.date), 'value': _metric_value(m.median_time_to_first_coach_comment_hours_30d)}
-                for m in metric_rows
-            ],
-            'estimated_time_saved_hours_30d': [
-                {'date': str(m.date), 'value': _metric_value(m.estimated_time_saved_hours_30d)}
-                for m in metric_rows
-            ],
-        },
-        'definitions': {
-            'coach_identity': 'User who owns one or more spaces.',
-            'active_students_30d': 'Distinct non-owner users who uploaded sessions in coach-owned spaces.',
-            'coach_comments_7d': 'Comments authored by this coach on student sessions in coach-owned spaces.',
-            'coach_comments_30d': 'Comments authored by this coach on student sessions in coach-owned spaces over 30 days.',
-            'median_time_to_first_coach_comment_hours_30d': 'Median hours from student session upload to first coach comment.',
-            'estimated_time_saved_hours_30d': 'coach_comments_30d * minutes_saved_per_comment / 60.',
-        },
-    }
-    return Response(response)
-
-
 # ── Health check ────────────────────────────────────────────────────
 
 def health_check(request):

@@ -3,13 +3,10 @@ from django.conf import settings
 from django.utils import timezone
 from django.core.files.storage import default_storage
 from rest_framework import serializers
-from urllib.parse import parse_qs, urlencode, urlparse
-import re
 from .models import (
-    Profile, Exercise, Session, Chapter, Comment, InviteCode, SessionLastSeen,
-    Tag, Space, SpaceMember, ExerciseReferenceClip, SessionAsset,
-    PracticePlan, PracticePlanItem, DailyCheckIn, DailyCheckInItem,
-    ReviewLink, ReviewFeedback,
+    Profile, Session, Chapter, VideoFeedback,
+    SessionAsset,
+    ReviewLink,
 )
 
 
@@ -19,60 +16,10 @@ class ProfileSerializer(serializers.ModelSerializer):
         fields = ['display_name']
 
 
-class SpaceSerializer(serializers.ModelSerializer):
-    session_count = serializers.SerializerMethodField()
-    members = serializers.SerializerMethodField()
-    is_owner = serializers.SerializerMethodField()
-    invite_link = serializers.SerializerMethodField()
-    main_session_id = serializers.IntegerField(source='main_session.id', read_only=True, default=None)
-    main_session_summary = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Space
-        fields = [
-            'id', 'name', 'invite_slug',
-            'main_session_id', 'main_session_summary',
-            'session_count', 'members', 'is_owner', 'invite_link', 'created_at',
-        ]
-        read_only_fields = ['id', 'invite_slug', 'created_at']
-
-    def get_session_count(self, obj):
-        return obj.sessions.count()
-
-    def get_members(self, obj):
-        return [{
-            'id': m.user.id,
-            'display_name': m.user.profile.display_name if hasattr(m.user, 'profile') and m.user.profile.display_name else m.user.username,
-        } for m in obj.members.select_related('user', 'user__profile').all()]
-
-    def get_is_owner(self, obj):
-        request = self.context.get('request')
-        return request and request.user == obj.owner
-
-    def get_invite_link(self, obj):
-        return f"/join/{obj.invite_slug}"
-
-    def get_main_session_summary(self, obj):
-        session = getattr(obj, 'main_session', None)
-        if not session:
-            return None
-        return {
-            'id': session.id,
-            'title': session.title,
-            'video_file': session.video_file.url if session.video_file else None,
-            'processing_status': session.processing_status,
-        }
 
 
 class UserSerializer(serializers.ModelSerializer):
     display_name = serializers.SerializerMethodField()
-    spaces = serializers.SerializerMethodField()
-    has_spaces = serializers.SerializerMethodField()
-    joined_spaces_count = serializers.SerializerMethodField()
-    primary_role = serializers.SerializerMethodField()
-    role_labels = serializers.SerializerMethodField()
-    current_streak_days = serializers.SerializerMethodField()
-    last_practice_at = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -81,13 +28,6 @@ class UserSerializer(serializers.ModelSerializer):
             'username',
             'email',
             'display_name',
-            'spaces',
-            'has_spaces',
-            'joined_spaces_count',
-            'primary_role',
-            'role_labels',
-            'current_streak_days',
-            'last_practice_at',
         ]
         read_only_fields = ['id']
 
@@ -96,97 +36,18 @@ class UserSerializer(serializers.ModelSerializer):
             return obj.profile.display_name
         return obj.username
 
-    def get_spaces(self, obj):
-        owned = [{'id': s.id, 'name': s.name, 'role': 'owner'} for s in obj.owned_spaces.all()]
-        following = [{'id': m.space.id, 'name': m.space.name, 'role': 'viewer'}
-                     for m in obj.space_memberships.select_related('space').all()]
-        return owned + following
-
-    def get_has_spaces(self, obj):
-        return obj.owned_spaces.exists() or obj.space_memberships.exists()
-
-    def get_joined_spaces_count(self, obj):
-        return obj.space_memberships.count()
-
-    def get_primary_role(self, obj):
-        owns = obj.owned_spaces.exists()
-        joins = obj.space_memberships.exists()
-        if owns and joins:
-            return 'teacher_student'
-        if owns:
-            return 'teacher'
-        if joins:
-            return 'student'
-        return 'new'
-
-    def get_role_labels(self, obj):
-        mapping = {
-            'teacher': ['Teacher'],
-            'student': ['Student'],
-            'teacher_student': ['Teacher', 'Student'],
-            'new': ['New user'],
-        }
-        return mapping.get(self.get_primary_role(obj), [])
-
-    def get_current_streak_days(self, obj):
-        dates = list(
-            obj.sessions.order_by('-recorded_at')
-            .values_list('recorded_at', flat=True)
-        )
-        unique_days = []
-        seen = set()
-        for dt in dates:
-            if not dt:
-                continue
-            day = timezone.localtime(dt).date() if timezone.is_aware(dt) else dt.date()
-            if day in seen:
-                continue
-            seen.add(day)
-            unique_days.append(day)
-        if not unique_days:
-            return 0
-        streak = 1
-        previous = unique_days[0]
-        for day in unique_days[1:]:
-            if (previous - day).days == 1:
-                streak += 1
-                previous = day
-                continue
-            break
-        return streak
-
-    def get_last_practice_at(self, obj):
-        latest = obj.sessions.order_by('-recorded_at').values_list('recorded_at', flat=True).first()
-        return latest.isoformat() if latest else None
-
 
 class RegisterSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
     password = serializers.CharField(write_only=True, min_length=6)
     display_name = serializers.CharField(max_length=100, required=False, default='')
-    invite_code = serializers.CharField(max_length=8, required=False, default='')
-    invite_slug = serializers.CharField(max_length=20, required=False, default='')
 
     def validate_username(self, value):
         if User.objects.filter(username__iexact=value).exists():
             raise serializers.ValidationError("Username already taken.")
         return value
 
-    def validate(self, data):
-        code = data.get('invite_code', '').strip().upper()
-        slug = data.get('invite_slug', '').strip()
-        if code:
-            if not InviteCode.objects.filter(code=code, used_by__isnull=True).exists():
-                raise serializers.ValidationError({'invite_code': "Invalid or already used invite code."})
-        if slug:
-            if not Space.objects.filter(invite_slug=slug).exists():
-                raise serializers.ValidationError({'invite_slug': "Invalid invite link."})
-        return data
-
     def create(self, validated_data):
-        code = validated_data.pop('invite_code', '').strip().upper()
-        slug = validated_data.pop('invite_slug', '').strip()
-
         user = User.objects.create_user(
             username=validated_data['username'],
             password=validated_data['password'],
@@ -196,190 +57,9 @@ class RegisterSerializer(serializers.Serializer):
             display_name=validated_data.get('display_name', ''),
         )
 
-        # Handle invite code
-        if code:
-            try:
-                invite = InviteCode.objects.get(code=code, used_by__isnull=True)
-                invite.used_by = user
-                invite.used_at = timezone.now()
-                invite.save()
-                if invite.space:
-                    SpaceMember.objects.get_or_create(space=invite.space, user=user)
-            except InviteCode.DoesNotExist:
-                pass
-
-        # Handle invite slug (permanent link)
-        if slug:
-            try:
-                space = Space.objects.get(invite_slug=slug)
-                SpaceMember.objects.get_or_create(space=space, user=user)
-            except Space.DoesNotExist:
-                pass
-
         return user
 
 
-class ExerciseSerializer(serializers.ModelSerializer):
-    chapter_count = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Exercise
-        fields = ['id', 'name', 'category', 'description', 'created_at', 'chapter_count']
-        read_only_fields = ['id', 'created_at', 'chapter_count']
-
-    def get_chapter_count(self, obj):
-        return obj.chapters.count()
-
-
-class ExerciseReferenceClipSerializer(serializers.ModelSerializer):
-    embed_url = serializers.SerializerMethodField()
-    watch_url_with_start = serializers.SerializerMethodField()
-
-    class Meta:
-        model = ExerciseReferenceClip
-        fields = [
-            'id', 'exercise', 'title', 'youtube_url', 'youtube_video_id', 'youtube_playlist_id',
-            'start_seconds', 'end_seconds', 'notes', 'created_at', 'updated_at',
-            'embed_url', 'watch_url_with_start',
-        ]
-        read_only_fields = [
-            'id', 'exercise', 'youtube_video_id', 'youtube_playlist_id',
-            'created_at', 'updated_at', 'embed_url', 'watch_url_with_start',
-        ]
-
-    def validate(self, attrs):
-        attrs = super().validate(attrs)
-        current_start = self.instance.start_seconds if self.instance else 0
-        current_end = self.instance.end_seconds if self.instance else None
-
-        start_seconds = attrs.get('start_seconds', current_start)
-        end_seconds = attrs.get('end_seconds', current_end)
-        if start_seconds < 0:
-            raise serializers.ValidationError({'start_seconds': 'Start must be 0 or greater.'})
-        if end_seconds is not None and end_seconds <= start_seconds:
-            raise serializers.ValidationError({'end_seconds': 'End must be greater than start.'})
-
-        if 'youtube_url' in attrs:
-            parsed = self._parse_youtube_url(attrs['youtube_url'])
-            attrs['youtube_video_id'] = parsed['video_id']
-            attrs['youtube_playlist_id'] = parsed['playlist_id']
-            query = {'v': parsed['video_id']}
-            if parsed['playlist_id']:
-                query['list'] = parsed['playlist_id']
-            attrs['youtube_url'] = f"https://www.youtube.com/watch?{urlencode(query)}"
-
-        return attrs
-
-    def _parse_youtube_url(self, value):
-        raw = (value or '').strip()
-        if not raw:
-            raise serializers.ValidationError({'youtube_url': 'YouTube URL is required.'})
-        parsed = urlparse(raw)
-        if parsed.scheme not in ('http', 'https'):
-            raise serializers.ValidationError({'youtube_url': 'YouTube URL must include http:// or https://.'})
-        host = (parsed.netloc or '').lower()
-        path = parsed.path or ''
-        query = parse_qs(parsed.query or '')
-        video_id = None
-        playlist_id = ''
-
-        if host in ('youtube.com', 'www.youtube.com', 'm.youtube.com'):
-            if path != '/watch':
-                raise serializers.ValidationError({'youtube_url': 'Use a YouTube watch URL with v=VIDEO_ID.'})
-            video_id = (query.get('v') or [None])[0]
-            playlist_id = ((query.get('list') or [''])[0] or '').strip()
-        elif host == 'youtu.be':
-            video_id = path.lstrip('/').split('/')[0] if path else None
-            playlist_id = ((query.get('list') or [''])[0] or '').strip()
-        else:
-            raise serializers.ValidationError({'youtube_url': 'Only youtube.com or youtu.be URLs are supported.'})
-
-        if not video_id or not re.match(r'^[A-Za-z0-9_-]{11}$', video_id):
-            raise serializers.ValidationError({'youtube_url': 'Could not detect a valid YouTube video id.'})
-
-        return {'video_id': video_id, 'playlist_id': playlist_id}
-
-    def get_embed_url(self, obj):
-        params = {'start': int(obj.start_seconds or 0)}
-        if obj.end_seconds is not None:
-            params['end'] = int(obj.end_seconds)
-        return f"https://www.youtube.com/embed/{obj.youtube_video_id}?{urlencode(params)}"
-
-    def get_watch_url_with_start(self, obj):
-        params = {'v': obj.youtube_video_id, 't': f"{int(obj.start_seconds or 0)}s"}
-        if obj.youtube_playlist_id:
-            params['list'] = obj.youtube_playlist_id
-        return f"https://www.youtube.com/watch?{urlencode(params)}"
-
-
-class PracticePlanItemSerializer(serializers.ModelSerializer):
-    exercise_name = serializers.CharField(source='exercise.name', read_only=True)
-    reference_clip_detail = ExerciseReferenceClipSerializer(source='reference_clip', read_only=True)
-
-    class Meta:
-        model = PracticePlanItem
-        fields = [
-            'id', 'plan', 'exercise', 'exercise_name', 'sort_order',
-            'target_minutes', 'target_reps', 'notes',
-            'reference_clip', 'reference_clip_detail', 'schedule_json',
-        ]
-        read_only_fields = ['id', 'plan', 'exercise_name', 'reference_clip_detail']
-
-
-class PracticePlanSerializer(serializers.ModelSerializer):
-    items = PracticePlanItemSerializer(many=True, read_only=True)
-    created_by_display_name = serializers.SerializerMethodField()
-
-    class Meta:
-        model = PracticePlan
-        fields = [
-            'id', 'space', 'created_by', 'created_by_display_name',
-            'name', 'description', 'timezone', 'start_date', 'end_date',
-            'is_active', 'created_at', 'updated_at', 'items',
-        ]
-        read_only_fields = ['id', 'space', 'created_by', 'created_by_display_name', 'created_at', 'updated_at', 'items']
-
-    def get_created_by_display_name(self, obj):
-        if not obj.created_by:
-            return ''
-        if hasattr(obj.created_by, 'profile') and obj.created_by.profile.display_name:
-            return obj.created_by.profile.display_name
-        return obj.created_by.username
-
-
-class DailyCheckInItemSerializer(serializers.ModelSerializer):
-    plan_item_detail = PracticePlanItemSerializer(source='plan_item', read_only=True)
-
-    class Meta:
-        model = DailyCheckInItem
-        fields = ['id', 'plan_item', 'plan_item_detail', 'completed', 'minutes', 'reps', 'notes']
-        read_only_fields = ['id', 'plan_item_detail']
-
-
-class DailyCheckInSerializer(serializers.ModelSerializer):
-    items = DailyCheckInItemSerializer(many=True, read_only=True)
-    user_display_name = serializers.SerializerMethodField()
-    linked_session_id = serializers.IntegerField(source='linked_session.id', read_only=True, default=None)
-    linked_session_title = serializers.CharField(source='linked_session.title', read_only=True, default='')
-    plan_name = serializers.CharField(source='plan.name', read_only=True, default='')
-
-    class Meta:
-        model = DailyCheckIn
-        fields = [
-            'id', 'space', 'user', 'user_display_name', 'plan', 'plan_name',
-            'date', 'status', 'total_minutes', 'notes',
-            'linked_session', 'linked_session_id', 'linked_session_title',
-            'created_at', 'updated_at', 'items',
-        ]
-        read_only_fields = [
-            'id', 'space', 'user', 'user_display_name', 'plan_name', 'linked_session_id', 'linked_session_title',
-            'created_at', 'updated_at', 'items',
-        ]
-
-    def get_user_display_name(self, obj):
-        if hasattr(obj.user, 'profile') and obj.user.profile.display_name:
-            return obj.user.profile.display_name
-        return obj.user.username
 
 
 class SessionAssetSerializer(serializers.ModelSerializer):
@@ -401,14 +81,14 @@ class SessionAssetSerializer(serializers.ModelSerializer):
             return key
 
 
-class CommentSerializer(serializers.ModelSerializer):
+class VideoFeedbackSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     display_name = serializers.SerializerMethodField()
 
     class Meta:
-        model = Comment
+        model = VideoFeedback
         fields = ['id', 'session', 'user', 'username', 'display_name',
-                  'timestamp_seconds', 'text', 'video_reply', 'created_at']
+                  'timestamp_seconds', 'text', 'feedback_video', 'created_at']
         read_only_fields = ['id', 'user', 'username', 'display_name', 'created_at']
 
     def get_display_name(self, obj):
@@ -427,35 +107,20 @@ class ChapterSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
 
 
-class TagSerializer(serializers.ModelSerializer):
-    session_count = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Tag
-        fields = ['id', 'name', 'session_count']
-        read_only_fields = ['id']
-
-    def get_session_count(self, obj):
-        return obj.sessions.count()
 
 
 class SessionSerializer(serializers.ModelSerializer):
     chapters = ChapterSerializer(many=True, read_only=True)
-    comments = CommentSerializer(many=True, read_only=True)
-    review_feedback = serializers.SerializerMethodField()
+    video_feedback = VideoFeedbackSerializer(many=True, read_only=True)
     active_review_link = serializers.SerializerMethodField()
-    can_review_feedback = serializers.SerializerMethodField()
     tag_names = serializers.SerializerMethodField()
-    space_name = serializers.CharField(source='space.name', read_only=True, default=None)
-    space_id = serializers.IntegerField(source='space.id', read_only=True, default=None)
     chapter_count = serializers.SerializerMethodField()
-    comment_count = serializers.SerializerMethodField()
+    video_feedback_count = serializers.SerializerMethodField()
     owner = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
     processing_status = serializers.CharField(read_only=True)
     processing_error = serializers.CharField(read_only=True)
     assets = SessionAssetSerializer(many=True, read_only=True)
-    is_space_main = serializers.SerializerMethodField()
 
     class Meta:
         model = Session
@@ -463,9 +128,8 @@ class SessionSerializer(serializers.ModelSerializer):
                   'reference_title', 'reference_url',
                   'duration_seconds', 'recorded_at', 'created_at', 'updated_at',
                   'processing_status', 'processing_error',
-                  'space_id', 'space_name', 'tag_names',
-                  'assets', 'is_space_main',
-                  'chapters', 'comments', 'review_feedback', 'active_review_link', 'can_review_feedback', 'chapter_count', 'comment_count', 'owner',
+                  'tag_names', 'assets',
+                  'chapters', 'video_feedback', 'active_review_link', 'chapter_count', 'video_feedback_count', 'owner',
                   'can_edit']
         read_only_fields = ['id', 'recorded_at', 'created_at', 'updated_at']
 
@@ -475,12 +139,8 @@ class SessionSerializer(serializers.ModelSerializer):
     def get_chapter_count(self, obj):
         return obj.chapters.count()
 
-    def get_comment_count(self, obj):
-        return obj.comments.count()
-
-    def get_review_feedback(self, obj):
-        feedback = obj.review_feedback.all().order_by('timestamp_seconds', 'created_at')
-        return ReviewFeedbackSerializer(feedback, many=True).data
+    def get_video_feedback_count(self, obj):
+        return obj.video_feedback.count()
 
     def get_active_review_link(self, obj):
         user = self._request_user()
@@ -491,14 +151,6 @@ class SessionSerializer(serializers.ModelSerializer):
         if not link:
             return None
         return ReviewLinkSerializer(link, context=self.context).data
-
-    def get_can_review_feedback(self, obj):
-        user = self._request_user()
-        if not user:
-            return False
-        if user.is_staff or obj.user_id == user.id:
-            return True
-        return bool(obj.space_id and getattr(obj.space, 'owner_id', None) == user.id)
 
     def get_owner(self, obj):
         if obj.user:
@@ -518,119 +170,24 @@ class SessionSerializer(serializers.ModelSerializer):
             return False
         return user.is_staff or obj.user_id == user.id
 
-    def get_is_space_main(self, obj):
-        return bool(obj.space_id and getattr(obj.space, 'main_session_id', None) == obj.id)
-
-
 class SessionListSerializer(serializers.ModelSerializer):
-    tag_names = serializers.SerializerMethodField()
-    space_name = serializers.CharField(source='space.name', read_only=True, default=None)
-    space_id = serializers.IntegerField(source='space.id', read_only=True, default=None)
-    chapter_count = serializers.SerializerMethodField()
-    comment_count = serializers.SerializerMethodField()
-    review_feedback_count = serializers.SerializerMethodField()
-    feedback_given_by_you_count = serializers.SerializerMethodField()
-    has_feedback_from_you = serializers.SerializerMethodField()
-    student_streak_days = serializers.SerializerMethodField()
-    owner_name = serializers.SerializerMethodField()
-    owner_id = serializers.IntegerField(source='user.id', read_only=True, default=None)
-    has_unread = serializers.SerializerMethodField()
+    video_feedback_count = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
-    can_review_feedback = serializers.SerializerMethodField()
-    needs_review = serializers.SerializerMethodField()
     processing_status = serializers.CharField(read_only=True)
     processing_error = serializers.CharField(read_only=True)
     assets = SessionAssetSerializer(many=True, read_only=True)
-    is_space_main = serializers.SerializerMethodField()
 
     class Meta:
         model = Session
         fields = ['id', 'title', 'description', 'video_file',
-                  'reference_title', 'reference_url',
                   'duration_seconds', 'recorded_at', 'created_at',
                   'processing_status', 'processing_error',
-                  'space_id', 'space_name', 'tag_names',
-                  'assets', 'is_space_main',
-                  'chapter_count', 'comment_count', 'review_feedback_count', 'feedback_given_by_you_count', 'has_feedback_from_you', 'student_streak_days', 'owner_name', 'owner_id', 'has_unread',
-                  'can_review_feedback', 'needs_review',
+                  'assets', 'video_feedback_count',
                   'can_edit']
         read_only_fields = ['id', 'recorded_at', 'created_at']
 
-    def get_tag_names(self, obj):
-        return [t.name for t in obj.tags.all()]
-
-    def get_chapter_count(self, obj):
-        return obj.chapters.count()
-
-    def get_comment_count(self, obj):
-        return obj.comments.count()
-
-    def get_review_feedback_count(self, obj):
-        return obj.review_feedback.count()
-
-    def get_feedback_given_by_you_count(self, obj):
-        user = self._request_user()
-        if not user:
-            return 0
-        return obj.review_feedback.filter(author_user_id=user.id).count()
-
-    def get_has_feedback_from_you(self, obj):
-        return self.get_feedback_given_by_you_count(obj) > 0
-
-    def get_student_streak_days(self, obj):
-        if not obj.user_id:
-            return 0
-        dates = list(
-            Session.objects.filter(user_id=obj.user_id)
-            .order_by('-recorded_at')
-            .values_list('recorded_at', flat=True)
-        )
-        unique_days = []
-        seen = set()
-        for dt in dates:
-            if not dt:
-                continue
-            day = timezone.localtime(dt).date() if timezone.is_aware(dt) else dt.date()
-            if day in seen:
-                continue
-            seen.add(day)
-            unique_days.append(day)
-        if not unique_days:
-            return 0
-        streak = 1
-        previous = unique_days[0]
-        for day in unique_days[1:]:
-            if (previous - day).days == 1:
-                streak += 1
-                previous = day
-                continue
-            break
-        return streak
-
-    def get_owner_name(self, obj):
-        if obj.user and hasattr(obj.user, 'profile') and obj.user.profile.display_name:
-            return obj.user.profile.display_name
-        return obj.user.username if obj.user else None
-
-    def get_has_unread(self, obj):
-        request = self.context.get('request')
-        if not request or not request.user.is_authenticated:
-            return False
-        latest_timestamps = []
-        comments = obj.comments.all()
-        feedback = obj.review_feedback.all()
-        if comments:
-            latest_timestamps.append(max(c.created_at for c in comments))
-        if feedback:
-            latest_timestamps.append(max(f.created_at for f in feedback))
-        if not latest_timestamps:
-            return False
-        latest_activity = max(latest_timestamps)
-        try:
-            last_seen = obj.last_seen_by.get(user=request.user)
-            return latest_activity > last_seen.seen_at
-        except SessionLastSeen.DoesNotExist:
-            return True
+    def get_video_feedback_count(self, obj):
+        return obj.video_feedback.count()
 
     def _request_user(self):
         request = self.context.get('request')
@@ -644,33 +201,6 @@ class SessionListSerializer(serializers.ModelSerializer):
             return False
         return user.is_staff or obj.user_id == user.id
 
-    def get_can_review_feedback(self, obj):
-        user = self._request_user()
-        if not user:
-            return False
-        if user.is_staff or obj.user_id == user.id:
-            return True
-        return bool(obj.space_id and getattr(obj.space, 'owner_id', None) == user.id)
-
-    def get_needs_review(self, obj):
-        if not self.get_can_review_feedback(obj) or self.get_can_edit(obj):
-            return False
-        return obj.review_feedback.count() == 0
-
-    def get_is_space_main(self, obj):
-        return bool(obj.space_id and getattr(obj.space, 'main_session_id', None) == obj.id)
-
-
-class ProgressChapterSerializer(serializers.ModelSerializer):
-    session_title = serializers.CharField(source='session.title', read_only=True)
-    session_id = serializers.IntegerField(source='session.id', read_only=True)
-    session_video = serializers.FileField(source='session.video_file', read_only=True)
-    session_date = serializers.DateTimeField(source='session.recorded_at', read_only=True)
-
-    class Meta:
-        model = Chapter
-        fields = ['id', 'timestamp_seconds', 'end_seconds', 'notes',
-                  'session_id', 'session_title', 'session_video', 'session_date', 'created_at']
 
 
 class PublicSessionSerializer(serializers.ModelSerializer):
@@ -678,7 +208,7 @@ class PublicSessionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Session
-        fields = ['id', 'title', 'description', 'video_file', 'duration_seconds', 'recorded_at', 'assets']
+        fields = ['id', 'title', 'description', 'video_file', 'duration_seconds', 'recorded_at', 'assets', 'processing_status', 'processing_error']
         read_only_fields = fields
 
 
@@ -687,8 +217,8 @@ class ReviewLinkSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ReviewLink
-        fields = ['token', 'expires_at', 'is_active', 'allow_comments', 'url']
-        read_only_fields = ['token', 'expires_at', 'is_active', 'allow_comments', 'url']
+        fields = ['token', 'expires_at', 'is_active', 'allow_video_feedback', 'url']
+        read_only_fields = ['token', 'expires_at', 'is_active', 'allow_video_feedback', 'url']
 
     def get_url(self, obj):
         request = self.context.get('request')
@@ -699,22 +229,28 @@ class ReviewLinkSerializer(serializers.ModelSerializer):
         return f"{base}/r/{obj.token}"
 
 
-class ReviewFeedbackSerializer(serializers.ModelSerializer):
+class ReviewVideoFeedbackSerializer(serializers.ModelSerializer):
     author_display_name = serializers.SerializerMethodField()
     authored_by_current_user = serializers.SerializerMethodField()
+    text = serializers.CharField(required=False, allow_blank=True, default='')
+
+    class Meta:
+        model = VideoFeedback
+        fields = [
+            'id', 'author_display_name', 'authored_by_current_user',
+            'timestamp_seconds', 'text', 'feedback_video', 'created_at',
+        ]
+        read_only_fields = ['id', 'author_display_name', 'authored_by_current_user', 'created_at']
 
     def get_author_display_name(self, obj):
-        if getattr(obj, 'author_user', None):
-            user = obj.author_user
-            if hasattr(user, 'profile') and user.profile.display_name:
-                return user.profile.display_name
-            return user.username
-        return obj.name or 'Anonymous'
+        if hasattr(obj.user, 'profile') and obj.user.profile.display_name:
+            return obj.user.profile.display_name
+        return obj.user.username
 
     def get_authored_by_current_user(self, obj):
         request = self.context.get('request')
         user = getattr(request, 'user', None) if request else None
-        return bool(user and user.is_authenticated and getattr(obj, 'author_user_id', None) == user.id)
+        return bool(user and user.is_authenticated and obj.user_id == user.id)
 
     def validate_timestamp_seconds(self, value):
         if value is None:
@@ -727,8 +263,3 @@ class ReviewFeedbackSerializer(serializers.ModelSerializer):
         if duration_seconds is not None and value > int(duration_seconds):
             raise serializers.ValidationError('Timestamp must be within the video duration.')
         return value
-
-    class Meta:
-        model = ReviewFeedback
-        fields = ['id', 'name', 'email', 'author_display_name', 'authored_by_current_user', 'timestamp_seconds', 'text', 'created_at']
-        read_only_fields = ['id', 'created_at']

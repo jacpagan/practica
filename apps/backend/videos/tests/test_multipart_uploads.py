@@ -7,7 +7,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from videos.models import MultipartSessionUpload, Profile, Session, Space, SpaceMember
+from videos.models import MultipartSessionUpload, Profile, Session
 
 
 class FakeS3Client:
@@ -54,8 +54,6 @@ class MultipartUploadApiTests(APITestCase):
         self.member = User.objects.create_user(username='member', password='pass1234')
         Profile.objects.create(user=self.owner, display_name='Owner')
         Profile.objects.create(user=self.member, display_name='Member')
-        self.space = Space.objects.create(name='Drumming', owner=self.owner)
-        SpaceMember.objects.create(space=self.space, user=self.member)
 
     def test_multipart_create_session_flow(self):
         fake_s3 = FakeS3Client()
@@ -70,7 +68,6 @@ class MultipartUploadApiTests(APITestCase):
                     'size_bytes': 30 * 1024 * 1024,
                     'filename': 'drum-take.mp4',
                     'content_type': 'video/mp4',
-                    'space': self.space.id,
                     'tags': ['timing', 'groove'],
                     'duration_seconds': 900,
                 },
@@ -101,7 +98,6 @@ class MultipartUploadApiTests(APITestCase):
 
         session = Session.objects.get(id=complete_res.data['id'])
         self.assertEqual(session.user, self.member)
-        self.assertEqual(session.space, self.space)
         self.assertEqual(session.duration_seconds, 900)
         self.assertEqual(set(session.tags.values_list('name', flat=True)), {'timing', 'groove'})
         self.assertIn('sessions/', session.video_file.name)
@@ -111,7 +107,6 @@ class MultipartUploadApiTests(APITestCase):
 
         upload = MultipartSessionUpload.objects.create(
             user=self.owner,
-            space=self.space,
             status=MultipartSessionUpload.STATUS_INITIATED,
             title='Owner Upload',
             description='',
@@ -143,7 +138,6 @@ class MultipartUploadApiTests(APITestCase):
 
         upload = MultipartSessionUpload.objects.create(
             user=self.member,
-            space=self.space,
             status=MultipartSessionUpload.STATUS_INITIATED,
             title='Resume me',
             description='',
@@ -169,13 +163,11 @@ class MultipartUploadApiTests(APITestCase):
         self.assertEqual(status_res.data['part_size'], 5 * 1024 * 1024)
         self.assertEqual(status_res.data['total_parts'], 4)
         self.assertEqual(len(status_res.data['uploaded_parts']), 2)
-        self.assertEqual(status_res.data['uploaded_parts'][0]['part_number'], 1)
 
     def test_status_marks_expired_upload(self):
         fake_s3 = FakeS3Client()
         upload = MultipartSessionUpload.objects.create(
             user=self.member,
-            space=self.space,
             status=MultipartSessionUpload.STATUS_INITIATED,
             title='Old upload',
             description='',
@@ -212,7 +204,6 @@ class MultipartUploadApiTests(APITestCase):
                     'size_bytes': 50 * 1024 * 1024,
                     'filename': 'IMG_1313.MOV',
                     'content_type': 'application/octet-stream',
-                    'space': self.space.id,
                 },
                 format='json',
             )

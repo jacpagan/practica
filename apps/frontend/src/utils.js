@@ -7,8 +7,6 @@ const MULTIPART_CONCURRENCY = 4
 const RETRY_BASE_DELAY_MS = 500
 const RETRY_MAX_DELAY_MS = 4000
 const MULTIPART_RESUME_PREFIX = 'practica.multipart.resume.v1'
-const REFERENCE_ATTEMPT_DRAFT_KEY = 'practica.reference_attempt_draft.v1'
-const SPACE_REFERENCE_LIBRARY_PREFIX = 'practica.space_reference_library.v1'
 const CLIENT_TRACE_ID_KEY = 'practica.client_trace_id.v1'
 const RECORDER_MIME_CANDIDATES = [
   'video/webm;codecs=vp9',
@@ -66,21 +64,6 @@ export const preferredSessionVideoUrl = (session) => {
   return assetUrl(proxy) || videoUrl(session?.video_file)
 }
 
-export const sessionHlsUrl = (session) => {
-  const hls = assetByType(session, 'hls_master')
-  return assetUrl(hls)
-}
-
-export const sessionThumbVttUrl = (session) => {
-  const vtt = assetByType(session, 'thumb_vtt')
-  return assetUrl(vtt)
-}
-
-export const sessionThumbSpriteUrl = (session) => {
-  const sprite = assetByType(session, 'thumb_sprite')
-  return assetUrl(sprite)
-}
-
 export const fmtTime = (s) => {
   const sec = Math.floor(s)
   const m = Math.floor(sec / 60)
@@ -107,55 +90,6 @@ export const fmtDate = (d) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-export const fmtDateLong = (d) =>
-  new Date(d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-
-const pad2 = (n) => String(n).padStart(2, '0')
-
-export const toDateTimeLocalValue = (value = new Date()) => {
-  const date = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`
-}
-
-export const dateTimeLocalToIso = (value) => {
-  if (!value) return null
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return null
-  return date.toISOString()
-}
-
-export const fmtDuration = (start, end) => {
-  if (end == null) return null
-  const d = end - start
-  if (d <= 0) return null
-  if (d < 60) return `${d}s`
-  const m = Math.floor(d / 60)
-  const s = d % 60
-  return s > 0 ? `${m}m ${s}s` : `${m}m`
-}
-
-export const parseTimeInput = (str) => {
-  if (!str || !str.trim()) return null
-  const parseIntToken = (value) => {
-    const parsed = Number.parseInt(String(value).trim(), 10)
-    return Number.isNaN(parsed) ? null : parsed
-  }
-  const parts = str.split(':')
-  if (parts.length === 2) {
-    const minutes = parseIntToken(parts[0])
-    const seconds = parseIntToken(parts[1])
-    if (minutes === null || seconds === null) return null
-    return Math.max(0, minutes * 60 + seconds)
-  }
-  if (parts.length === 1) {
-    const seconds = parseIntToken(parts[0])
-    if (seconds === null) return null
-    return Math.max(0, seconds)
-  }
-  return null
-}
-
 export const pickRecorderMimeType = (preferred = []) => {
   if (typeof window === 'undefined' || typeof window.MediaRecorder === 'undefined') return ''
   if (typeof window.MediaRecorder.isTypeSupported !== 'function') return ''
@@ -168,120 +102,12 @@ export const pickRecorderMimeType = (preferred = []) => {
   return ''
 }
 
-export const canUseScreenRecording = () => {
-  if (typeof window === 'undefined') return false
-  const canvas = document.createElement('canvas')
-  return Boolean(
-    window.MediaRecorder &&
-    navigator?.mediaDevices &&
-    typeof navigator.mediaDevices.getDisplayMedia === 'function' &&
-    typeof canvas.captureStream === 'function'
-  )
-}
-
 const localStore = () => {
   try {
     return window.localStorage
   } catch {
     return null
   }
-}
-
-const sessionStore = () => {
-  try {
-    return window.sessionStorage
-  } catch {
-    return null
-  }
-}
-
-export const readReferenceAttemptDraft = () => {
-  const store = sessionStore()
-  if (!store) return null
-  try {
-    const raw = store.getItem(REFERENCE_ATTEMPT_DRAFT_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object') return null
-    return parsed
-  } catch {
-    return null
-  }
-}
-
-export const writeReferenceAttemptDraft = (draft = {}) => {
-  const store = sessionStore()
-  if (!store) return
-  try {
-    store.setItem(REFERENCE_ATTEMPT_DRAFT_KEY, JSON.stringify({
-      reference_title: String(draft.reference_title || '').trim(),
-      reference_url: String(draft.reference_url || '').trim(),
-      space_id: draft.space_id || null,
-      updated_at: Date.now(),
-    }))
-  } catch {
-    // Ignore draft persistence failures.
-  }
-}
-
-export const clearReferenceAttemptDraft = () => {
-  const store = sessionStore()
-  if (!store) return
-  try {
-    store.removeItem(REFERENCE_ATTEMPT_DRAFT_KEY)
-  } catch {
-    // Ignore draft persistence failures.
-  }
-}
-
-const referenceLibraryKey = (spaceId) => `${SPACE_REFERENCE_LIBRARY_PREFIX}:${spaceId || 'none'}`
-
-export const readSavedSpaceReferences = (spaceId) => {
-  if (!spaceId) return []
-  const store = localStore()
-  if (!store) return []
-  try {
-    const raw = store.getItem(referenceLibraryKey(spaceId))
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-export const saveSavedSpaceReference = (spaceId, reference = {}) => {
-  if (!spaceId) return []
-  const store = localStore()
-  if (!store) return []
-  const existing = readSavedSpaceReferences(spaceId)
-  const normalized = {
-    id: reference.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    title: String(reference.title || reference.reference_title || reference.reference_url || '').trim(),
-    reference_url: String(reference.reference_url || '').trim(),
-    notes: String(reference.notes || '').trim(),
-    created_at: reference.created_at || new Date().toISOString(),
-  }
-  const next = [normalized, ...existing.filter((item) => item.id !== normalized.id)]
-  try {
-    store.setItem(referenceLibraryKey(spaceId), JSON.stringify(next))
-  } catch {
-    return existing
-  }
-  return next
-}
-
-export const deleteSavedSpaceReference = (spaceId, referenceId) => {
-  if (!spaceId) return []
-  const store = localStore()
-  if (!store) return []
-  const next = readSavedSpaceReferences(spaceId).filter((item) => item.id !== referenceId)
-  try {
-    store.setItem(referenceLibraryKey(spaceId), JSON.stringify(next))
-  } catch {
-    return readSavedSpaceReferences(spaceId)
-  }
-  return next
 }
 
 const trimLogValue = (value, maxChars) => String(value || '').slice(0, maxChars)
@@ -331,7 +157,6 @@ const multipartFingerprint = ({ payload, videoFile }) => {
     payload?.title || '',
     payload?.reference_title || '',
     payload?.reference_url || '',
-    payload?.space || '',
     payload?.duration_seconds || '',
     tags,
   ].join('|')
@@ -678,7 +503,6 @@ export const createSessionUpload = async ({ token, payload, videoFile, onProgres
     if (payload.duration_seconds !== undefined && payload.duration_seconds !== null && payload.duration_seconds !== '') {
       fd.append('duration_seconds', payload.duration_seconds)
     }
-    if (payload.space) fd.append('space', payload.space)
     if (payload.tags?.length) fd.append('tags', payload.tags.join(','))
     return uploadFormData({ url: '/api/sessions/', formData: fd, token, onProgress })
   } catch {
