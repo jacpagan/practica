@@ -109,16 +109,7 @@ docker ps -aq \
   --filter label=com.docker.compose.project=practica \
   --filter label=com.docker.compose.service=backend | xargs -r docker rm -f
 docker ps --filter publish=8000 -q | xargs -r docker rm -f
-compose -f docker-compose.prod.yml up -d --no-deps backend
-
-# Schedule periodic coach metrics aggregation.
-cat > /etc/cron.d/practica-coach-metrics <<CRON
-SHELL=/bin/bash
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-0 * * * * root cd /opt/practica && if docker compose version >/dev/null 2>&1; then docker compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py build_coach_metrics --days 35; elif command -v docker-compose >/dev/null 2>&1; then docker-compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py build_coach_metrics --days 35; fi >> /var/log/practica-coach-metrics.log 2>&1
-CRON
-chmod 0644 /etc/cron.d/practica-coach-metrics
-systemctl reload cron || service cron reload || true
+compose -f docker-compose.prod.yml up -d --force-recreate --no-deps backend
 
 # Apply upload-safe nginx defaults globally (http context).
 cat > /etc/nginx/conf.d/practica-upload.conf <<NGINXUPLOAD
@@ -132,7 +123,26 @@ NGINXUPLOAD
 
 backend_ok=0
 for i in $(seq 1 60); do
-  curl -fsS -H "Host: practica.jpagan.com" http://127.0.0.1:8000/health/ && backend_ok=1 && break || sleep 2
+  HEALTH_JSON=$(curl -fsS -H "Host: practica.jpagan.com" http://127.0.0.1:8000/health/ 2>/dev/null || true)
+  if [ -n "$HEALTH_JSON" ] && python3 -c '
+import json
+import sys
+
+expected = (sys.argv[1] or "").strip()
+try:
+    payload = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+
+status = str(payload.get("status") or "").strip()
+deployed_sha = str(payload.get("deployed_sha") or "").strip()
+sys.exit(0 if status == "healthy" and deployed_sha == expected else 1)
+' "$DEPLOYED_GIT_SHA" <<<"$HEALTH_JSON"
+  then
+    backend_ok=1
+    break
+  fi
+  sleep 2
 done
 if [ "$backend_ok" != "1" ]; then
   echo 'Backend failed health check' >&2
@@ -256,23 +266,23 @@ PUBLIC_FINAL=0
 PUBLIC_STREAK=0
 for i in $(seq 1 "$PUBLIC_VERIFY_MAX_POLLS"); do
   HEALTH_JSON=$(curl -fsS --max-time 10 https://practica.jpagan.com/health/ 2>/dev/null || true)
-  if [ -n "$HEALTH_JSON" ] && python3 - "$EXPECTED_SHA" <<'PY' <<<"$HEALTH_JSON"
+  if [ -n "$HEALTH_JSON" ] && python3 -c '
 import json
 import sys
 
-expected = (sys.argv[1] or '').strip()
+expected = (sys.argv[1] or "").strip()
 try:
     payload = json.load(sys.stdin)
 except Exception:
     sys.exit(1)
 
-status = str(payload.get('status') or '').strip()
-deployed_sha = str(payload.get('deployed_sha') or '').strip()
-if status == 'healthy' and deployed_sha == expected:
+status = str(payload.get("status") or "").strip()
+deployed_sha = str(payload.get("deployed_sha") or "").strip()
+if status == "healthy" and deployed_sha == expected:
     print(f"healthy deployed_sha={deployed_sha}")
     sys.exit(0)
 sys.exit(1)
-PY
+' "$EXPECTED_SHA" <<<"$HEALTH_JSON"
   then
     READY_JSON=$(curl -fsS --max-time 10 https://practica.jpagan.com/ready/ 2>/dev/null || true)
     if [ -n "$READY_JSON" ] && python3 <<'PY' <<<"$READY_JSON"
