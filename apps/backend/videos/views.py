@@ -10,7 +10,6 @@ from django.db import connection, transaction
 from django.utils import timezone
 from django.conf import settings
 from django.contrib.auth import authenticate
-from django.contrib.auth.models import User
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
@@ -44,6 +43,25 @@ def _visible_sessions_qs(user):
     if not user.is_authenticated:
         return Session.objects.none()
     return Session.objects.filter(user=user)
+
+
+def _active_review_link_or_404(token):
+    normalized_token = str(token or '').strip()
+    if not normalized_token:
+        raise Http404('Review link not found')
+
+    link = ReviewLink.objects.select_related(
+        'session',
+        'session__user',
+        'session__user__profile',
+    ).filter(
+        token=normalized_token,
+        is_active=True,
+        expires_at__gt=timezone.now(),
+    ).first()
+    if not link:
+        raise Http404('Review link not found')
+    return link
 
 
 def can_edit_session(user, session):
@@ -363,11 +381,22 @@ class SessionViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("You can only delete your own sessions.")
         instance.delete()
 
-    @action(detail=True, methods=['post'], url_path='share')
+    @action(detail=True, methods=['post', 'delete'], url_path='share')
     def create_share_link(self, request, pk=None):
         session = self.get_object()
+        if request.method == 'DELETE':
+            if not can_edit_session(request.user, session):
+                raise PermissionDenied("You can only revoke your own sessions' links.")
+            ReviewLink.objects.filter(session=session, is_active=True).update(is_active=False)
+            return Response({'ok': True})
+
         if not can_edit_session(request.user, session):
             raise PermissionDenied("You can only share your own sessions.")
+        if session.processing_status != Session.STATUS_READY:
+            return Response(
+                {'error': 'This video must be playback ready before you can share a private feedback link.'},
+                status=status.HTTP_409_CONFLICT,
+            )
         existing_link = session.review_links.filter(is_active=True, expires_at__gt=timezone.now()).order_by('-created_at').first()
         if existing_link:
             return Response(ReviewLinkSerializer(existing_link, context={'request': request}).data, status=status.HTTP_200_OK)

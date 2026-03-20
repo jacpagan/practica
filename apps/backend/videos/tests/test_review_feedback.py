@@ -22,6 +22,7 @@ class ReviewFeedbackApiTests(APITestCase):
             description='Session to test private video feedback',
             video_file='sessions/review-owner.mp4',
             duration_seconds=120,
+            processing_status=Session.STATUS_READY,
         )
         self.link = ReviewLink.objects.create(
             session=self.session,
@@ -98,6 +99,8 @@ class ReviewFeedbackApiTests(APITestCase):
         self.assertTrue(bool(response.data['video_feedback'][0]['feedback_video']))
 
     def test_owner_can_create_and_reuse_private_share_link(self):
+        self.link.is_active = False
+        self.link.save(update_fields=['is_active'])
         self._auth(self.owner)
 
         first = self.client.post(f'/api/sessions/{self.session.id}/share/')
@@ -107,3 +110,44 @@ class ReviewFeedbackApiTests(APITestCase):
         self.assertEqual(second.status_code, status.HTTP_200_OK)
         self.assertEqual(first.data['token'], second.data['token'])
         self.assertIn('/r/', first.data['url'])
+
+    def test_owner_can_revoke_private_share_link_via_delete_share_route(self):
+        self._auth(self.owner)
+
+        response = self.client.delete(f'/api/sessions/{self.session.id}/share/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {'ok': True})
+        self.link.refresh_from_db()
+        self.assertFalse(self.link.is_active)
+
+    def test_revoked_private_link_returns_not_found(self):
+        self.link.is_active = False
+        self.link.save(update_fields=['is_active'])
+        self._auth(self.reviewer)
+
+        response = self.client.get(f'/api/review/{self.link.token}/')
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_delete_share_route_blocks_review_access_after_revoke(self):
+        self._auth(self.owner)
+        revoke_response = self.client.delete(f'/api/sessions/{self.session.id}/share/')
+        self.assertEqual(revoke_response.status_code, status.HTTP_200_OK)
+
+        self._auth(self.reviewer)
+        response = self.client.get(f'/api/review/{self.link.token}/feedback/')
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_owner_cannot_create_private_share_link_until_session_is_ready(self):
+        self.link.is_active = False
+        self.link.save(update_fields=['is_active'])
+        self.session.processing_status = Session.STATUS_PROCESSING
+        self.session.save(update_fields=['processing_status'])
+        self._auth(self.owner)
+
+        response = self.client.post(f'/api/sessions/{self.session.id}/share/')
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertIn('playback ready', response.data['error'].lower())

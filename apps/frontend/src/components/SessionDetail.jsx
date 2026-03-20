@@ -21,6 +21,7 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
 
   const authHeaders = useMemo(() => (token ? { Authorization: `Token ${token}` } : {}), [token])
   const canEdit = Boolean(session?.can_edit)
+  const canCreateShareLink = session?.processing_status === 'ready'
   const playableUrl = session?.local_preview_url || preferredSessionVideoUrl(session)
   const videoFeedback = Array.isArray(session?.video_feedback)
     ? session.video_feedback.filter((item) => item.feedback_video)
@@ -88,13 +89,13 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
         method: 'POST',
         headers: authHeaders,
       })
-      if (!res.ok) throw new Error('share')
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Could not create private feedback link')
       setActiveReviewLink(data)
       await navigator.clipboard.writeText(data.url)
       toast.success(res.status === 201 ? 'Private feedback link created' : 'Private feedback link copied')
-    } catch {
-      toast.error('Could not create private feedback link')
+    } catch (error) {
+      toast.error(error?.message || 'Could not create private feedback link')
     } finally {
       setSharing(false)
     }
@@ -300,9 +301,21 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
                       </div>
                     </div>
                   ) : (
-                    <button type="button" onClick={createShare} disabled={sharing} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                      {sharing ? 'Creating…' : 'Create private feedback link'}
-                    </button>
+                    <div className="space-y-3">
+                      {!canCreateShareLink ? (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
+                          <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Not shareable yet</p>
+                          <p className="text-sm text-amber-900 mt-1">
+                            {session.processing_status === 'failed'
+                              ? 'Fix playback processing before sharing this private review link.'
+                              : 'Wait until playback is ready before sharing this private review link.'}
+                          </p>
+                        </div>
+                      ) : null}
+                      <button type="button" onClick={createShare} disabled={sharing || !canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
+                        {sharing ? 'Creating…' : 'Create private feedback link'}
+                      </button>
+                    </div>
                   )}
                 </div>
               ) : null}

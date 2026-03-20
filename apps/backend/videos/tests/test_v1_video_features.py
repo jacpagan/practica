@@ -95,6 +95,27 @@ class V1VideoFeaturesTests(APITestCase):
         AWS_MEDIA_CONVERT_ROLE_ARN='',
         AWS_MEDIA_CONVERT_ENDPOINT_URL='',
     )
+    def test_session_create_rejects_non_video_uploads(self):
+        self.client.force_authenticate(user=self.owner)
+
+        res = self.client.post(
+            '/api/sessions/',
+            {
+                'title': 'Invalid Upload',
+                'description': 'not a video',
+                'video_file': SimpleUploadedFile('notes.txt', b'hello', content_type='text/plain'),
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('only video files allowed', str(res.data).lower())
+
+    @override_settings(
+        AWS_STORAGE_BUCKET_NAME='',
+        AWS_MEDIA_CONVERT_ROLE_ARN='',
+        AWS_MEDIA_CONVERT_ENDPOINT_URL='',
+    )
     def test_mov_session_without_transcoding_fails_with_clear_message(self):
         self.client.force_authenticate(user=self.owner)
 
