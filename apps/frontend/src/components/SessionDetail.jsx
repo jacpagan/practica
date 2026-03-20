@@ -19,6 +19,38 @@ const requestStatusLabel = (value = '') => {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1)
 }
 
+const LAST_TEACHER_KEY = 'practica.last_teacher.v1'
+const LESSON_GOAL_PRESETS = [
+  'Today\'s drum lesson follow-up',
+  'Timing and consistency',
+  'Groove and feel',
+  'Technique and motion',
+]
+
+const readLastTeacher = () => {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(LAST_TEACHER_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || !parsed.id) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+const writeLastTeacher = (teacher) => {
+  if (typeof window === 'undefined' || !teacher?.id) return
+  try {
+    window.localStorage.setItem(LAST_TEACHER_KEY, JSON.stringify({
+      id: teacher.id,
+      username: teacher.username,
+      display_name: teacher.display_name,
+    }))
+  } catch {}
+}
+
 function SessionDetail({ session: initialSession, token, onBack, onOpenReviewRequest, initialReviewRequestDraft = null, onReviewRequestDraftCleared, onSessionUpdate, onSessionDelete, justUploaded = false, onRecordAnother }) {
   const toast = useToast()
   const confirm = useConfirm()
@@ -42,6 +74,9 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const [teacherResults, setTeacherResults] = useState([])
   const [teacherSearchLoading, setTeacherSearchLoading] = useState(false)
   const [selectedTeacher, setSelectedTeacher] = useState(null)
+  const [recentTeachers, setRecentTeachers] = useState([])
+  const [recentTeachersLoading, setRecentTeachersLoading] = useState(false)
+  const [showRequestDetails, setShowRequestDetails] = useState(false)
   const [requestInstrument, setRequestInstrument] = useState('drums')
   const [requestStudentLevel, setRequestStudentLevel] = useState('')
   const [requestGoal, setRequestGoal] = useState('')
@@ -69,6 +104,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     setTeacherQuery('')
     setTeacherResults([])
     setSelectedTeacher(null)
+    setRecentTeachers([])
+    setShowRequestDetails(false)
     setRequestInstrument('drums')
     setRequestStudentLevel('')
     setRequestGoal('')
@@ -82,6 +119,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     if (!initialReviewRequestDraft || !canEdit) return
     setShowRequestComposer(true)
     setSelectedTeacher(initialReviewRequestDraft.teacher || null)
+    setShowRequestDetails(true)
     setRequestInstrument(initialReviewRequestDraft.instrument || 'drums')
     setRequestStudentLevel(initialReviewRequestDraft.student_level || '')
     setRequestGoal(initialReviewRequestDraft.goal || '')
@@ -108,6 +146,47 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   useEffect(() => {
     loadReviewRequests()
   }, [token, session?.id, canEdit])
+
+  useEffect(() => {
+    if (!token || !canEdit) return undefined
+
+    let cancelled = false
+    const loadRecentTeachers = async () => {
+      setRecentTeachersLoading(true)
+      try {
+        const res = await fetch('/api/review-requests/?role=student', { headers: authHeaders })
+        if (!res.ok) throw new Error('student-review-requests')
+        const data = await res.json()
+        const items = Array.isArray(data) ? data : data.results || []
+        const seen = new Set()
+        const teachers = []
+        items.forEach((item) => {
+          const teacher = item?.teacher
+          if (!teacher?.id || seen.has(teacher.id)) return
+          seen.add(teacher.id)
+          teachers.push(teacher)
+        })
+        if (cancelled) return
+        setRecentTeachers(teachers.slice(0, 6))
+        setSelectedTeacher((current) => {
+          if (current?.id || initialReviewRequestDraft?.teacher?.id) return current
+          const storedTeacher = readLastTeacher()
+          if (storedTeacher?.id) {
+            return teachers.find((teacher) => teacher.id === storedTeacher.id) || storedTeacher
+          }
+          if (teachers.length === 1) return teachers[0]
+          return current
+        })
+      } catch {
+        if (!cancelled) setRecentTeachers([])
+      } finally {
+        if (!cancelled) setRecentTeachersLoading(false)
+      }
+    }
+
+    loadRecentTeachers()
+    return () => { cancelled = true }
+  }, [authHeaders, canEdit, initialReviewRequestDraft?.teacher?.id, token])
 
   useEffect(() => {
     if (!token || !canEdit) return undefined
@@ -143,6 +222,13 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     setEditTitle(session.title || '')
     setEditDescription(session.description || '')
     setEditing(true)
+  }
+
+  const chooseTeacher = (teacher) => {
+    setSelectedTeacher(teacher)
+    setTeacherQuery('')
+    setTeacherResults([])
+    writeLastTeacher(teacher)
   }
 
   const saveEdits = async () => {
@@ -276,17 +362,19 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       setTeacherQuery('')
       setTeacherResults([])
       setSelectedTeacher(null)
+      setShowRequestDetails(false)
       setRequestGoal('')
       setRequestExerciseOrSong('')
       setRequestNotes('')
       setRequestStudentLevel('')
       setRequestDeadline('')
       onReviewRequestDraftCleared?.()
-      toast.success('Teacher review request created')
+      writeLastTeacher(selectedTeacher)
+      toast.success(`Request sent to ${selectedTeacher.display_name || selectedTeacher.username}`)
       if (data?.review_link?.url) {
         try {
           await navigator.clipboard.writeText(data.review_link.url)
-          toast.success('Teacher request link copied')
+          toast.success('Request link copied')
         } catch {}
       }
     } catch (error) {
@@ -462,11 +550,16 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               {justUploaded ? (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4">
                   <p className="text-sm font-medium text-emerald-900">Your video is saved.</p>
-                  <p className="text-sm text-emerald-800 mt-1">It is already in your private library. Watch it now, or record another one.</p>
+                  <p className="text-sm text-emerald-800 mt-1">It is already in your private library. Watch it, ask your teacher, or record another one.</p>
                   <div className="flex flex-wrap gap-2 mt-3">
                     <button type="button" onClick={() => videoRef.current?.play?.().catch?.(() => {})} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
                       Watch video
                     </button>
+                    {canEdit && canCreateShareLink ? (
+                      <button type="button" onClick={() => setShowRequestComposer(true)} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
+                        Ask teacher
+                      </button>
+                    ) : null}
                     <button type="button" onClick={onRecordAnother} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
                       Record another
                     </button>
@@ -539,8 +632,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 <div className="rounded-xl border border-gray-200 bg-white px-4 py-4 space-y-4">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">Teacher review requests</p>
-                      <p className="text-xs text-gray-500 mt-1">Send a structured private request to one teacher, then track the loop from response to resubmission.</p>
+                      <p className="text-sm font-semibold text-gray-900">Ask a teacher</p>
+                      <p className="text-xs text-gray-500 mt-1">Choose your teacher, add one goal, and send.</p>
                     </div>
                     <button
                       type="button"
@@ -548,7 +641,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       disabled={!canCreateShareLink}
                       className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors"
                     >
-                      {showRequestComposer ? 'Close request form' : 'Create teacher request'}
+                      {showRequestComposer ? 'Close' : 'New request'}
                     </button>
                   </div>
 
@@ -573,11 +666,26 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           </div>
                         ) : (
                           <div className="space-y-2">
+                            {recentTeachersLoading ? <p className="text-xs text-gray-500">Loading recent teachers…</p> : null}
+                            {recentTeachers.length > 0 ? (
+                              <div className="flex flex-wrap gap-2">
+                                {recentTeachers.map((teacher) => (
+                                  <button
+                                    key={teacher.id}
+                                    type="button"
+                                    onClick={() => chooseTeacher(teacher)}
+                                    className="rounded-full border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                                  >
+                                    {teacher.display_name || teacher.username}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : null}
                             <input
                               type="text"
                               value={teacherQuery}
                               onChange={(event) => setTeacherQuery(event.target.value)}
-                              placeholder="Search by teacher username or name"
+                              placeholder="Search by teacher name or username"
                               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
                             />
                             {teacherSearchLoading ? <p className="text-xs text-gray-500">Searching…</p> : null}
@@ -587,7 +695,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                   <button
                                     key={teacher.id}
                                     type="button"
-                                    onClick={() => setSelectedTeacher(teacher)}
+                                    onClick={() => chooseTeacher(teacher)}
                                     className="w-full text-left px-3 py-3 hover:bg-gray-50 transition-colors border-b last:border-b-0 border-gray-100"
                                   >
                                     <p className="text-sm font-medium text-gray-900">{teacher.display_name || teacher.username}</p>
@@ -600,46 +708,62 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                         )}
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Instrument</label>
-                          <input type="text" value={requestInstrument} onChange={(event) => setRequestInstrument(event.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Level</label>
-                          <input type="text" value={requestStudentLevel} onChange={(event) => setRequestStudentLevel(event.target.value)} placeholder="Beginner, intermediate, advanced" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
-                        </div>
-                      </div>
-
                       <div>
                         <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Goal</label>
-                        <input type="text" value={requestGoal} onChange={(event) => setRequestGoal(event.target.value)} placeholder="What do you want this teacher to help with?" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Exercise or song</label>
-                        <input type="text" value={requestExerciseOrSong} onChange={(event) => setRequestExerciseOrSong(event.target.value)} placeholder="Optional focus area" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Requested turnaround hours</label>
-                          <input type="number" min="1" step="1" value={requestTurnaroundHours} onChange={(event) => setRequestTurnaroundHours(event.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Deadline</label>
-                          <input type="datetime-local" value={requestDeadline} onChange={(event) => setRequestDeadline(event.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
+                        <input type="text" value={requestGoal} onChange={(event) => setRequestGoal(event.target.value)} placeholder="What do you want help with today?" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {LESSON_GOAL_PRESETS.map((preset) => (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => setRequestGoal(preset)}
+                              className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                            >
+                              {preset}
+                            </button>
+                          ))}
                         </div>
                       </div>
 
-                      <div>
-                        <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Notes</label>
-                        <textarea value={requestNotes} onChange={(event) => setRequestNotes(event.target.value)} rows={3} placeholder="Anything the teacher should pay attention to?" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none" />
+                      <div className="rounded-lg border border-gray-200 bg-white px-3 py-3 space-y-3">
+                        <button type="button" onClick={() => setShowRequestDetails((current) => !current)} className="text-xs text-gray-600 hover:text-gray-900 transition-colors">
+                          {showRequestDetails ? 'Hide details' : 'Add details (optional)'}
+                        </button>
+
+                        {showRequestDetails ? (
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Level</label>
+                                <input type="text" value={requestStudentLevel} onChange={(event) => setRequestStudentLevel(event.target.value)} placeholder="Beginner, intermediate, advanced" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Turnaround hours</label>
+                                <input type="number" min="1" step="1" value={requestTurnaroundHours} onChange={(event) => setRequestTurnaroundHours(event.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Exercise or song</label>
+                              <input type="text" value={requestExerciseOrSong} onChange={(event) => setRequestExerciseOrSong(event.target.value)} placeholder="Optional focus area" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Deadline</label>
+                              <input type="datetime-local" value={requestDeadline} onChange={(event) => setRequestDeadline(event.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Notes</label>
+                              <textarea value={requestNotes} onChange={(event) => setRequestNotes(event.target.value)} rows={3} placeholder="Anything the teacher should watch for?" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none" />
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
 
                       <div className="flex justify-end">
                         <button type="button" disabled={creatingRequest || !canCreateShareLink} onClick={createReviewRequest} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                          {creatingRequest ? 'Creating…' : 'Send teacher request'}
+                          {creatingRequest ? 'Sending…' : 'Send request'}
                         </button>
                       </div>
                     </div>
