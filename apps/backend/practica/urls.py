@@ -5,16 +5,18 @@ from django.conf.urls.static import static
 from django.shortcuts import render
 from rest_framework.routers import DefaultRouter
 from videos.views import (
-    SessionViewSet, health_check,
+    SessionViewSet, ReviewRequestViewSet, health_check,
     ready_check,
     register_view, login_view, me_view,
     client_error_view,
     review_link_info, review_link_feedback,
+    teacher_inbox, teacher_roster,
     favicon,
 )
 
 router = DefaultRouter()
 router.register(r'sessions', SessionViewSet, basename='session')
+router.register(r'review-requests', ReviewRequestViewSet, basename='review-request')
 
 
 def spa_index(request):
@@ -33,6 +35,8 @@ urlpatterns = [
     path('api/client-errors/', client_error_view, name='client_error'),
     path('api/review/<slug:token>/', review_link_info, name='review_link_info'),
     path('api/review/<slug:token>/feedback/', review_link_feedback, name='review_link_feedback'),
+    path('api/teacher/inbox/', teacher_inbox, name='teacher_inbox'),
+    path('api/teacher/roster/', teacher_roster, name='teacher_roster'),
     path('health/', health_check, name='health_check'),
     path('ready/', ready_check, name='ready_check'),
     path('favicon.ico', favicon, name='favicon'),

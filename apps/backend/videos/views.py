@@ -7,6 +7,7 @@ from datetime import timedelta
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse, HttpResponse
 from django.db import connection, transaction
+from django.db.models import Q
 from django.utils import timezone
 from django.conf import settings
 from django.contrib.auth import authenticate
@@ -26,12 +27,14 @@ from .models import (
     Session, Chapter, VideoFeedback, SessionLastSeen, Exercise,
     Tag, MultipartSessionUpload, SessionAsset,
     ReviewLink,
+    ReviewRequest, TeacherRosterMembership,
 )
 from .serializers import (
     UserSerializer, RegisterSerializer,
     SessionSerializer, SessionListSerializer,
     ChapterSerializer,
     PublicSessionSerializer, ReviewLinkSerializer, ReviewVideoFeedbackSerializer,
+    ReviewRequestSerializer, TeacherRosterStudentSerializer,
 )
 from .services.media_pipeline import enqueue_session_processing, enqueue_local_session_transcode, apply_processing_update
 
@@ -91,6 +94,57 @@ def _review_link_error_response(reason):
         },
         status=details['status'],
     )
+
+
+def _review_request_forbidden_response(message='You do not have access to this review request.'):
+    return Response(
+        {
+            'error': message,
+            'code': 'review_request_forbidden',
+        },
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
+
+def _review_request_visible_to_user(review_request, user):
+    if not user.is_authenticated:
+        return False
+    if user.is_staff:
+        return True
+    return user.id in {review_request.student_id, review_request.teacher_id}
+
+
+def _review_request_teacher_can_respond(review_request, user):
+    if not user.is_authenticated:
+        return False
+    if user.is_staff:
+        return True
+    return user.id == review_request.teacher_id
+
+
+def _visible_review_requests_qs(user):
+    if not user.is_authenticated:
+        return ReviewRequest.objects.none()
+    if user.is_staff:
+        return ReviewRequest.objects.all()
+    return ReviewRequest.objects.filter(Q(student=user) | Q(teacher=user) | Q(created_by=user))
+
+
+def _ensure_teacher_roster_membership(*, teacher, student, created_by=None):
+    membership, created = TeacherRosterMembership.objects.get_or_create(
+        teacher=teacher,
+        student=student,
+        defaults={
+            'created_by': created_by,
+            'is_active': True,
+        },
+    )
+    if not created and not membership.is_active:
+        membership.is_active = True
+        if created_by and membership.created_by_id is None:
+            membership.created_by = created_by
+        membership.save(update_fields=['is_active', 'created_by', 'updated_at'])
+    return membership
 
 
 def can_edit_session(user, session):
@@ -325,11 +379,19 @@ def review_link_info(request, token):
     link, error_reason = _resolve_review_link(token)
     if error_reason:
         return _review_link_error_response(error_reason)
+    review_request = getattr(link, 'review_request', None)
+    if review_request and not _review_request_visible_to_user(review_request, request.user):
+        return _review_request_forbidden_response()
     ReviewLink.objects.filter(pk=link.pk).update(last_accessed_at=timezone.now())
     link.refresh_from_db(fields=['last_accessed_at'])
+    if review_request and review_request.status == ReviewRequest.STATUS_REQUESTED and request.user.id == review_request.teacher_id:
+        review_request.status = ReviewRequest.STATUS_OPENED
+        review_request.opened_at = timezone.now()
+        review_request.save(update_fields=['status', 'opened_at', 'updated_at'])
     return Response({
         'session': PublicSessionSerializer(link.session, context={'request': request}).data,
         'link': ReviewLinkSerializer(link, context={'request': request}).data,
+        'review_request': ReviewRequestSerializer(review_request, context={'request': request}).data if review_request else None,
     })
 
 
@@ -340,6 +402,9 @@ def review_link_feedback(request, token):
     link, error_reason = _resolve_review_link(token)
     if error_reason:
         return _review_link_error_response(error_reason)
+    review_request = getattr(link, 'review_request', None)
+    if review_request and not _review_request_visible_to_user(review_request, request.user):
+        return _review_request_forbidden_response()
 
     if request.method == 'GET':
         feedback = link.session.video_feedback.select_related('user', 'user__profile').order_by('timestamp_seconds', 'created_at')
@@ -353,6 +418,9 @@ def review_link_feedback(request, token):
             },
             status=status.HTTP_403_FORBIDDEN,
         )
+
+    if review_request and not _review_request_teacher_can_respond(review_request, request.user):
+        return _review_request_forbidden_response('Only the designated teacher can reply to this review request.')
 
     serializer = ReviewVideoFeedbackSerializer(data=request.data, context={'request': request, 'session': link.session})
     serializer.is_valid(raise_exception=True)
@@ -370,10 +438,122 @@ def review_link_feedback(request, token):
         feedback_video=video_file,
         is_legacy_text_feedback=False,
     )
+    if review_request:
+        review_request.status = ReviewRequest.STATUS_RESPONDED
+        review_request.responded_at = timezone.now()
+        review_request.save(update_fields=['status', 'responded_at', 'updated_at'])
     return Response(
         ReviewVideoFeedbackSerializer(item, context={'request': request, 'session': link.session}).data,
         status=status.HTTP_201_CREATED,
     )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def teacher_inbox(request):
+    qs = ReviewRequest.objects.filter(teacher=request.user).select_related(
+        'student', 'student__profile', 'teacher', 'teacher__profile', 'session', 'review_link'
+    ).order_by('-created_at')
+    status_filter = str(request.query_params.get('status', '')).strip().lower()
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+    return Response(ReviewRequestSerializer(qs, many=True, context={'request': request}).data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def teacher_roster(request):
+    memberships = TeacherRosterMembership.objects.filter(teacher=request.user, is_active=True).select_related(
+        'student', 'student__profile'
+    ).order_by('student__username')
+    return Response(TeacherRosterStudentSerializer(memberships, many=True, context={'request': request}).data)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class ReviewRequestViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ReviewRequestSerializer
+    http_method_names = ['get', 'post', 'patch', 'head', 'options']
+
+    def get_queryset(self):
+        return _visible_review_requests_qs(self.request.user).select_related(
+            'session', 'session__user', 'session__user__profile',
+            'teacher', 'teacher__profile',
+            'student', 'student__profile',
+            'review_link',
+        )
+
+    def perform_create(self, serializer):
+        with transaction.atomic():
+            review_request = serializer.save(
+                student=self.request.user,
+                created_by=self.request.user,
+            )
+            _ensure_teacher_roster_membership(
+                teacher=review_request.teacher,
+                student=review_request.student,
+                created_by=self.request.user,
+            )
+            expires_at = timezone.now() + timedelta(days=7)
+            link = ReviewLink.objects.create(
+                session=review_request.session,
+                token=secrets.token_urlsafe(16),
+                created_by=self.request.user,
+                expires_at=expires_at,
+                is_active=True,
+                allow_video_feedback=True,
+            )
+            review_request.review_link = link
+            review_request.save(update_fields=['review_link', 'updated_at'])
+
+    def partial_update(self, request, *args, **kwargs):
+        review_request = self.get_object()
+        if not _review_request_visible_to_user(review_request, request.user):
+            raise PermissionDenied('You do not have access to this review request.')
+
+        allowed_fields = {'goal', 'exercise_or_song', 'notes', 'deadline', 'requested_turnaround_hours', 'student_level'}
+        if 'status' in request.data:
+            next_status = str(request.data.get('status', '')).strip().lower()
+            if request.user.id == review_request.student_id and next_status == ReviewRequest.STATUS_RESUBMITTED:
+                review_request.status = ReviewRequest.STATUS_RESUBMITTED
+                review_request.resubmitted_at = timezone.now()
+                review_request.save(update_fields=['status', 'resubmitted_at', 'updated_at'])
+            elif request.user.id in {review_request.student_id, review_request.teacher_id} and next_status == ReviewRequest.STATUS_CLOSED:
+                review_request.status = ReviewRequest.STATUS_CLOSED
+                review_request.closed_at = timezone.now()
+                review_request.save(update_fields=['status', 'closed_at', 'updated_at'])
+            elif request.user.id == review_request.student_id and next_status == ReviewRequest.STATUS_REVOKED:
+                review_request.status = ReviewRequest.STATUS_REVOKED
+                review_request.closed_at = timezone.now()
+                if review_request.review_link_id:
+                    ReviewLink.objects.filter(pk=review_request.review_link_id).update(is_active=False)
+                review_request.save(update_fields=['status', 'closed_at', 'updated_at'])
+            else:
+                raise PermissionDenied('This status transition is not allowed.')
+
+        partial_payload = {key: value for key, value in request.data.items() if key in allowed_fields}
+        if partial_payload:
+            serializer = self.get_serializer(review_request, data=partial_payload, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+        review_request.refresh_from_db()
+        return Response(self.get_serializer(review_request).data)
+
+    @action(detail=True, methods=['post'], url_path='mark-viewed')
+    def mark_viewed(self, request, pk=None):
+        review_request = self.get_object()
+        if request.user.id not in {review_request.student_id, review_request.teacher_id} and not request.user.is_staff:
+            raise PermissionDenied('You do not have access to this review request.')
+        if request.user.id == review_request.student_id:
+            review_request.status = ReviewRequest.STATUS_VIEWED
+            review_request.viewed_at = timezone.now()
+            review_request.save(update_fields=['status', 'viewed_at', 'updated_at'])
+        SessionLastSeen.objects.update_or_create(
+            user=request.user,
+            session=review_request.session,
+            defaults={},
+        )
+        return Response(self.get_serializer(review_request).data)
 
 
 # ── Session views ───────────────────────────────────────────────────

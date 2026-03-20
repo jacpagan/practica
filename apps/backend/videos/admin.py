@@ -2,6 +2,7 @@ from django.contrib import admin
 from .models import (
     Profile, Session, Chapter, VideoFeedback, MultipartSessionUpload, SessionAsset,
     SessionLastSeen,
+    ReviewRequest, TeacherRosterMembership,
 )
 
 
@@ -66,3 +67,19 @@ class SessionLastSeenAdmin(admin.ModelAdmin):
     list_filter = ['seen_at']
     search_fields = ['user__username', 'session__title']
     raw_id_fields = ['user', 'session']
+
+
+@admin.register(TeacherRosterMembership)
+class TeacherRosterMembershipAdmin(admin.ModelAdmin):
+    list_display = ['teacher', 'student', 'is_active', 'created_at']
+    list_filter = ['is_active']
+    search_fields = ['teacher__username', 'student__username']
+    raw_id_fields = ['teacher', 'student', 'created_by']
+
+
+@admin.register(ReviewRequest)
+class ReviewRequestAdmin(admin.ModelAdmin):
+    list_display = ['id', 'session', 'student', 'teacher', 'instrument', 'status', 'created_at']
+    list_filter = ['status', 'instrument']
+    search_fields = ['session__title', 'student__username', 'teacher__username', 'goal', 'exercise_or_song']
+    raw_id_fields = ['session', 'student', 'teacher', 'created_by', 'review_link']

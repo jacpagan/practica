@@ -1,8 +1,12 @@
 # Flow Audit
 
+This document audits the shipped flow foundation and highlights the gaps that matter most before and during Practica v2.
+
+For strategic direction, use `docs/practica-v2-prd.md`.
+
 ## Scope
 
-This audit covers the current end-to-end user flows implemented across:
+This audit covers the implemented end-to-end user flows across:
 
 - `apps/frontend/src/App.jsx`
 - `apps/frontend/src/components/SessionUpload.jsx`
@@ -10,233 +14,144 @@ This audit covers the current end-to-end user flows implemented across:
 - `apps/frontend/src/components/ReviewPage.jsx`
 - `apps/backend/videos/views.py`
 - `apps/backend/videos/serializers.py`
+- `apps/backend/videos/models.py`
 
-Primary flows reviewed:
+Primary shipped flows reviewed:
 
-1. Authentication
-2. Private library upload
-3. Session detail and processing
-4. Private share-link creation and revocation
-5. Reviewer access and video-feedback submission
+1. authentication
+2. private library upload
+3. session detail and processing
+4. private share-link creation and revocation
+5. reviewer access and video-feedback submission
 
 ## Current-State Flow Map
 
 ### 1. Authentication
 
-- Anonymous users hit the SPA and are shown `AuthForm`.
-- Successful login or registration stores a token in local storage.
-- App bootstrap calls `/api/auth/me/` to restore the session.
-- After auth, the SPA keeps the originally parsed route and renders the matching view.
+- Anonymous users land in the SPA and see `AuthForm`.
+- Login and registration store an auth token locally.
+- App bootstrap restores user state through `/api/auth/me/`.
+- Authenticated users keep using the route-oriented SPA flow.
 
-### 2. Owner Upload Flow
+### 2. Owner upload flow
 
 - Authenticated user navigates to `/upload`.
 - User records or selects a video in `SessionUpload`.
 - Frontend submits either:
-  - regular multipart form POST to `/api/sessions/`, or
+  - regular multipart POST to `/api/sessions/`, or
   - direct multipart upload flow for large files.
 - Backend creates a `Session`, attaches tags, and starts media processing.
 - Frontend navigates to `/sessions/:id` after success.
 
-### 3. Owner Session Detail Flow
+### 3. Owner session detail flow
 
 - User opens `/sessions/:id`.
 - Frontend fetches `/api/sessions/:id/`.
-- User can edit metadata, retry processing, refresh, download original, delete, or create a private review link.
-- Feedback videos attached to the session render inline in the detail view.
+- User can edit metadata, retry processing, refresh, delete, or create a private review link.
+- Share-link creation is gated by `processing_status === 'ready'`.
+- Feedback videos render inline in the detail view.
 
-### 4. Private Share Link Flow
+### 4. Private share-link flow
 
-- Owner creates a link via `/api/sessions/:id/share/`.
+- Owner creates a link through `/api/sessions/:id/share/`.
 - Backend creates or reuses an active `ReviewLink`.
-- Frontend copies the link for sharing.
-- Reviewer is expected to open `/r/:token`, authenticate, watch the source video, and submit a video reply.
+- Owner can copy or revoke the link from the session detail page.
+- Reviewer opens `/r/:token`, authenticates, watches the source video, and can submit a feedback video if the link allows it.
 
-### 5. Reviewer Feedback Flow
+### 5. Reviewer feedback flow
 
 - Reviewer opens `/r/:token`.
 - Frontend loads:
   - `/api/review/:token/`
   - `/api/review/:token/feedback/`
+- Backend resolves the link through shared review-link logic and returns explicit invalid, expired, or revoked states.
 - Reviewer records or uploads a response video.
-- Frontend posts to `/api/review/:token/feedback/`.
+- Frontend posts feedback to `/api/review/:token/feedback/`.
 - Backend saves a `VideoFeedback` row and returns the created feedback item.
 
-## Top Flow Gaps
+## What Is Working Well In The Shipped Foundation
 
-### P0 — Review-link resolution is broken at the backend
+- The private library, session detail, and review page form a coherent owner-to-reviewer loop.
+- Review-link invalid, expired, and revoked states are modeled explicitly in backend responses and frontend UX.
+- Share-link creation is gated on playback readiness.
+- Review responses are already video-first and can include timestamps plus optional notes.
+- The product has stronger privacy semantics than general-purpose messaging or file-sharing tools.
 
-The review endpoints call `_active_review_link_or_404(token)`, but that helper is not defined in `apps/backend/videos/views.py`.
+## Top Flow Gaps For The Teacher-Led v2 Direction
 
-Impact:
+### P0 — The review flow is built for generic authenticated responders, not designated teachers
 
-- Review link open can fail before business rules are applied.
-- Review feedback submission can fail before authorization and validation logic runs.
-- The entire share/reviewer flow is unstable.
-
-### P0 — Share-link revoke contract is mismatched between frontend and backend
-
-The frontend calls `DELETE /api/sessions/:id/share/`, while the backend exposes `POST /api/sessions/:id/share/revoke/`.
+The current review flow enforces authenticated access and explicit invalid, expired, and revoked states, but it does not model a designated teacher workflow object.
 
 Impact:
 
-- Owners can create links but cannot reliably turn them off from the UI.
-- A “revoked” link may remain active even though the user explicitly attempted to disable it.
-- This breaks trust in privacy and access control.
+- Any logged-in authorized responder can act like the reviewer.
+- Teacher queue ownership, response promises, and routing are not first-class.
+- This is good enough for private-link collaboration but not yet for a teacher OS.
 
-### P1 — Owners can share sessions that are not actually review-ready
+### P0 — `ReviewLink` is an access primitive, not a workflow primitive
 
-Share-link creation has no guard against `processing_status` states like `processing` or `failed`.
-
-Impact:
-
-- Reviewers can receive links to videos that are not playable.
-- The reviewer journey can dead-end after successful login.
-- Owners are not warned that they are sharing a broken review experience.
-
-### P1 — Standard session upload lacks backend video-file validation
-
-Large direct uploads validate file type in the backend, but regular `/api/sessions/` creation trusts the serializer and has no equivalent server-side video validation.
+The current product uses `ReviewLink` to gate access, but teacher-led workflows need a structured request object with intent and ownership.
 
 Impact:
 
-- Frontend filtering can be bypassed.
-- Non-video files can enter the session pipeline.
-- Downstream processing and playback logic can fail in inconsistent ways.
+- There is no native place for goal, turnaround, designated teacher, or request status.
+- Teacher inbox, roster, and cycle analytics cannot be modeled cleanly on links alone.
+- The product cannot yet distinguish a casual share from a formal feedback request.
 
-### P1 — Upload flow allows leaving the screen during an active save
+### P1 — There is no teacher inbox or roster surface
 
-`SessionUpload` disables the submit button while uploading, but the cancel action stays available and the global nav remains active.
-
-Impact:
-
-- Users can abandon an in-flight upload with no definitive outcome.
-- Retries can create ambiguity about whether a session was saved.
-- This is especially risky on slow networks and large uploads.
-
-### P2 — Staff permission semantics are inconsistent
-
-`can_edit_session()` allows staff edits, but `_visible_sessions_qs()` only returns the current user’s sessions.
+The shipped product gives owners a library and reviewers a link page, but it does not give teachers an operational home.
 
 Impact:
 
-- Staff capability is implied in serializers and permission helpers but blocked by queryset visibility.
-- Admin/debug flows are harder to reason about.
+- Teachers cannot see all pending work in one place.
+- Repeated use depends on memory, ad hoc links, or external coordination.
+- The product still behaves more like a tool than a platform.
 
-### P2 — Review-link failure states are not modeled clearly
+### P1 — Student ownership is clear, but teacher workflow ownership is not
 
-The current flow does not visibly distinguish invalid token, expired token, revoked token, or disabled feedback.
+The current data model keeps `Session.user` as the archive owner, which is strategically correct for v2. What is missing is a relationship and workflow layer that gives teachers controlled access without taking content ownership away from students.
 
 Impact:
 
-- Reviewers get generic failure states.
-- Owners cannot tell what action to take next.
-- Support/debug time goes up because all failures look similar.
+- There is no explicit teacher-student roster model.
+- The system cannot express designated reviewer permissions cleanly.
+- Studio and multi-teacher expansion remain awkward until this layer exists.
 
-## Agile Stories
+### P1 — Standardization is too light for analytics, routing, and future matching
 
-### Story 1 — Make private review links resolvable
+The current `Session`, `Chapter`, `Tag`, and timestamped feedback model contains strong raw material, but it lacks a small shared schema for instrument, level, goal, turnaround, and feedback category.
 
-- **As a** reviewer
-- **I want** every private review link to resolve through one explicit backend rule
-- **So that** valid links open and invalid ones fail predictably
+Impact:
 
-Acceptance criteria:
+- Search, analytics, and AI summarization will remain shallow.
+- Teacher triage will be slower than necessary.
+- Platform learning loops will be hard to compare across submissions.
 
-- Backend defines a single helper/service that resolves a review link by token.
-- Valid link requires `is_active=True` and `expires_at > now`.
-- Invalid, expired, or revoked links return controlled API errors instead of server errors.
-- Both `/api/review/:token/` and `/api/review/:token/feedback/` use the same resolution logic.
+### P2 — The current low-pressure UX can be damaged by overbuilding v2
 
-### Story 2 — Let owners reliably revoke private links
+The shipped product is intentionally simple, private, and low pressure. Reintroducing teacher workflow without discipline could turn the product into a heavy LMS too early.
 
-- **As an** owner
-- **I want** the “Turn off link” action to match the backend contract
-- **So that** shared access ends immediately when I revoke it
+Impact:
 
-Acceptance criteria:
-
-- Frontend calls the actual revoke endpoint and method used by the backend, or backend supports the frontend contract.
-- Revoked links no longer open the review page.
-- Revocation updates the owner UI without requiring a manual refresh.
-- Backend test covers create → revoke → rejected access.
-
-### Story 3 — Only share review-ready sessions
-
-- **As an** owner
-- **I want** to share only sessions that can actually be reviewed
-- **So that** reviewers never land on a broken playback page
-
-Acceptance criteria:
-
-- Backend blocks share-link creation unless the session is review-ready.
-- Frontend explains why link creation is unavailable for `processing` and `failed` sessions.
-- Retry-processing path returns the session to a state that can later become shareable.
-- Reviewers never receive a link for a non-playable session.
-
-### Story 4 — Enforce server-side video validation for all upload paths
-
-- **As a** system
-- **I want** every upload entry point to validate file type consistently
-- **So that** invalid files are rejected before session creation and processing
-
-Acceptance criteria:
-
-- `/api/sessions/` rejects non-video uploads on the backend.
-- Multipart and non-multipart uploads follow the same validation rules.
-- Error messages are user-readable and consistent.
-- Tests cover valid video upload and invalid file rejection.
-
-### Story 5 — Make active uploads non-ambiguous
-
-- **As an** owner
-- **I want** clear behavior while a video is saving
-- **So that** I do not accidentally interrupt or duplicate an upload
-
-Acceptance criteria:
-
-- Upload screen prevents destructive navigation while upload is active, or explicitly confirms it.
-- Cancel action is disabled or converted into an intentional abort flow during upload.
-- UI communicates whether the upload can resume, retry, or is definitely lost.
-- Post-upload success always lands in a deterministic next state.
-
-### Story 6 — Model review-link failure states explicitly
-
-- **As a** reviewer
-- **I want** meaningful link failure messages
-- **So that** I know whether to log in again, request a new link, or stop trying
-
-Acceptance criteria:
-
-- API differentiates invalid, expired, and revoked links.
-- Frontend renders distinct messages for each failure state.
-- Disabled feedback renders a specific “view-only” or “feedback disabled” state.
-
-### Story 7 — Align staff visibility with permission rules
-
-- **As a** staff user
-- **I want** visibility rules to match edit permissions
-- **So that** admin-only support flows behave consistently
-
-Acceptance criteria:
-
-- Queryset visibility and permission helpers follow the same staff policy.
-- Staff-only access is either fully supported or intentionally removed.
-- Tests verify the chosen rule.
+- Student experience could become too administrative.
+- Teachers could face more overhead than value.
+- The product could lose its strongest emotional advantage: easy private sharing and clear video feedback.
 
 ## Recommended Delivery Order
 
-1. Story 1 — Fix review-link resolution
-2. Story 2 — Fix revoke-link contract
-3. Story 3 — Guard share to review-ready sessions
-4. Story 4 — Add backend validation for normal uploads
-5. Story 5 — Harden in-flight upload UX
-6. Story 6 — Improve review-link failure states
-7. Story 7 — Align staff semantics
+1. Preserve and harden the current trusted private-library and playback flow.
+2. Add `ReviewRequest` as a workflow object without breaking existing sharing.
+3. Add a teacher inbox for pending and completed requests.
+4. Add a lightweight roster and designated-teacher permissions.
+5. Add structured request metadata and reusable templates.
+6. Add cycle analytics after the workflow object exists.
 
-## Suggested Definition of Done
+## Suggested Definition Of Done For v2 Foundation Work
 
-- Backend tests cover the happy path and the blocked path for each flow transition.
-- Frontend screens reflect backend state instead of assuming success.
-- A user can never advance to the next screen unless the backend agrees the transition is valid.
-- Link, upload, and review flows all fail closed instead of failing ambiguously.
+- The student can still record, upload, watch, and privately share without extra friction.
+- A teacher can own a request from inbox to response without using external tools.
+- The system can distinguish a generic link from a formal teacher review request.
+- Permissions fail closed and are easy to explain in the UI.
+- Completed review cycles are measurable from backend events and visible in product surfaces.

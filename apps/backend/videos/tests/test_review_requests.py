@@ -1,0 +1,152 @@
+from datetime import timedelta
+
+from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
+from rest_framework import status
+from rest_framework.authtoken.models import Token
+from rest_framework.test import APITestCase
+
+from videos.models import Profile, ReviewRequest, Session, SessionLastSeen, TeacherRosterMembership, VideoFeedback
+
+
+class ReviewRequestApiTests(APITestCase):
+    def setUp(self):
+        self.student = User.objects.create_user(username='student-user', password='pass1234')
+        self.teacher = User.objects.create_user(username='teacher-user', password='pass1234')
+        self.outsider = User.objects.create_user(username='outsider-user', password='pass1234')
+        Profile.objects.create(user=self.student, display_name='Student Musician')
+        Profile.objects.create(user=self.teacher, display_name='Drum Teacher')
+        Profile.objects.create(user=self.outsider, display_name='Random Reviewer')
+        self.session = Session.objects.create(
+            user=self.student,
+            title='Groove Practice',
+            description='Working on ghost notes',
+            video_file='sessions/groove-practice.mp4',
+            duration_seconds=180,
+            processing_status=Session.STATUS_READY,
+        )
+
+    def _auth(self, user):
+        token, _ = Token.objects.get_or_create(user=user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
+
+    def _video_file(self, name='feedback.mp4', content_type='video/mp4'):
+        return SimpleUploadedFile(name, b'video-feedback-data', content_type=content_type)
+
+    def _create_review_request(self):
+        self._auth(self.student)
+        response = self.client.post(
+            '/api/review-requests/',
+            {
+                'session_id': self.session.id,
+                'teacher_id': self.teacher.id,
+                'instrument': 'drums',
+                'student_level': 'intermediate',
+                'goal': 'Improve ghost-note consistency',
+                'exercise_or_song': 'Funky groove in 4/4',
+                'notes': 'Focus on bars 5 through 8.',
+                'requested_turnaround_hours': 24,
+                'deadline': (timezone.now() + timedelta(days=2)).isoformat(),
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        return ReviewRequest.objects.get(pk=response.data['id'])
+
+    def test_student_can_create_review_request_with_link_and_roster_membership(self):
+        review_request = self._create_review_request()
+
+        self.assertEqual(review_request.student, self.student)
+        self.assertEqual(review_request.teacher, self.teacher)
+        self.assertEqual(review_request.status, ReviewRequest.STATUS_REQUESTED)
+        self.assertEqual(review_request.instrument, 'drums')
+        self.assertTrue(bool(review_request.review_link))
+        self.assertTrue(
+            TeacherRosterMembership.objects.filter(
+                teacher=self.teacher,
+                student=self.student,
+                is_active=True,
+            ).exists()
+        )
+
+    def test_teacher_inbox_lists_assigned_review_requests(self):
+        review_request = self._create_review_request()
+
+        self._auth(self.teacher)
+        response = self.client.get('/api/teacher/inbox/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['id'], review_request.id)
+        self.assertEqual(response.data[0]['current_user_role'], 'teacher')
+
+    def test_only_designated_teacher_can_reply_via_review_link(self):
+        review_request = self._create_review_request()
+
+        self._auth(self.outsider)
+        response = self.client.post(
+            f'/api/review/{review_request.review_link.token}/feedback/',
+            {
+                'text': 'Trying to review without permission.',
+                'feedback_video': self._video_file(),
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data['code'], 'review_request_forbidden')
+
+    def test_designated_teacher_open_and_reply_updates_request_status(self):
+        review_request = self._create_review_request()
+
+        self._auth(self.teacher)
+        open_response = self.client.get(f'/api/review/{review_request.review_link.token}/')
+        self.assertEqual(open_response.status_code, status.HTTP_200_OK)
+        review_request.refresh_from_db()
+        self.assertEqual(review_request.status, ReviewRequest.STATUS_OPENED)
+        self.assertIsNotNone(review_request.opened_at)
+
+        reply_response = self.client.post(
+            f'/api/review/{review_request.review_link.token}/feedback/',
+            {
+                'text': 'Relax the hi-hat shoulder and lean into the backbeat.',
+                'timestamp_seconds': 42,
+                'feedback_video': self._video_file(),
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(reply_response.status_code, status.HTTP_201_CREATED)
+        review_request.refresh_from_db()
+        self.assertEqual(review_request.status, ReviewRequest.STATUS_RESPONDED)
+        self.assertIsNotNone(review_request.responded_at)
+        feedback = VideoFeedback.objects.get(session=self.session, user=self.teacher)
+        self.assertEqual(feedback.timestamp_seconds, 42)
+
+    def test_student_can_mark_review_request_viewed(self):
+        review_request = self._create_review_request()
+        review_request.status = ReviewRequest.STATUS_RESPONDED
+        review_request.responded_at = timezone.now()
+        review_request.save(update_fields=['status', 'responded_at', 'updated_at'])
+
+        self._auth(self.student)
+        response = self.client.post(f'/api/review-requests/{review_request.id}/mark-viewed/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        review_request.refresh_from_db()
+        self.assertEqual(review_request.status, ReviewRequest.STATUS_VIEWED)
+        self.assertIsNotNone(review_request.viewed_at)
+        self.assertTrue(SessionLastSeen.objects.filter(user=self.student, session=self.session).exists())
+
+    def test_teacher_roster_includes_student_request_counts(self):
+        self._create_review_request()
+
+        self._auth(self.teacher)
+        response = self.client.get('/api/teacher/roster/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['student']['id'], self.student.id)
+        self.assertEqual(response.data[0]['pending_review_count'], 1)
+        self.assertEqual(response.data[0]['total_review_count'], 1)

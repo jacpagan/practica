@@ -1,180 +1,154 @@
-# Practica - Personal Practice Tracking System
+# Practica
 
-A containerized Django + React application for tracking personal practice sessions with video uploads.
+Practica is a Django + React application for private async video feedback, evolving into a teacher-led private platform for async music instruction.
 
-## 🎯 Features
+The shipped product already supports:
 
-- **Exercise Video Management**: Upload and organize 60-minute drum lessons
-- **Practice Session Tracking**: Record and link 10-minute practice sessions
-- **Progress Visualization**: Track practice frequency and improvement
-- **AWS Integration**: Cost-effective cloud storage and deployment
+- a private student video library,
+- upload and in-app recording,
+- authenticated private review flows,
+- video-first feedback replies,
+- and playback processing for review-ready sessions.
 
-## 🚀 Quick Start
+The v2 product direction is to serve independent drum teachers and their existing students with a lightweight teacher workflow: structured review requests, teacher inbox, roster, and repeat feedback cycles.
+
+## Product Docs
+
+- `docs/practica-v2-prd.md`: strategic source of truth for Practica v2.
+- `docs/platform-effects-mvp-playbook.md`: shipped v1 baseline and product model.
+- `docs/flow-audit.md`: implementation audit and v2 foundation gaps.
+- `docs/README.md`: documentation index.
+
+## Product Positioning
+
+### Current shipped foundation
+
+Practica is currently strongest as a private async video feedback tool:
+
+- students upload or record videos into a private library,
+- owners create private feedback links,
+- reviewers log in and respond with video feedback,
+- and feedback stays attached to the original source video.
+
+### V2 strategic direction
+
+Practica v2 is a teacher-led private platform for async music instruction.
+
+Strategic decisions:
+
+- start with existing teacher-student relationships,
+- focus the wedge on independent drum teachers,
+- keep student archives private and student-owned,
+- build teacher workflow before marketplace discovery,
+- and optimize for completed review cycles: `submission -> feedback -> resubmission`.
+
+## Quick Start
 
 ### Prerequisites
 
-- Docker & Docker Compose
-- AWS CLI (for cloud deployment)
-- Terraform (for infrastructure)
+- Docker and Docker Compose
+- Python virtualenv for local backend work
+- Node.js and npm for local frontend work
+- AWS CLI and Terraform for infra or production work
 
 ### Local Development
 
-1. **Clone and setup**:
+1. Clone the repo and set up environment variables:
+
    ```bash
    git clone <your-repo>
    cd practica
    cp env.example .env
-   # Edit .env with your configuration
    ```
 
-2. **Start with Docker**:
+2. Start the local stack:
+
    ```bash
-   docker-compose up -d
+   make up
    ```
 
-3. **Access the application**:
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8000
-   - Django Admin: http://localhost:8000/admin/
+3. Access the app:
 
-### AWS Deployment (Idempotent)
+   - Frontend: `http://localhost:3000`
+   - Backend API: `http://localhost:8000`
+   - Django Admin: `http://localhost:8000/admin/`
 
-1. **Setup AWS credentials**:
-   ```bash
-   aws configure
-   ```
+### Local Commands
 
-2. **Check current status**:
-   ```bash
-   ./status-aws.sh
-   ```
+```bash
+# Docker workflow
+make up
+make down
+make logs
+make ps
+make migrate
+make createsuperuser
 
-3. **Deploy infrastructure** (safe to run multiple times):
-   ```bash
-   ./deploy-aws.sh
-   ```
+# Backend local dev
+source .venv/bin/activate && cd apps/backend && python manage.py runserver 0.0.0.0:8000
+source .venv/bin/activate && cd apps/backend && python manage.py test
+source .venv/bin/activate && ruff check apps/backend/practica/ apps/backend/videos/
 
-4. **Clean up when done**:
-   ```bash
-   ./cleanup-aws.sh
-   ```
-
-### Deployment Commands
-
-- `./setup-aws.sh` - Validate AWS setup and Terraform config
-- `./deploy-aws.sh` - Deploy/update infrastructure (idempotent)
-- `./status-aws.sh` - Check current infrastructure status  
-- `./cleanup-aws.sh` - Destroy all AWS resources
-
-### Deployment Strategy (Solo Mode)
-
-- `main` is the only production deployment branch.
-- Deployment contract: `feature branch -> PR -> main -> production`.
-- No active staging promotion path exists in CI.
-- Guardrails stay enabled: backup/smoke checks and fast rollback are part of the production flow.
-
-## 🏗️ Architecture
-
-### Backend (Django)
-- **Framework**: Django 4.2 + Django REST Framework
-- **Database**: PostgreSQL (production) / SQLite (development)
-- **Cache**: Redis for performance
-- **Storage**: AWS S3 for video files
-
-### Frontend (React)
-- **Framework**: React 18 + Vite
-- **Styling**: Tailwind CSS
-- **State**: React hooks
-- **API**: Axios for HTTP requests
-
-### Infrastructure (AWS)
-- **Database**: RDS PostgreSQL (db.t3.micro)
-- **Storage**: S3 Standard
-- **CDN**: CloudFront (PriceClass_100)
-- **Cache**: ElastiCache Redis (optional)
-
-## 💰 Cost-Saving Features
-
-- **Database**: db.t3.micro instance (smallest available)
-- **Storage**: S3 Standard (not IA or Glacier)
-- **CDN**: PriceClass_100 (US, Canada, Europe only)
-- **Backup**: Minimal retention (7 days)
-- **Deployment**: Single AZ for development
-
-## 🐳 Docker Services
-
-- `db`: PostgreSQL database
-- `redis`: Redis cache
-- `backend`: Django API server
-- `frontend`: React development server
-
-## 📁 Project Structure
-
+# Frontend local dev
+cd apps/frontend && npm run dev -- --host 0.0.0.0 --port 3000
+cd apps/frontend && npm run build
 ```
+
+## Architecture
+
+### Backend
+
+- Django 4.2 + Django REST Framework
+- SQLite in development and PostgreSQL in production
+- S3-backed uploads when `AWS_STORAGE_BUCKET_NAME` is set
+- Media processing pipeline for playback-ready sessions
+
+### Frontend
+
+- React 18 + Vite
+- Tailwind CSS
+- Route-driven SPA around library, upload, session detail, and review surfaces
+- Shared upload utilities for regular and multipart upload flows
+
+### Infrastructure
+
+- Terraform under `infra/`
+- Docker-based local development
+- EC2 deploy path through `scripts/deploy-via-ssm.sh`
+
+## Project Structure
+
+```text
 practica/
 ├── apps/
-│   ├── backend/          # Django API
+│   ├── backend/          # Django API and domain logic
 │   └── frontend/         # React app
-├── infrastructure/       # Terraform configs
+├── docs/                 # Product and implementation docs
+├── infra/                # Terraform and infra configs
+├── scripts/              # Dev and deploy scripts
 ├── docker-compose.yml    # Local development
-├── deploy-aws.sh         # AWS deployment script
 └── requirements.txt      # Python dependencies
 ```
 
-## 🔧 Development Commands
+## Deployment Notes
 
-```bash
-# Start all services
-docker-compose up -d
+- `scripts/dev.sh`: local Docker helper commands.
+- `scripts/deploy-via-ssm.sh`: production deploy to EC2 via AWS SSM.
+- `scripts/branch-audit.sh`: compare remote branches against a base branch.
 
-# View logs
-docker-compose logs -f
+Deployment strategy:
 
-# Stop services
-docker-compose down
+- `main` is the production branch.
+- Deployment contract is `feature branch -> PR -> main -> production`.
+- Backup, smoke checks, and rollback remain part of the production flow.
 
-# Rebuild containers
-docker-compose build --no-cache
+## Monitoring And Security
 
-# Django management
-docker-compose exec backend python manage.py migrate
-docker-compose exec backend python manage.py createsuperuser
-```
+- Health checks are built into Docker Compose.
+- Product metrics are defined in `docs/practica-v2-prd.md`.
+- Local development uses SQLite by default.
+- Sensitive values belong in environment variables, not in git.
 
-## 🌐 Production Deployment
+## License
 
-1. **Deploy AWS infrastructure**:
-   ```bash
-   cd infrastructure
-   terraform apply
-   ```
-
-2. **Update environment variables**:
-   ```bash
-   # Set production values in .env
-   DEBUG=False
-   DATABASE_URL=postgresql://...
-   ```
-
-3. **Deploy application**:
-   ```bash
-   docker-compose -f docker-compose.prod.yml up -d
-   ```
-
-## 📊 Monitoring
-
-- **Health checks**: Built into Docker Compose
-- **Logs**: Centralized logging with Docker
-- **Metrics**: Basic Django admin monitoring
-- **Cost tracking**: AWS Cost Explorer
-
-## 🔒 Security
-
-- **Environment variables**: Sensitive data in .env
-- **CORS**: Configured for frontend domains
-- **Database**: Isolated in private subnets
-- **S3**: Bucket policies for access control
-
-## 📝 License
-
-Personal use only. This is your private practice tracking system.
+Personal use only unless explicitly relicensed.

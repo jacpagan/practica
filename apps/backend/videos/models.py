@@ -213,3 +213,75 @@ class ReviewLink(models.Model):
 
     def __str__(self):
         return f"ReviewLink {self.token} session={self.session_id} active={self.is_active}"
+
+
+class TeacherRosterMembership(models.Model):
+    """A lightweight teacher-student relationship for repeat async review workflows."""
+
+    teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name='teacher_roster_memberships')
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='student_roster_memberships')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_teacher_roster_memberships')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['teacher_id', 'student_id']
+        constraints = [
+            models.UniqueConstraint(fields=['teacher', 'student'], name='teacher_roster_membership_teacher_student_uniq'),
+        ]
+
+    def __str__(self):
+        return f"TeacherRosterMembership teacher={self.teacher_id} student={self.student_id} active={self.is_active}"
+
+
+class ReviewRequest(models.Model):
+    """A structured teacher-owned review workflow around a student session."""
+
+    STATUS_REQUESTED = 'requested'
+    STATUS_OPENED = 'opened'
+    STATUS_RESPONDED = 'responded'
+    STATUS_VIEWED = 'viewed'
+    STATUS_RESUBMITTED = 'resubmitted'
+    STATUS_CLOSED = 'closed'
+    STATUS_REVOKED = 'revoked'
+    STATUS_CHOICES = [
+        (STATUS_REQUESTED, 'Requested'),
+        (STATUS_OPENED, 'Opened'),
+        (STATUS_RESPONDED, 'Responded'),
+        (STATUS_VIEWED, 'Viewed'),
+        (STATUS_RESUBMITTED, 'Resubmitted'),
+        (STATUS_CLOSED, 'Closed'),
+        (STATUS_REVOKED, 'Revoked'),
+    ]
+
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='review_requests')
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='review_requests_as_student')
+    teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name='review_requests_as_teacher')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_review_requests_v2')
+    review_link = models.OneToOneField(ReviewLink, on_delete=models.SET_NULL, null=True, blank=True, related_name='review_request')
+    instrument = models.CharField(max_length=64)
+    student_level = models.CharField(max_length=64, blank=True)
+    goal = models.CharField(max_length=255)
+    exercise_or_song = models.CharField(max_length=255, blank=True)
+    notes = models.TextField(blank=True)
+    requested_turnaround_hours = models.PositiveIntegerField(null=True, blank=True)
+    deadline = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_REQUESTED)
+    opened_at = models.DateTimeField(null=True, blank=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+    viewed_at = models.DateTimeField(null=True, blank=True)
+    resubmitted_at = models.DateTimeField(null=True, blank=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['teacher', 'status']),
+            models.Index(fields=['student', 'status']),
+        ]
+
+    def __str__(self):
+        return f"ReviewRequest #{self.id} session={self.session_id} teacher={self.teacher_id} status={self.status}"

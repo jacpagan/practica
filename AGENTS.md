@@ -1,5 +1,25 @@
 # Repository Guidelines
 
+## Product Direction
+
+Use `docs/practica-v2-prd.md` as the strategic source of truth for product-facing work.
+
+Important product context:
+
+- Practica is moving from a private async video feedback tool toward a teacher-led private platform for async music instruction.
+- The initial wedge is independent drum teachers with their existing students.
+- The current shipped foundation remains the private student-owned library plus authenticated review flows described in `docs/platform-effects-mvp-playbook.md`.
+- Preserve `private by default`, `student-owned archive`, and `video-first feedback` as core product principles.
+- Prioritize teacher workflow primitives next: `ReviewRequest`, teacher inbox, roster, designated-teacher permissions, and reusable templates.
+- Optimize for completed review cycles: `submission -> feedback -> resubmission`.
+- Do not introduce public marketplace mechanics, public discovery, heavy school-workspace abstractions, streaks, or practice-plan systems unless the user explicitly asks for that strategy shift.
+
+## Documentation Source Of Truth
+
+- `docs/practica-v2-prd.md`: v2 product requirements and roadmap direction.
+- `docs/platform-effects-mvp-playbook.md`: shipped v1 baseline.
+- `docs/flow-audit.md`: implementation and foundation gaps.
+
 ## Project Structure & Module Organization
 
 `apps/backend/` contains the Django app and API. Core project settings live in `apps/backend/practica/`; product code, models, views, migrations, and backend tests live in `apps/backend/videos/`. `apps/frontend/` contains the React 18 + Vite SPA; reusable UI lives in `apps/frontend/src/components/` and shared helpers in `apps/frontend/src/`. Dev scripts are in `scripts/`, infrastructure code is in `infra/`, and top-level Docker and Make targets support local orchestration.
@@ -16,6 +36,11 @@
 ## Coding Style & Naming Conventions
 
 Use 4-space indentation in Python and standard React/JS formatting already present in the repo. Prefer descriptive names: `snake_case` for Python functions and modules, `PascalCase` for React components, and `camelCase` for frontend helpers. Keep changes focused and consistent with surrounding code. Use `ruff` for backend style checks; avoid pinning Python package versions in `requirements.txt`.
+
+For product terminology and naming in new code or docs:
+
+- Prefer `teacher`, `student`, `review request`, `private library`, and `video feedback` when working on v2 platform features.
+- Keep legacy `share link` terminology only where you are explicitly touching the shipped v1 flow.
 
 ## Testing Guidelines
 

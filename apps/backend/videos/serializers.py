@@ -7,6 +7,8 @@ from .models import (
     Profile, Session, Chapter, VideoFeedback,
     SessionAsset,
     ReviewLink,
+    ReviewRequest,
+    TeacherRosterMembership,
 )
 
 
@@ -48,6 +50,19 @@ class UserSerializer(serializers.ModelSerializer):
             'display_name',
         ]
         read_only_fields = ['id']
+
+    def get_display_name(self, obj):
+        if hasattr(obj, 'profile') and obj.profile.display_name:
+            return obj.profile.display_name
+        return obj.username
+
+
+class UserSummarySerializer(serializers.ModelSerializer):
+    display_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'display_name']
 
     def get_display_name(self, obj):
         if hasattr(obj, 'profile') and obj.profile.display_name:
@@ -286,3 +301,117 @@ class ReviewVideoFeedbackSerializer(serializers.ModelSerializer):
         if duration_seconds is not None and value > int(duration_seconds):
             raise serializers.ValidationError('Timestamp must be within the video duration.')
         return value
+
+
+class ReviewRequestSerializer(serializers.ModelSerializer):
+    student = UserSummarySerializer(read_only=True)
+    teacher = UserSummarySerializer(read_only=True)
+    session = SessionListSerializer(read_only=True)
+    session_id = serializers.PrimaryKeyRelatedField(
+        source='session',
+        queryset=Session.objects.all(),
+        write_only=True,
+        required=True,
+    )
+    teacher_id = serializers.PrimaryKeyRelatedField(
+        source='teacher',
+        queryset=User.objects.all(),
+        write_only=True,
+        required=True,
+    )
+    review_link = ReviewLinkSerializer(read_only=True)
+    response_count = serializers.SerializerMethodField()
+    current_user_role = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ReviewRequest
+        fields = [
+            'id',
+            'session', 'session_id',
+            'student',
+            'teacher', 'teacher_id',
+            'review_link',
+            'instrument', 'student_level', 'goal', 'exercise_or_song', 'notes',
+            'requested_turnaround_hours', 'deadline',
+            'status', 'opened_at', 'responded_at', 'viewed_at', 'resubmitted_at', 'closed_at',
+            'response_count', 'current_user_role',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = [
+            'id', 'student', 'teacher', 'session', 'review_link',
+            'status', 'opened_at', 'responded_at', 'viewed_at', 'resubmitted_at', 'closed_at',
+            'response_count', 'current_user_role',
+            'created_at', 'updated_at',
+        ]
+
+    def get_response_count(self, obj):
+        return obj.session.video_feedback.filter(user=obj.teacher).count()
+
+    def get_current_user_role(self, obj):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
+        if not user or not user.is_authenticated:
+            return ''
+        if user.id == obj.teacher_id:
+            return 'teacher'
+        if user.id == obj.student_id:
+            return 'student'
+        return ''
+
+    def validate(self, attrs):
+        session = attrs.get('session') or getattr(self.instance, 'session', None)
+        teacher = attrs.get('teacher') or getattr(self.instance, 'teacher', None)
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
+
+        if not user or not user.is_authenticated:
+            raise serializers.ValidationError('Authentication required.')
+        if session and session.user_id != user.id and not user.is_staff:
+            raise serializers.ValidationError({'session_id': 'You can only request review on your own sessions.'})
+        if session and session.processing_status != Session.STATUS_READY:
+            raise serializers.ValidationError({'session_id': 'This session must be playback ready before requesting review.'})
+        if teacher and teacher.id == user.id:
+            raise serializers.ValidationError({'teacher_id': 'Choose a teacher other than yourself.'})
+        return attrs
+
+
+class TeacherRosterStudentSerializer(serializers.ModelSerializer):
+    student = UserSummarySerializer(read_only=True)
+    pending_review_count = serializers.SerializerMethodField()
+    total_review_count = serializers.SerializerMethodField()
+    last_request_at = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TeacherRosterMembership
+        fields = [
+            'id', 'student', 'is_active',
+            'pending_review_count', 'total_review_count', 'last_request_at',
+            'created_at', 'updated_at',
+        ]
+
+    def _teacher(self):
+        request = self.context.get('request')
+        return getattr(request, 'user', None) if request else None
+
+    def get_pending_review_count(self, obj):
+        teacher = self._teacher()
+        if not teacher or not teacher.is_authenticated:
+            return 0
+        return ReviewRequest.objects.filter(
+            teacher=teacher,
+            student=obj.student,
+            status__in=[ReviewRequest.STATUS_REQUESTED, ReviewRequest.STATUS_OPENED],
+        ).count()
+
+    def get_total_review_count(self, obj):
+        teacher = self._teacher()
+        if not teacher or not teacher.is_authenticated:
+            return 0
+        return ReviewRequest.objects.filter(teacher=teacher, student=obj.student).count()
+
+    def get_last_request_at(self, obj):
+        teacher = self._teacher()
+        if not teacher or not teacher.is_authenticated:
+            return None
+        last_request = ReviewRequest.objects.filter(teacher=teacher, student=obj.student).order_by('-created_at').first()
+        return last_request.created_at if last_request else None
