@@ -261,8 +261,8 @@ function ReviewPage({ reviewToken = '' }) {
       <main className="max-w-3xl mx-auto space-y-6">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Private feedback link</p>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">Respond with a video</h1>
-          <p className="text-sm text-gray-500 mt-2">You are logged in as {user.display_name || user.username}. Your feedback is a video response, not a text-only note.</p>
+          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">Reply with video</h1>
+          <p className="text-sm text-gray-500 mt-2">Signed in as {user.display_name || user.username}.</p>
         </div>
 
         {reviewRequest ? (
@@ -306,8 +306,8 @@ function ReviewPage({ reviewToken = '' }) {
         {link?.allow_video_feedback && canRespondToRequest ? (
           <div className="rounded-xl border border-gray-200 p-4 space-y-4">
             <div>
-              <p className="text-sm font-semibold text-gray-900">Record your feedback video</p>
-              <p className="text-xs text-gray-500 mt-1">Show first, then tell. Add an optional note or timestamp if it helps.</p>
+              <p className="text-sm font-semibold text-gray-900">Add your reply</p>
+              <p className="text-xs text-gray-500 mt-1">Record or upload, then send.</p>
             </div>
 
             {reviewRequest?.current_user_role === 'teacher' ? (
@@ -421,7 +421,7 @@ function ReviewPage({ reviewToken = '' }) {
                 value={responseNotes}
                 onChange={(event) => setResponseNotes(event.target.value)}
                 rows={3}
-                placeholder="Optional note to go with your video reply"
+                placeholder="Optional note"
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
               />
 
@@ -429,7 +429,7 @@ function ReviewPage({ reviewToken = '' }) {
 
               <div className="flex justify-end">
                 <button type="submit" disabled={submitting} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50">
-                  {submitting ? 'Sending…' : 'Send video feedback'}
+                  {submitting ? 'Sending…' : 'Send reply'}
                 </button>
               </div>
             </form>

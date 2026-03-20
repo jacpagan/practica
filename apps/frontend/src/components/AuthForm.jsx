@@ -35,7 +35,7 @@ function AuthForm() {
       <div className="w-full max-w-sm">
         <h1 className="text-2xl font-semibold text-gray-900 text-center mb-1">Practica</h1>
 
-        <p className="text-sm text-gray-400 text-center mb-8">Record, review, improve.</p>
+        <p className="text-sm text-gray-400 text-center mb-8">Private video reviews for music lessons.</p>
 
         {/* Tabs */}
         <div className="flex gap-1 mb-6 border-b border-gray-100">

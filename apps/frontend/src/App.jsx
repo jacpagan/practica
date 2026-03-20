@@ -218,53 +218,49 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-white">
-      <header className="sticky top-0 z-30 border-b border-gray-100 bg-white/95 backdrop-blur px-4 py-3 sm:px-6">
-        <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
-          <button onClick={() => navigate({ view: 'library', sessionId: null })} className="text-lg font-semibold text-gray-900 tracking-tight">
-            Practica
-          </button>
-          <div className="flex items-center gap-3">
-            <nav className="hidden sm:flex items-center gap-2">
+      <header className="border-b border-gray-100 bg-white px-4 py-4 sm:px-6">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
+          <div className="flex items-center gap-4 min-w-0">
+            <button onClick={() => navigate({ view: 'library', sessionId: null })} className="text-lg font-semibold text-gray-900 tracking-tight">
+              Practica
+            </button>
+            <nav className="hidden sm:flex items-center gap-2 rounded-full border border-gray-200 p-1">
               <button
                 onClick={() => navigate({ view: 'library', sessionId: null })}
-                className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'library' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
+                className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'library' || view === 'detail' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
               >
                 Library
               </button>
               <button
-                onClick={() => navigate({ view: 'upload', sessionId: null })}
-                className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'upload' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
-              >
-                Record
-              </button>
-              <button
                 onClick={() => navigate({ view: 'teaching', sessionId: null })}
-                className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'teaching' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
+                className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'teaching' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
               >
                 Teaching
               </button>
             </nav>
+          </div>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={() => navigate({ view: 'upload', sessionId: null })}
+              className="hidden sm:inline-flex rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
+            >
+              New video
+            </button>
             <div className="flex items-center gap-2 sm:border-l sm:border-gray-100 sm:pl-3">
-              <span className="text-xs text-gray-400">{user.display_name}</span>
+              <span className="hidden sm:inline text-xs text-gray-400">{user.display_name}</span>
               <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
                 Log out
               </button>
             </div>
           </div>
         </div>
-        <div className="max-w-5xl mx-auto mt-3 sm:hidden">
-          <nav className="grid grid-cols-3 gap-2">
+        <div className="max-w-4xl mx-auto mt-3 space-y-2 sm:hidden">
+          <nav className="grid grid-cols-2 gap-2">
             <button
               onClick={() => navigate({ view: 'library', sessionId: null })}
-              className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'library' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+              className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'library' || view === 'detail' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
             >
               Library
-            </button>
-            <button
-              onClick={() => navigate({ view: 'upload', sessionId: null })}
-              className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'upload' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
-            >
-              Record
             </button>
             <button
               onClick={() => navigate({ view: 'teaching', sessionId: null })}
@@ -273,10 +269,16 @@ function AppContent() {
               Teaching
             </button>
           </nav>
+          <button
+            onClick={() => navigate({ view: 'upload', sessionId: null })}
+            className="w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
+          >
+            New video
+          </button>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto pb-24">
+      <main className="max-w-4xl mx-auto pb-24">
         {view === 'library' && (
           <LibraryView
             sessions={sessions}

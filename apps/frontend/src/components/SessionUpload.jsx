@@ -25,7 +25,6 @@ function SessionUpload({
   const dropRef = useRef(null)
   const inputRef = useRef(null)
   const captureInputRef = useRef(null)
-  const libraryInputRef = useRef(null)
   const ownedPreviewUrlRef = useRef('')
   const abortControllerRef = useRef(null)
   const abortRequestedRef = useRef(false)
@@ -195,7 +194,6 @@ function SessionUpload({
   }
 
   const openCamera = () => captureInputRef.current?.click()
-  const openLibrary = () => libraryInputRef.current?.click()
   const openFiles = () => inputRef.current?.click()
 
   const startRecording = () => {
@@ -211,35 +209,17 @@ function SessionUpload({
       <div className="max-w-lg mx-auto">
         <div className="mb-6 space-y-3">
           <div>
-            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Record a private video</h2>
-            <p className="text-sm text-gray-500 mt-1">Record or upload now. It stays in your private library until you share a private feedback link.</p>
-          </div>
-
-          <div className="rounded-3xl border border-gray-900 bg-gray-900 text-white px-4 py-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-white/70">Next action</p>
-            <p className="text-lg font-semibold mt-1">Record or upload your video</p>
-            <p className="text-sm mt-2 text-white/75">You can watch it immediately, keep it private, and request personalized video feedback later.</p>
-            <button
-              type="button"
-              onClick={startRecording}
-              disabled={isUploading}
-              className="mt-4 w-full rounded-2xl py-3 text-sm font-medium bg-white text-gray-900 hover:bg-gray-100 transition-colors"
-            >
-              Start recording
-            </button>
+            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">New video</h2>
+            <p className="text-sm text-gray-500 mt-1">Record or upload. Save when it looks right.</p>
           </div>
 
           <div className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Choose a source</p>
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button type="button" onClick={startRecording} disabled={isUploading} className="rounded-2xl bg-gray-900 text-white px-4 py-3 text-sm font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                Record now
-              </button>
-              <button type="button" onClick={openLibrary} disabled={isUploading} className="rounded-2xl border border-gray-200 bg-white text-gray-900 px-4 py-3 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 transition-colors">
-                Choose from library
+                Record
               </button>
               <button type="button" onClick={openFiles} disabled={isUploading} className="rounded-2xl border border-gray-200 bg-white text-gray-900 px-4 py-3 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 transition-colors">
-                Browse files
+                Upload file
               </button>
             </div>
             <p className="text-xs text-gray-500 mt-3">Supports `.mov`, `.mp4`, and `.webm`.</p>
@@ -250,8 +230,8 @@ function SessionUpload({
           <div className="mb-5 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-semibold text-gray-900">Record inside Practica</h3>
-                <p className="text-xs text-gray-500 mt-1">You should be able to watch this recording immediately before saving it.</p>
+                <h3 className="text-sm font-semibold text-gray-900">Recorder</h3>
+                <p className="text-xs text-gray-500 mt-1">Make a take, then save it.</p>
               </div>
               <button type="button" onClick={() => setShowRecorder(false)} disabled={isUploading} className="text-xs text-gray-500 hover:text-gray-900 disabled:opacity-50 transition-colors">
                 Close
@@ -267,7 +247,7 @@ function SessionUpload({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">Preview</h3>
-                  <p className="text-xs text-gray-500 mt-1">Watch your video here before saving it.</p>
+                  <p className="text-xs text-gray-500 mt-1">Watch before saving.</p>
                 </div>
                 {videoFile ? (
                   <button type="button" onClick={clearSelectedVideo} className="text-xs text-red-600 hover:text-red-700 transition-colors">
@@ -289,7 +269,7 @@ function SessionUpload({
               onChange={(event) => setTitle(event.target.value)}
               disabled={isUploading}
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
-              placeholder={videoFile ? 'Rename your video here if you want' : 'Add a short title'}
+              placeholder={videoFile ? 'Give it a name' : 'Title'}
               required
             />
           </div>
@@ -310,7 +290,7 @@ function SessionUpload({
                 disabled={isUploading}
                 rows={3}
                 className="w-full mt-2 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
-                placeholder="What do you want feedback on?"
+                placeholder="Optional note"
               />
             ) : null}
           </div>
@@ -337,13 +317,12 @@ function SessionUpload({
                 </div>
               ) : (
                 <>
-                  <p className="text-sm font-medium text-gray-900">Drag & drop your video here</p>
-                  <p className="text-xs text-gray-500 mt-1">or tap to choose a file</p>
+                  <p className="text-sm font-medium text-gray-900">Drop a video here</p>
+                  <p className="text-xs text-gray-500 mt-1">or tap to choose one</p>
                 </>
               )}
               <input ref={inputRef} type="file" accept={videoFileAccept()} className="hidden" onChange={handleFilePick} />
               <input ref={captureInputRef} type="file" accept={videoFileAccept()} capture="environment" className="hidden" onChange={handleFilePick} />
-              <input ref={libraryInputRef} type="file" accept={videoFileAccept()} className="hidden" onChange={handleFilePick} />
             </div>
           </div>
 
@@ -360,7 +339,7 @@ function SessionUpload({
                 <div className="h-full bg-gray-900 transition-all" style={{ width: `${Math.max(uploadProgress ?? 5, 5)}%` }} />
               </div>
               <p className="text-xs text-gray-500 mt-1">Saving video{uploadProgress !== null ? ` (${uploadProgress}%)` : ''}. Keep this tab open until it finishes.</p>
-              <p className="text-xs text-amber-700">Navigation is protected while this upload is in progress. Use “Abort upload” if you want to leave.</p>
+              <p className="text-xs text-amber-700">Stay on this page until the upload finishes.</p>
             </div>
           ) : null}
         </form>

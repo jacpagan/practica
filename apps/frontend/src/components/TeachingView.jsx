@@ -122,18 +122,21 @@ function TeachingView({ token, onOpenReviewRequest }) {
   }
 
   const pendingCount = requests.filter((item) => ['requested', 'opened'].includes(item.status)).length
+  const studentCount = roster.length
+  const templateCount = templates.length
 
   return (
     <div className="px-4 sm:px-6 py-6">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
+          <div className="space-y-3">
             <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Teaching</h2>
-            <p className="text-sm text-gray-500 mt-1">Review student requests, respond with video feedback, and keep your roster organized.</p>
-          </div>
-          <div className="rounded-2xl border border-gray-200 px-4 py-3 bg-white">
-            <p className="text-xs uppercase tracking-wide text-gray-400">Pending now</p>
-            <p className="text-lg font-semibold text-gray-900 mt-1">{pendingCount}</p>
+            <p className="text-sm text-gray-500 mt-1">Inbox first. Roster and templates when you need them.</p>
+            <div className="flex flex-wrap gap-2">
+              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{pendingCount} pending</span>
+              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{studentCount} students</span>
+              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{templateCount} templates</span>
+            </div>
           </div>
         </div>
 
@@ -232,12 +235,12 @@ function TeachingView({ token, onOpenReviewRequest }) {
               ))}
             </div>
           )
-        ) : (
+        ) : tab === 'templates' ? (
           <div className="space-y-4">
             <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
               <div>
-                <p className="text-sm font-semibold text-gray-900">Save a reusable feedback template</p>
-                <p className="text-xs text-gray-500 mt-1">Use templates for recurring drum-technique reminders and save time in async reviews.</p>
+                <p className="text-sm font-semibold text-gray-900">New template</p>
+                <p className="text-xs text-gray-500 mt-1">Keep common coaching notes ready.</p>
               </div>
               <input
                 type="text"
@@ -295,7 +298,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
               </div>
             )}
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   )
