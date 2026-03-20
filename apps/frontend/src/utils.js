@@ -198,11 +198,54 @@ const clearResumeRecord = (storageKey) => {
   }
 }
 
-export const uploadFormData = ({ url, formData, token, onProgress }) =>
+const createAbortError = (message = 'Upload aborted') => {
+  const error = new Error(message)
+  error.name = 'AbortError'
+  return error
+}
+
+const isAbortError = (error) => error?.name === 'AbortError'
+
+const throwIfAborted = (signal) => {
+  if (signal?.aborted) throw createAbortError()
+}
+
+const abortableSleep = (ms, signal) =>
   new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(createAbortError())
+      return
+    }
+
+    let timeoutId = null
+    const onAbort = () => {
+      if (timeoutId !== null) clearTimeout(timeoutId)
+      signal?.removeEventListener('abort', onAbort)
+      reject(createAbortError())
+    }
+
+    timeoutId = window.setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
+
+export const uploadFormData = ({ url, formData, token, onProgress, signal }) =>
+  new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(createAbortError())
+      return
+    }
+
     const xhr = new XMLHttpRequest()
     xhr.open('POST', url)
     if (token) xhr.setRequestHeader('Authorization', `Token ${token}`)
+
+    const handleAbort = () => xhr.abort()
+    const cleanup = () => signal?.removeEventListener('abort', handleAbort)
+    signal?.addEventListener('abort', handleAbort, { once: true })
 
     xhr.upload.onprogress = (event) => {
       if (!onProgress) return
@@ -215,6 +258,7 @@ export const uploadFormData = ({ url, formData, token, onProgress }) =>
     }
 
     xhr.onload = () => {
+      cleanup()
       const text = xhr.responseText || ''
       let data = null
       if (text) {
@@ -228,8 +272,14 @@ export const uploadFormData = ({ url, formData, token, onProgress }) =>
       })
     }
 
-    xhr.onerror = () => reject(new Error('Network error during upload'))
-    xhr.onabort = () => reject(new Error('Upload aborted'))
+    xhr.onerror = () => {
+      cleanup()
+      reject(new Error('Network error during upload'))
+    }
+    xhr.onabort = () => {
+      cleanup()
+      reject(createAbortError())
+    }
     xhr.send(formData)
   })
 
@@ -247,7 +297,7 @@ const parseJsonResponse = async (res) => {
   }
 }
 
-const authedJsonPost = async ({ url, token, body }) => {
+const authedJsonPost = async ({ url, token, body, signal }) => {
   const res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -255,20 +305,31 @@ const authedJsonPost = async ({ url, token, body }) => {
       ...(token ? { Authorization: `Token ${token}` } : {}),
     },
     body: JSON.stringify(body),
+    signal,
   })
   return parseJsonResponse(res)
 }
 
-const putBlobToSignedUrl = ({ signedUrl, blob, onProgress }) =>
+const putBlobToSignedUrl = ({ signedUrl, blob, onProgress, signal }) =>
   new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(createAbortError())
+      return
+    }
+
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', signedUrl)
+    const handleAbort = () => xhr.abort()
+    const cleanup = () => signal?.removeEventListener('abort', handleAbort)
+    signal?.addEventListener('abort', handleAbort, { once: true })
+
     xhr.upload.onprogress = (event) => {
       if (!onProgress) return
       if (event.lengthComputable) onProgress(event.loaded, event.total)
       else onProgress(event.loaded, null)
     }
     xhr.onload = () => {
+      cleanup()
       if (xhr.status >= 200 && xhr.status < 300) {
         const etag = (xhr.getResponseHeader('ETag') || '').trim()
         resolve({ etag })
@@ -276,24 +337,30 @@ const putBlobToSignedUrl = ({ signedUrl, blob, onProgress }) =>
       }
       reject(new Error(`Upload part failed (${xhr.status})`))
     }
-    xhr.onerror = () => reject(new Error('Network error during multipart upload'))
-    xhr.onabort = () => reject(new Error('Multipart upload aborted'))
+    xhr.onerror = () => {
+      cleanup()
+      reject(new Error('Network error during multipart upload'))
+    }
+    xhr.onabort = () => {
+      cleanup()
+      reject(createAbortError('Multipart upload aborted'))
+    }
     xhr.send(blob)
   })
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-
-const retry = async (fn, maxAttempts = MAX_PART_RETRIES) => {
+const retry = async (fn, maxAttempts = MAX_PART_RETRIES, signal) => {
   let lastErr = null
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
+      throwIfAborted(signal)
       return await fn()
     } catch (err) {
       lastErr = err
+      if (isAbortError(err)) break
       if (attempt >= maxAttempts) break
       const jitter = Math.floor(Math.random() * 250)
       const backoff = Math.min(RETRY_MAX_DELAY_MS, RETRY_BASE_DELAY_MS * (2 ** (attempt - 1)))
-      await sleep(backoff + jitter)
+      await abortableSleep(backoff + jitter, signal)
     }
   }
   throw lastErr || new Error('Unknown retry failure')
@@ -328,7 +395,7 @@ const buildPartsPayload = (partsByNumber) =>
     .sort((a, b) => a[0] - b[0])
     .map(([partNumber, etag]) => ({ part_number: partNumber, etag }))
 
-const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress }) => {
+const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress, signal }) => {
   const normalizedContentType = normalizedVideoContentType(videoFile)
   const fingerprint = multipartFingerprint({ payload, videoFile })
   const storageKey = multipartResumeKey(fingerprint)
@@ -337,62 +404,66 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
   let partSize = null
   let totalParts = null
   let uploadedParts = []
+  try {
+    throwIfAborted(signal)
 
-  const resumeRecord = readResumeRecord(storageKey)
-  if (resumeRecord?.upload_id && Number(resumeRecord?.size_bytes) === Number(videoFile.size)) {
-    const statusRes = await authedJsonPost({
-      url: '/api/sessions/multipart/status/',
-      token,
-      body: { multipart_upload_id: resumeRecord.upload_id },
-    })
-    if (statusRes.ok && statusRes.data?.status === 'initiated') {
-      uploadId = statusRes.data?.multipart_upload_id
-      partSize = statusRes.data?.part_size
-      totalParts = statusRes.data?.total_parts
-      uploadedParts = statusRes.data?.uploaded_parts || []
-    } else if (statusRes.ok || [400, 404, 410].includes(statusRes.status)) {
-      clearResumeRecord(storageKey)
-    } else {
-      return statusRes
+    const resumeRecord = readResumeRecord(storageKey)
+    if (resumeRecord?.upload_id && Number(resumeRecord?.size_bytes) === Number(videoFile.size)) {
+      const statusRes = await authedJsonPost({
+        url: '/api/sessions/multipart/status/',
+        token,
+        body: { multipart_upload_id: resumeRecord.upload_id },
+        signal,
+      })
+      if (statusRes.ok && statusRes.data?.status === 'initiated') {
+        uploadId = statusRes.data?.multipart_upload_id
+        partSize = statusRes.data?.part_size
+        totalParts = statusRes.data?.total_parts
+        uploadedParts = statusRes.data?.uploaded_parts || []
+      } else if (statusRes.ok || [400, 404, 410].includes(statusRes.status)) {
+        clearResumeRecord(storageKey)
+      } else {
+        return statusRes
+      }
     }
-  }
 
-  if (!uploadId) {
-    const initRes = await authedJsonPost({
-      url: '/api/sessions/multipart/initiate/',
-      token,
-      body: {
-        ...payload,
-        filename: videoFile.name,
-        content_type: normalizedContentType,
-        size_bytes: videoFile.size,
-      },
+    if (!uploadId) {
+      const initRes = await authedJsonPost({
+        url: '/api/sessions/multipart/initiate/',
+        token,
+        body: {
+          ...payload,
+          filename: videoFile.name,
+          content_type: normalizedContentType,
+          size_bytes: videoFile.size,
+        },
+        signal,
+      })
+      if (!initRes.ok) return initRes
+
+      uploadId = initRes.data?.multipart_upload_id
+      partSize = initRes.data?.part_size
+      totalParts = initRes.data?.total_parts
+      uploadedParts = []
+    }
+
+    if (!uploadId || !partSize || !totalParts) {
+      clearResumeRecord(storageKey)
+      return { ok: false, status: 500, data: { error: 'Invalid multipart upload state' } }
+    }
+
+    writeResumeRecord(storageKey, {
+      upload_id: uploadId,
+      size_bytes: videoFile.size,
+      filename: videoFile.name,
+      last_modified: videoFile.lastModified || 0,
     })
-    if (!initRes.ok) return initRes
 
-    uploadId = initRes.data?.multipart_upload_id
-    partSize = initRes.data?.part_size
-    totalParts = initRes.data?.total_parts
-    uploadedParts = []
-  }
-
-  if (!uploadId || !partSize || !totalParts) {
-    clearResumeRecord(storageKey)
-    return { ok: false, status: 500, data: { error: 'Invalid multipart upload state' } }
-  }
-
-  writeResumeRecord(storageKey, {
-    upload_id: uploadId,
-    size_bytes: videoFile.size,
-    filename: videoFile.name,
-    last_modified: videoFile.lastModified || 0,
-  })
-
-  const partsByNumber = parseUploadedParts(uploadedParts, totalParts)
-  let completedBytes = 0
-  for (const partNumber of partsByNumber.keys()) {
-    completedBytes += partByteLength(partNumber, partSize, videoFile.size)
-  }
+    const partsByNumber = parseUploadedParts(uploadedParts, totalParts)
+    let completedBytes = 0
+    for (const partNumber of partsByNumber.keys()) {
+      completedBytes += partByteLength(partNumber, partSize, videoFile.size)
+    }
 
   const inflightLoaded = new Map()
   const reportProgress = () => {
@@ -413,10 +484,11 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
     if (!partsByNumber.has(partNumber)) missingParts.push(partNumber)
   }
 
-  const uploadOnePart = async (partNumber) => {
-    const start = (partNumber - 1) * partSize
-    const end = Math.min(start + partSize, videoFile.size)
-    const chunk = videoFile.slice(start, end)
+    const uploadOnePart = async (partNumber) => {
+      throwIfAborted(signal)
+      const start = (partNumber - 1) * partSize
+      const end = Math.min(start + partSize, videoFile.size)
+      const chunk = videoFile.slice(start, end)
     inflightLoaded.set(partNumber, 0)
     reportProgress()
 
@@ -425,7 +497,8 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
         url: '/api/sessions/multipart/sign-part/',
         token,
         body: { multipart_upload_id: uploadId, part_number: partNumber },
-      }))
+        signal,
+      }), MAX_PART_RETRIES, signal)
       if (!signRes.ok || !signRes.data?.signed_url) throw asApiError(signRes)
 
       const partResult = await retry(async () => {
@@ -436,10 +509,11 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
             inflightLoaded.set(partNumber, loaded)
             reportProgress()
           },
+          signal,
         })
         if (!result.etag) throw new Error('S3 did not return an ETag for uploaded part')
         return result
-      })
+      }, MAX_PART_RETRIES, signal)
 
       partsByNumber.set(partNumber, partResult.etag)
       completedBytes += chunk.size
@@ -447,50 +521,74 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
       inflightLoaded.delete(partNumber)
       reportProgress()
     }
-  }
+    }
 
-  if (missingParts.length) {
-    let cursor = 0
-    const worker = async () => {
-      while (true) {
-        const index = cursor
-        cursor += 1
-        if (index >= missingParts.length) return
-        await uploadOnePart(missingParts[index])
+    if (missingParts.length) {
+      let cursor = 0
+      const worker = async () => {
+        while (true) {
+          throwIfAborted(signal)
+          const index = cursor
+          cursor += 1
+          if (index >= missingParts.length) return
+          await uploadOnePart(missingParts[index])
+        }
+      }
+      const workerCount = Math.min(MULTIPART_CONCURRENCY, missingParts.length)
+      try {
+        await Promise.all(Array.from({ length: workerCount }, () => worker()))
+      } catch (err) {
+        if (err?.apiResponse) return err.apiResponse
+        throw err
       }
     }
-    const workerCount = Math.min(MULTIPART_CONCURRENCY, missingParts.length)
-    try {
-      await Promise.all(Array.from({ length: workerCount }, () => worker()))
-    } catch (err) {
-      if (err?.apiResponse) return err.apiResponse
-      throw err
+
+    const completeRes = await authedJsonPost({
+      url: '/api/sessions/multipart/complete/',
+      token,
+      body: {
+        multipart_upload_id: uploadId,
+        parts: buildPartsPayload(partsByNumber),
+      },
+      signal,
+    })
+
+    if (completeRes.ok) {
+      clearResumeRecord(storageKey)
+      if (onProgress) onProgress(100, videoFile.size, videoFile.size)
+      return completeRes
     }
-  }
 
-  const completeRes = await authedJsonPost({
-    url: '/api/sessions/multipart/complete/',
-    token,
-    body: {
-      multipart_upload_id: uploadId,
-      parts: buildPartsPayload(partsByNumber),
-    },
-  })
-
-  if (completeRes.ok) {
-    clearResumeRecord(storageKey)
-    if (onProgress) onProgress(100, videoFile.size, videoFile.size)
+    if ([400, 404, 410].includes(completeRes.status)) clearResumeRecord(storageKey)
     return completeRes
+  } catch (error) {
+    if (isAbortError(error)) {
+      if (uploadId) {
+        try {
+          await authedJsonPost({
+            url: '/api/sessions/multipart/abort/',
+            token,
+            body: { multipart_upload_id: uploadId },
+          })
+        } catch {
+          // Best effort.
+        }
+      }
+      return {
+        ok: false,
+        status: 499,
+        data: { error: 'Upload aborted', code: 'upload_aborted' },
+        text: '',
+      }
+    }
+    throw error
   }
-
-  if ([400, 404, 410].includes(completeRes.status)) clearResumeRecord(storageKey)
-  return completeRes
 }
 
-export const createSessionUpload = async ({ token, payload, videoFile, onProgress }) => {
+export const createSessionUpload = async ({ token, payload, videoFile, onProgress, signal }) => {
   try {
     if (videoFile && videoFile.size >= MULTIPART_THRESHOLD_BYTES) {
-      const multipartRes = await createSessionViaMultipart({ token, payload, videoFile, onProgress })
+      const multipartRes = await createSessionViaMultipart({ token, payload, videoFile, onProgress, signal })
       if (multipartRes.ok || ![400, 404, 405].includes(multipartRes.status)) return multipartRes
     }
 
@@ -504,8 +602,16 @@ export const createSessionUpload = async ({ token, payload, videoFile, onProgres
       fd.append('duration_seconds', payload.duration_seconds)
     }
     if (payload.tags?.length) fd.append('tags', payload.tags.join(','))
-    return uploadFormData({ url: '/api/sessions/', formData: fd, token, onProgress })
-  } catch {
+    return uploadFormData({ url: '/api/sessions/', formData: fd, token, onProgress, signal })
+  } catch (error) {
+    if (isAbortError(error)) {
+      return {
+        ok: false,
+        status: 499,
+        data: { error: 'Upload aborted', code: 'upload_aborted' },
+        text: '',
+      }
+    }
     return {
       ok: false,
       status: 0,
@@ -517,6 +623,7 @@ export const createSessionUpload = async ({ token, payload, videoFile, onProgres
 
 export const uploadErrorMessage = (res) => {
   if (!res) return 'Upload failed'
+  if (res?.data?.code === 'upload_aborted') return 'Upload aborted.'
   if (res.status === 0) return 'Network interrupted during upload. Please retry.'
   if (res.status === 410) return 'Upload session expired. Please retry.'
   if (res.status === 413) return 'File too large for server limits. Current max is 2GB.'

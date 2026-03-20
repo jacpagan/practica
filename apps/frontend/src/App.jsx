@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { reportClientError } from './utils'
 import { AuthProvider, useAuth } from './auth'
 import { ToastProvider, useToast } from './components/Toast'
-import { ConfirmProvider } from './components/ConfirmDialog'
+import { ConfirmProvider, useConfirm } from './components/ConfirmDialog'
 import AuthForm from './components/AuthForm'
 import ReviewPage from './components/ReviewPage'
 import SessionUpload from './components/SessionUpload'
@@ -32,6 +32,7 @@ const routePath = ({ view, sessionId, token }) => {
 function AppContent() {
   const { user, token, loading, logout } = useAuth()
   const toast = useToast()
+  const confirm = useConfirm()
   const initialRoute = useMemo(() => parseRoute(window.location.pathname), [])
   const [view, setView] = useState(initialRoute.view)
   const [routeSessionId, setRouteSessionId] = useState(initialRoute.sessionId)
@@ -42,8 +43,10 @@ function AppContent() {
   const [detailReturnView, setDetailReturnView] = useState('library')
   const [openRecorderOnUpload, setOpenRecorderOnUpload] = useState(false)
   const [justUploadedSessionId, setJustUploadedSessionId] = useState(null)
+  const uploadGuardRef = useRef({ active: false, abort: null })
+  const currentPathRef = useRef(routePath(initialRoute))
 
-  const navigate = useCallback((nextRoute, { replace = false } = {}) => {
+  const applyRoute = useCallback((nextRoute, { replace = false } = {}) => {
     setView(nextRoute.view)
     setRouteSessionId(nextRoute.sessionId ?? null)
     setReviewToken(nextRoute.token || '')
@@ -54,15 +57,69 @@ function AppContent() {
     }
   }, [])
 
+  const requestAbortActiveUpload = useCallback(() => {
+    try { uploadGuardRef.current.abort?.() } catch {}
+  }, [])
+
+  const confirmAbortActiveUpload = useCallback(async (nextAction = 'leave this page') => {
+    if (!uploadGuardRef.current.active) return true
+    return confirm({
+      title: 'Abort upload?',
+      message: `A video is still uploading. If you ${nextAction}, the upload will be aborted and you will need to start again.`,
+      confirmLabel: 'Abort upload',
+      cancelLabel: 'Keep uploading',
+      tone: 'danger',
+    })
+  }, [confirm])
+
+  const navigate = useCallback(async (nextRoute, { replace = false, bypassUploadGuard = false } = {}) => {
+    const nextPath = routePath(nextRoute)
+    if (!bypassUploadGuard && uploadGuardRef.current.active && nextPath !== currentPathRef.current) {
+      const accepted = await confirmAbortActiveUpload('leave this page')
+      if (!accepted) return false
+      requestAbortActiveUpload()
+    }
+    applyRoute(nextRoute, { replace })
+    return true
+  }, [applyRoute, confirmAbortActiveUpload, requestAbortActiveUpload])
+
+  const setUploadNavigationGuard = useCallback(({ active = false, abort = null } = {}) => {
+    uploadGuardRef.current = {
+      active: Boolean(active),
+      abort: typeof abort === 'function' ? abort : null,
+    }
+  }, [])
+
+  useEffect(() => {
+    currentPathRef.current = routePath({ view, sessionId: routeSessionId, token: reviewToken })
+  }, [reviewToken, routeSessionId, view])
+
   useEffect(() => {
     const onPopState = () => {
       const route = parseRoute(window.location.pathname)
-      setView(route.view)
-      setRouteSessionId(route.sessionId)
-      setReviewToken(route.token || '')
+      const nextPath = routePath(route)
+      if (uploadGuardRef.current.active && nextPath !== currentPathRef.current) {
+        window.history.pushState(null, '', currentPathRef.current)
+        const accepted = window.confirm('A video is still uploading. Leaving this page will abort the upload. Do you want to continue?')
+        if (!accepted) return
+        requestAbortActiveUpload()
+        applyRoute(route)
+        return
+      }
+      applyRoute(route, { replace: true })
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
+  }, [applyRoute, requestAbortActiveUpload])
+
+  useEffect(() => {
+    const onBeforeUnload = (event) => {
+      if (!uploadGuardRef.current.active) return
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
   }, [])
 
   const loadSessions = useCallback(async () => {
@@ -147,6 +204,13 @@ function AppContent() {
     return <AuthForm />
   }
 
+  const handleLogout = async () => {
+    const accepted = await confirmAbortActiveUpload('log out')
+    if (!accepted) return
+    if (uploadGuardRef.current.active) requestAbortActiveUpload()
+    logout()
+  }
+
   return (
     <div className="min-h-screen bg-white">
       <header className="sticky top-0 z-30 border-b border-gray-100 bg-white/95 backdrop-blur px-4 py-3 sm:px-6">
@@ -171,7 +235,7 @@ function AppContent() {
             </nav>
             <div className="flex items-center gap-2 sm:border-l sm:border-gray-100 sm:pl-3">
               <span className="text-xs text-gray-400">{user.display_name}</span>
-              <button onClick={logout} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+              <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
                 Log out
               </button>
             </div>
@@ -209,9 +273,10 @@ function AppContent() {
           <SessionUpload
             token={token}
             onComplete={handleUploadComplete}
-            onCancel={() => navigate({ view: 'library', sessionId: null })}
+            onCancel={({ bypassUploadGuard = false } = {}) => navigate({ view: 'library', sessionId: null }, { bypassUploadGuard })}
             initialRecorderOpen={openRecorderOnUpload}
             onRecorderOpenHandled={() => setOpenRecorderOnUpload(false)}
+            onUploadGuardChange={setUploadNavigationGuard}
           />
         )}
 
