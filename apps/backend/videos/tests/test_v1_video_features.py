@@ -116,7 +116,8 @@ class V1VideoFeaturesTests(APITestCase):
         AWS_MEDIA_CONVERT_ROLE_ARN='',
         AWS_MEDIA_CONVERT_ENDPOINT_URL='',
     )
-    def test_mov_session_without_transcoding_fails_with_clear_message(self):
+    @patch('videos.views.enqueue_local_session_transcode', return_value=(False, 'ffmpeg missing'))
+    def test_mov_session_without_transcoding_fails_with_clear_message(self, enqueue_local_transcode):
         self.client.force_authenticate(user=self.owner)
 
         res = self.client.post(
@@ -133,6 +134,7 @@ class V1VideoFeaturesTests(APITestCase):
         created = Session.objects.get(id=res.data['id'])
         self.assertEqual(created.processing_status, Session.STATUS_FAILED)
         self.assertIn('browser playback needs transcoding', created.processing_error.lower())
+        enqueue_local_transcode.assert_called_once()
 
     @override_settings(
         AWS_STORAGE_BUCKET_NAME='',

@@ -16,11 +16,13 @@ class Migration(migrations.Migration):
             model_name='multipartsessionupload',
             name='space',
         ),
-        migrations.DeleteModel(
-            name='CoachDailyMetric',
+        migrations.RunSQL(
+            sql='DROP TABLE IF EXISTS videos_coachdailymetric CASCADE;',
+            reverse_sql=migrations.RunSQL.noop,
         ),
-        migrations.DeleteModel(
-            name='CoachEvent',
+        migrations.RunSQL(
+            sql='DROP TABLE IF EXISTS videos_coachevent CASCADE;',
+            reverse_sql=migrations.RunSQL.noop,
         ),
         migrations.DeleteModel(
             name='DailyCheckInItem',
