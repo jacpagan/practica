@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -97,6 +98,24 @@ class ReviewFeedbackApiTests(APITestCase):
         self.assertEqual(len(response.data['video_feedback']), 1)
         self.assertEqual(response.data['video_feedback'][0]['text'], 'Video reply note')
         self.assertTrue(bool(response.data['video_feedback'][0]['feedback_video']))
+
+    def test_session_detail_falls_back_to_file_names_when_storage_url_fails(self):
+        VideoFeedback.objects.create(
+            session=self.session,
+            user=self.reviewer,
+            text='Video reply note',
+            timestamp_seconds=10,
+            feedback_video='feedback_videos/reply.mp4',
+            is_legacy_text_feedback=False,
+        )
+        self._auth(self.owner)
+
+        with patch('django.core.files.storage.FileSystemStorage.url', side_effect=RuntimeError('storage unavailable')):
+            response = self.client.get(f'/api/sessions/{self.session.id}/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['video_file'], 'sessions/review-owner.mp4')
+        self.assertEqual(response.data['video_feedback'][0]['feedback_video'], 'feedback_videos/reply.mp4')
 
     def test_owner_can_create_and_reuse_private_share_link(self):
         self.link.is_active = False

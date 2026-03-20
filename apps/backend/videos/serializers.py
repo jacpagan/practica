@@ -31,6 +31,14 @@ def _is_allowed_video_upload(file_obj):
     return False
 
 
+class SafeFileField(serializers.FileField):
+    def to_representation(self, value):
+        try:
+            return super().to_representation(value)
+        except Exception:
+            return str(getattr(value, 'name', '') or '')
+
+
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
@@ -119,6 +127,7 @@ class VideoFeedbackSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     display_name = serializers.SerializerMethodField()
     review_request_id = serializers.IntegerField(source='review_request_id', read_only=True)
+    feedback_video = SafeFileField(required=False, allow_null=True)
 
     class Meta:
         model = VideoFeedback
@@ -153,6 +162,7 @@ class SessionSerializer(serializers.ModelSerializer):
     video_feedback_count = serializers.SerializerMethodField()
     owner = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
+    video_file = SafeFileField()
     processing_status = serializers.CharField(read_only=True)
     processing_error = serializers.CharField(read_only=True)
     assets = SessionAssetSerializer(many=True, read_only=True)
@@ -213,6 +223,7 @@ class SessionSerializer(serializers.ModelSerializer):
 class SessionListSerializer(serializers.ModelSerializer):
     video_feedback_count = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
+    video_file = SafeFileField()
     processing_status = serializers.CharField(read_only=True)
     processing_error = serializers.CharField(read_only=True)
     assets = SessionAssetSerializer(many=True, read_only=True)
@@ -244,6 +255,7 @@ class SessionListSerializer(serializers.ModelSerializer):
 
 
 class PublicSessionSerializer(serializers.ModelSerializer):
+    video_file = SafeFileField()
     assets = SessionAssetSerializer(many=True, read_only=True)
 
     class Meta:
@@ -275,6 +287,7 @@ class ReviewVideoFeedbackSerializer(serializers.ModelSerializer):
     text = serializers.CharField(required=False, allow_blank=True, default='')
     review_request_id = serializers.IntegerField(source='review_request_id', read_only=True)
     feedback_category = serializers.ChoiceField(choices=VideoFeedback.CATEGORY_CHOICES, required=False, allow_blank=True, default='')
+    feedback_video = SafeFileField(required=False, allow_null=True)
 
     class Meta:
         model = VideoFeedback
