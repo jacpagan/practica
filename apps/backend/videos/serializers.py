@@ -126,7 +126,7 @@ class SessionAssetSerializer(serializers.ModelSerializer):
 class VideoFeedbackSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     display_name = serializers.SerializerMethodField()
-    review_request_id = serializers.IntegerField(source='review_request_id', read_only=True)
+    review_request_id = serializers.IntegerField(read_only=True)
     feedback_video = SafeFileField(required=False, allow_null=True)
 
     class Meta:
@@ -285,7 +285,7 @@ class ReviewVideoFeedbackSerializer(serializers.ModelSerializer):
     author_display_name = serializers.SerializerMethodField()
     authored_by_current_user = serializers.SerializerMethodField()
     text = serializers.CharField(required=False, allow_blank=True, default='')
-    review_request_id = serializers.IntegerField(source='review_request_id', read_only=True)
+    review_request_id = serializers.IntegerField(read_only=True)
     feedback_category = serializers.ChoiceField(choices=VideoFeedback.CATEGORY_CHOICES, required=False, allow_blank=True, default='')
     feedback_video = SafeFileField(required=False, allow_null=True)
 
