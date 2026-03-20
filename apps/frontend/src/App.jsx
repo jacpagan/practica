@@ -46,6 +46,7 @@ function AppContent() {
   const [detailReturnView, setDetailReturnView] = useState('library')
   const [openRecorderOnUpload, setOpenRecorderOnUpload] = useState(false)
   const [justUploadedSessionId, setJustUploadedSessionId] = useState(null)
+  const [pendingFollowUpRequestDraft, setPendingFollowUpRequestDraft] = useState(null)
   const uploadGuardRef = useRef({ active: false, abort: null })
   const currentPathRef = useRef(routePath(initialRoute))
 
@@ -180,10 +181,11 @@ function AppContent() {
     navigate({ view: 'detail', sessionId: session.id })
   }, [navigate])
 
-  const handleRecordAnother = useCallback(() => {
+  const handleRecordAnother = useCallback((draft = null) => {
     setSelectedSession(null)
     setJustUploadedSessionId(null)
     setOpenRecorderOnUpload(true)
+    setPendingFollowUpRequestDraft(draft || null)
     navigate({ view: 'upload', sessionId: null })
   }, [navigate])
 
@@ -311,6 +313,8 @@ function AppContent() {
             session={selectedSession}
             token={token}
             onBack={goBack}
+            initialReviewRequestDraft={pendingFollowUpRequestDraft}
+            onReviewRequestDraftCleared={() => setPendingFollowUpRequestDraft(null)}
             onOpenReviewRequest={(requestItem) => {
               if (!requestItem?.review_link?.token) return
               navigate({ view: 'review', token: requestItem.review_link.token, sessionId: null })

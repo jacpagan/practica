@@ -19,7 +19,7 @@ const requestStatusLabel = (value = '') => {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1)
 }
 
-function SessionDetail({ session: initialSession, token, onBack, onOpenReviewRequest, onSessionUpdate, onSessionDelete, justUploaded = false, onRecordAnother }) {
+function SessionDetail({ session: initialSession, token, onBack, onOpenReviewRequest, initialReviewRequestDraft = null, onReviewRequestDraftCleared, onSessionUpdate, onSessionDelete, justUploaded = false, onRecordAnother }) {
   const toast = useToast()
   const confirm = useConfirm()
   const videoRef = useRef(null)
@@ -77,6 +77,18 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     setRequestTurnaroundHours('24')
     setRequestDeadline('')
   }, [initialSession?.id])
+
+  useEffect(() => {
+    if (!initialReviewRequestDraft || !canEdit) return
+    setShowRequestComposer(true)
+    setSelectedTeacher(initialReviewRequestDraft.teacher || null)
+    setRequestInstrument(initialReviewRequestDraft.instrument || 'drums')
+    setRequestStudentLevel(initialReviewRequestDraft.student_level || '')
+    setRequestGoal(initialReviewRequestDraft.goal || '')
+    setRequestExerciseOrSong(initialReviewRequestDraft.exercise_or_song || '')
+    setRequestNotes(initialReviewRequestDraft.notes || '')
+    setRequestTurnaroundHours(initialReviewRequestDraft.requested_turnaround_hours ? String(initialReviewRequestDraft.requested_turnaround_hours) : '24')
+  }, [initialReviewRequestDraft, canEdit])
 
   const loadReviewRequests = async () => {
     if (!token || !session?.id || !canEdit) return
@@ -241,6 +253,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       const payload = {
         session_id: session.id,
         teacher_id: selectedTeacher.id,
+        parent_request_id: initialReviewRequestDraft?.parent_request_id || null,
         instrument: requestInstrument.trim() || 'drums',
         student_level: requestStudentLevel.trim(),
         goal: requestGoal.trim(),
@@ -268,6 +281,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       setRequestNotes('')
       setRequestStudentLevel('')
       setRequestDeadline('')
+      onReviewRequestDraftCleared?.()
       toast.success('Teacher review request created')
       if (data?.review_link?.url) {
         try {
@@ -695,6 +709,24 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                             {requestItem.review_link?.token ? (
                               <button type="button" onClick={() => onOpenReviewRequest?.(requestItem)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
                                 Open request page
+                              </button>
+                            ) : null}
+                            {requestItem.status !== 'closed' && requestItem.teacher ? (
+                              <button
+                                type="button"
+                                onClick={() => onRecordAnother?.({
+                                  parent_request_id: requestItem.id,
+                                  teacher: requestItem.teacher,
+                                  instrument: requestItem.instrument,
+                                  student_level: requestItem.student_level,
+                                  goal: requestItem.goal,
+                                  exercise_or_song: requestItem.exercise_or_song,
+                                  notes: requestItem.notes,
+                                  requested_turnaround_hours: requestItem.requested_turnaround_hours,
+                                })}
+                                className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
+                              >
+                                Record follow-up
                               </button>
                             ) : null}
                             {requestItem.status === 'responded' ? (

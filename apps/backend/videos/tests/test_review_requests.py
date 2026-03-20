@@ -257,3 +257,65 @@ class ReviewRequestApiTests(APITestCase):
         self.assertEqual(len(response.data['feedback_items']), 1)
         self.assertEqual(response.data['feedback_items'][0]['text'], 'Focus on kick-snare balance.')
         self.assertEqual(response.data['feedback_items'][0]['review_request_id'], review_request.id)
+
+    def test_student_can_create_follow_up_review_request_on_new_session(self):
+        parent_request = self._create_review_request()
+        new_session = Session.objects.create(
+            user=self.student,
+            title='Groove Practice Follow-up',
+            description='Second take after feedback',
+            video_file='sessions/groove-practice-follow-up.mp4',
+            duration_seconds=190,
+            processing_status=Session.STATUS_READY,
+        )
+
+        self._auth(self.student)
+        response = self.client.post(
+            '/api/review-requests/',
+            {
+                'session_id': new_session.id,
+                'teacher_id': self.teacher.id,
+                'parent_request_id': parent_request.id,
+                'instrument': 'drums',
+                'student_level': 'intermediate',
+                'goal': 'Follow up after teacher notes',
+                'exercise_or_song': 'Same groove, second take',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        child_request = ReviewRequest.objects.get(pk=response.data['id'])
+        self.assertEqual(child_request.parent_request_id, parent_request.id)
+        parent_request.refresh_from_db()
+        self.assertEqual(parent_request.status, ReviewRequest.STATUS_RESUBMITTED)
+        self.assertIsNotNone(parent_request.resubmitted_at)
+
+    def test_follow_up_review_request_requires_same_teacher(self):
+        parent_request = self._create_review_request()
+        another_teacher = User.objects.create_user(username='other-teacher', password='pass1234')
+        Profile.objects.create(user=another_teacher, display_name='Other Teacher')
+        new_session = Session.objects.create(
+            user=self.student,
+            title='Follow-up mismatch',
+            description='Should fail',
+            video_file='sessions/follow-up-mismatch.mp4',
+            duration_seconds=90,
+            processing_status=Session.STATUS_READY,
+        )
+
+        self._auth(self.student)
+        response = self.client.post(
+            '/api/review-requests/',
+            {
+                'session_id': new_session.id,
+                'teacher_id': another_teacher.id,
+                'parent_request_id': parent_request.id,
+                'instrument': 'drums',
+                'goal': 'Wrong teacher follow-up',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('same teacher', response.data['teacher_id'][0].lower())

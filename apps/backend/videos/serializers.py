@@ -322,10 +322,19 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
         required=True,
     )
     review_link = ReviewLinkSerializer(read_only=True)
+    parent_request = serializers.SerializerMethodField()
+    parent_request_id = serializers.PrimaryKeyRelatedField(
+        source='parent_request',
+        queryset=ReviewRequest.objects.all(),
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
     response_count = serializers.SerializerMethodField()
     current_user_role = serializers.SerializerMethodField()
     feedback_items = serializers.SerializerMethodField()
     latest_feedback_at = serializers.SerializerMethodField()
+    follow_up_request_count = serializers.SerializerMethodField()
 
     class Meta:
         model = ReviewRequest
@@ -335,18 +344,30 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
             'student',
             'teacher', 'teacher_id',
             'review_link',
+            'parent_request', 'parent_request_id',
             'instrument', 'student_level', 'goal', 'exercise_or_song', 'notes',
             'requested_turnaround_hours', 'deadline',
             'status', 'opened_at', 'responded_at', 'viewed_at', 'resubmitted_at', 'closed_at',
-            'response_count', 'current_user_role', 'feedback_items', 'latest_feedback_at',
+            'response_count', 'current_user_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count',
             'created_at', 'updated_at',
         ]
         read_only_fields = [
-            'id', 'student', 'teacher', 'session', 'review_link',
+            'id', 'student', 'teacher', 'session', 'review_link', 'parent_request',
             'status', 'opened_at', 'responded_at', 'viewed_at', 'resubmitted_at', 'closed_at',
-            'response_count', 'current_user_role', 'feedback_items', 'latest_feedback_at',
+            'response_count', 'current_user_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count',
             'created_at', 'updated_at',
         ]
+
+    def get_parent_request(self, obj):
+        parent = obj.parent_request
+        if not parent:
+            return None
+        return {
+            'id': parent.id,
+            'session_id': parent.session_id,
+            'goal': parent.goal,
+            'status': parent.status,
+        }
 
     def get_response_count(self, obj):
         return obj.feedback_items.count()
@@ -370,9 +391,13 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
         latest = obj.feedback_items.order_by('-created_at').values_list('created_at', flat=True).first()
         return latest
 
+    def get_follow_up_request_count(self, obj):
+        return obj.follow_up_requests.count()
+
     def validate(self, attrs):
         session = attrs.get('session') or getattr(self.instance, 'session', None)
         teacher = attrs.get('teacher') or getattr(self.instance, 'teacher', None)
+        parent_request = attrs.get('parent_request') or getattr(self.instance, 'parent_request', None)
         request = self.context.get('request')
         user = getattr(request, 'user', None) if request else None
 
@@ -384,6 +409,13 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'session_id': 'This session must be playback ready before requesting review.'})
         if teacher and teacher.id == user.id:
             raise serializers.ValidationError({'teacher_id': 'Choose a teacher other than yourself.'})
+        if parent_request:
+            if parent_request.student_id != user.id and not user.is_staff:
+                raise serializers.ValidationError({'parent_request_id': 'You can only follow up on your own review requests.'})
+            if teacher and parent_request.teacher_id != teacher.id:
+                raise serializers.ValidationError({'teacher_id': 'Follow-up requests must use the same teacher as the parent request.'})
+            if session and parent_request.session_id == session.id:
+                raise serializers.ValidationError({'session_id': 'Choose a new session for this follow-up request.'})
         return attrs
 
 

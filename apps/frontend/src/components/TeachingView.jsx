@@ -180,6 +180,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
                         <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${statusTone[item.status] || 'bg-gray-100 text-gray-700'}`}>
                           {statusLabel(item.status)}
                         </span>
+                        {item.parent_request ? <span className="text-[11px] uppercase tracking-wide bg-violet-100 text-violet-800 px-2 py-1 rounded-full">Follow-up</span> : null}
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
                         {item.student?.display_name || item.student?.username || 'Student'} • {item.instrument}{item.student_level ? ` • ${item.student_level}` : ''}

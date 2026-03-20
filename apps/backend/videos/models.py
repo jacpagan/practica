@@ -259,6 +259,7 @@ class ReviewRequest(models.Model):
     session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='review_requests')
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='review_requests_as_student')
     teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name='review_requests_as_teacher')
+    parent_request = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='follow_up_requests')
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_review_requests_v2')
     review_link = models.OneToOneField(ReviewLink, on_delete=models.SET_NULL, null=True, blank=True, related_name='review_request')
     instrument = models.CharField(max_length=64)

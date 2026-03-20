@@ -544,6 +544,7 @@ class ReviewRequestViewSet(viewsets.ModelViewSet):
             'teacher', 'teacher__profile',
             'student', 'student__profile',
             'review_link',
+            'parent_request',
         ).prefetch_related(
             'feedback_items', 'feedback_items__user', 'feedback_items__user__profile',
         )
@@ -566,6 +567,11 @@ class ReviewRequestViewSet(viewsets.ModelViewSet):
                 student=self.request.user,
                 created_by=self.request.user,
             )
+            if review_request.parent_request_id:
+                parent_request = review_request.parent_request
+                parent_request.status = ReviewRequest.STATUS_RESUBMITTED
+                parent_request.resubmitted_at = timezone.now()
+                parent_request.save(update_fields=['status', 'resubmitted_at', 'updated_at'])
             _ensure_teacher_roster_membership(
                 teacher=review_request.teacher,
                 student=review_request.student,
