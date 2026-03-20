@@ -89,6 +89,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const canEdit = Boolean(session?.can_edit)
   const canCreateShareLink = session?.processing_status === 'ready'
   const playableUrl = session?.local_preview_url || preferredSessionVideoUrl(session)
+  const selectedTeacherName = selectedTeacher?.display_name || selectedTeacher?.username || ''
   const videoFeedback = Array.isArray(session?.video_feedback)
     ? session.video_feedback.filter((item) => item.feedback_video)
     : []
@@ -557,7 +558,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                     </button>
                     {canEdit && canCreateShareLink ? (
                       <button type="button" onClick={() => setShowRequestComposer(true)} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
-                        Ask teacher
+                        {selectedTeacherName ? `Send to ${selectedTeacherName}` : 'Ask teacher'}
                       </button>
                     ) : null}
                     <button type="button" onClick={onRecordAnother} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
@@ -641,7 +642,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       disabled={!canCreateShareLink}
                       className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors"
                     >
-                      {showRequestComposer ? 'Close' : 'New request'}
+                      {showRequestComposer ? 'Close' : (selectedTeacherName ? `Send to ${selectedTeacherName}` : 'Ask teacher')}
                     </button>
                   </div>
 
@@ -651,6 +652,13 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
                           <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Playback ready required</p>
                           <p className="text-sm text-amber-900 mt-1">Wait until this session is playback ready before sending a teacher review request.</p>
+                        </div>
+                      ) : null}
+
+                      {selectedTeacherName ? (
+                        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3">
+                          <p className="text-xs font-medium uppercase tracking-wide text-emerald-800">Ready</p>
+                          <p className="text-sm text-emerald-900 mt-1">This request will go to {selectedTeacherName}.</p>
                         </div>
                       ) : null}
 
@@ -763,7 +771,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
 
                       <div className="flex justify-end">
                         <button type="button" disabled={creatingRequest || !canCreateShareLink} onClick={createReviewRequest} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                          {creatingRequest ? 'Sending…' : 'Send request'}
+                          {creatingRequest ? (selectedTeacherName ? `Sending to ${selectedTeacherName}…` : 'Sending…') : (selectedTeacherName ? `Send to ${selectedTeacherName}` : 'Send request')}
                         </button>
                       </div>
                     </div>
