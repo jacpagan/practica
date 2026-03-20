@@ -5,7 +5,7 @@ import logging
 import os
 from datetime import timedelta
 from django.shortcuts import get_object_or_404
-from django.http import JsonResponse, HttpResponse, Http404
+from django.http import JsonResponse, HttpResponse
 from django.db import connection, transaction
 from django.utils import timezone
 from django.conf import settings
@@ -37,6 +37,24 @@ from .services.media_pipeline import enqueue_session_processing, enqueue_local_s
 
 logger = logging.getLogger(__name__)
 
+REVIEW_LINK_ERROR_DETAILS = {
+    'invalid': {
+        'status': status.HTTP_404_NOT_FOUND,
+        'code': 'review_link_invalid',
+        'error': 'This private feedback link does not exist.',
+    },
+    'expired': {
+        'status': status.HTTP_410_GONE,
+        'code': 'review_link_expired',
+        'error': 'This private feedback link has expired.',
+    },
+    'revoked': {
+        'status': status.HTTP_403_FORBIDDEN,
+        'code': 'review_link_revoked',
+        'error': 'This private feedback link has been turned off.',
+    },
+}
+
 
 def _visible_sessions_qs(user):
     """Private library sessions for the authenticated user."""
@@ -45,23 +63,34 @@ def _visible_sessions_qs(user):
     return Session.objects.filter(user=user)
 
 
-def _active_review_link_or_404(token):
+def _resolve_review_link(token):
     normalized_token = str(token or '').strip()
     if not normalized_token:
-        raise Http404('Review link not found')
+        return None, 'invalid'
 
     link = ReviewLink.objects.select_related(
         'session',
         'session__user',
         'session__user__profile',
-    ).filter(
-        token=normalized_token,
-        is_active=True,
-        expires_at__gt=timezone.now(),
-    ).first()
+    ).filter(token=normalized_token).first()
     if not link:
-        raise Http404('Review link not found')
-    return link
+        return None, 'invalid'
+    if not link.is_active:
+        return None, 'revoked'
+    if link.expires_at <= timezone.now():
+        return None, 'expired'
+    return link, None
+
+
+def _review_link_error_response(reason):
+    details = REVIEW_LINK_ERROR_DETAILS.get(reason, REVIEW_LINK_ERROR_DETAILS['invalid'])
+    return Response(
+        {
+            'error': details['error'],
+            'code': details['code'],
+        },
+        status=details['status'],
+    )
 
 
 def can_edit_session(user, session):
@@ -293,7 +322,9 @@ def client_error_view(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def review_link_info(request, token):
-    link = _active_review_link_or_404(token)
+    link, error_reason = _resolve_review_link(token)
+    if error_reason:
+        return _review_link_error_response(error_reason)
     ReviewLink.objects.filter(pk=link.pk).update(last_accessed_at=timezone.now())
     link.refresh_from_db(fields=['last_accessed_at'])
     return Response({
@@ -306,14 +337,22 @@ def review_link_info(request, token):
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def review_link_feedback(request, token):
-    link = _active_review_link_or_404(token)
+    link, error_reason = _resolve_review_link(token)
+    if error_reason:
+        return _review_link_error_response(error_reason)
 
     if request.method == 'GET':
         feedback = link.session.video_feedback.select_related('user', 'user__profile').order_by('timestamp_seconds', 'created_at')
         return Response(ReviewVideoFeedbackSerializer(feedback, many=True, context={'request': request, 'session': link.session}).data)
 
     if not link.allow_video_feedback:
-        return Response({'error': 'Video feedback is disabled for this link'}, status=status.HTTP_403_FORBIDDEN)
+        return Response(
+            {
+                'error': 'Video feedback is disabled for this link',
+                'code': 'review_link_feedback_disabled',
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
 
     serializer = ReviewVideoFeedbackSerializer(data=request.data, context={'request': request, 'session': link.session})
     serializer.is_valid(raise_exception=True)

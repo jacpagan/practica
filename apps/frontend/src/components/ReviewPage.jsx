@@ -3,6 +3,41 @@ import { fmtTimer, preferredSessionVideoUrl, videoUrl, isLikelyVideoFile, videoF
 import { useAuth } from '../auth'
 import VideoRecorder from './VideoRecorder'
 
+const reviewLinkLoadErrorState = ({ status, data }) => {
+  const code = data?.code || ''
+  if (code === 'review_link_expired' || status === 410) {
+    return {
+      title: 'Private link expired',
+      message: 'This private feedback link expired. Ask the owner for a new link.',
+    }
+  }
+  if (code === 'review_link_revoked' || status === 403) {
+    return {
+      title: 'Private link turned off',
+      message: 'The owner has turned off this private feedback link. Ask for a new one if you still need access.',
+    }
+  }
+  if (code === 'review_link_invalid' || status === 404) {
+    return {
+      title: 'Private link not found',
+      message: 'This private feedback link does not exist or may have been copied incorrectly.',
+    }
+  }
+  return {
+    title: 'Could not open private link',
+    message: data?.error || 'Try again in a moment.',
+  }
+}
+
+const reviewLinkSubmitErrorMessage = ({ status, data }) => {
+  const code = data?.code || ''
+  if (code === 'review_link_feedback_disabled') return 'Video feedback is turned off for this link.'
+  if (code === 'review_link_expired' || status === 410) return 'This private feedback link expired. Ask for a new link.'
+  if (code === 'review_link_revoked' || status === 403) return 'This private feedback link has been turned off.'
+  if (code === 'review_link_invalid' || status === 404) return 'This private feedback link is no longer available.'
+  return data?.error || 'Could not send feedback.'
+}
+
 function ReviewPage({ reviewToken = '' }) {
   const { user, token: authToken } = useAuth()
   const videoRef = useRef(null)
@@ -12,6 +47,7 @@ function ReviewPage({ reviewToken = '' }) {
   const [feedback, setFeedback] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState(null)
   const [showRecorder, setShowRecorder] = useState(false)
   const [responseFile, setResponseFile] = useState(null)
   const [responsePreviewUrl, setResponsePreviewUrl] = useState('')
@@ -42,20 +78,25 @@ function ReviewPage({ reviewToken = '' }) {
     const load = async () => {
       setLoading(true)
       setError('')
+      setLoadError(null)
       try {
-        const [infoRes, feedbackRes] = await Promise.all([
-          fetch(`/api/review/${token}/`, { headers: { Authorization: `Token ${authToken}` } }),
-          fetch(`/api/review/${token}/feedback/`, { headers: { Authorization: `Token ${authToken}` } }),
-        ])
-        if (!infoRes.ok || !feedbackRes.ok) throw new Error('load-review')
-        const infoData = await infoRes.json()
-        const feedbackData = await feedbackRes.json()
+        const infoRes = await fetch(`/api/review/${token}/`, { headers: { Authorization: `Token ${authToken}` } })
+        const infoData = await infoRes.json().catch(() => ({}))
+        if (!infoRes.ok) {
+          throw { status: infoRes.status, data: infoData }
+        }
+
+        const feedbackRes = await fetch(`/api/review/${token}/feedback/`, { headers: { Authorization: `Token ${authToken}` } })
+        const feedbackData = await feedbackRes.json().catch(() => ({}))
+        if (!feedbackRes.ok) {
+          throw { status: feedbackRes.status, data: feedbackData }
+        }
         if (cancelled) return
         setSession(infoData.session)
         setLink(infoData.link)
         setFeedback(Array.isArray(feedbackData) ? feedbackData : [])
-      } catch {
-        if (!cancelled) setError('Could not open this private feedback link.')
+      } catch (loadFailure) {
+        if (!cancelled) setLoadError(reviewLinkLoadErrorState(loadFailure || {}))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -112,7 +153,7 @@ function ReviewPage({ reviewToken = '' }) {
         body: formData,
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data?.error || 'submit-feedback')
+      if (!res.ok) throw new Error(reviewLinkSubmitErrorMessage({ status: res.status, data }))
       setFeedback((current) => [...current, data].sort((left, right) => {
         const leftTs = typeof left.timestamp_seconds === 'number' ? left.timestamp_seconds : Number.MAX_SAFE_INTEGER
         const rightTs = typeof right.timestamp_seconds === 'number' ? right.timestamp_seconds : Number.MAX_SAFE_INTEGER
@@ -138,8 +179,16 @@ function ReviewPage({ reviewToken = '' }) {
     return <div className="min-h-screen bg-white flex items-center justify-center"><p className="text-sm text-gray-400">Opening private link…</p></div>
   }
 
-  if (error && !session) {
-    return <div className="min-h-screen bg-white flex items-center justify-center px-4"><p className="text-sm text-red-500">{error}</p></div>
+  if (loadError && !session) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center px-4">
+        <div className="max-w-md rounded-2xl border border-gray-200 bg-white px-6 py-6 text-center">
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Private feedback link</p>
+          <h1 className="text-xl font-semibold text-gray-900 mt-2">{loadError.title}</h1>
+          <p className="text-sm text-gray-600 mt-3">{loadError.message}</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -267,7 +316,12 @@ function ReviewPage({ reviewToken = '' }) {
               </div>
             </form>
           </div>
-        ) : null}
+        ) : (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-2">
+            <p className="text-sm font-semibold text-blue-900">Feedback is view-only</p>
+            <p className="text-sm text-blue-800">The owner left this private page open for viewing, but new video replies are turned off.</p>
+          </div>
+        )}
 
         <div className="space-y-2">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Video feedback</p>

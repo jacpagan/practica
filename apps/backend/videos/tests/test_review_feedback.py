@@ -121,16 +121,18 @@ class ReviewFeedbackApiTests(APITestCase):
         self.link.refresh_from_db()
         self.assertFalse(self.link.is_active)
 
-    def test_revoked_private_link_returns_not_found(self):
+    def test_revoked_private_link_returns_forbidden_with_specific_code(self):
         self.link.is_active = False
         self.link.save(update_fields=['is_active'])
         self._auth(self.reviewer)
 
         response = self.client.get(f'/api/review/{self.link.token}/')
 
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data['code'], 'review_link_revoked')
+        self.assertIn('turned off', response.data['error'].lower())
 
-    def test_delete_share_route_blocks_review_access_after_revoke(self):
+    def test_delete_share_route_returns_revoked_code_on_followup_access(self):
         self._auth(self.owner)
         revoke_response = self.client.delete(f'/api/sessions/{self.session.id}/share/')
         self.assertEqual(revoke_response.status_code, status.HTTP_200_OK)
@@ -138,7 +140,8 @@ class ReviewFeedbackApiTests(APITestCase):
         self._auth(self.reviewer)
         response = self.client.get(f'/api/review/{self.link.token}/feedback/')
 
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data['code'], 'review_link_revoked')
 
     def test_owner_cannot_create_private_share_link_until_session_is_ready(self):
         self.link.is_active = False
@@ -151,3 +154,23 @@ class ReviewFeedbackApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertIn('playback ready', response.data['error'].lower())
+
+    def test_expired_private_link_returns_gone_with_specific_code(self):
+        self.link.expires_at = timezone.now() - timedelta(minutes=1)
+        self.link.save(update_fields=['expires_at'])
+        self._auth(self.reviewer)
+
+        response = self.client.get(f'/api/review/{self.link.token}/')
+
+        self.assertEqual(response.status_code, status.HTTP_410_GONE)
+        self.assertEqual(response.data['code'], 'review_link_expired')
+        self.assertIn('expired', response.data['error'].lower())
+
+    def test_invalid_private_link_returns_not_found_with_specific_code(self):
+        self._auth(self.reviewer)
+
+        response = self.client.get('/api/review/not-a-real-link/')
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data['code'], 'review_link_invalid')
+        self.assertIn('does not exist', response.data['error'].lower())
