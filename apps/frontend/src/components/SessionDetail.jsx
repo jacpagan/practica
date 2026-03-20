@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { feedbackCategoryLabel, feedbackCategoryTone, fmtTimer, preferredSessionVideoUrl, videoUrl } from '../utils'
+import { feedbackCategoryLabel, feedbackCategoryTone, fmtTimer, sessionVideoSources, videoUrl } from '../utils'
 import { useConfirm } from './ConfirmDialog'
 import { useToast } from './Toast'
 
@@ -120,11 +120,19 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const authHeaders = useMemo(() => (token ? { Authorization: `Token ${token}` } : {}), [token])
   const canEdit = Boolean(session?.can_edit)
   const canCreateShareLink = session?.processing_status === 'ready'
-  const playableUrl = session?.local_preview_url || preferredSessionVideoUrl(session)
+  const playbackSources = useMemo(() => sessionVideoSources(session, session?.local_preview_url || ''), [session])
+  const [playbackSourceIndex, setPlaybackSourceIndex] = useState(0)
+  const [playbackFailed, setPlaybackFailed] = useState(false)
+  const playableUrl = playbackSources[playbackSourceIndex] || null
   const selectedTeacherName = selectedTeacher?.display_name || selectedTeacher?.username || ''
   const videoFeedback = Array.isArray(session?.video_feedback)
     ? session.video_feedback.filter((item) => item.feedback_video)
     : []
+
+  useEffect(() => {
+    setPlaybackSourceIndex(0)
+    setPlaybackFailed(false)
+  }, [session?.id, session?.local_preview_url, session?.video_file, JSON.stringify(session?.assets || [])])
 
   useEffect(() => {
     setSession(initialSession)
@@ -541,6 +549,14 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     } catch {}
   }
 
+  const handlePlaybackError = () => {
+    if (playbackSourceIndex < playbackSources.length - 1) {
+      setPlaybackSourceIndex((current) => current + 1)
+      return
+    }
+    setPlaybackFailed(true)
+  }
+
   return (
     <div className="px-4 sm:px-6 py-4 pb-28 max-w-3xl mx-auto">
       <div className="mb-4">
@@ -549,10 +565,14 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
 
       <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
         <div className="aspect-video bg-black">
-          {playableUrl ? (
-            <video key={playableUrl} ref={videoRef} src={playableUrl} controls playsInline className="w-full h-full bg-black" />
+          {playableUrl && !playbackFailed ? (
+            <video key={playableUrl} ref={videoRef} src={playableUrl} controls playsInline onError={handlePlaybackError} className="w-full h-full bg-black" />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-sm text-white/70">Video is still preparing for playback.</div>
+            <div className="w-full h-full flex items-center justify-center px-6 text-center text-sm text-white/70">
+              {session?.processing_status === 'ready'
+                ? 'This video is marked ready, but playback failed. Try downloading the original below.'
+                : 'Video is still preparing for playback.'}
+            </div>
           )}
         </div>
 

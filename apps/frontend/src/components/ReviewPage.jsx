@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { feedbackCategoryLabel, feedbackCategoryOptions, feedbackCategoryTone, fmtTimer, preferredSessionVideoUrl, videoUrl, isLikelyVideoFile, videoFileAccept } from '../utils'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { feedbackCategoryLabel, feedbackCategoryOptions, feedbackCategoryTone, fmtTimer, sessionVideoSources, videoUrl, isLikelyVideoFile, videoFileAccept } from '../utils'
 import { useAuth } from '../auth'
 import VideoRecorder from './VideoRecorder'
 
@@ -61,6 +61,10 @@ function ReviewPage({ reviewToken = '' }) {
   const [templates, setTemplates] = useState([])
   const [templatesLoading, setTemplatesLoading] = useState(false)
   const ownedPreviewUrlRef = useRef('')
+  const playbackSources = useMemo(() => sessionVideoSources(session), [session])
+  const [playbackSourceIndex, setPlaybackSourceIndex] = useState(0)
+  const [playbackFailed, setPlaybackFailed] = useState(false)
+  const playableUrl = playbackSources[playbackSourceIndex] || null
 
   const token = reviewToken || window.location.pathname.replace(/^\/r\//, '')
 
@@ -74,6 +78,11 @@ function ReviewPage({ reviewToken = '' }) {
   }
 
   useEffect(() => () => replaceOwnedPreviewUrl(''), [])
+
+  useEffect(() => {
+    setPlaybackSourceIndex(0)
+    setPlaybackFailed(false)
+  }, [session?.id, session?.video_file, JSON.stringify(session?.assets || [])])
 
   useEffect(() => {
     if (!token || !authToken) return
@@ -176,6 +185,14 @@ function ReviewPage({ reviewToken = '' }) {
   }
 
   const clearTimestamp = () => setSelectedTimestampSeconds(null)
+
+  const handlePlaybackError = () => {
+    if (playbackSourceIndex < playbackSources.length - 1) {
+      setPlaybackSourceIndex((current) => current + 1)
+      return
+    }
+    setPlaybackFailed(true)
+  }
 
   const pickFile = (event) => {
     const file = event.target.files?.[0]
@@ -281,21 +298,29 @@ function ReviewPage({ reviewToken = '' }) {
 
         <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
           <div className="aspect-video bg-black">
-            <video
-              ref={videoRef}
-              src={preferredSessionVideoUrl(session)}
-              controls
-              playsInline
-              className="w-full h-full bg-black"
-              onTimeUpdate={(event) => setCurrentTime(Math.round(event.currentTarget.currentTime || 0))}
-              onLoadedMetadata={(event) => {
-                const duration = Math.round(event.currentTarget.duration || 0)
-                if (Number.isFinite(duration) && duration > 0) {
-                  setDurationSeconds(duration)
-                  setSelectedTimestampSeconds((current) => (typeof current === 'number' ? Math.min(current, duration) : current))
-                }
-              }}
-            />
+            {playableUrl && !playbackFailed ? (
+              <video
+                key={playableUrl}
+                ref={videoRef}
+                src={playableUrl}
+                controls
+                playsInline
+                onError={handlePlaybackError}
+                className="w-full h-full bg-black"
+                onTimeUpdate={(event) => setCurrentTime(Math.round(event.currentTarget.currentTime || 0))}
+                onLoadedMetadata={(event) => {
+                  const duration = Math.round(event.currentTarget.duration || 0)
+                  if (Number.isFinite(duration) && duration > 0) {
+                    setDurationSeconds(duration)
+                    setSelectedTimestampSeconds((current) => (typeof current === 'number' ? Math.min(current, duration) : current))
+                  }
+                }}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center px-6 text-center text-sm text-white/70">
+                This video is marked ready, but playback failed.
+              </div>
+            )}
           </div>
           <div className="p-4 space-y-1">
             <h2 className="text-lg font-semibold text-gray-900">{session.title}</h2>

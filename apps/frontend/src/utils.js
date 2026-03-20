@@ -64,6 +64,16 @@ export const preferredSessionVideoUrl = (session) => {
   return assetUrl(proxy) || videoUrl(session?.video_file)
 }
 
+export const sessionVideoSources = (session, localPreviewUrl = '') => {
+  const sources = [
+    videoUrl(localPreviewUrl),
+    assetUrl(assetByType(session, 'proxy_mp4')),
+    videoUrl(session?.video_file),
+  ].filter(Boolean)
+
+  return Array.from(new Set(sources))
+}
+
 export const fmtTime = (s) => {
   const sec = Math.floor(s)
   const m = Math.floor(sec / 60)
