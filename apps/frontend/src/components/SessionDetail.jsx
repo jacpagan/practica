@@ -27,6 +27,38 @@ const LESSON_GOAL_PRESETS = [
   'Technique and motion',
 ]
 
+const normalizeTeacherText = (value = '') => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+
+const findTeacherAutoPick = (query, teachers = []) => {
+  const normalizedQuery = normalizeTeacherText(query)
+  if (!normalizedQuery) return null
+
+  const queryWords = normalizedQuery.split(/\s+/).filter(Boolean)
+  const candidates = teachers
+    .map((teacher) => {
+      const display = normalizeTeacherText(teacher.display_name)
+      const username = normalizeTeacherText(teacher.username)
+      const haystack = `${display} ${username}`.trim()
+      let score = 0
+
+      if (display === normalizedQuery || username === normalizedQuery) score += 100
+      if (display.startsWith(normalizedQuery) || username.startsWith(normalizedQuery)) score += 80
+      if (queryWords.length > 0 && queryWords.every((word) => haystack.includes(word))) score += 60
+      if (normalizedQuery.includes('jimmy') && haystack.includes('jimmy')) score += 50
+      if (normalizedQuery.includes('sage') && haystack.includes('sage')) score += 50
+      if (haystack.includes('jimmy sage')) score += 25
+
+      return { teacher, score }
+    })
+    .filter((item) => item.score > 0)
+    .sort((left, right) => right.score - left.score)
+
+  if (candidates.length === 0) return null
+  if (candidates.length === 1) return candidates[0].teacher
+  if (candidates[0].score >= 130 && candidates[0].score >= candidates[1].score + 20) return candidates[0].teacher
+  return null
+}
+
 const readLastTeacher = () => {
   if (typeof window === 'undefined') return null
   try {
@@ -205,7 +237,17 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
         const res = await fetch(`/api/users/search/?q=${encodeURIComponent(query)}`, { headers: authHeaders })
         if (!res.ok) throw new Error('teacher-search')
         const data = await res.json()
-        if (!cancelled) setTeacherResults(Array.isArray(data) ? data : [])
+        if (cancelled) return
+        const results = Array.isArray(data) ? data : []
+        const autoPick = findTeacherAutoPick(query, results)
+        if (autoPick) {
+          setSelectedTeacher(autoPick)
+          setTeacherQuery('')
+          setTeacherResults([])
+          writeLastTeacher(autoPick)
+          return
+        }
+        setTeacherResults(results)
       } catch {
         if (!cancelled) setTeacherResults([])
       } finally {
