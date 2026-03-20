@@ -44,6 +44,7 @@ function ReviewPage({ reviewToken = '' }) {
   const inputRef = useRef(null)
   const [session, setSession] = useState(null)
   const [link, setLink] = useState(null)
+  const [reviewRequest, setReviewRequest] = useState(null)
   const [feedback, setFeedback] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -94,6 +95,7 @@ function ReviewPage({ reviewToken = '' }) {
         if (cancelled) return
         setSession(infoData.session)
         setLink(infoData.link)
+        setReviewRequest(infoData.review_request || null)
         setFeedback(Array.isArray(feedbackData) ? feedbackData : [])
       } catch (loadFailure) {
         if (!cancelled) setLoadError(reviewLinkLoadErrorState(loadFailure || {}))
@@ -199,6 +201,20 @@ function ReviewPage({ reviewToken = '' }) {
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">Respond with a video</h1>
           <p className="text-sm text-gray-500 mt-2">You are logged in as {user.display_name || user.username}. Your feedback is a video response, not a text-only note.</p>
         </div>
+
+        {reviewRequest ? (
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-sm font-semibold text-gray-900">Teacher request</p>
+              <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">{reviewRequest.instrument}</span>
+              {reviewRequest.student_level ? <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">{reviewRequest.student_level}</span> : null}
+            </div>
+            <p className="text-sm text-gray-800">{reviewRequest.goal}</p>
+            {reviewRequest.exercise_or_song ? <p className="text-xs text-gray-500">Focus: {reviewRequest.exercise_or_song}</p> : null}
+            {reviewRequest.notes ? <p className="text-xs text-gray-500 whitespace-pre-wrap">{reviewRequest.notes}</p> : null}
+            {reviewRequest.deadline ? <p className="text-xs text-gray-500">Requested deadline: {new Date(reviewRequest.deadline).toLocaleString()}</p> : null}
+          </div>
+        ) : null}
 
         <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
           <div className="aspect-video bg-black">

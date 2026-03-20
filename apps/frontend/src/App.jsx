@@ -8,12 +8,14 @@ import ReviewPage from './components/ReviewPage'
 import SessionUpload from './components/SessionUpload'
 import SessionDetail from './components/SessionDetail'
 import LibraryView from './components/LibraryView'
+import TeachingView from './components/TeachingView'
 
 const parseRoute = (pathname) => {
   if (pathname === '/' || pathname === '/library') {
     return { view: 'library', sessionId: null }
   }
   if (pathname === '/upload') return { view: 'upload', sessionId: null }
+  if (pathname === '/teaching') return { view: 'teaching', sessionId: null }
   const reviewMatch = pathname.match(/^\/r\/(.+)$/)
   if (reviewMatch) return { view: 'review', token: reviewMatch[1], sessionId: null }
   const sessionMatch = pathname.match(/^\/sessions\/(\d+)$/)
@@ -24,6 +26,7 @@ const parseRoute = (pathname) => {
 const routePath = ({ view, sessionId, token }) => {
   if (view === 'library') return '/library'
   if (view === 'upload') return '/upload'
+  if (view === 'teaching') return '/teaching'
   if (view === 'review' && token) return `/r/${token}`
   if (view === 'detail' && sessionId) return `/sessions/${sessionId}`
   return '/library'
@@ -232,6 +235,12 @@ function AppContent() {
               >
                 Record
               </button>
+              <button
+                onClick={() => navigate({ view: 'teaching', sessionId: null })}
+                className={`text-sm px-3 py-2 rounded-lg transition-colors ${view === 'teaching' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
+              >
+                Teaching
+              </button>
             </nav>
             <div className="flex items-center gap-2 sm:border-l sm:border-gray-100 sm:pl-3">
               <span className="text-xs text-gray-400">{user.display_name}</span>
@@ -242,7 +251,7 @@ function AppContent() {
           </div>
         </div>
         <div className="max-w-5xl mx-auto mt-3 sm:hidden">
-          <nav className="grid grid-cols-2 gap-2">
+          <nav className="grid grid-cols-3 gap-2">
             <button
               onClick={() => navigate({ view: 'library', sessionId: null })}
               className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'library' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
@@ -254,6 +263,12 @@ function AppContent() {
               className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'upload' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
             >
               Record
+            </button>
+            <button
+              onClick={() => navigate({ view: 'teaching', sessionId: null })}
+              className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'teaching' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+            >
+              Teaching
             </button>
           </nav>
         </div>
@@ -282,6 +297,13 @@ function AppContent() {
 
         {view === 'review' && (
           <ReviewPage reviewToken={reviewToken} />
+        )}
+
+        {view === 'teaching' && (
+          <TeachingView token={token} onOpenReviewRequest={(requestItem) => {
+            if (!requestItem?.review_link?.token) return
+            navigate({ view: 'review', token: requestItem.review_link.token, sessionId: null })
+          }} />
         )}
 
         {view === 'detail' && selectedSession && (

@@ -11,6 +11,7 @@ from django.db.models import Q
 from django.utils import timezone
 from django.conf import settings
 from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
@@ -30,7 +31,7 @@ from .models import (
     ReviewRequest, TeacherRosterMembership,
 )
 from .serializers import (
-    UserSerializer, RegisterSerializer,
+    UserSerializer, UserSummarySerializer, RegisterSerializer,
     SessionSerializer, SessionListSerializer,
     ChapterSerializer,
     PublicSessionSerializer, ReviewLinkSerializer, ReviewVideoFeedbackSerializer,
@@ -340,6 +341,16 @@ def me_view(request):
     return Response(UserSerializer(request.user).data)
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_search_view(request):
+    query = str(request.query_params.get('q', '')).strip()
+    qs = User.objects.select_related('profile').exclude(pk=request.user.pk).order_by('username')
+    if query:
+        qs = qs.filter(Q(username__icontains=query) | Q(profile__display_name__icontains=query))
+    return Response(UserSummarySerializer(qs[:10], many=True).data)
+
+
 @csrf_exempt
 @ratelimit(key='ip', rate='30/m', method='POST', block=True)
 @api_view(['POST'])
@@ -476,12 +487,24 @@ class ReviewRequestViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'patch', 'head', 'options']
 
     def get_queryset(self):
-        return _visible_review_requests_qs(self.request.user).select_related(
+        qs = _visible_review_requests_qs(self.request.user).select_related(
             'session', 'session__user', 'session__user__profile',
             'teacher', 'teacher__profile',
             'student', 'student__profile',
             'review_link',
         )
+        session_id = str(self.request.query_params.get('session_id', '')).strip()
+        if session_id.isdigit():
+            qs = qs.filter(session_id=int(session_id))
+        role = str(self.request.query_params.get('role', '')).strip().lower()
+        if role == 'teacher':
+            qs = qs.filter(teacher=self.request.user)
+        elif role == 'student':
+            qs = qs.filter(student=self.request.user)
+        status_filter = str(self.request.query_params.get('status', '')).strip().lower()
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return qs
 
     def perform_create(self, serializer):
         with transaction.atomic():
