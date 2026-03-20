@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { fmtTimer, preferredSessionVideoUrl, videoUrl, isLikelyVideoFile, videoFileAccept } from '../utils'
+import { feedbackCategoryLabel, feedbackCategoryOptions, feedbackCategoryTone, fmtTimer, preferredSessionVideoUrl, videoUrl, isLikelyVideoFile, videoFileAccept } from '../utils'
 import { useAuth } from '../auth'
 import VideoRecorder from './VideoRecorder'
 
@@ -53,6 +53,7 @@ function ReviewPage({ reviewToken = '' }) {
   const [responseFile, setResponseFile] = useState(null)
   const [responsePreviewUrl, setResponsePreviewUrl] = useState('')
   const [responseNotes, setResponseNotes] = useState('')
+  const [responseCategory, setResponseCategory] = useState('')
   const [selectedTimestampSeconds, setSelectedTimestampSeconds] = useState(null)
   const [durationSeconds, setDurationSeconds] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
@@ -206,6 +207,7 @@ function ReviewPage({ reviewToken = '' }) {
     try {
       const formData = new FormData()
       formData.append('feedback_video', responseFile)
+      if (responseCategory) formData.append('feedback_category', responseCategory)
       if (responseNotes.trim()) formData.append('text', responseNotes.trim())
       if (typeof selectedTimestampSeconds === 'number') formData.append('timestamp_seconds', selectedTimestampSeconds)
 
@@ -225,6 +227,7 @@ function ReviewPage({ reviewToken = '' }) {
       setResponseFile(null)
       replaceOwnedPreviewUrl('')
       setResponseNotes('')
+      setResponseCategory('')
       setSelectedTimestampSeconds(null)
     } catch (submitError) {
       setError(submitError.message || 'Could not send feedback.')
@@ -367,6 +370,18 @@ function ReviewPage({ reviewToken = '' }) {
               </div>
 
               <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-3 space-y-3">
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Category</label>
+                  <select
+                    value={responseCategory}
+                    onChange={(event) => setResponseCategory(event.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white"
+                  >
+                    {feedbackCategoryOptions().map((option) => (
+                      <option key={option.value || 'uncategorized'} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Timestamp</p>
@@ -432,17 +447,24 @@ function ReviewPage({ reviewToken = '' }) {
 
         <div className="space-y-2">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Video feedback</p>
-          {feedback.length === 0 ? (
-            <p className="text-sm text-gray-500">No video feedback yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {feedback.map((item) => (
-                <div key={item.id} className="rounded-xl bg-gray-50 px-3 py-3 space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{item.author_display_name || 'Viewer'}</p>
-                      <p className="text-xs text-gray-400 mt-1">{new Date(item.created_at).toLocaleString()}</p>
-                    </div>
+              {feedback.length === 0 ? (
+                <p className="text-sm text-gray-500">No video feedback yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {feedback.map((item) => (
+                    <div key={item.id} className="rounded-xl bg-gray-50 px-3 py-3 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-medium text-gray-900">{item.author_display_name || 'Viewer'}</p>
+                            {item.feedback_category ? (
+                              <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${feedbackCategoryTone(item.feedback_category)}`}>
+                                {feedbackCategoryLabel(item.feedback_category)}
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">{new Date(item.created_at).toLocaleString()}</p>
+                        </div>
                     {typeof item.timestamp_seconds === 'number' ? <span className="text-xs text-gray-500">@{fmtTimer(item.timestamp_seconds)}</span> : null}
                   </div>
                   <div className="rounded-xl overflow-hidden bg-black">

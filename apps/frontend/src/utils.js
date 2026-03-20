@@ -90,6 +90,29 @@ export const fmtDate = (d) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+export const feedbackCategoryOptions = () => ([
+  { value: '', label: 'Uncategorized' },
+  { value: 'timing', label: 'Timing' },
+  { value: 'groove', label: 'Groove' },
+  { value: 'dynamics', label: 'Dynamics' },
+  { value: 'technique', label: 'Technique' },
+  { value: 'posture', label: 'Posture' },
+  { value: 'tone', label: 'Tone' },
+])
+
+const FEEDBACK_CATEGORY_LABELS = Object.fromEntries(feedbackCategoryOptions().map((item) => [item.value, item.label]))
+const FEEDBACK_CATEGORY_TONES = {
+  timing: 'bg-amber-100 text-amber-800',
+  groove: 'bg-violet-100 text-violet-800',
+  dynamics: 'bg-emerald-100 text-emerald-800',
+  technique: 'bg-blue-100 text-blue-800',
+  posture: 'bg-rose-100 text-rose-800',
+  tone: 'bg-cyan-100 text-cyan-800',
+}
+
+export const feedbackCategoryLabel = (value = '') => FEEDBACK_CATEGORY_LABELS[String(value || '').trim().toLowerCase()] || 'Uncategorized'
+export const feedbackCategoryTone = (value = '') => FEEDBACK_CATEGORY_TONES[String(value || '').trim().toLowerCase()] || 'bg-gray-100 text-gray-700'
+
 export const pickRecorderMimeType = (preferred = []) => {
   if (typeof window === 'undefined' || typeof window.MediaRecorder === 'undefined') return ''
   if (typeof window.MediaRecorder.isTypeSupported !== 'function') return ''

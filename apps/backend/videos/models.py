@@ -175,9 +175,25 @@ class SessionLastSeen(models.Model):
 
 class VideoFeedback(models.Model):
     """A timestamped video feedback response on a session."""
+    CATEGORY_TIMING = 'timing'
+    CATEGORY_GROOVE = 'groove'
+    CATEGORY_DYNAMICS = 'dynamics'
+    CATEGORY_TECHNIQUE = 'technique'
+    CATEGORY_POSTURE = 'posture'
+    CATEGORY_TONE = 'tone'
+    CATEGORY_CHOICES = [
+        (CATEGORY_TIMING, 'Timing'),
+        (CATEGORY_GROOVE, 'Groove'),
+        (CATEGORY_DYNAMICS, 'Dynamics'),
+        (CATEGORY_TECHNIQUE, 'Technique'),
+        (CATEGORY_POSTURE, 'Posture'),
+        (CATEGORY_TONE, 'Tone'),
+    ]
+
     session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='video_feedback')
     review_request = models.ForeignKey('ReviewRequest', on_delete=models.SET_NULL, null=True, blank=True, related_name='feedback_items')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='video_feedback')
+    feedback_category = models.CharField(max_length=24, choices=CATEGORY_CHOICES, blank=True)
     timestamp_seconds = models.IntegerField(null=True, blank=True)
     text = models.TextField()
     feedback_video = models.FileField(upload_to='feedback_videos/', null=True, blank=True)

@@ -118,11 +118,12 @@ class SessionAssetSerializer(serializers.ModelSerializer):
 class VideoFeedbackSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     display_name = serializers.SerializerMethodField()
+    review_request_id = serializers.IntegerField(source='review_request_id', read_only=True)
 
     class Meta:
         model = VideoFeedback
         fields = ['id', 'session', 'user', 'username', 'display_name',
-                  'timestamp_seconds', 'text', 'feedback_video', 'created_at']
+                  'feedback_category', 'timestamp_seconds', 'text', 'feedback_video', 'review_request_id', 'created_at']
         read_only_fields = ['id', 'user', 'username', 'display_name', 'created_at']
 
     def get_display_name(self, obj):
@@ -273,12 +274,13 @@ class ReviewVideoFeedbackSerializer(serializers.ModelSerializer):
     authored_by_current_user = serializers.SerializerMethodField()
     text = serializers.CharField(required=False, allow_blank=True, default='')
     review_request_id = serializers.IntegerField(source='review_request_id', read_only=True)
+    feedback_category = serializers.ChoiceField(choices=VideoFeedback.CATEGORY_CHOICES, required=False, allow_blank=True, default='')
 
     class Meta:
         model = VideoFeedback
         fields = [
             'id', 'author_display_name', 'authored_by_current_user',
-            'timestamp_seconds', 'text', 'feedback_video', 'review_request_id', 'created_at',
+            'feedback_category', 'timestamp_seconds', 'text', 'feedback_video', 'review_request_id', 'created_at',
         ]
         read_only_fields = ['id', 'author_display_name', 'authored_by_current_user', 'created_at']
 
@@ -303,6 +305,9 @@ class ReviewVideoFeedbackSerializer(serializers.ModelSerializer):
         if duration_seconds is not None and value > int(duration_seconds):
             raise serializers.ValidationError('Timestamp must be within the video duration.')
         return value
+
+    def validate_feedback_category(self, value):
+        return str(value or '').strip().lower()
 
 
 class ReviewRequestSerializer(serializers.ModelSerializer):
@@ -335,6 +340,7 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
     feedback_items = serializers.SerializerMethodField()
     latest_feedback_at = serializers.SerializerMethodField()
     follow_up_request_count = serializers.SerializerMethodField()
+    feedback_category_counts = serializers.SerializerMethodField()
 
     class Meta:
         model = ReviewRequest
@@ -348,13 +354,13 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
             'instrument', 'student_level', 'goal', 'exercise_or_song', 'notes',
             'requested_turnaround_hours', 'deadline',
             'status', 'opened_at', 'responded_at', 'viewed_at', 'resubmitted_at', 'closed_at',
-            'response_count', 'current_user_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count',
+            'response_count', 'current_user_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count', 'feedback_category_counts',
             'created_at', 'updated_at',
         ]
         read_only_fields = [
             'id', 'student', 'teacher', 'session', 'review_link', 'parent_request',
             'status', 'opened_at', 'responded_at', 'viewed_at', 'resubmitted_at', 'closed_at',
-            'response_count', 'current_user_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count',
+            'response_count', 'current_user_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count', 'feedback_category_counts',
             'created_at', 'updated_at',
         ]
 
@@ -393,6 +399,15 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
 
     def get_follow_up_request_count(self, obj):
         return obj.follow_up_requests.count()
+
+    def get_feedback_category_counts(self, obj):
+        counts = {}
+        for feedback_item in obj.feedback_items.all():
+            category = str(feedback_item.feedback_category or '').strip().lower()
+            if not category:
+                continue
+            counts[category] = counts.get(category, 0) + 1
+        return counts
 
     def validate(self, attrs):
         session = attrs.get('session') or getattr(self.instance, 'session', None)

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { fmtTimer, preferredSessionVideoUrl, videoUrl } from '../utils'
+import { feedbackCategoryLabel, feedbackCategoryTone, fmtTimer, preferredSessionVideoUrl, videoUrl } from '../utils'
 import { useConfirm } from './ConfirmDialog'
 import { useToast } from './Toast'
 
@@ -675,6 +675,15 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                             <p className="text-sm text-gray-800">{requestItem.goal}</p>
                             {requestItem.exercise_or_song ? <p className="text-xs text-gray-500 mt-1">Focus: {requestItem.exercise_or_song}</p> : null}
                             {requestItem.notes ? <p className="text-xs text-gray-500 mt-2 whitespace-pre-wrap">{requestItem.notes}</p> : null}
+                            {requestItem.feedback_category_counts && Object.keys(requestItem.feedback_category_counts).length > 0 ? (
+                              <div className="flex flex-wrap gap-2 mt-3">
+                                {Object.entries(requestItem.feedback_category_counts).map(([category, count]) => (
+                                  <span key={category} className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${feedbackCategoryTone(category)}`}>
+                                    {feedbackCategoryLabel(category)} · {count}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
                           </div>
                           {Array.isArray(requestItem.feedback_items) && requestItem.feedback_items.length > 0 ? (
                             <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-3">
@@ -683,7 +692,14 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                 <div key={feedbackItem.id} className="rounded-xl bg-gray-50 px-3 py-3 space-y-3">
                                   <div className="flex items-start justify-between gap-3">
                                     <div>
-                                      <p className="text-sm font-medium text-gray-900">{feedbackItem.author_display_name || 'Teacher'}</p>
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <p className="text-sm font-medium text-gray-900">{feedbackItem.author_display_name || 'Teacher'}</p>
+                                        {feedbackItem.feedback_category ? (
+                                          <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${feedbackCategoryTone(feedbackItem.feedback_category)}`}>
+                                            {feedbackCategoryLabel(feedbackItem.feedback_category)}
+                                          </span>
+                                        ) : null}
+                                      </div>
                                       <p className="text-xs text-gray-400 mt-1">{new Date(feedbackItem.created_at).toLocaleString()}</p>
                                     </div>
                                     {typeof feedbackItem.timestamp_seconds === 'number' ? (
@@ -795,7 +811,14 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       <div key={item.id} className="rounded-xl bg-gray-50 px-3 py-3 space-y-3">
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="text-sm font-medium text-gray-900">{item.display_name || item.username || 'Viewer'}</p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-medium text-gray-900">{item.display_name || item.username || 'Viewer'}</p>
+                              {item.feedback_category ? (
+                                <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${feedbackCategoryTone(item.feedback_category)}`}>
+                                  {feedbackCategoryLabel(item.feedback_category)}
+                                </span>
+                              ) : null}
+                            </div>
                             <p className="text-xs text-gray-400 mt-1">{new Date(item.created_at).toLocaleString()}</p>
                           </div>
                           {typeof item.timestamp_seconds === 'number' ? (

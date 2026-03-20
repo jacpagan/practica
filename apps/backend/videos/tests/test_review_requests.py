@@ -111,6 +111,7 @@ class ReviewRequestApiTests(APITestCase):
             f'/api/review/{review_request.review_link.token}/feedback/',
             {
                 'text': 'Relax the hi-hat shoulder and lean into the backbeat.',
+                'feedback_category': 'technique',
                 'timestamp_seconds': 42,
                 'feedback_video': self._video_file(),
             },
@@ -122,6 +123,7 @@ class ReviewRequestApiTests(APITestCase):
         self.assertEqual(review_request.status, ReviewRequest.STATUS_RESPONDED)
         self.assertIsNotNone(review_request.responded_at)
         feedback = VideoFeedback.objects.get(session=self.session, user=self.teacher)
+        self.assertEqual(feedback.feedback_category, 'technique')
         self.assertEqual(feedback.timestamp_seconds, 42)
         self.assertEqual(feedback.review_request, review_request)
 
@@ -244,6 +246,7 @@ class ReviewRequestApiTests(APITestCase):
             session=self.session,
             review_request=review_request,
             user=self.teacher,
+            feedback_category='timing',
             text='Focus on kick-snare balance.',
             timestamp_seconds=18,
             feedback_video=self._video_file('request-thread.mp4'),
@@ -257,6 +260,8 @@ class ReviewRequestApiTests(APITestCase):
         self.assertEqual(len(response.data['feedback_items']), 1)
         self.assertEqual(response.data['feedback_items'][0]['text'], 'Focus on kick-snare balance.')
         self.assertEqual(response.data['feedback_items'][0]['review_request_id'], review_request.id)
+        self.assertEqual(response.data['feedback_items'][0]['feedback_category'], 'timing')
+        self.assertEqual(response.data['feedback_category_counts'], {'timing': 1})
 
     def test_student_can_create_follow_up_review_request_on_new_session(self):
         parent_request = self._create_review_request()

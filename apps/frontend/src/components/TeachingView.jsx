@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { fmtDate } from '../utils'
+import { feedbackCategoryLabel, feedbackCategoryTone, fmtDate } from '../utils'
 import { useToast } from './Toast'
 
 const statusTone = {
@@ -187,6 +187,15 @@ function TeachingView({ token, onOpenReviewRequest }) {
                       </p>
                       <p className="text-sm text-gray-700 mt-3">{item.goal}</p>
                       {item.exercise_or_song ? <p className="text-xs text-gray-500 mt-2">Focus: {item.exercise_or_song}</p> : null}
+                      {item.feedback_category_counts && Object.keys(item.feedback_category_counts).length > 0 ? (
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          {Object.entries(item.feedback_category_counts).map(([category, count]) => (
+                            <span key={category} className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${feedbackCategoryTone(category)}`}>
+                              {feedbackCategoryLabel(category)} · {count}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
                       {item.deadline ? <p className="text-xs text-gray-500 mt-1">Due {new Date(item.deadline).toLocaleString()}</p> : <p className="text-xs text-gray-500 mt-1">Requested {fmtDate(item.created_at)}</p>}
                     </div>
                     <div className="shrink-0 flex items-center gap-2">

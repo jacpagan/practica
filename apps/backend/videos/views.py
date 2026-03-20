@@ -469,6 +469,7 @@ def review_link_feedback(request, token):
         session=link.session,
         review_request=review_request,
         user=request.user,
+        feedback_category=serializer.validated_data.get('feedback_category', ''),
         timestamp_seconds=serializer.validated_data.get('timestamp_seconds'),
         text=str(serializer.validated_data.get('text', '')).strip(),
         feedback_video=video_file,
