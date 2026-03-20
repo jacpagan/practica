@@ -123,6 +123,7 @@ class ReviewRequestApiTests(APITestCase):
         self.assertIsNotNone(review_request.responded_at)
         feedback = VideoFeedback.objects.get(session=self.session, user=self.teacher)
         self.assertEqual(feedback.timestamp_seconds, 42)
+        self.assertEqual(feedback.review_request, review_request)
 
     def test_student_can_mark_review_request_viewed(self):
         review_request = self._create_review_request()
@@ -132,6 +133,21 @@ class ReviewRequestApiTests(APITestCase):
 
         self._auth(self.student)
         response = self.client.post(f'/api/review-requests/{review_request.id}/mark-viewed/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        review_request.refresh_from_db()
+        self.assertEqual(review_request.status, ReviewRequest.STATUS_VIEWED)
+        self.assertIsNotNone(review_request.viewed_at)
+        self.assertTrue(SessionLastSeen.objects.filter(user=self.student, session=self.session).exists())
+
+    def test_student_opening_review_request_link_auto_marks_viewed_after_response(self):
+        review_request = self._create_review_request()
+        review_request.status = ReviewRequest.STATUS_RESPONDED
+        review_request.responded_at = timezone.now()
+        review_request.save(update_fields=['status', 'responded_at', 'updated_at'])
+
+        self._auth(self.student)
+        response = self.client.get(f'/api/review/{review_request.review_link.token}/')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         review_request.refresh_from_db()
@@ -221,3 +237,23 @@ class ReviewRequestApiTests(APITestCase):
         self.assertEqual(delete_response.status_code, status.HTTP_200_OK)
         self.assertEqual(delete_response.data, {'ok': True})
         self.assertFalse(FeedbackTemplate.objects.filter(pk=template_id).exists())
+
+    def test_review_request_detail_includes_request_specific_feedback_items(self):
+        review_request = self._create_review_request()
+        VideoFeedback.objects.create(
+            session=self.session,
+            review_request=review_request,
+            user=self.teacher,
+            text='Focus on kick-snare balance.',
+            timestamp_seconds=18,
+            feedback_video=self._video_file('request-thread.mp4'),
+            is_legacy_text_feedback=False,
+        )
+
+        self._auth(self.student)
+        response = self.client.get(f'/api/review-requests/{review_request.id}/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['feedback_items']), 1)
+        self.assertEqual(response.data['feedback_items'][0]['text'], 'Focus on kick-snare balance.')
+        self.assertEqual(response.data['feedback_items'][0]['review_request_id'], review_request.id)

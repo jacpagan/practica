@@ -149,6 +149,23 @@ def _ensure_teacher_roster_membership(*, teacher, student, created_by=None):
     return membership
 
 
+def _mark_review_request_viewed(review_request, user):
+    if not review_request or not user.is_authenticated:
+        return
+    if user.id != review_request.student_id and not user.is_staff:
+        return
+    if review_request.status != ReviewRequest.STATUS_RESPONDED:
+        return
+    review_request.status = ReviewRequest.STATUS_VIEWED
+    review_request.viewed_at = timezone.now()
+    review_request.save(update_fields=['status', 'viewed_at', 'updated_at'])
+    SessionLastSeen.objects.update_or_create(
+        user=user,
+        session=review_request.session,
+        defaults={},
+    )
+
+
 def can_edit_session(user, session):
     if not user.is_authenticated:
         return False
@@ -400,6 +417,9 @@ def review_link_info(request, token):
         review_request.status = ReviewRequest.STATUS_OPENED
         review_request.opened_at = timezone.now()
         review_request.save(update_fields=['status', 'opened_at', 'updated_at'])
+    elif review_request and request.user.id == review_request.student_id:
+        _mark_review_request_viewed(review_request, request.user)
+        review_request.refresh_from_db()
     return Response({
         'session': PublicSessionSerializer(link.session, context={'request': request}).data,
         'link': ReviewLinkSerializer(link, context={'request': request}).data,
@@ -524,6 +544,8 @@ class ReviewRequestViewSet(viewsets.ModelViewSet):
             'teacher', 'teacher__profile',
             'student', 'student__profile',
             'review_link',
+        ).prefetch_related(
+            'feedback_items', 'feedback_items__user', 'feedback_items__user__profile',
         )
         session_id = str(self.request.query_params.get('session_id', '')).strip()
         if session_id.isdigit():

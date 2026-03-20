@@ -311,6 +311,10 @@ function AppContent() {
             session={selectedSession}
             token={token}
             onBack={goBack}
+            onOpenReviewRequest={(requestItem) => {
+              if (!requestItem?.review_link?.token) return
+              navigate({ view: 'review', token: requestItem.review_link.token, sessionId: null })
+            }}
             justUploaded={selectedSession.id === justUploadedSessionId}
             onRecordAnother={handleRecordAnother}
             onSessionUpdate={(sessionData) => {

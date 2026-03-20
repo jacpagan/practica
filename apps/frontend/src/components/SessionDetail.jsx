@@ -19,7 +19,7 @@ const requestStatusLabel = (value = '') => {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1)
 }
 
-function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate, onSessionDelete, justUploaded = false, onRecordAnother }) {
+function SessionDetail({ session: initialSession, token, onBack, onOpenReviewRequest, onSessionUpdate, onSessionDelete, justUploaded = false, onRecordAnother }) {
   const toast = useToast()
   const confirm = useConfirm()
   const videoRef = useRef(null)
@@ -662,10 +662,39 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
                             {requestItem.exercise_or_song ? <p className="text-xs text-gray-500 mt-1">Focus: {requestItem.exercise_or_song}</p> : null}
                             {requestItem.notes ? <p className="text-xs text-gray-500 mt-2 whitespace-pre-wrap">{requestItem.notes}</p> : null}
                           </div>
+                          {Array.isArray(requestItem.feedback_items) && requestItem.feedback_items.length > 0 ? (
+                            <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-3">
+                              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Request thread</p>
+                              {requestItem.feedback_items.map((feedbackItem) => (
+                                <div key={feedbackItem.id} className="rounded-xl bg-gray-50 px-3 py-3 space-y-3">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <p className="text-sm font-medium text-gray-900">{feedbackItem.author_display_name || 'Teacher'}</p>
+                                      <p className="text-xs text-gray-400 mt-1">{new Date(feedbackItem.created_at).toLocaleString()}</p>
+                                    </div>
+                                    {typeof feedbackItem.timestamp_seconds === 'number' ? (
+                                      <button type="button" onClick={() => jumpToTimestamp(feedbackItem.timestamp_seconds)} className="text-xs text-blue-700 hover:text-blue-900 transition-colors">
+                                        @{fmtTimer(feedbackItem.timestamp_seconds)}
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                  <div className="rounded-xl overflow-hidden bg-black">
+                                    <video src={videoUrl(feedbackItem.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
+                                  </div>
+                                  {feedbackItem.text ? <p className="text-sm text-gray-600 whitespace-pre-wrap">{feedbackItem.text}</p> : null}
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
                           <div className="flex flex-wrap gap-2">
                             {requestItem.review_link?.url ? (
                               <button type="button" onClick={() => copyReviewRequestLink(requestItem)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
                                 Copy request link
+                              </button>
+                            ) : null}
+                            {requestItem.review_link?.token ? (
+                              <button type="button" onClick={() => onOpenReviewRequest?.(requestItem)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
+                                Open request page
                               </button>
                             ) : null}
                             {requestItem.status === 'responded' ? (

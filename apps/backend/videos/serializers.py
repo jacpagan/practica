@@ -324,6 +324,8 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
     review_link = ReviewLinkSerializer(read_only=True)
     response_count = serializers.SerializerMethodField()
     current_user_role = serializers.SerializerMethodField()
+    feedback_items = serializers.SerializerMethodField()
+    latest_feedback_at = serializers.SerializerMethodField()
 
     class Meta:
         model = ReviewRequest
@@ -336,13 +338,13 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
             'instrument', 'student_level', 'goal', 'exercise_or_song', 'notes',
             'requested_turnaround_hours', 'deadline',
             'status', 'opened_at', 'responded_at', 'viewed_at', 'resubmitted_at', 'closed_at',
-            'response_count', 'current_user_role',
+            'response_count', 'current_user_role', 'feedback_items', 'latest_feedback_at',
             'created_at', 'updated_at',
         ]
         read_only_fields = [
             'id', 'student', 'teacher', 'session', 'review_link',
             'status', 'opened_at', 'responded_at', 'viewed_at', 'resubmitted_at', 'closed_at',
-            'response_count', 'current_user_role',
+            'response_count', 'current_user_role', 'feedback_items', 'latest_feedback_at',
             'created_at', 'updated_at',
         ]
 
@@ -359,6 +361,14 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
         if user.id == obj.student_id:
             return 'student'
         return ''
+
+    def get_feedback_items(self, obj):
+        feedback = obj.feedback_items.select_related('user', 'user__profile').order_by('timestamp_seconds', 'created_at')
+        return ReviewVideoFeedbackSerializer(feedback, many=True, context=self.context).data
+
+    def get_latest_feedback_at(self, obj):
+        latest = obj.feedback_items.order_by('-created_at').values_list('created_at', flat=True).first()
+        return latest
 
     def validate(self, attrs):
         session = attrs.get('session') or getattr(self.instance, 'session', None)
