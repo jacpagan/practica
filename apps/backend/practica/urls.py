@@ -11,7 +11,7 @@ from videos.views import (
     user_search_view,
     client_error_view,
     review_link_info, review_link_feedback,
-    teacher_inbox, teacher_roster,
+    teacher_inbox, teacher_roster, teacher_templates, teacher_template_detail,
     favicon,
 )
 
@@ -39,6 +39,8 @@ urlpatterns = [
     path('api/review/<slug:token>/feedback/', review_link_feedback, name='review_link_feedback'),
     path('api/teacher/inbox/', teacher_inbox, name='teacher_inbox'),
     path('api/teacher/roster/', teacher_roster, name='teacher_roster'),
+    path('api/teacher/templates/', teacher_templates, name='teacher_templates'),
+    path('api/teacher/templates/<int:template_id>/', teacher_template_detail, name='teacher_template_detail'),
     path('health/', health_check, name='health_check'),
     path('ready/', ready_check, name='ready_check'),
     path('favicon.ico', favicon, name='favicon'),

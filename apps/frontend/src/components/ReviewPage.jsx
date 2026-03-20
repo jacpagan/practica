@@ -57,6 +57,8 @@ function ReviewPage({ reviewToken = '' }) {
   const [durationSeconds, setDurationSeconds] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
   const [submitting, setSubmitting] = useState(false)
+  const [templates, setTemplates] = useState([])
+  const [templatesLoading, setTemplatesLoading] = useState(false)
   const ownedPreviewUrlRef = useRef('')
 
   const token = reviewToken || window.location.pathname.replace(/^\/r\//, '')
@@ -107,6 +109,64 @@ function ReviewPage({ reviewToken = '' }) {
     load()
     return () => { cancelled = true }
   }, [authToken, token])
+
+  useEffect(() => {
+    if (!authToken || reviewRequest?.current_user_role !== 'teacher') {
+      setTemplates([])
+      setTemplatesLoading(false)
+      return
+    }
+    let cancelled = false
+    const loadTemplates = async () => {
+      setTemplatesLoading(true)
+      try {
+        const res = await fetch('/api/teacher/templates/', { headers: { Authorization: `Token ${authToken}` } })
+        if (!res.ok) throw new Error('templates')
+        const data = await res.json()
+        if (!cancelled) setTemplates(Array.isArray(data) ? data : [])
+      } catch {
+        if (!cancelled) setTemplates([])
+      } finally {
+        if (!cancelled) setTemplatesLoading(false)
+      }
+    }
+    loadTemplates()
+    return () => { cancelled = true }
+  }, [authToken, reviewRequest?.current_user_role])
+
+  const canRespondToRequest = !reviewRequest || reviewRequest.current_user_role !== 'student'
+
+  const applyTemplate = (template) => {
+    if (!template) return
+    setResponseNotes(template.text || '')
+  }
+
+  const saveCurrentNoteAsTemplate = async () => {
+    const text = responseNotes.trim()
+    if (!text) {
+      setError('Write a note first if you want to save it as a template.')
+      return
+    }
+    const title = window.prompt('Template title')
+    if (!title || !title.trim()) return
+
+    try {
+      const res = await fetch('/api/teacher/templates/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Token ${authToken}`,
+        },
+        body: JSON.stringify({ title: title.trim(), text }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.title?.[0] || data?.error || 'Could not save template')
+      setTemplates((current) => [...current, data].sort((left, right) => left.title.localeCompare(right.title)))
+      setError('')
+    } catch (saveError) {
+      setError(saveError.message || 'Could not save template.')
+    }
+  }
 
   const useCurrentVideoTime = () => {
     const video = videoRef.current
@@ -240,12 +300,39 @@ function ReviewPage({ reviewToken = '' }) {
           </div>
         </div>
 
-        {link?.allow_video_feedback ? (
+        {link?.allow_video_feedback && canRespondToRequest ? (
           <div className="rounded-xl border border-gray-200 p-4 space-y-4">
             <div>
               <p className="text-sm font-semibold text-gray-900">Record your feedback video</p>
               <p className="text-xs text-gray-500 mt-1">Show first, then tell. Add an optional note or timestamp if it helps.</p>
             </div>
+
+            {reviewRequest?.current_user_role === 'teacher' ? (
+              <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-3 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Saved templates</p>
+                  <button type="button" onClick={saveCurrentNoteAsTemplate} className="text-xs text-gray-600 hover:text-gray-900 transition-colors">
+                    Save current note
+                  </button>
+                </div>
+                {templatesLoading ? <p className="text-xs text-gray-500">Loading templates…</p> : null}
+                {templates.length === 0 && !templatesLoading ? <p className="text-xs text-gray-500">No templates yet.</p> : null}
+                {templates.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {templates.map((template) => (
+                      <button
+                        key={template.id}
+                        type="button"
+                        onClick={() => applyTemplate(template)}
+                        className="text-xs text-gray-700 border border-gray-200 rounded-full px-3 py-1.5 hover:bg-white transition-colors"
+                      >
+                        {template.title}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button type="button" onClick={() => setShowRecorder(true)} className="rounded-2xl bg-gray-900 text-white px-4 py-3 text-sm font-medium hover:bg-gray-800 transition-colors">
@@ -335,7 +422,11 @@ function ReviewPage({ reviewToken = '' }) {
         ) : (
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-2">
             <p className="text-sm font-semibold text-blue-900">Feedback is view-only</p>
-            <p className="text-sm text-blue-800">The owner left this private page open for viewing, but new video replies are turned off.</p>
+            <p className="text-sm text-blue-800">
+              {reviewRequest?.current_user_role === 'student'
+                ? 'This request belongs to your teacher workflow, so you can view the feedback here but only the designated teacher can reply.'
+                : 'The owner left this private page open for viewing, but new video replies are turned off.'}
+            </p>
           </div>
         )}
 

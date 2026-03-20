@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
-from videos.models import Profile, ReviewRequest, Session, SessionLastSeen, TeacherRosterMembership, VideoFeedback
+from videos.models import FeedbackTemplate, Profile, ReviewRequest, Session, SessionLastSeen, TeacherRosterMembership, VideoFeedback
 
 
 class ReviewRequestApiTests(APITestCase):
@@ -150,3 +150,74 @@ class ReviewRequestApiTests(APITestCase):
         self.assertEqual(response.data[0]['student']['id'], self.student.id)
         self.assertEqual(response.data[0]['pending_review_count'], 1)
         self.assertEqual(response.data[0]['total_review_count'], 1)
+
+    def test_review_link_feedback_list_is_scoped_to_review_request(self):
+        review_request = self._create_review_request()
+        another_request = ReviewRequest.objects.create(
+            session=self.session,
+            student=self.student,
+            teacher=self.teacher,
+            created_by=self.student,
+            instrument='drums',
+            goal='Second thread',
+            status=ReviewRequest.STATUS_RESPONDED,
+        )
+        VideoFeedback.objects.create(
+            session=self.session,
+            review_request=review_request,
+            user=self.teacher,
+            text='Feedback for request one',
+            timestamp_seconds=12,
+            feedback_video=self._video_file('one.mp4'),
+            is_legacy_text_feedback=False,
+        )
+        VideoFeedback.objects.create(
+            session=self.session,
+            review_request=another_request,
+            user=self.teacher,
+            text='Feedback for request two',
+            timestamp_seconds=34,
+            feedback_video=self._video_file('two.mp4'),
+            is_legacy_text_feedback=False,
+        )
+
+        self._auth(self.teacher)
+        response = self.client.get(f'/api/review/{review_request.review_link.token}/feedback/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['text'], 'Feedback for request one')
+        self.assertEqual(response.data[0]['review_request_id'], review_request.id)
+
+    def test_teacher_can_manage_feedback_templates(self):
+        self._auth(self.teacher)
+
+        create_response = self.client.post(
+            '/api/teacher/templates/',
+            {
+                'title': 'Groove timing reminder',
+                'text': 'Relax your shoulders, lock with the click, and listen for consistent ghost-note volume.',
+            },
+            format='json',
+        )
+
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        template_id = create_response.data['id']
+
+        list_response = self.client.get('/api/teacher/templates/')
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(list_response.data), 1)
+        self.assertEqual(list_response.data[0]['title'], 'Groove timing reminder')
+
+        patch_response = self.client.patch(
+            f'/api/teacher/templates/{template_id}/',
+            {'text': 'Listen for the click and let the snare stay heavy on beats 2 and 4.'},
+            format='json',
+        )
+        self.assertEqual(patch_response.status_code, status.HTTP_200_OK)
+        self.assertIn('snare stay heavy', patch_response.data['text'])
+
+        delete_response = self.client.delete(f'/api/teacher/templates/{template_id}/')
+        self.assertEqual(delete_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(delete_response.data, {'ok': True})
+        self.assertFalse(FeedbackTemplate.objects.filter(pk=template_id).exists())

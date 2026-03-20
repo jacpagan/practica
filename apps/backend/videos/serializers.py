@@ -9,6 +9,7 @@ from .models import (
     ReviewLink,
     ReviewRequest,
     TeacherRosterMembership,
+    FeedbackTemplate,
 )
 
 
@@ -271,12 +272,13 @@ class ReviewVideoFeedbackSerializer(serializers.ModelSerializer):
     author_display_name = serializers.SerializerMethodField()
     authored_by_current_user = serializers.SerializerMethodField()
     text = serializers.CharField(required=False, allow_blank=True, default='')
+    review_request_id = serializers.IntegerField(source='review_request_id', read_only=True)
 
     class Meta:
         model = VideoFeedback
         fields = [
             'id', 'author_display_name', 'authored_by_current_user',
-            'timestamp_seconds', 'text', 'feedback_video', 'created_at',
+            'timestamp_seconds', 'text', 'feedback_video', 'review_request_id', 'created_at',
         ]
         read_only_fields = ['id', 'author_display_name', 'authored_by_current_user', 'created_at']
 
@@ -345,7 +347,7 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
         ]
 
     def get_response_count(self, obj):
-        return obj.session.video_feedback.filter(user=obj.teacher).count()
+        return obj.feedback_items.count()
 
     def get_current_user_role(self, obj):
         request = self.context.get('request')
@@ -415,3 +417,29 @@ class TeacherRosterStudentSerializer(serializers.ModelSerializer):
             return None
         last_request = ReviewRequest.objects.filter(teacher=teacher, student=obj.student).order_by('-created_at').first()
         return last_request.created_at if last_request else None
+
+
+class FeedbackTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FeedbackTemplate
+        fields = ['id', 'title', 'text', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def validate_title(self, value):
+        normalized = str(value or '').strip()
+        if not normalized:
+            raise serializers.ValidationError('Title is required.')
+        return normalized
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
+        title = attrs.get('title') or getattr(self.instance, 'title', '')
+        if not user or not user.is_authenticated:
+            raise serializers.ValidationError('Authentication required.')
+        existing = FeedbackTemplate.objects.filter(teacher=user, title__iexact=title.strip())
+        if self.instance:
+            existing = existing.exclude(pk=self.instance.pk)
+        if existing.exists():
+            raise serializers.ValidationError({'title': 'You already have a template with this title.'})
+        return attrs

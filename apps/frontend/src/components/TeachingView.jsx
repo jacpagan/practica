@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { fmtDate } from '../utils'
+import { useToast } from './Toast'
 
 const statusTone = {
   requested: 'bg-amber-100 text-amber-800',
@@ -18,11 +19,17 @@ const statusLabel = (value = '') => {
 }
 
 function TeachingView({ token, onOpenReviewRequest }) {
+  const toast = useToast()
   const [tab, setTab] = useState('inbox')
   const [requests, setRequests] = useState([])
   const [requestsLoading, setRequestsLoading] = useState(true)
   const [roster, setRoster] = useState([])
   const [rosterLoading, setRosterLoading] = useState(true)
+  const [templates, setTemplates] = useState([])
+  const [templatesLoading, setTemplatesLoading] = useState(true)
+  const [templateTitle, setTemplateTitle] = useState('')
+  const [templateText, setTemplateText] = useState('')
+  const [savingTemplate, setSavingTemplate] = useState(false)
 
   const authHeaders = useMemo(() => (token ? { Authorization: `Token ${token}` } : {}), [token])
 
@@ -54,11 +61,65 @@ function TeachingView({ token, onOpenReviewRequest }) {
     }
   }, [authHeaders])
 
+  const loadTemplates = useCallback(async () => {
+    setTemplatesLoading(true)
+    try {
+      const res = await fetch('/api/teacher/templates/', { headers: authHeaders })
+      if (!res.ok) throw new Error('templates')
+      const data = await res.json()
+      setTemplates(Array.isArray(data) ? data : [])
+    } catch {
+      setTemplates([])
+    } finally {
+      setTemplatesLoading(false)
+    }
+  }, [authHeaders])
+
   useEffect(() => {
     if (!token) return
     loadInbox()
     loadRoster()
-  }, [loadInbox, loadRoster, token])
+    loadTemplates()
+  }, [loadInbox, loadRoster, loadTemplates, token])
+
+  const createTemplate = async () => {
+    if (!templateTitle.trim()) {
+      toast.error('Add a template title first')
+      return
+    }
+    setSavingTemplate(true)
+    try {
+      const res = await fetch('/api/teacher/templates/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ title: templateTitle.trim(), text: templateText.trim() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.title?.[0] || data?.error || 'Could not save template')
+      setTemplates((current) => [...current, data].sort((left, right) => left.title.localeCompare(right.title)))
+      setTemplateTitle('')
+      setTemplateText('')
+      toast.success('Template saved')
+    } catch (error) {
+      toast.error(error?.message || 'Could not save template')
+    } finally {
+      setSavingTemplate(false)
+    }
+  }
+
+  const deleteTemplate = async (templateId) => {
+    try {
+      const res = await fetch(`/api/teacher/templates/${templateId}/`, {
+        method: 'DELETE',
+        headers: authHeaders,
+      })
+      if (!res.ok) throw new Error('delete-template')
+      setTemplates((current) => current.filter((item) => item.id !== templateId))
+      toast.success('Template deleted')
+    } catch {
+      toast.error('Could not delete template')
+    }
+  }
 
   const pendingCount = requests.filter((item) => ['requested', 'opened'].includes(item.status)).length
 
@@ -90,6 +151,13 @@ function TeachingView({ token, onOpenReviewRequest }) {
             className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${tab === 'roster' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
           >
             Roster
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('templates')}
+            className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${tab === 'templates' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+          >
+            Templates
           </button>
         </div>
 
@@ -134,7 +202,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
               ))}
             </div>
           )
-        ) : (
+        ) : tab === 'roster' ? (
           rosterLoading ? (
             <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading roster…</div>
           ) : roster.length === 0 ? (
@@ -154,6 +222,69 @@ function TeachingView({ token, onOpenReviewRequest }) {
               ))}
             </div>
           )
+        ) : (
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Save a reusable feedback template</p>
+                <p className="text-xs text-gray-500 mt-1">Use templates for recurring drum-technique reminders and save time in async reviews.</p>
+              </div>
+              <input
+                type="text"
+                value={templateTitle}
+                onChange={(event) => setTemplateTitle(event.target.value)}
+                placeholder="Template title"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+              />
+              <textarea
+                value={templateText}
+                onChange={(event) => setTemplateText(event.target.value)}
+                rows={4}
+                placeholder="Template note"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
+              />
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={createTemplate}
+                  disabled={savingTemplate}
+                  className="rounded-xl bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                >
+                  {savingTemplate ? 'Saving…' : 'Save template'}
+                </button>
+              </div>
+            </div>
+
+            {templatesLoading ? (
+              <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading templates…</div>
+            ) : templates.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
+                <p className="text-sm text-gray-700">No templates yet.</p>
+                <p className="text-xs text-gray-500 mt-1">Create your first reusable coaching note here.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {templates.map((template) => (
+                  <div key={template.id} className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{template.title}</p>
+                        <p className="text-xs text-gray-400 mt-1">Updated {new Date(template.updated_at).toLocaleString()}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => deleteTemplate(template.id)}
+                        className="text-xs text-red-600 hover:text-red-700 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{template.text || 'No note text yet.'}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

@@ -2,7 +2,7 @@ from django.contrib import admin
 from .models import (
     Profile, Session, Chapter, VideoFeedback, MultipartSessionUpload, SessionAsset,
     SessionLastSeen,
-    ReviewRequest, TeacherRosterMembership,
+    ReviewRequest, TeacherRosterMembership, FeedbackTemplate,
 )
 
 
@@ -40,9 +40,9 @@ class ChapterAdmin(admin.ModelAdmin):
 
 @admin.register(VideoFeedback)
 class VideoFeedbackAdmin(admin.ModelAdmin):
-    list_display = ['__str__', 'session', 'user', 'timestamp_seconds', 'is_legacy_text_feedback', 'created_at']
+    list_display = ['__str__', 'session', 'review_request', 'user', 'timestamp_seconds', 'is_legacy_text_feedback', 'created_at']
     list_filter = ['user', 'is_legacy_text_feedback']
-    raw_id_fields = ['session', 'user']
+    raw_id_fields = ['session', 'review_request', 'user']
 
 
 @admin.register(SessionAsset)
@@ -83,3 +83,10 @@ class ReviewRequestAdmin(admin.ModelAdmin):
     list_filter = ['status', 'instrument']
     search_fields = ['session__title', 'student__username', 'teacher__username', 'goal', 'exercise_or_song']
     raw_id_fields = ['session', 'student', 'teacher', 'created_by', 'review_link']
+
+
+@admin.register(FeedbackTemplate)
+class FeedbackTemplateAdmin(admin.ModelAdmin):
+    list_display = ['id', 'teacher', 'title', 'updated_at']
+    search_fields = ['teacher__username', 'teacher__profile__display_name', 'title', 'text']
+    raw_id_fields = ['teacher']

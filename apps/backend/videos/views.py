@@ -29,13 +29,14 @@ from .models import (
     Tag, MultipartSessionUpload, SessionAsset,
     ReviewLink,
     ReviewRequest, TeacherRosterMembership,
+    FeedbackTemplate,
 )
 from .serializers import (
     UserSerializer, UserSummarySerializer, RegisterSerializer,
     SessionSerializer, SessionListSerializer,
     ChapterSerializer,
     PublicSessionSerializer, ReviewLinkSerializer, ReviewVideoFeedbackSerializer,
-    ReviewRequestSerializer, TeacherRosterStudentSerializer,
+    ReviewRequestSerializer, TeacherRosterStudentSerializer, FeedbackTemplateSerializer,
 )
 from .services.media_pipeline import enqueue_session_processing, enqueue_local_session_transcode, apply_processing_update
 
@@ -418,7 +419,10 @@ def review_link_feedback(request, token):
         return _review_request_forbidden_response()
 
     if request.method == 'GET':
-        feedback = link.session.video_feedback.select_related('user', 'user__profile').order_by('timestamp_seconds', 'created_at')
+        feedback = link.session.video_feedback.select_related('user', 'user__profile')
+        if review_request:
+            feedback = feedback.filter(review_request=review_request)
+        feedback = feedback.order_by('timestamp_seconds', 'created_at')
         return Response(ReviewVideoFeedbackSerializer(feedback, many=True, context={'request': request, 'session': link.session}).data)
 
     if not link.allow_video_feedback:
@@ -443,6 +447,7 @@ def review_link_feedback(request, token):
 
     item = VideoFeedback.objects.create(
         session=link.session,
+        review_request=review_request,
         user=request.user,
         timestamp_seconds=serializer.validated_data.get('timestamp_seconds'),
         text=str(serializer.validated_data.get('text', '')).strip(),
@@ -478,6 +483,33 @@ def teacher_roster(request):
         'student', 'student__profile'
     ).order_by('student__username')
     return Response(TeacherRosterStudentSerializer(memberships, many=True, context={'request': request}).data)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def teacher_templates(request):
+    if request.method == 'GET':
+        templates = FeedbackTemplate.objects.filter(teacher=request.user).order_by('title', '-updated_at')
+        return Response(FeedbackTemplateSerializer(templates, many=True, context={'request': request}).data)
+
+    serializer = FeedbackTemplateSerializer(data=request.data, context={'request': request})
+    serializer.is_valid(raise_exception=True)
+    template = serializer.save(teacher=request.user)
+    return Response(FeedbackTemplateSerializer(template, context={'request': request}).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def teacher_template_detail(request, template_id):
+    template = get_object_or_404(FeedbackTemplate, pk=template_id, teacher=request.user)
+    if request.method == 'DELETE':
+        template.delete()
+        return Response({'ok': True})
+
+    serializer = FeedbackTemplateSerializer(template, data=request.data, partial=True, context={'request': request})
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)
 
 
 @method_decorator(csrf_exempt, name='dispatch')

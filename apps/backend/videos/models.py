@@ -176,6 +176,7 @@ class SessionLastSeen(models.Model):
 class VideoFeedback(models.Model):
     """A timestamped video feedback response on a session."""
     session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='video_feedback')
+    review_request = models.ForeignKey('ReviewRequest', on_delete=models.SET_NULL, null=True, blank=True, related_name='feedback_items')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='video_feedback')
     timestamp_seconds = models.IntegerField(null=True, blank=True)
     text = models.TextField()
@@ -285,3 +286,22 @@ class ReviewRequest(models.Model):
 
     def __str__(self):
         return f"ReviewRequest #{self.id} session={self.session_id} teacher={self.teacher_id} status={self.status}"
+
+
+class FeedbackTemplate(models.Model):
+    """Reusable teacher note templates for faster async feedback."""
+
+    teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name='feedback_templates')
+    title = models.CharField(max_length=120)
+    text = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['title', '-updated_at']
+        constraints = [
+            models.UniqueConstraint(fields=['teacher', 'title'], name='feedback_template_teacher_title_uniq'),
+        ]
+
+    def __str__(self):
+        return f"FeedbackTemplate teacher={self.teacher_id} title={self.title}"
