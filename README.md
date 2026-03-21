@@ -1,16 +1,16 @@
 # Practica
 
-Practica is a Django + React application for private async video feedback, evolving into a teacher-led private platform for async music instruction.
+Practica is a Django + React application for private video practice and trusted feedback, built around the idea that everyone is still learning.
 
 The shipped product already supports:
 
-- a private student video library,
+- a private member video library,
 - upload and in-app recording,
 - authenticated private review flows,
 - video-first feedback replies,
 - and playback processing for review-ready sessions.
 
-The v2 product direction is to serve independent drum teachers and their existing students with a lightweight teacher workflow: structured review requests, teacher inbox, roster, and repeat feedback cycles.
+The v2 product direction is to deepen the private-library foundation with trusted invites, practice threads, and video-first feedback between members.
 
 ## Product Docs
 
@@ -25,22 +25,22 @@ The v2 product direction is to serve independent drum teachers and their existin
 
 Practica is currently strongest as a private async video feedback tool:
 
-- students upload or record videos into a private library,
+- members upload or record videos into a private library,
 - owners create private feedback links,
 - reviewers log in and respond with video feedback,
 - and feedback stays attached to the original source video.
 
 ### V2 strategic direction
 
-Practica v2 is a teacher-led private platform for async music instruction.
+Practica v2 is a learner-first private platform for practice and feedback.
 
 Strategic decisions:
 
-- start with existing teacher-student relationships,
-- focus the wedge on independent drum teachers,
-- keep student archives private and student-owned,
-- build teacher workflow before marketplace discovery,
-- and optimize for completed review cycles: `submission -> feedback -> resubmission`.
+- treat everyone as a learner rather than a fixed teacher/student identity,
+- keep archives private and member-owned,
+- organize repeated takes into private practice threads,
+- grow through trusted invite-only onboarding rather than open discovery,
+- and optimize for repeated practice plus attached feedback over time.
 
 ## Quick Start
 

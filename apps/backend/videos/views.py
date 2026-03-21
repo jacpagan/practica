@@ -421,10 +421,12 @@ def review_link_info(request, token):
     elif review_request and request.user.id == review_request.student_id:
         _mark_review_request_viewed(review_request, request.user)
         review_request.refresh_from_db()
+    request_payload = ReviewRequestSerializer(review_request, context={'request': request}).data if review_request else None
     return Response({
         'session': PublicSessionSerializer(link.session, context={'request': request}).data,
         'link': ReviewLinkSerializer(link, context={'request': request}).data,
-        'review_request': ReviewRequestSerializer(review_request, context={'request': request}).data if review_request else None,
+        'review_request': request_payload,
+        'feedback_request': request_payload,
     })
 
 

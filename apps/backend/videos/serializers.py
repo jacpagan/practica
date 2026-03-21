@@ -355,6 +355,8 @@ class ReviewVideoFeedbackSerializer(serializers.ModelSerializer):
 class ReviewRequestSerializer(serializers.ModelSerializer):
     student = UserSummarySerializer(read_only=True)
     teacher = UserSummarySerializer(read_only=True)
+    owner = UserSummarySerializer(source='student', read_only=True)
+    reviewer = UserSummarySerializer(source='teacher', read_only=True)
     session = SessionListSerializer(read_only=True)
     session_id = serializers.PrimaryKeyRelatedField(
         source='session',
@@ -369,7 +371,9 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
         required=True,
     )
     review_link = ReviewLinkSerializer(read_only=True)
+    feedback_link = ReviewLinkSerializer(source='review_link', read_only=True)
     parent_request = serializers.SerializerMethodField()
+    parent_feedback_request = serializers.SerializerMethodField()
     parent_request_id = serializers.PrimaryKeyRelatedField(
         source='parent_request',
         queryset=ReviewRequest.objects.all(),
@@ -379,6 +383,7 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
     )
     response_count = serializers.SerializerMethodField()
     current_user_role = serializers.SerializerMethodField()
+    current_member_role = serializers.SerializerMethodField()
     feedback_items = serializers.SerializerMethodField()
     latest_feedback_at = serializers.SerializerMethodField()
     follow_up_request_count = serializers.SerializerMethodField()
@@ -391,18 +396,20 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
             'session', 'session_id',
             'student',
             'teacher', 'teacher_id',
-            'review_link',
+            'owner', 'reviewer',
+            'review_link', 'feedback_link',
             'parent_request', 'parent_request_id',
+            'parent_feedback_request',
             'instrument', 'student_level', 'goal', 'exercise_or_song', 'notes',
             'requested_turnaround_hours', 'deadline',
             'status', 'opened_at', 'responded_at', 'viewed_at', 'resubmitted_at', 'closed_at',
-            'response_count', 'current_user_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count', 'feedback_category_counts',
+            'response_count', 'current_user_role', 'current_member_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count', 'feedback_category_counts',
             'created_at', 'updated_at',
         ]
         read_only_fields = [
-            'id', 'student', 'teacher', 'session', 'review_link', 'parent_request',
+            'id', 'student', 'teacher', 'owner', 'reviewer', 'session', 'review_link', 'feedback_link', 'parent_request', 'parent_feedback_request',
             'status', 'opened_at', 'responded_at', 'viewed_at', 'resubmitted_at', 'closed_at',
-            'response_count', 'current_user_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count', 'feedback_category_counts',
+            'response_count', 'current_user_role', 'current_member_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count', 'feedback_category_counts',
             'created_at', 'updated_at',
         ]
 
@@ -417,6 +424,9 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
             'status': parent.status,
         }
 
+    def get_parent_feedback_request(self, obj):
+        return self.get_parent_request(obj)
+
     def get_response_count(self, obj):
         return obj.feedback_items.count()
 
@@ -429,6 +439,14 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
             return 'teacher'
         if user.id == obj.student_id:
             return 'student'
+        return ''
+
+    def get_current_member_role(self, obj):
+        legacy = self.get_current_user_role(obj)
+        if legacy == 'teacher':
+            return 'reviewer'
+        if legacy == 'student':
+            return 'owner'
         return ''
 
     def get_feedback_items(self, obj):

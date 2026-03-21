@@ -16,12 +16,12 @@ This repository now has an explicit product-strategy source of truth.
 
 ## Current Strategic Direction
 
-Practica is moving from a private async video feedback tool toward a teacher-led private platform for async music instruction.
+Practica is a private learner-first video feedback platform.
 
 Key strategic decisions:
 
-- Start with existing teacher-student relationships, not an open marketplace.
-- Focus the initial wedge on independent drum teachers.
-- Keep student video archives private and student-owned.
-- Treat the completed review cycle as the core unit of value: `submission -> feedback -> resubmission`.
-- Build teacher workflow primitives next: `ReviewRequest`, inbox, roster, and templates.
+- Treat everyone as a learner, not as a fixed teacher/student identity.
+- Keep video archives private and member-owned.
+- Treat repeated takes and durable feedback history as the core unit of value.
+- Grow through trusted invites, not open public signup or discovery.
+- Prefer product terms like `member`, `session owner`, `reviewer`, `feedback link`, and `practice thread`.

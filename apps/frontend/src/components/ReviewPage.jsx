@@ -556,7 +556,7 @@ function ReviewPage({ reviewToken = '' }) {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-sm font-medium text-gray-900">{item.author_display_name || 'Viewer'}</p>
+                            <p className="text-sm font-medium text-gray-900">{item.author_display_name || 'Member'}</p>
                           </div>
                           <p className="text-xs text-gray-400 mt-1">{new Date(item.created_at).toLocaleString()}</p>
                         </div>

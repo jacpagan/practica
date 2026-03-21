@@ -4,473 +4,241 @@
 
 This document is the strategic source of truth for Practica v2.
 
-It supersedes older generic positioning like "personal practice tracker" as the main product direction, while preserving the shipped private-library product as the foundation Practica already has.
+It replaces older role-heavy framing and clarifies the current direction:
+Practica is a private video practice archive with trusted feedback, built for people who are all still learning.
 
 Related docs:
 
 - `docs/platform-effects-mvp-playbook.md`: shipped v1 baseline
-- `docs/flow-audit.md`: implementation audit and platform-foundation gaps
+- `docs/flow-audit.md`: implementation audit and reliability gaps
 
 ## Executive Summary
 
-Practica v2 turns the current private async video feedback product into a teacher-led private platform for async music instruction.
+Practica v2 is a private, video-first platform for ongoing practice and feedback among trusted people.
 
-The v2 bet is:
+The core bet is:
 
-- start with existing teacher-student relationships,
-- focus on independent drum teachers first,
-- keep student archives private and student-owned,
-- give teachers lightweight workflow control,
-- and measure success by completed review cycles, not by uploaded videos alone.
+- everyone is a learner,
+- every take should remain private by default,
+- feedback should stay attached to the video,
+- repeated takes should be easy to organize over time,
+- and the product should optimize for durable practice history rather than public discovery.
 
-Practica is not an open marketplace in v2. It is a private interaction platform that helps teachers review more student practice with less chaos and better follow-through.
-
-## Evidence Base
-
-The strategic direction in this PRD is grounded in the codebase and repo documentation.
-
-### What the product is today
-
-The shipped product already implements:
-
-- a private video library for user-owned sessions,
-- authenticated private review links,
-- video-first feedback replies,
-- timestamp-aware feedback,
-- playback processing and upload infrastructure,
-- and owner-side session detail views that aggregate feedback around a source video.
-
-Current product artifacts and implementation signals:
-
-- `docs/platform-effects-mvp-playbook.md`
-- `docs/flow-audit.md`
-- `apps/backend/videos/models.py`
-- `apps/backend/videos/views.py`
-- `apps/backend/videos/serializers.py`
-- `apps/frontend/src/components/SessionUpload.jsx`
-- `apps/frontend/src/components/SessionDetail.jsx`
-- `apps/frontend/src/components/ReviewPage.jsx`
-
-### Strategic tension in the repo
-
-The repo also contains signs of earlier, broader platform ambition:
-
-- the root `README.md` previously framed Practica as a practice tracking system,
-- historical migrations explored teacher-student relationships, invite codes, spaces, plans, and metrics,
-- and alternate product descriptions leaned toward a broader role-based learning platform.
-
-The v2 strategy resolves that tension by choosing a concrete next step:
-
-- do not jump to a public marketplace,
-- do not reintroduce full school or studio abstractions yet,
-- do reintroduce the smallest possible teacher workflow layer on top of the existing private-library foundation.
+Practica is not a marketplace, a social feed, or a school workspace.
+It is a private place to record, revisit, and exchange trusted feedback.
 
 ## Product Thesis
 
-Practica should become the private operating system for async music instruction between teachers and their existing students.
+Practica should become the private operating system for video-based improvement.
 
 The core value proposition is:
 
-"A student sends one private review request, the teacher responds with clear video feedback, and both sides keep a durable record of improvement over time."
+"Record a take, keep it private, get video feedback from trusted people, and build a durable history of progress over time."
 
-## Product Type
+## Product Model
 
-Practica v2 is a teacher-led private platform, not an open marketplace.
+Practica is a learner-first private platform.
 
 That means:
 
-- relationships start from existing teacher-student trust,
-- access remains private and permissioned,
-- teacher workflow matters more than public discovery,
-- and network effects come from better specialization, credibility, and outcomes rather than from open-feed liquidity.
+- no permanent teacher/student identity model,
+- no public discovery,
+- no public profiles or marketplace mechanics,
+- no role-based hierarchy as the foundation of the product,
+- and no assumption that one person is always the instructor and another is always the student.
 
-## Wedge
+People can still mentor each other, coach each other, review each other, or invite each other.
+Those are relationship and permission patterns, not permanent platform identities.
 
-### Initial category
+## Core Roles
 
-Independent drum teachers.
+Practica should prefer situational roles over fixed role labels.
 
-Why this wedge:
+### Session owner
 
-- drums are already the strongest instrument signal in the repo,
-- video feedback is especially valuable for timing, posture, stick control, and groove,
-- teachers already manage recurring student rosters,
-- and async review naturally complements live lessons.
+- Records or uploads a video.
+- Owns the private archive entry.
+- Controls whether a feedback link exists.
 
-### Expansion path
+### Reviewer
 
-If the drum-teacher wedge works, the product can later expand to:
+- Receives a private feedback link.
+- Watches the video.
+- Responds with video feedback.
 
-- guitar,
-- voice,
-- piano,
-- bass,
-- and adjacent performance-coaching domains.
+### Member
 
-## Users
+- Any authenticated person inside the trusted network.
+- Can be a session owner on one video and a reviewer on another.
 
-### Primary buyer
+### Inviter
 
-Independent teacher.
-
-### Primary workflow owner
-
-Teacher.
-
-### Primary archive owner
-
-Student.
-
-### Core user types
-
-#### Teacher
-
-- Has an existing roster of students.
-- Wants to review more student practice between lessons.
-- Wants less context-switching across messaging apps and file links.
-- Wants durable feedback history without a heavy LMS.
-
-#### Student
-
-- Records practice videos regularly.
-- Wants clear, high-bandwidth feedback between lessons.
-- Values privacy and a low-pressure workflow.
-- Wants their own archive to remain theirs even if they stop working with one teacher.
-
-## Problem Statement
-
-Today, many teachers and students manage between-lesson feedback across text threads, shared drives, and ad hoc video links.
-
-That creates predictable failure modes:
-
-- feedback is scattered,
-- version history is unclear,
-- playback reliability is inconsistent,
-- privacy and access control are weak,
-- and there is no durable improvement loop tied to the original submission.
-
-Practica solves this by making the submission, the review request, the feedback response, and the resubmission loop live in one private system.
-
-## Jobs To Be Done
-
-### Teacher JTBD
-
-- When my students need feedback between lessons, help me review their practice asynchronously in a way that is fast, clear, and repeatable.
-
-### Student JTBD
-
-- When I am unsure whether I am practicing correctly, help me send one clear private submission and get specific video feedback tied to my actual performance.
+- A trusted person or platform admin who brings someone into Practica.
+- Invite permissions are product policy, not identity class.
 
 ## Product Principles
 
-- `Private by default`: no student video becomes public or discoverable by default.
-- `Student-owned archive`: the student keeps ownership of their session history.
-- `Show first, then tell`: feedback remains video-first.
-- `Teacher workflow over teacher analytics`: inbox, queue, roster, and templates before dashboards.
-- `Completed cycles over content volume`: repeated `submission -> feedback -> resubmission` matters more than raw uploads.
-- `Simple first, structured where it compounds`: add only enough structure to unlock routing, measurement, and repeatability.
-- `Known relationships before discovery`: build for existing teacher-student graphs before building marketplace liquidity.
+- `Private by default`: nothing is public unless explicitly shared.
+- `Video first`: the video is the center of the experience.
+- `Feedback attached to the artifact`: feedback belongs with the source video.
+- `Everyone is a learner`: the product should avoid rigid teacher/student ontology.
+- `Progress through repetition`: the product should make repeated takes easy to organize.
+- `Low pressure`: no streaks, no gamified accountability loops, no public performance layer.
+- `Trusted network growth`: membership should expand through invites and existing trust, not open viral loops.
 
-## Goals
+## Primary User Stories
 
-### Product goals
+### Practice archive
 
-- Turn the current private-link workflow into a first-class teacher-student review workflow.
-- Give teachers a lightweight operating surface for pending reviews and active rosters.
-- Preserve the student's private library as the system of record.
-- Increase the percentage of submissions that receive feedback and lead to resubmission.
+- As a member, I want to record or upload a private take quickly.
+- As a member, I want to revisit my previous takes easily.
+- As a member, I want repeated takes on the same skill to live together.
 
-### Business goals
+### Trusted feedback
 
-- Prove willingness to pay from independent music teachers.
-- Establish a credible teacher OS wedge before expanding into studios or discovery.
-- Build durable platform data around submissions, feedback, and iteration loops.
+- As a session owner, I want to share one private link for feedback.
+- As a reviewer, I want to respond with a video quickly.
+- As a reviewer, I may add a short optional caption, but the feedback remains video-first.
+- As a feedback author, I want to edit or delete my own feedback.
 
-## Non-Goals For v2
+### Practice threads
 
-Practica v2 does not aim to ship:
+- As a member, I want multiple takes of the same exercise to stay grouped over days and weeks.
+- As a member, I want to open one thread like `Singles @ 120 BPM` and see the timeline of takes.
+- As a member, I want starting a new take in the same thread to feel fast and natural.
 
-- an open teacher marketplace,
-- public profiles and ratings,
-- school-wide workspaces,
-- courses and curriculum hierarchy,
-- practice plans and daily streak mechanics,
-- generic social feeds,
-- or AI-generated text-only coaching that replaces human video feedback.
+### Invite-only trust model
 
-## Core Value Unit
+- As a platform admin, I want to control who can sign up.
+- As a product, Practica should prefer invite-only onboarding over open account creation.
+- As a new member, I should join with context and trust, not into an empty app.
 
-The core value unit is the completed review cycle:
+## Current Strategic Direction
 
-1. student submission,
-2. structured review request,
-3. teacher video feedback,
-4. student consumption of feedback,
-5. student resubmission.
+Practica is moving toward a private learner network, not a teacher-led operating system.
 
-This should become the main product, operational, and analytics primitive.
+Key decisions:
 
-## V2 Scope
+- keep the private library,
+- keep private feedback links,
+- keep video-first responses,
+- add lightweight practice threads for repeated takes,
+- require trusted onboarding,
+- and avoid hard-coding fixed teacher/student product identity into the long-term model.
 
-### 1. `ReviewRequest` as a first-class object
+## What Practica Is
 
-The current `ReviewLink` is an access-control primitive. Practica v2 needs a workflow primitive.
+- A private video archive
+- A trusted feedback tool
+- A place for repeated practice history
+- A learner-first product
+- A lightweight private network
 
-`ReviewRequest` should capture:
+## What Practica Is Not
 
-- source `Session`,
-- student,
-- designated teacher,
-- instrument,
-- level,
-- goal,
-- exercise or song,
-- optional timestamps or chapters,
-- requested turnaround,
-- deadline,
-- current status,
-- and payment state if the business model requires it later.
+- A public marketplace
+- A social content feed
+- A school workspace platform
+- A role-heavy LMS
+- A practice-plan or streak app
+- A public creator discovery system
 
-### 2. Teacher inbox
+## Growth Model
 
-Teachers need a simple queue for:
+Practica should grow through trusted relationships, not through open signups and public visibility.
 
-- new requests,
-- opened requests,
-- due soon,
-- responded,
-- viewed,
-- resubmitted,
-- and closed loops.
+Preferred growth loop:
 
-The inbox is a workflow surface, not a reporting dashboard.
+1. One trusted member joins.
+2. They record private videos.
+3. They share a private feedback link or invite another trusted person.
+4. That person joins in context.
+5. The network grows through real practice relationships.
 
-### 3. Teacher roster
+## Invite Policy
 
-Teachers need a lightweight view of active students, including:
+The default posture should be invite-only.
 
-- recent submissions,
-- pending requests,
-- turnaround health,
-- and repeat cycle frequency.
+Near-term recommendation:
 
-This should remain intentionally small in v2.
+- platform admins control signup access,
+- signup requires a valid invite code,
+- invite codes should be limited-use,
+- and new accounts should enter through a trusted path.
 
-### 4. Feedback composition
+Future options can include:
 
-The teacher feedback surface should preserve the current strengths and add small workflow upgrades:
+- admin-generated member invites,
+- member-generated invites within limits,
+- or context-specific invite links.
 
-- record or upload a feedback video,
-- attach optional timestamps,
-- add short supporting notes,
-- categorize feedback markers,
-- and save reusable response patterns or templates.
+## Naming Guidance
 
-### 5. Governance and permissions
+Preferred product language:
 
-Practica v2 must tighten the current private-link model into deliberate workflow governance:
+- `member`
+- `session owner`
+- `reviewer`
+- `responder`
+- `feedback`
+- `feedback link`
+- `practice thread`
+- `take`
+- `private library`
 
-- designated teacher ownership of a request,
-- deterministic request states,
-- revocable access,
-- expiration semantics,
-- view-only vs reply permissions,
-- and explicit invalid, expired, and revoked handling.
+Avoid as foundational product language:
 
-### 6. Student loop continuity
+- `teacher`
+- `student`
+- `roster`
+- `designated teacher`
+- `teacher workflow`
 
-Students should be able to:
-
-- create a review request from an existing private session,
-- see the request state clearly,
-- review teacher feedback in context,
-- and start the next submission from that same thread of work.
-
-## Functional Requirements
-
-### FR-1 Student creates a review request from a session
-
-- Student selects a private session from their library.
-- Student creates a request for a designated teacher.
-- Student provides at least a goal and instrument metadata.
-- Student can optionally attach timestamps, tags, chapters, reference material, and a note.
-- System creates a request record and grants access only to the designated teacher and authorized viewers.
-
-### FR-2 Teacher has an actionable inbox
-
-- Teacher can view pending and completed requests in one place.
-- Teacher can filter by status, student, and due date.
-- Teacher can open a request directly into the original source video.
-- Teacher can see enough request metadata to triage quickly.
-
-### FR-3 Teacher can reply with video-first feedback
-
-- Teacher records or uploads a response video.
-- Teacher can attach one or more timestamps or markers.
-- Teacher can add optional short notes.
-- Feedback remains attached to the source session and request context.
-
-### FR-4 Student sees the loop state
-
-- Student can tell whether a request is pending, opened, responded, viewed, or closed.
-- Student can watch the teacher response in the source session detail view.
-- Student can create a follow-up submission without losing the thread of work.
-
-### FR-5 Permissions are explicit
-
-- Only designated teacher accounts can submit feedback on a teacher-owned request unless the owner explicitly broadens access.
-- Revoked or expired requests fail closed with clear UX states.
-- Student archive ownership remains unchanged even if teacher access is revoked.
-
-### FR-6 Request and cycle analytics exist from day one
-
-- System tracks request creation, open, response, student-viewed, and resubmission events.
-- Request status changes are queryable in product surfaces and reporting.
-- Metrics support the north star and leading indicators defined below.
-
-## Data Model Direction
-
-The current data model already provides a strong base through `Session`, `ReviewLink`, `VideoFeedback`, `Chapter`, and `SessionLastSeen`.
-
-Likely v2 additions:
-
-- `TeacherProfile`: identifies a user operating as a teacher.
-- `TeacherRosterMembership`: maps teacher-student relationships without taking archive ownership away from students.
-- `ReviewRequest`: workflow object for the review cycle.
-- `FeedbackTemplate`: reusable teacher reply patterns.
-- optional categorized feedback markers or request metadata tables if needed for normalization.
-
-Important constraint:
-
-- `Session.user` should remain the student archive owner.
-
-## API Direction
-
-Indicative API additions for v2:
-
-- `POST /api/review-requests/`
-- `GET /api/review-requests/`
-- `GET /api/review-requests/:id/`
-- `PATCH /api/review-requests/:id/`
-- `POST /api/review-requests/:id/respond/`
-- `POST /api/review-requests/:id/mark-viewed/`
-- `GET /api/teacher/inbox/`
-- `GET /api/teacher/roster/`
-- `GET /api/teacher/templates/`
-- `POST /api/teacher/templates/`
-
-The current review-link routes can remain for compatibility and non-teacher workflows, but v2 teacher flows should be routed through `ReviewRequest`.
-
-## UX Requirements
-
-### Student experience
-
-- Keep the current upload and session-detail experience familiar.
-- Add review-request creation without making the student feel like they are entering a heavy LMS.
-- Keep privacy language explicit and reassuring.
-
-### Teacher experience
-
-- Optimize for quick triage and fast response.
-- Do not require teachers to navigate full admin-style dashboards.
-- Make the inbox the default starting surface.
+Those legacy terms may still exist in code and migrations, but product-facing language should move away from them.
 
 ## Success Metrics
 
-### North star
+Practica should care more about retained practice behavior than role-specific workflow metrics.
 
-- Completed review cycles per week.
+Early indicators:
 
-### Leading indicators
+- repeat uploads per member,
+- repeated takes inside the same practice thread,
+- feedback-link creation rate,
+- video feedback response rate,
+- and revisit behavior on older takes.
 
-- Active teachers with at least one pending or completed request each week.
-- Active students with at least one request each week.
-- Percentage of requests that receive a teacher response.
-- Median teacher turnaround time.
-- Percentage of responded requests viewed by students.
-- Percentage of responded requests that lead to resubmission within 7 days and 30 days.
+## Near-Term Roadmap
 
-### Quality guardrails
+### 1. Private library reliability
 
-- Playback-ready share or request success rate.
-- Review-request open success rate.
-- Feedback submission success rate.
-- Expired, revoked, and invalid access states handled without ambiguity.
+- Make upload, playback, and session detail boringly reliable.
 
-## Monetization Direction
+### 2. Practice threads
 
-For the teacher-led v2 strategy, teachers are the first buyer.
+- Group repeated takes under one private thread.
+- Make comparison over time easier.
 
-Recommended initial commercial model:
+### 3. Video-first trusted feedback
 
-- teacher SaaS by seat or by active student band.
+- Keep link-based video feedback simple.
+- Support optional short captions attached to feedback videos.
+- Preserve author edit/delete for their own feedback.
 
-Rationale:
+### 4. Invite-only membership
 
-- the new control point is the teacher inbox and roster,
-- the teacher realizes the clearest workflow ROI,
-- and the product remains aligned with private known-relationship workflows.
+- Gate signup through invite codes.
+- Keep onboarding inside trusted boundaries.
 
-Possible future monetization layers:
+## Migration Note
 
-- premium student add-ons,
-- paid review transactions,
-- studio plans,
-- and AI-assisted workflow augmentation.
+The repository still contains legacy naming and structures tied to `teacher`, `student`, `roster`, and `review request` concepts.
 
-## Release Plan
+That should be treated as implementation history, not the long-term product ontology.
 
-### Phase 0: Foundation hardening
+The practical direction is:
 
-- Resolve any trust-critical link, playback, upload, and review-state issues.
-- Ensure the current private workflow is boringly reliable.
-
-### Phase 1: Teacher OS v2
-
-- Add `ReviewRequest`.
-- Add teacher inbox.
-- Add lightweight roster.
-- Add designated-teacher permissions.
-- Add simple templates.
-
-### Phase 2: Structured improvement layer
-
-- Add standardized request metadata.
-- Add feedback categories and richer markers.
-- Add cycle analytics and health views.
-
-### Phase 3: Studio layer
-
-- Consider school or studio workspaces only after teacher rosters and repeat cycles are healthy.
-
-### Phase 4: Optional marketplace expansion
-
-- Add public profiles, reputation, pricing, matching, payouts, and moderation only if Practica intentionally moves beyond the private-platform model.
-
-## Risks
-
-- Reintroducing too much teacher complexity too early could break the product's current low-pressure feel.
-- A teacher inbox without strong governance will create confusion about ownership and response expectations.
-- Marketplace ambitions too early could weaken the private-by-default trust advantage.
-- Over-structuring feedback could flatten the human, demonstrative value of video replies.
-
-## Decision Rules
-
-When prioritizing product work, prefer features that:
-
-- increase completed review cycles,
-- reduce teacher review friction,
-- preserve student ownership and privacy,
-- strengthen governance and trust,
-- or improve playback and upload reliability.
-
-Deprioritize features that:
-
-- optimize for public discovery,
-- add heavy school-style administration,
-- reintroduce streaks or daily-pressure mechanics,
-- or replace human video feedback with text-first automation.
-
-## One-Sentence Positioning
-
-Practica helps drum teachers review more student practice asynchronously through private video requests, video-first feedback, and durable improvement history.
+- update product docs first,
+- rename product-facing UI next,
+- add neutral API aliases before deep model renames,
+- and only later decide whether the database/domain model should be fully renamed.

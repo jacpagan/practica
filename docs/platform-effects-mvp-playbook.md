@@ -98,13 +98,20 @@ Avoid old product terms in v1-facing copy:
 
 ## Strategic Note
 
-Practica v2 deliberately reopens a narrow subset of the items above.
+Practica v2 no longer treats `teacher` and `student` as the primary product ontology.
 
-Specifically, v2 reintroduces teacher workflow primitives in a lightweight form:
+The v1 baseline still matters because it captures what Practica already does well:
 
-- teacher inbox,
-- teacher roster,
-- designated review requests,
-- and reusable feedback templates.
+- private library,
+- private feedback links,
+- video-first responses,
+- and durable archive value.
 
-That change does not invalidate the v1 baseline; it means the current private-library MVP is now the foundation for a teacher-led private platform rather than the end state.
+The v2 direction builds on that baseline by emphasizing:
+
+- learner-first language,
+- trusted invite-only growth,
+- practice threads for repeated takes,
+- and private feedback between members.
+
+Legacy teacher/student structures may remain in code for some time, but they should not be treated as the long-term product identity model.
