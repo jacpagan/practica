@@ -144,7 +144,7 @@ function ReviewPage({ reviewToken = '' }) {
     return () => { cancelled = true }
   }, [authToken, reviewRequest?.current_user_role])
 
-  const canRespondToRequest = !reviewRequest || reviewRequest.current_user_role !== 'student'
+  const canRespondToRequest = true
 
   const applyTemplate = (template) => {
     if (!template) return
@@ -214,8 +214,8 @@ function ReviewPage({ reviewToken = '' }) {
       setError('Please log in to send video feedback.')
       return
     }
-    if (!responseFile) {
-      setError('Record or upload a feedback video first.')
+    if (!responseFile && !responseNotes.trim()) {
+      setError('Add a comment or video first.')
       return
     }
 
@@ -223,7 +223,7 @@ function ReviewPage({ reviewToken = '' }) {
     setError('')
     try {
       const formData = new FormData()
-      formData.append('feedback_video', responseFile)
+      if (responseFile) formData.append('feedback_video', responseFile)
       if (responseCategory) formData.append('feedback_category', responseCategory)
       if (responseNotes.trim()) formData.append('text', responseNotes.trim())
       if (typeof selectedTimestampSeconds === 'number') formData.append('timestamp_seconds', selectedTimestampSeconds)
@@ -278,14 +278,14 @@ function ReviewPage({ reviewToken = '' }) {
       <main className="max-w-3xl mx-auto space-y-6">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Private feedback link</p>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">Reply with video</h1>
-          <p className="text-sm text-gray-500 mt-2">Signed in as {user.display_name || user.username}.</p>
+          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">Leave feedback</h1>
+          <p className="text-sm text-gray-500 mt-2">Signed in as {user.display_name || user.username}. Leave a comment, a video, or both.</p>
         </div>
 
         {reviewRequest ? (
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-sm font-semibold text-gray-900">Teacher request</p>
+              <p className="text-sm font-semibold text-gray-900">Feedback request</p>
               <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">{reviewRequest.instrument}</span>
               {reviewRequest.student_level ? <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">{reviewRequest.student_level}</span> : null}
             </div>
@@ -331,11 +331,11 @@ function ReviewPage({ reviewToken = '' }) {
         {link?.allow_video_feedback && canRespondToRequest ? (
           <div className="rounded-xl border border-gray-200 p-4 space-y-4">
             <div>
-              <p className="text-sm font-semibold text-gray-900">Add your reply</p>
-              <p className="text-xs text-gray-500 mt-1">Record or upload, then send.</p>
+              <p className="text-sm font-semibold text-gray-900">Add feedback</p>
+              <p className="text-xs text-gray-500 mt-1">Leave a comment, add a video, or do both.</p>
             </div>
 
-            {reviewRequest?.current_user_role === 'teacher' ? (
+            {false ? (
               <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-3 space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Saved templates</p>
@@ -364,10 +364,10 @@ function ReviewPage({ reviewToken = '' }) {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button type="button" onClick={() => setShowRecorder(true)} className="rounded-2xl bg-gray-900 text-white px-4 py-3 text-sm font-medium hover:bg-gray-800 transition-colors">
-                Record feedback
+                Record video
               </button>
               <button type="button" onClick={() => inputRef.current?.click()} className="rounded-2xl border border-gray-200 bg-white text-gray-900 px-4 py-3 text-sm font-medium hover:bg-gray-50 transition-colors">
-                Upload feedback video
+                Upload video
               </button>
               <input ref={inputRef} type="file" accept={videoFileAccept()} className="hidden" onChange={pickFile} />
             </div>
@@ -377,7 +377,7 @@ function ReviewPage({ reviewToken = '' }) {
             {responsePreviewUrl ? (
               <div className="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium text-gray-900">Feedback preview</p>
+                  <p className="text-sm font-medium text-gray-900">Video preview</p>
                   <button type="button" onClick={() => { setResponseFile(null); replaceOwnedPreviewUrl('') }} className="text-xs text-red-600 hover:text-red-700 transition-colors">
                     Remove
                   </button>
@@ -454,26 +454,22 @@ function ReviewPage({ reviewToken = '' }) {
 
               <div className="flex justify-end">
                 <button type="submit" disabled={submitting} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50">
-                  {submitting ? 'Sending…' : 'Send reply'}
+                  {submitting ? 'Sending…' : 'Send feedback'}
                 </button>
               </div>
             </form>
           </div>
         ) : (
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-2">
-            <p className="text-sm font-semibold text-blue-900">Feedback is view-only</p>
-            <p className="text-sm text-blue-800">
-              {reviewRequest?.current_user_role === 'student'
-                ? 'This request belongs to your teacher workflow, so you can view the feedback here but only the designated teacher can reply.'
-                : 'The owner left this private page open for viewing, but new video replies are turned off.'}
-            </p>
+            <p className="text-sm font-semibold text-blue-900">Feedback is turned off</p>
+            <p className="text-sm text-blue-800">The owner left this page open for viewing, but new feedback is currently disabled.</p>
           </div>
         )}
 
         <div className="space-y-2">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Video feedback</p>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Feedback</p>
               {feedback.length === 0 ? (
-                <p className="text-sm text-gray-500">No video feedback yet.</p>
+                <p className="text-sm text-gray-500">No feedback yet.</p>
               ) : (
                 <div className="space-y-3">
                   {feedback.map((item) => (
@@ -492,9 +488,11 @@ function ReviewPage({ reviewToken = '' }) {
                         </div>
                     {typeof item.timestamp_seconds === 'number' ? <span className="text-xs text-gray-500">@{fmtTimer(item.timestamp_seconds)}</span> : null}
                   </div>
-                  <div className="rounded-xl overflow-hidden bg-black">
-                    <video src={videoUrl(item.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
-                  </div>
+                  {item.feedback_video ? (
+                    <div className="rounded-xl overflow-hidden bg-black">
+                      <video src={videoUrl(item.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
+                    </div>
+                  ) : null}
                   {item.text ? <p className="text-sm text-gray-700 whitespace-pre-wrap">{item.text}</p> : null}
                 </div>
               ))}

@@ -409,8 +409,6 @@ def review_link_info(request, token):
     if error_reason:
         return _review_link_error_response(error_reason)
     review_request = getattr(link, 'review_request', None)
-    if review_request and not _review_request_visible_to_user(review_request, request.user):
-        return _review_request_forbidden_response()
     ReviewLink.objects.filter(pk=link.pk).update(last_accessed_at=timezone.now())
     link.refresh_from_db(fields=['last_accessed_at'])
     if review_request and review_request.status == ReviewRequest.STATUS_REQUESTED and request.user.id == review_request.teacher_id:
@@ -435,8 +433,6 @@ def review_link_feedback(request, token):
     if error_reason:
         return _review_link_error_response(error_reason)
     review_request = getattr(link, 'review_request', None)
-    if review_request and not _review_request_visible_to_user(review_request, request.user):
-        return _review_request_forbidden_response()
 
     if request.method == 'GET':
         feedback = link.session.video_feedback.select_related('user', 'user__profile')
@@ -454,14 +450,12 @@ def review_link_feedback(request, token):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    if review_request and not _review_request_teacher_can_respond(review_request, request.user):
-        return _review_request_forbidden_response('Only the designated teacher can reply to this review request.')
-
     serializer = ReviewVideoFeedbackSerializer(data=request.data, context={'request': request, 'session': link.session})
     serializer.is_valid(raise_exception=True)
     video_file = request.FILES.get('feedback_video')
-    if not video_file:
-        return Response({'error': 'Feedback video is required'}, status=status.HTTP_400_BAD_REQUEST)
+    text = str(serializer.validated_data.get('text', '')).strip()
+    if not video_file and not text:
+        return Response({'error': 'Add a comment or video first'}, status=status.HTTP_400_BAD_REQUEST)
     if video_file and not str(video_file.content_type or '').startswith('video/'):
         return Response({'error': 'Only video files allowed'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -471,9 +465,9 @@ def review_link_feedback(request, token):
         user=request.user,
         feedback_category=serializer.validated_data.get('feedback_category', ''),
         timestamp_seconds=serializer.validated_data.get('timestamp_seconds'),
-        text=str(serializer.validated_data.get('text', '')).strip(),
+        text=text,
         feedback_video=video_file,
-        is_legacy_text_feedback=False,
+        is_legacy_text_feedback=not bool(video_file),
     )
     if review_request:
         review_request.status = ReviewRequest.STATUS_RESPONDED
@@ -504,6 +498,67 @@ def teacher_roster(request):
         'student', 'student__profile'
     ).order_by('student__username')
     return Response(TeacherRosterStudentSerializer(memberships, many=True, context={'request': request}).data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def teacher_insights(request):
+    review_requests = ReviewRequest.objects.filter(teacher=request.user).select_related('student', 'student__profile')
+    feedback_items = VideoFeedback.objects.filter(review_request__teacher=request.user).select_related('review_request', 'review_request__student', 'review_request__student__profile')
+
+    category_counts = {}
+    for feedback_item in feedback_items:
+        category = str(feedback_item.feedback_category or '').strip().lower()
+        if not category:
+            continue
+        category_counts[category] = category_counts.get(category, 0) + 1
+
+    top_students = []
+    students = {}
+    for review_request in review_requests.order_by('-created_at'):
+        student_id = review_request.student_id
+        bucket = students.setdefault(student_id, {
+            'student': review_request.student,
+            'request_count': 0,
+            'follow_up_request_count': 0,
+            'category_counts': {},
+            'last_request_at': review_request.created_at,
+        })
+        bucket['request_count'] += 1
+        if review_request.parent_request_id:
+            bucket['follow_up_request_count'] += 1
+        if review_request.created_at > bucket['last_request_at']:
+            bucket['last_request_at'] = review_request.created_at
+
+    for feedback_item in feedback_items:
+        student_id = feedback_item.review_request.student_id if feedback_item.review_request_id else None
+        if not student_id or student_id not in students:
+            continue
+        category = str(feedback_item.feedback_category or '').strip().lower()
+        if not category:
+            continue
+        bucket = students[student_id]['category_counts']
+        bucket[category] = bucket.get(category, 0) + 1
+
+    for student_data in students.values():
+        top_students.append({
+            'student': UserSummarySerializer(student_data['student']).data,
+            'request_count': student_data['request_count'],
+            'follow_up_request_count': student_data['follow_up_request_count'],
+            'category_counts': student_data['category_counts'],
+            'last_request_at': student_data['last_request_at'],
+        })
+
+    top_students.sort(key=lambda item: (-item['request_count'], item['student']['display_name'].lower()))
+
+    return Response({
+        'total_review_requests': review_requests.count(),
+        'pending_review_requests': review_requests.filter(status__in=[ReviewRequest.STATUS_REQUESTED, ReviewRequest.STATUS_OPENED]).count(),
+        'responded_review_requests': review_requests.filter(status__in=[ReviewRequest.STATUS_RESPONDED, ReviewRequest.STATUS_VIEWED, ReviewRequest.STATUS_RESUBMITTED, ReviewRequest.STATUS_CLOSED]).count(),
+        'follow_up_review_requests': review_requests.exclude(parent_request__isnull=True).count(),
+        'category_counts': category_counts,
+        'top_students': top_students,
+    })
 
 
 @api_view(['GET', 'POST'])

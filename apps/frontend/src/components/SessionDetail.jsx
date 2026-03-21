@@ -126,7 +126,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const playableUrl = playbackSources[playbackSourceIndex] || null
   const selectedTeacherName = selectedTeacher?.display_name || selectedTeacher?.username || ''
   const videoFeedback = Array.isArray(session?.video_feedback)
-    ? session.video_feedback.filter((item) => item.feedback_video)
+    ? session.video_feedback
     : []
 
   useEffect(() => {
@@ -613,14 +613,14 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               {justUploaded ? (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4">
                   <p className="text-sm font-medium text-emerald-900">Your video is saved.</p>
-                  <p className="text-sm text-emerald-800 mt-1">It is already in your private library. Watch it, ask your teacher, or record another one.</p>
+                  <p className="text-sm text-emerald-800 mt-1">It is already in your private library. Watch it, share a feedback link, or record another one.</p>
                   <div className="flex flex-wrap gap-2 mt-3">
                     <button type="button" onClick={() => videoRef.current?.play?.().catch?.(() => {})} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
                       Watch video
                     </button>
                     {canEdit && canCreateShareLink ? (
-                      <button type="button" onClick={() => setShowRequestComposer(true)} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
-                        {selectedTeacherName ? `Send to ${selectedTeacherName}` : 'Ask teacher'}
+                      <button type="button" onClick={() => (activeReviewLink?.url ? copyShareLink() : createShare())} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
+                        {activeReviewLink?.url ? 'Copy feedback link' : 'Create feedback link'}
                       </button>
                     ) : null}
                     <button type="button" onClick={onRecordAnother} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
@@ -653,13 +653,13 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               {canEdit ? (
                 <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 space-y-3">
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">Private feedback link</p>
-                    <p className="text-xs text-gray-500 mt-1">Anyone with this link must log in before sending a video response.</p>
+                    <p className="text-sm font-semibold text-gray-900">Feedback link</p>
+                    <p className="text-xs text-gray-500 mt-1">Anyone with this link can log in and leave feedback.</p>
                   </div>
                   {activeReviewLink?.url ? (
                     <div className="space-y-3">
                       <div className="rounded-lg border border-gray-200 bg-white px-3 py-3">
-                        <p className="text-xs text-gray-500">Share this private link</p>
+                        <p className="text-xs text-gray-500">Share this link</p>
                         <p className="text-sm text-gray-900 break-all mt-1">{activeReviewLink.url}</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -678,20 +678,20 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Not shareable yet</p>
                           <p className="text-sm text-amber-900 mt-1">
                             {session.processing_status === 'failed'
-                              ? 'Fix playback processing before sharing this private review link.'
-                              : 'Wait until playback is ready before sharing this private review link.'}
+                              ? 'Fix playback processing before sharing this feedback link.'
+                              : 'Wait until playback is ready before sharing this feedback link.'}
                           </p>
                         </div>
                       ) : null}
                       <button type="button" onClick={createShare} disabled={sharing || !canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                        {sharing ? 'Creating…' : 'Create private feedback link'}
+                        {sharing ? 'Creating…' : 'Create feedback link'}
                       </button>
                     </div>
                   )}
                 </div>
               ) : null}
 
-              {canEdit ? (
+              {false ? (
                 <div className="rounded-xl border border-gray-200 bg-white px-4 py-4 space-y-4">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
@@ -990,14 +990,14 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
 
               <div className="rounded-xl border border-gray-200 bg-white px-4 py-4 space-y-3">
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">Video feedback</p>
-                  <p className="text-xs text-gray-500 mt-1">Feedback comes back as response videos, not text-only notes.</p>
+                  <p className="text-sm font-semibold text-gray-900">Feedback</p>
+                  <p className="text-xs text-gray-500 mt-1">Anyone who logs in with your feedback link can leave a comment or video.</p>
                 </div>
 
                 {videoFeedback.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-gray-200 px-4 py-4 text-center">
-                    <p className="text-sm text-gray-600">No video feedback yet.</p>
-                    <p className="text-xs text-gray-400 mt-1">Share your private link when you want someone to respond with a video.</p>
+                    <p className="text-sm text-gray-600">No feedback yet.</p>
+                    <p className="text-xs text-gray-400 mt-1">Share your feedback link when you want comments.</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -1021,9 +1021,11 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                             </button>
                           ) : null}
                         </div>
-                        <div className="rounded-xl overflow-hidden bg-black">
-                          <video src={videoUrl(item.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
-                        </div>
+                        {item.feedback_video ? (
+                          <div className="rounded-xl overflow-hidden bg-black">
+                            <video src={videoUrl(item.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
+                          </div>
+                        ) : null}
                         {item.text ? <p className="text-sm text-gray-600 whitespace-pre-wrap">{item.text}</p> : null}
                       </div>
                     ))}
