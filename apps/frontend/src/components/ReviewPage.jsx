@@ -58,6 +58,12 @@ function ReviewPage({ reviewToken = '' }) {
   const [durationSeconds, setDurationSeconds] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
   const [submitting, setSubmitting] = useState(false)
+  const [editingFeedbackId, setEditingFeedbackId] = useState(null)
+  const [editingText, setEditingText] = useState('')
+  const [editingCategory, setEditingCategory] = useState('')
+  const [editingTimestampSeconds, setEditingTimestampSeconds] = useState('')
+  const [savingFeedbackId, setSavingFeedbackId] = useState(null)
+  const [deletingFeedbackId, setDeletingFeedbackId] = useState(null)
   const [templates, setTemplates] = useState([])
   const [templatesLoading, setTemplatesLoading] = useState(false)
   const ownedPreviewUrlRef = useRef('')
@@ -206,6 +212,76 @@ function ReviewPage({ reviewToken = '' }) {
     if (!isLikelyVideoFile(file)) return
     setResponseFile(file)
     replaceOwnedPreviewUrl(URL.createObjectURL(file))
+  }
+
+  const beginEditingFeedback = (item) => {
+    setEditingFeedbackId(item.id)
+    setEditingText(item.text || '')
+    setEditingCategory(item.feedback_category || '')
+    setEditingTimestampSeconds(typeof item.timestamp_seconds === 'number' ? String(item.timestamp_seconds) : '')
+    setError('')
+  }
+
+  const cancelEditingFeedback = () => {
+    setEditingFeedbackId(null)
+    setEditingText('')
+    setEditingCategory('')
+    setEditingTimestampSeconds('')
+  }
+
+  const saveFeedbackEdit = async (feedbackId) => {
+    if (!authToken) return
+    setSavingFeedbackId(feedbackId)
+    setError('')
+    try {
+      const payload = {
+        feedback_id: feedbackId,
+        text: editingText,
+        feedback_category: editingCategory,
+        timestamp_seconds: editingTimestampSeconds,
+      }
+      const res = await fetch(`/api/review/${token}/feedback/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Token ${authToken}`,
+        },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(reviewLinkSubmitErrorMessage({ status: res.status, data }))
+      setFeedback((current) => current.map((item) => (item.id === feedbackId ? data : item)))
+      cancelEditingFeedback()
+    } catch (saveError) {
+      setError(saveError.message || 'Could not update feedback.')
+    } finally {
+      setSavingFeedbackId(null)
+    }
+  }
+
+  const deleteFeedback = async (feedbackId) => {
+    if (!authToken) return
+    if (!window.confirm('Delete your feedback?')) return
+    setDeletingFeedbackId(feedbackId)
+    setError('')
+    try {
+      const res = await fetch(`/api/review/${token}/feedback/`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Token ${authToken}`,
+        },
+        body: JSON.stringify({ feedback_id: feedbackId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(reviewLinkSubmitErrorMessage({ status: res.status, data }))
+      setFeedback((current) => current.filter((item) => item.id !== feedbackId))
+      if (editingFeedbackId === feedbackId) cancelEditingFeedback()
+    } catch (deleteError) {
+      setError(deleteError.message || 'Could not delete feedback.')
+    } finally {
+      setDeletingFeedbackId(null)
+    }
   }
 
   const submit = async (event) => {
@@ -488,12 +564,62 @@ function ReviewPage({ reviewToken = '' }) {
                         </div>
                     {typeof item.timestamp_seconds === 'number' ? <span className="text-xs text-gray-500">@{fmtTimer(item.timestamp_seconds)}</span> : null}
                   </div>
+                  {item.authored_by_current_user ? (
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => beginEditingFeedback(item)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-white transition-colors">
+                        Edit
+                      </button>
+                      <button type="button" onClick={() => deleteFeedback(item.id)} disabled={deletingFeedbackId === item.id} className="text-xs text-red-600 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50 disabled:opacity-50 transition-colors">
+                        {deletingFeedbackId === item.id ? 'Deleting…' : 'Delete'}
+                      </button>
+                    </div>
+                  ) : null}
                   {item.feedback_video ? (
                     <div className="rounded-xl overflow-hidden bg-black">
                       <video src={videoUrl(item.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
                     </div>
                   ) : null}
                   {item.text ? <p className="text-sm text-gray-700 whitespace-pre-wrap">{item.text}</p> : null}
+                  {editingFeedbackId === item.id ? (
+                    <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-3">
+                      <textarea
+                        value={editingText}
+                        onChange={(event) => setEditingText(event.target.value)}
+                        rows={3}
+                        placeholder="Edit your comment"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
+                      />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <select
+                          value={editingCategory}
+                          onChange={(event) => setEditingCategory(event.target.value)}
+                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                        >
+                          {feedbackCategoryOptions().map((option) => (
+                            <option key={option.value || 'uncategorized'} value={option.value}>{option.label}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={editingTimestampSeconds}
+                          onChange={(event) => setEditingTimestampSeconds(event.target.value)}
+                          placeholder="Timestamp seconds"
+                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                        />
+                      </div>
+                      {item.feedback_video ? <p className="text-xs text-gray-500">Delete and repost if you want to replace the video.</p> : null}
+                      <div className="flex justify-end gap-2">
+                        <button type="button" onClick={cancelEditingFeedback} className="text-sm text-gray-600 border border-gray-200 rounded-lg px-4 py-2 hover:bg-gray-50 transition-colors">
+                          Cancel
+                        </button>
+                        <button type="button" onClick={() => saveFeedbackEdit(item.id)} disabled={savingFeedbackId === item.id} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2 hover:bg-gray-800 disabled:opacity-50 transition-colors">
+                          {savingFeedbackId === item.id ? 'Saving…' : 'Save'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>

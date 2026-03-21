@@ -426,7 +426,7 @@ def review_link_info(request, token):
 
 
 @csrf_exempt
-@api_view(['GET', 'POST'])
+@api_view(['GET', 'POST', 'PATCH', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def review_link_feedback(request, token):
     link, error_reason = _resolve_review_link(token)
@@ -440,6 +440,71 @@ def review_link_feedback(request, token):
             feedback = feedback.filter(review_request=review_request)
         feedback = feedback.order_by('timestamp_seconds', 'created_at')
         return Response(ReviewVideoFeedbackSerializer(feedback, many=True, context={'request': request, 'session': link.session}).data)
+
+    if request.method in {'PATCH', 'DELETE'}:
+        raw_feedback_id = request.data.get('feedback_id') or request.query_params.get('feedback_id')
+        try:
+            feedback_id = int(raw_feedback_id)
+        except (TypeError, ValueError):
+            return Response({'error': 'feedback_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        feedback = get_object_or_404(VideoFeedback, pk=feedback_id, session=link.session)
+        if review_request and feedback.review_request_id != review_request.id:
+            return Response({'error': 'Feedback not found'}, status=status.HTTP_404_NOT_FOUND)
+        if request.user != feedback.user and not request.user.is_staff:
+            return Response({'error': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
+
+        if request.method == 'DELETE':
+            feedback.delete()
+            return Response({'ok': True})
+
+        payload = request.data.copy()
+        if str(payload.get('timestamp_seconds', '')).strip() == '':
+            payload['timestamp_seconds'] = None
+
+        serializer = ReviewVideoFeedbackSerializer(
+            feedback,
+            data=payload,
+            partial=True,
+            context={'request': request, 'session': link.session},
+        )
+        serializer.is_valid(raise_exception=True)
+
+        next_text = str(serializer.validated_data.get('text', feedback.text) or '').strip()
+        next_category = serializer.validated_data.get('feedback_category', feedback.feedback_category)
+        next_timestamp = serializer.validated_data.get('timestamp_seconds', feedback.timestamp_seconds)
+
+        if 'timestamp_seconds' in request.data and str(request.data.get('timestamp_seconds', '')).strip() == '':
+            next_timestamp = None
+
+        next_video = feedback.feedback_video
+        if 'feedback_video' in request.FILES:
+            uploaded_video = request.FILES.get('feedback_video')
+            if uploaded_video and not str(uploaded_video.content_type or '').startswith('video/'):
+                return Response({'error': 'Only video files allowed'}, status=status.HTTP_400_BAD_REQUEST)
+            next_video = uploaded_video
+
+        remove_video = str(request.data.get('remove_feedback_video', '')).strip().lower() in {'1', 'true', 'yes'}
+        if remove_video:
+            next_video = None
+
+        if not next_video and not next_text:
+            return Response({'error': 'Add a comment or video first'}, status=status.HTTP_400_BAD_REQUEST)
+
+        feedback.text = next_text
+        feedback.feedback_category = next_category
+        feedback.timestamp_seconds = next_timestamp
+        if remove_video and feedback.feedback_video:
+            feedback.feedback_video.delete(save=False)
+            feedback.feedback_video = None
+        elif 'feedback_video' in request.FILES:
+            if feedback.feedback_video:
+                feedback.feedback_video.delete(save=False)
+            feedback.feedback_video = next_video
+        feedback.is_legacy_text_feedback = not bool(feedback.feedback_video)
+        feedback.save()
+
+        return Response(ReviewVideoFeedbackSerializer(feedback, context={'request': request, 'session': link.session}).data)
 
     if not link.allow_video_feedback:
         return Response(
