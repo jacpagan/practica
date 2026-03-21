@@ -470,8 +470,6 @@ def review_link_feedback(request, token):
         )
         serializer.is_valid(raise_exception=True)
 
-        next_text = str(serializer.validated_data.get('text', feedback.text) or '').strip()
-        next_category = serializer.validated_data.get('feedback_category', feedback.feedback_category)
         next_timestamp = serializer.validated_data.get('timestamp_seconds', feedback.timestamp_seconds)
 
         if 'timestamp_seconds' in request.data and str(request.data.get('timestamp_seconds', '')).strip() == '':
@@ -484,24 +482,17 @@ def review_link_feedback(request, token):
                 return Response({'error': 'Only video files allowed'}, status=status.HTTP_400_BAD_REQUEST)
             next_video = uploaded_video
 
-        remove_video = str(request.data.get('remove_feedback_video', '')).strip().lower() in {'1', 'true', 'yes'}
-        if remove_video:
-            next_video = None
+        if not next_video:
+            return Response({'error': 'Feedback video is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not next_video and not next_text:
-            return Response({'error': 'Add a comment or video first'}, status=status.HTTP_400_BAD_REQUEST)
-
-        feedback.text = next_text
-        feedback.feedback_category = next_category
+        feedback.text = ''
+        feedback.feedback_category = ''
         feedback.timestamp_seconds = next_timestamp
-        if remove_video and feedback.feedback_video:
-            feedback.feedback_video.delete(save=False)
-            feedback.feedback_video = None
-        elif 'feedback_video' in request.FILES:
+        if 'feedback_video' in request.FILES:
             if feedback.feedback_video:
                 feedback.feedback_video.delete(save=False)
             feedback.feedback_video = next_video
-        feedback.is_legacy_text_feedback = not bool(feedback.feedback_video)
+        feedback.is_legacy_text_feedback = False
         feedback.save()
 
         return Response(ReviewVideoFeedbackSerializer(feedback, context={'request': request, 'session': link.session}).data)
@@ -518,9 +509,8 @@ def review_link_feedback(request, token):
     serializer = ReviewVideoFeedbackSerializer(data=request.data, context={'request': request, 'session': link.session})
     serializer.is_valid(raise_exception=True)
     video_file = request.FILES.get('feedback_video')
-    text = str(serializer.validated_data.get('text', '')).strip()
-    if not video_file and not text:
-        return Response({'error': 'Add a comment or video first'}, status=status.HTTP_400_BAD_REQUEST)
+    if not video_file:
+        return Response({'error': 'Feedback video is required'}, status=status.HTTP_400_BAD_REQUEST)
     if video_file and not str(video_file.content_type or '').startswith('video/'):
         return Response({'error': 'Only video files allowed'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -528,11 +518,11 @@ def review_link_feedback(request, token):
         session=link.session,
         review_request=review_request,
         user=request.user,
-        feedback_category=serializer.validated_data.get('feedback_category', ''),
+        feedback_category='',
         timestamp_seconds=serializer.validated_data.get('timestamp_seconds'),
-        text=text,
+        text='',
         feedback_video=video_file,
-        is_legacy_text_feedback=not bool(video_file),
+        is_legacy_text_feedback=False,
     )
     if review_request:
         review_request.status = ReviewRequest.STATUS_RESPONDED

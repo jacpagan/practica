@@ -1008,13 +1008,13 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               <div className="rounded-xl border border-gray-200 bg-white px-4 py-4 space-y-3">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">Feedback</p>
-                  <p className="text-xs text-gray-500 mt-1">Anyone who logs in with your feedback link can leave a comment or video.</p>
+                  <p className="text-xs text-gray-500 mt-1">Anyone who logs in with your feedback link can leave a video response.</p>
                 </div>
 
                 {videoFeedback.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-gray-200 px-4 py-4 text-center">
                     <p className="text-sm text-gray-600">No feedback yet.</p>
-                    <p className="text-xs text-gray-400 mt-1">Share your feedback link when you want comments.</p>
+                    <p className="text-xs text-gray-400 mt-1">Share your feedback link when you want video responses.</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -1024,11 +1024,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="text-sm font-medium text-gray-900">{item.display_name || item.username || 'Viewer'}</p>
-                              {item.feedback_category ? (
-                                <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${feedbackCategoryTone(item.feedback_category)}`}>
-                                  {feedbackCategoryLabel(item.feedback_category)}
-                                </span>
-                              ) : null}
                             </div>
                             <p className="text-xs text-gray-400 mt-1">{new Date(item.created_at).toLocaleString()}</p>
                           </div>
@@ -1043,7 +1038,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                             <video src={videoUrl(item.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
                           </div>
                         ) : null}
-                        {item.text ? <p className="text-sm text-gray-600 whitespace-pre-wrap">{item.text}</p> : null}
                       </div>
                     ))}
                   </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { feedbackCategoryLabel, feedbackCategoryOptions, feedbackCategoryTone, fmtTimer, sessionVideoSources, videoUrl, isLikelyVideoFile, videoFileAccept } from '../utils'
+import { fmtTimer, sessionVideoSources, videoUrl, isLikelyVideoFile, videoFileAccept } from '../utils'
 import { useAuth } from '../auth'
 import VideoRecorder from './VideoRecorder'
 
@@ -54,18 +54,14 @@ function ReviewPage({ reviewToken = '' }) {
   const [responseFile, setResponseFile] = useState(null)
   const [responsePreviewUrl, setResponsePreviewUrl] = useState('')
   const [responseNotes, setResponseNotes] = useState('')
-  const [responseCategory, setResponseCategory] = useState('')
   const [selectedTimestampSeconds, setSelectedTimestampSeconds] = useState(null)
   const [durationSeconds, setDurationSeconds] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [editingFeedbackId, setEditingFeedbackId] = useState(null)
-  const [editingText, setEditingText] = useState('')
-  const [editingCategory, setEditingCategory] = useState('')
   const [editingTimestampSeconds, setEditingTimestampSeconds] = useState('')
   const [editingVideoFile, setEditingVideoFile] = useState(null)
   const [editingVideoPreviewUrl, setEditingVideoPreviewUrl] = useState('')
-  const [removeEditingVideo, setRemoveEditingVideo] = useState(false)
   const [savingFeedbackId, setSavingFeedbackId] = useState(null)
   const [deletingFeedbackId, setDeletingFeedbackId] = useState(null)
   const [templates, setTemplates] = useState([])
@@ -233,22 +229,16 @@ function ReviewPage({ reviewToken = '' }) {
 
   const beginEditingFeedback = (item) => {
     setEditingFeedbackId(item.id)
-    setEditingText(item.text || '')
-    setEditingCategory(item.feedback_category || '')
     setEditingTimestampSeconds(typeof item.timestamp_seconds === 'number' ? String(item.timestamp_seconds) : '')
     setEditingVideoFile(null)
-    setRemoveEditingVideo(false)
     replaceEditPreviewUrl('')
     setError('')
   }
 
   const cancelEditingFeedback = () => {
     setEditingFeedbackId(null)
-    setEditingText('')
-    setEditingCategory('')
     setEditingTimestampSeconds('')
     setEditingVideoFile(null)
-    setRemoveEditingVideo(false)
     replaceEditPreviewUrl('')
   }
 
@@ -256,15 +246,8 @@ function ReviewPage({ reviewToken = '' }) {
     const file = event.target.files?.[0]
     if (!file || !isLikelyVideoFile(file)) return
     setEditingVideoFile(file)
-    setRemoveEditingVideo(false)
     replaceEditPreviewUrl(URL.createObjectURL(file))
     event.target.value = ''
-  }
-
-  const removeEditVideoSelection = () => {
-    setEditingVideoFile(null)
-    setRemoveEditingVideo(true)
-    replaceEditPreviewUrl('')
   }
 
   const saveFeedbackEdit = async (feedbackId) => {
@@ -274,11 +257,8 @@ function ReviewPage({ reviewToken = '' }) {
     try {
       const payload = new FormData()
       payload.append('feedback_id', String(feedbackId))
-      payload.append('text', editingText)
-      payload.append('feedback_category', editingCategory)
       payload.append('timestamp_seconds', editingTimestampSeconds)
       if (editingVideoFile) payload.append('feedback_video', editingVideoFile)
-      if (removeEditingVideo) payload.append('remove_feedback_video', 'true')
       const res = await fetch(`/api/review/${token}/feedback/`, {
         method: 'PATCH',
         headers: {
@@ -328,8 +308,8 @@ function ReviewPage({ reviewToken = '' }) {
       setError('Please log in to send video feedback.')
       return
     }
-    if (!responseFile && !responseNotes.trim()) {
-      setError('Add a comment or video first.')
+    if (!responseFile) {
+      setError('Record or upload a feedback video first.')
       return
     }
 
@@ -337,9 +317,7 @@ function ReviewPage({ reviewToken = '' }) {
     setError('')
     try {
       const formData = new FormData()
-      if (responseFile) formData.append('feedback_video', responseFile)
-      if (responseCategory) formData.append('feedback_category', responseCategory)
-      if (responseNotes.trim()) formData.append('text', responseNotes.trim())
+      formData.append('feedback_video', responseFile)
       if (typeof selectedTimestampSeconds === 'number') formData.append('timestamp_seconds', selectedTimestampSeconds)
 
       const res = await fetch(`/api/review/${token}/feedback/`, {
@@ -357,8 +335,6 @@ function ReviewPage({ reviewToken = '' }) {
       }))
       setResponseFile(null)
       replaceOwnedPreviewUrl('')
-      setResponseNotes('')
-      setResponseCategory('')
       setSelectedTimestampSeconds(null)
     } catch (submitError) {
       setError(submitError.message || 'Could not send feedback.')
@@ -392,8 +368,8 @@ function ReviewPage({ reviewToken = '' }) {
       <main className="max-w-3xl mx-auto space-y-6">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Private feedback link</p>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">Leave feedback</h1>
-          <p className="text-sm text-gray-500 mt-2">Signed in as {user.display_name || user.username}. Leave a comment, a video, or both.</p>
+          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">Leave video feedback</h1>
+          <p className="text-sm text-gray-500 mt-2">Signed in as {user.display_name || user.username}.</p>
         </div>
 
         {reviewRequest ? (
@@ -445,8 +421,8 @@ function ReviewPage({ reviewToken = '' }) {
         {link?.allow_video_feedback && canRespondToRequest ? (
           <div className="rounded-xl border border-gray-200 p-4 space-y-4">
             <div>
-              <p className="text-sm font-semibold text-gray-900">Add feedback</p>
-              <p className="text-xs text-gray-500 mt-1">Leave a comment, add a video, or do both.</p>
+              <p className="text-sm font-semibold text-gray-900">Add your video</p>
+              <p className="text-xs text-gray-500 mt-1">Record or upload a video response.</p>
             </div>
 
             {false ? (
@@ -503,24 +479,7 @@ function ReviewPage({ reviewToken = '' }) {
             ) : null}
 
             <form onSubmit={submit} className="space-y-3">
-              <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Sending as</p>
-                <p className="text-sm font-medium text-gray-900 mt-1">{user.display_name || user.username}</p>
-              </div>
-
               <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-3 space-y-3">
-                <div>
-                  <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Category</label>
-                  <select
-                    value={responseCategory}
-                    onChange={(event) => setResponseCategory(event.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white"
-                  >
-                    {feedbackCategoryOptions().map((option) => (
-                      <option key={option.value || 'uncategorized'} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                </div>
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Timestamp</p>
@@ -556,14 +515,6 @@ function ReviewPage({ reviewToken = '' }) {
                 ) : null}
               </div>
 
-              <textarea
-                value={responseNotes}
-                onChange={(event) => setResponseNotes(event.target.value)}
-                rows={3}
-                placeholder="Optional note"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
-              />
-
               {error ? <p className="text-xs text-red-500">{error}</p> : null}
 
               <div className="flex justify-end">
@@ -592,11 +543,6 @@ function ReviewPage({ reviewToken = '' }) {
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="text-sm font-medium text-gray-900">{item.author_display_name || 'Viewer'}</p>
-                            {item.feedback_category ? (
-                              <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${feedbackCategoryTone(item.feedback_category)}`}>
-                                {feedbackCategoryLabel(item.feedback_category)}
-                              </span>
-                            ) : null}
                           </div>
                           <p className="text-xs text-gray-400 mt-1">{new Date(item.created_at).toLocaleString()}</p>
                         </div>
@@ -617,36 +563,17 @@ function ReviewPage({ reviewToken = '' }) {
                       <video src={videoUrl(item.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
                     </div>
                   ) : null}
-                  {item.text ? <p className="text-sm text-gray-700 whitespace-pre-wrap">{item.text}</p> : null}
                   {editingFeedbackId === item.id ? (
                     <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-3">
-                      <textarea
-                        value={editingText}
-                        onChange={(event) => setEditingText(event.target.value)}
-                        rows={3}
-                        placeholder="Edit your comment"
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={editingTimestampSeconds}
+                        onChange={(event) => setEditingTimestampSeconds(event.target.value)}
+                        placeholder="Timestamp seconds"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
                       />
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <select
-                          value={editingCategory}
-                          onChange={(event) => setEditingCategory(event.target.value)}
-                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
-                        >
-                          {feedbackCategoryOptions().map((option) => (
-                            <option key={option.value || 'uncategorized'} value={option.value}>{option.label}</option>
-                          ))}
-                        </select>
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={editingTimestampSeconds}
-                          onChange={(event) => setEditingTimestampSeconds(event.target.value)}
-                          placeholder="Timestamp seconds"
-                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
-                        />
-                      </div>
                       <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Video</p>
@@ -654,11 +581,6 @@ function ReviewPage({ reviewToken = '' }) {
                             <button type="button" onClick={() => editInputRef.current?.click()} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-white transition-colors">
                               {item.feedback_video || editingVideoFile ? 'Replace video' : 'Add video'}
                             </button>
-                            {(item.feedback_video || editingVideoFile) ? (
-                              <button type="button" onClick={removeEditVideoSelection} className="text-xs text-red-600 hover:text-red-700 transition-colors">
-                                Remove video
-                              </button>
-                            ) : null}
                           </div>
                         </div>
                         <input ref={editInputRef} type="file" accept={videoFileAccept()} className="hidden" onChange={pickEditFile} />
@@ -666,12 +588,12 @@ function ReviewPage({ reviewToken = '' }) {
                           <div className="rounded-xl overflow-hidden bg-black">
                             <video src={editingVideoPreviewUrl} controls playsInline className="w-full aspect-video bg-black" />
                           </div>
-                        ) : item.feedback_video && !removeEditingVideo ? (
+                        ) : item.feedback_video ? (
                           <div className="rounded-xl overflow-hidden bg-black">
                             <video src={videoUrl(item.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
                           </div>
                         ) : (
-                          <p className="text-xs text-gray-500">No video will be attached after saving.</p>
+                          <p className="text-xs text-gray-500">Add a replacement video before saving.</p>
                         )}
                       </div>
                       <div className="flex justify-end gap-2">

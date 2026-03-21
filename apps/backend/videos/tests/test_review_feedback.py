@@ -49,7 +49,7 @@ class ReviewFeedbackApiTests(APITestCase):
         response = self.client.get(f'/api/review/{self.link.token}/feedback/')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_private_link_feedback_requires_comment_or_video(self):
+    def test_private_link_feedback_requires_video(self):
         self._auth(self.reviewer)
         response = self.client.post(
             f'/api/review/{self.link.token}/feedback/',
@@ -57,28 +57,16 @@ class ReviewFeedbackApiTests(APITestCase):
             format='multipart',
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('comment or video', response.data['error'].lower())
-
-    def test_private_link_feedback_allows_text_only_comment(self):
-        self._auth(self.reviewer)
-        response = self.client.post(
-            f'/api/review/{self.link.token}/feedback/',
-            {'text': 'This bar rushes a little.'},
-            format='multipart',
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data['text'], 'This bar rushes a little.')
-        self.assertFalse(bool(response.data['feedback_video']))
+        self.assertIn('video is required', response.data['error'].lower())
 
     def test_feedback_author_can_update_own_feedback_via_review_link(self):
         feedback = VideoFeedback.objects.create(
             session=self.session,
             user=self.reviewer,
-            text='Original note',
+            text='',
             timestamp_seconds=12,
-            feedback_video='',
-            is_legacy_text_feedback=True,
+            feedback_video=self._video_file('original.mp4'),
+            is_legacy_text_feedback=False,
         )
         self._auth(self.reviewer)
 
@@ -86,26 +74,25 @@ class ReviewFeedbackApiTests(APITestCase):
             f'/api/review/{self.link.token}/feedback/',
             {
                 'feedback_id': feedback.id,
-                'text': 'Updated note',
                 'timestamp_seconds': 30,
-                'feedback_category': 'timing',
+                'feedback_video': self._video_file('updated.mp4'),
             },
-            format='json',
+            format='multipart',
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         feedback.refresh_from_db()
-        self.assertEqual(feedback.text, 'Updated note')
+        self.assertEqual(feedback.text, '')
         self.assertEqual(feedback.timestamp_seconds, 30)
-        self.assertEqual(feedback.feedback_category, 'timing')
+        self.assertTrue(bool(feedback.feedback_video))
 
     def test_feedback_author_can_delete_own_feedback_via_review_link(self):
         feedback = VideoFeedback.objects.create(
             session=self.session,
             user=self.reviewer,
-            text='Original note',
-            feedback_video='',
-            is_legacy_text_feedback=True,
+            text='',
+            feedback_video=self._video_file('original.mp4'),
+            is_legacy_text_feedback=False,
         )
         self._auth(self.reviewer)
 
@@ -125,16 +112,16 @@ class ReviewFeedbackApiTests(APITestCase):
         feedback = VideoFeedback.objects.create(
             session=self.session,
             user=self.reviewer,
-            text='Original note',
-            feedback_video='',
-            is_legacy_text_feedback=True,
+            text='',
+            feedback_video=self._video_file('original.mp4'),
+            is_legacy_text_feedback=False,
         )
         self._auth(other_user)
 
         response = self.client.patch(
             f'/api/review/{self.link.token}/feedback/',
-            {'feedback_id': feedback.id, 'text': 'Not yours'},
-            format='json',
+            {'feedback_id': feedback.id, 'feedback_video': self._video_file('not-yours.mp4')},
+            format='multipart',
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
