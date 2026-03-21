@@ -59,6 +59,7 @@ function ReviewPage({ reviewToken = '' }) {
   const [currentTime, setCurrentTime] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [editingFeedbackId, setEditingFeedbackId] = useState(null)
+  const [editingText, setEditingText] = useState('')
   const [editingTimestampSeconds, setEditingTimestampSeconds] = useState('')
   const [editingVideoFile, setEditingVideoFile] = useState(null)
   const [editingVideoPreviewUrl, setEditingVideoPreviewUrl] = useState('')
@@ -229,6 +230,7 @@ function ReviewPage({ reviewToken = '' }) {
 
   const beginEditingFeedback = (item) => {
     setEditingFeedbackId(item.id)
+    setEditingText(item.text || '')
     setEditingTimestampSeconds(typeof item.timestamp_seconds === 'number' ? String(item.timestamp_seconds) : '')
     setEditingVideoFile(null)
     replaceEditPreviewUrl('')
@@ -237,6 +239,7 @@ function ReviewPage({ reviewToken = '' }) {
 
   const cancelEditingFeedback = () => {
     setEditingFeedbackId(null)
+    setEditingText('')
     setEditingTimestampSeconds('')
     setEditingVideoFile(null)
     replaceEditPreviewUrl('')
@@ -257,6 +260,7 @@ function ReviewPage({ reviewToken = '' }) {
     try {
       const payload = new FormData()
       payload.append('feedback_id', String(feedbackId))
+      payload.append('text', editingText)
       payload.append('timestamp_seconds', editingTimestampSeconds)
       if (editingVideoFile) payload.append('feedback_video', editingVideoFile)
       const res = await fetch(`/api/review/${token}/feedback/`, {
@@ -318,6 +322,7 @@ function ReviewPage({ reviewToken = '' }) {
     try {
       const formData = new FormData()
       formData.append('feedback_video', responseFile)
+      if (responseNotes.trim()) formData.append('text', responseNotes.trim())
       if (typeof selectedTimestampSeconds === 'number') formData.append('timestamp_seconds', selectedTimestampSeconds)
 
       const res = await fetch(`/api/review/${token}/feedback/`, {
@@ -335,6 +340,7 @@ function ReviewPage({ reviewToken = '' }) {
       }))
       setResponseFile(null)
       replaceOwnedPreviewUrl('')
+      setResponseNotes('')
       setSelectedTimestampSeconds(null)
     } catch (submitError) {
       setError(submitError.message || 'Could not send feedback.')
@@ -422,7 +428,7 @@ function ReviewPage({ reviewToken = '' }) {
           <div className="rounded-xl border border-gray-200 p-4 space-y-4">
             <div>
               <p className="text-sm font-semibold text-gray-900">Add your video</p>
-              <p className="text-xs text-gray-500 mt-1">Record or upload a video response.</p>
+              <p className="text-xs text-gray-500 mt-1">Record or upload a video response. Add an optional caption if you want.</p>
             </div>
 
             {false ? (
@@ -515,6 +521,14 @@ function ReviewPage({ reviewToken = '' }) {
                 ) : null}
               </div>
 
+              <textarea
+                value={responseNotes}
+                onChange={(event) => setResponseNotes(event.target.value)}
+                rows={3}
+                placeholder="Optional caption"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
+              />
+
               {error ? <p className="text-xs text-red-500">{error}</p> : null}
 
               <div className="flex justify-end">
@@ -563,8 +577,16 @@ function ReviewPage({ reviewToken = '' }) {
                       <video src={videoUrl(item.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
                     </div>
                   ) : null}
+                  {item.text ? <p className="text-sm text-gray-700 whitespace-pre-wrap">{item.text}</p> : null}
                   {editingFeedbackId === item.id ? (
                     <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-3">
+                      <textarea
+                        value={editingText}
+                        onChange={(event) => setEditingText(event.target.value)}
+                        rows={3}
+                        placeholder="Optional caption"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
+                      />
                       <input
                         type="number"
                         min="0"

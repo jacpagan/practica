@@ -63,7 +63,7 @@ class ReviewFeedbackApiTests(APITestCase):
         feedback = VideoFeedback.objects.create(
             session=self.session,
             user=self.reviewer,
-            text='',
+            text='Original note',
             timestamp_seconds=12,
             feedback_video=self._video_file('original.mp4'),
             is_legacy_text_feedback=False,
@@ -74,6 +74,7 @@ class ReviewFeedbackApiTests(APITestCase):
             f'/api/review/{self.link.token}/feedback/',
             {
                 'feedback_id': feedback.id,
+                'text': 'Updated note',
                 'timestamp_seconds': 30,
                 'feedback_video': self._video_file('updated.mp4'),
             },
@@ -82,7 +83,7 @@ class ReviewFeedbackApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         feedback.refresh_from_db()
-        self.assertEqual(feedback.text, '')
+        self.assertEqual(feedback.text, 'Updated note')
         self.assertEqual(feedback.timestamp_seconds, 30)
         self.assertTrue(bool(feedback.feedback_video))
 
@@ -140,11 +141,13 @@ class ReviewFeedbackApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['author_display_name'], 'Helpful Reviewer')
+        self.assertEqual(response.data['text'], 'Watch the shoulder alignment here.')
         self.assertEqual(response.data['timestamp_seconds'], 25)
         self.assertTrue(bool(response.data['feedback_video']))
 
         feedback = VideoFeedback.objects.get(session=self.session)
         self.assertEqual(feedback.user, self.reviewer)
+        self.assertEqual(feedback.text, 'Watch the shoulder alignment here.')
         self.assertEqual(feedback.timestamp_seconds, 25)
         self.assertFalse(feedback.is_legacy_text_feedback)
 

@@ -1038,6 +1038,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                             <video src={videoUrl(item.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
                           </div>
                         ) : null}
+                        {item.text ? <p className="text-sm text-gray-600 whitespace-pre-wrap">{item.text}</p> : null}
                       </div>
                     ))}
                   </div>
