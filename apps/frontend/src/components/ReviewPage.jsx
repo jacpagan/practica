@@ -42,6 +42,7 @@ function ReviewPage({ reviewToken = '' }) {
   const { user, token: authToken } = useAuth()
   const videoRef = useRef(null)
   const inputRef = useRef(null)
+  const editInputRef = useRef(null)
   const [session, setSession] = useState(null)
   const [link, setLink] = useState(null)
   const [reviewRequest, setReviewRequest] = useState(null)
@@ -62,11 +63,15 @@ function ReviewPage({ reviewToken = '' }) {
   const [editingText, setEditingText] = useState('')
   const [editingCategory, setEditingCategory] = useState('')
   const [editingTimestampSeconds, setEditingTimestampSeconds] = useState('')
+  const [editingVideoFile, setEditingVideoFile] = useState(null)
+  const [editingVideoPreviewUrl, setEditingVideoPreviewUrl] = useState('')
+  const [removeEditingVideo, setRemoveEditingVideo] = useState(false)
   const [savingFeedbackId, setSavingFeedbackId] = useState(null)
   const [deletingFeedbackId, setDeletingFeedbackId] = useState(null)
   const [templates, setTemplates] = useState([])
   const [templatesLoading, setTemplatesLoading] = useState(false)
   const ownedPreviewUrlRef = useRef('')
+  const editPreviewUrlRef = useRef('')
   const playbackSources = useMemo(() => sessionVideoSources(session), [session])
   const [playbackSourceIndex, setPlaybackSourceIndex] = useState(0)
   const [playbackFailed, setPlaybackFailed] = useState(false)
@@ -83,7 +88,19 @@ function ReviewPage({ reviewToken = '' }) {
     setResponsePreviewUrl(nextUrl)
   }
 
-  useEffect(() => () => replaceOwnedPreviewUrl(''), [])
+  const replaceEditPreviewUrl = (nextUrl = '') => {
+    if (editPreviewUrlRef.current) {
+      try { URL.revokeObjectURL(editPreviewUrlRef.current) } catch {}
+      editPreviewUrlRef.current = ''
+    }
+    if (nextUrl) editPreviewUrlRef.current = nextUrl
+    setEditingVideoPreviewUrl(nextUrl)
+  }
+
+  useEffect(() => () => {
+    replaceOwnedPreviewUrl('')
+    replaceEditPreviewUrl('')
+  }, [])
 
   useEffect(() => {
     setPlaybackSourceIndex(0)
@@ -219,6 +236,9 @@ function ReviewPage({ reviewToken = '' }) {
     setEditingText(item.text || '')
     setEditingCategory(item.feedback_category || '')
     setEditingTimestampSeconds(typeof item.timestamp_seconds === 'number' ? String(item.timestamp_seconds) : '')
+    setEditingVideoFile(null)
+    setRemoveEditingVideo(false)
+    replaceEditPreviewUrl('')
     setError('')
   }
 
@@ -227,6 +247,24 @@ function ReviewPage({ reviewToken = '' }) {
     setEditingText('')
     setEditingCategory('')
     setEditingTimestampSeconds('')
+    setEditingVideoFile(null)
+    setRemoveEditingVideo(false)
+    replaceEditPreviewUrl('')
+  }
+
+  const pickEditFile = (event) => {
+    const file = event.target.files?.[0]
+    if (!file || !isLikelyVideoFile(file)) return
+    setEditingVideoFile(file)
+    setRemoveEditingVideo(false)
+    replaceEditPreviewUrl(URL.createObjectURL(file))
+    event.target.value = ''
+  }
+
+  const removeEditVideoSelection = () => {
+    setEditingVideoFile(null)
+    setRemoveEditingVideo(true)
+    replaceEditPreviewUrl('')
   }
 
   const saveFeedbackEdit = async (feedbackId) => {
@@ -234,19 +272,19 @@ function ReviewPage({ reviewToken = '' }) {
     setSavingFeedbackId(feedbackId)
     setError('')
     try {
-      const payload = {
-        feedback_id: feedbackId,
-        text: editingText,
-        feedback_category: editingCategory,
-        timestamp_seconds: editingTimestampSeconds,
-      }
+      const payload = new FormData()
+      payload.append('feedback_id', String(feedbackId))
+      payload.append('text', editingText)
+      payload.append('feedback_category', editingCategory)
+      payload.append('timestamp_seconds', editingTimestampSeconds)
+      if (editingVideoFile) payload.append('feedback_video', editingVideoFile)
+      if (removeEditingVideo) payload.append('remove_feedback_video', 'true')
       const res = await fetch(`/api/review/${token}/feedback/`, {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json',
           Authorization: `Token ${authToken}`,
         },
-        body: JSON.stringify(payload),
+        body: payload,
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(reviewLinkSubmitErrorMessage({ status: res.status, data }))
@@ -609,7 +647,33 @@ function ReviewPage({ reviewToken = '' }) {
                           className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
                         />
                       </div>
-                      {item.feedback_video ? <p className="text-xs text-gray-500">Delete and repost if you want to replace the video.</p> : null}
+                      <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Video</p>
+                          <div className="flex items-center gap-2">
+                            <button type="button" onClick={() => editInputRef.current?.click()} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-white transition-colors">
+                              {item.feedback_video || editingVideoFile ? 'Replace video' : 'Add video'}
+                            </button>
+                            {(item.feedback_video || editingVideoFile) ? (
+                              <button type="button" onClick={removeEditVideoSelection} className="text-xs text-red-600 hover:text-red-700 transition-colors">
+                                Remove video
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+                        <input ref={editInputRef} type="file" accept={videoFileAccept()} className="hidden" onChange={pickEditFile} />
+                        {editingVideoPreviewUrl ? (
+                          <div className="rounded-xl overflow-hidden bg-black">
+                            <video src={editingVideoPreviewUrl} controls playsInline className="w-full aspect-video bg-black" />
+                          </div>
+                        ) : item.feedback_video && !removeEditingVideo ? (
+                          <div className="rounded-xl overflow-hidden bg-black">
+                            <video src={videoUrl(item.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-500">No video will be attached after saving.</p>
+                        )}
+                      </div>
                       <div className="flex justify-end gap-2">
                         <button type="button" onClick={cancelEditingFeedback} className="text-sm text-gray-600 border border-gray-200 rounded-lg px-4 py-2 hover:bg-gray-50 transition-colors">
                           Cancel
