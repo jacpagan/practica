@@ -1,0 +1,52 @@
+name: Recover Prod EC2
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Recovery action"
+        required: true
+        default: "reboot"
+
+jobs:
+  recover:
+    name: Recover production EC2
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Describe instance before action
+        env:
+          INSTANCE_ID: ${{ secrets.INSTANCE_ID }}
+        run: |
+          aws ec2 describe-instances --instance-ids "$INSTANCE_ID" --query 'Reservations[0].Instances[0].{State:State.Name,PublicIp:PublicIpAddress,PrivateIp:PrivateIpAddress,LaunchTime:LaunchTime}' --output table
+          aws ec2 describe-instance-status --instance-ids "$INSTANCE_ID" --include-all-instances --output table || true
+
+      - name: Reboot instance
+        if: ${{ github.event.inputs.action == 'reboot' }}
+        env:
+          INSTANCE_ID: ${{ secrets.INSTANCE_ID }}
+        run: aws ec2 reboot-instances --instance-ids "$INSTANCE_ID"
+
+      - name: Wait for instance checks
+        env:
+          INSTANCE_ID: ${{ secrets.INSTANCE_ID }}
+        run: |
+          sleep 15
+          aws ec2 wait instance-status-ok --instance-ids "$INSTANCE_ID"
+          aws ec2 describe-instance-status --instance-ids "$INSTANCE_ID" --include-all-instances --output table
+
+      - name: Public health check
+        run: |
+          for _ in $(seq 1 24); do
+            curl -fsS --max-time 10 https://practica.jpagan.com/health/ && exit 0 || sleep 5
+          done
+          exit 1
