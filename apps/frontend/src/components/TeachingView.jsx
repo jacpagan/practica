@@ -36,7 +36,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
   const loadInbox = useCallback(async () => {
     setRequestsLoading(true)
     try {
-      const res = await fetch('/api/teacher/inbox/', { headers: authHeaders })
+      const res = await fetch('/api/inbox/', { headers: authHeaders })
       if (!res.ok) throw new Error('inbox')
       const data = await res.json()
       setRequests(Array.isArray(data) ? data : [])
@@ -50,7 +50,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
   const loadRoster = useCallback(async () => {
     setRosterLoading(true)
     try {
-      const res = await fetch('/api/teacher/roster/', { headers: authHeaders })
+      const res = await fetch('/api/connections/', { headers: authHeaders })
       if (!res.ok) throw new Error('roster')
       const data = await res.json()
       setRoster(Array.isArray(data) ? data : [])
@@ -64,7 +64,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
   const loadTemplates = useCallback(async () => {
     setTemplatesLoading(true)
     try {
-      const res = await fetch('/api/teacher/templates/', { headers: authHeaders })
+      const res = await fetch('/api/feedback-templates/', { headers: authHeaders })
       if (!res.ok) throw new Error('templates')
       const data = await res.json()
       setTemplates(Array.isArray(data) ? data : [])
@@ -89,7 +89,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
     }
     setSavingTemplate(true)
     try {
-      const res = await fetch('/api/teacher/templates/', {
+      const res = await fetch('/api/feedback-templates/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ title: templateTitle.trim(), text: templateText.trim() }),
@@ -109,7 +109,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
 
   const deleteTemplate = async (templateId) => {
     try {
-      const res = await fetch(`/api/teacher/templates/${templateId}/`, {
+      const res = await fetch(`/api/feedback-templates/${templateId}/`, {
         method: 'DELETE',
         headers: authHeaders,
       })

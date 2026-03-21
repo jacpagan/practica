@@ -36,7 +36,7 @@ from .serializers import (
     SessionSerializer, SessionListSerializer,
     ChapterSerializer,
     PublicSessionSerializer, ReviewLinkSerializer, ReviewVideoFeedbackSerializer,
-    ReviewRequestSerializer, TeacherRosterStudentSerializer, FeedbackTemplateSerializer,
+    ReviewRequestSerializer, MemberConnectionSerializer, FeedbackTemplateSerializer,
 )
 from .services.media_pipeline import enqueue_session_processing, enqueue_local_session_transcode, apply_processing_update
 
@@ -543,7 +543,7 @@ def review_link_feedback(request, token):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def teacher_inbox(request):
+def feedback_inbox(request):
     qs = ReviewRequest.objects.filter(teacher=request.user).select_related(
         'student', 'student__profile', 'teacher', 'teacher__profile', 'session', 'review_link'
     ).order_by('-created_at')
@@ -555,16 +555,16 @@ def teacher_inbox(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def teacher_roster(request):
+def member_connections(request):
     memberships = TeacherRosterMembership.objects.filter(teacher=request.user, is_active=True).select_related(
         'student', 'student__profile'
     ).order_by('student__username')
-    return Response(TeacherRosterStudentSerializer(memberships, many=True, context={'request': request}).data)
+    return Response(MemberConnectionSerializer(memberships, many=True, context={'request': request}).data)
 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def teacher_insights(request):
+def feedback_insights(request):
     review_requests = ReviewRequest.objects.filter(teacher=request.user).select_related('student', 'student__profile')
     feedback_items = VideoFeedback.objects.filter(review_request__teacher=request.user).select_related('review_request', 'review_request__student', 'review_request__student__profile')
 
@@ -625,7 +625,7 @@ def teacher_insights(request):
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
-def teacher_templates(request):
+def feedback_templates(request):
     if request.method == 'GET':
         templates = FeedbackTemplate.objects.filter(teacher=request.user).order_by('title', '-updated_at')
         return Response(FeedbackTemplateSerializer(templates, many=True, context={'request': request}).data)
@@ -638,7 +638,7 @@ def teacher_templates(request):
 
 @api_view(['PATCH', 'DELETE'])
 @permission_classes([IsAuthenticated])
-def teacher_template_detail(request, template_id):
+def feedback_template_detail(request, template_id):
     template = get_object_or_404(FeedbackTemplate, pk=template_id, teacher=request.user)
     if request.method == 'DELETE':
         template.delete()
@@ -648,6 +648,13 @@ def teacher_template_detail(request, template_id):
     serializer.is_valid(raise_exception=True)
     serializer.save()
     return Response(serializer.data)
+
+
+teacher_inbox = feedback_inbox
+teacher_roster = member_connections
+teacher_insights = feedback_insights
+teacher_templates = feedback_templates
+teacher_template_detail = feedback_template_detail
 
 
 @method_decorator(csrf_exempt, name='dispatch')

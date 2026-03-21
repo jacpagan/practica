@@ -150,7 +150,7 @@ function ReviewPage({ reviewToken = '' }) {
     const loadTemplates = async () => {
       setTemplatesLoading(true)
       try {
-        const res = await fetch('/api/teacher/templates/', { headers: { Authorization: `Token ${authToken}` } })
+        const res = await fetch('/api/feedback-templates/', { headers: { Authorization: `Token ${authToken}` } })
         if (!res.ok) throw new Error('templates')
         const data = await res.json()
         if (!cancelled) setTemplates(Array.isArray(data) ? data : [])
@@ -181,7 +181,7 @@ function ReviewPage({ reviewToken = '' }) {
     if (!title || !title.trim()) return
 
     try {
-      const res = await fetch('/api/teacher/templates/', {
+      const res = await fetch('/api/feedback-templates/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

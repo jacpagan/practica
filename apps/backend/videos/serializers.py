@@ -494,8 +494,9 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class TeacherRosterStudentSerializer(serializers.ModelSerializer):
+class MemberConnectionSerializer(serializers.ModelSerializer):
     student = UserSummarySerializer(read_only=True)
+    member = UserSummarySerializer(source='student', read_only=True)
     pending_review_count = serializers.SerializerMethodField()
     total_review_count = serializers.SerializerMethodField()
     last_request_at = serializers.SerializerMethodField()
@@ -503,7 +504,7 @@ class TeacherRosterStudentSerializer(serializers.ModelSerializer):
     class Meta:
         model = TeacherRosterMembership
         fields = [
-            'id', 'student', 'is_active',
+            'id', 'student', 'member', 'is_active',
             'pending_review_count', 'total_review_count', 'last_request_at',
             'created_at', 'updated_at',
         ]
@@ -534,6 +535,9 @@ class TeacherRosterStudentSerializer(serializers.ModelSerializer):
             return None
         last_request = ReviewRequest.objects.filter(teacher=teacher, student=obj.student).order_by('-created_at').first()
         return last_request.created_at if last_request else None
+
+
+TeacherRosterStudentSerializer = MemberConnectionSerializer
 
 
 class FeedbackTemplateSerializer(serializers.ModelSerializer):
