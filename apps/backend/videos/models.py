@@ -48,6 +48,7 @@ class Session(models.Model):
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sessions', null=True, blank=True)
     title = models.CharField(max_length=200)
+    practice_series = models.CharField(max_length=200, blank=True, db_index=True)
     description = models.TextField(blank=True)
     reference_title = models.CharField(max_length=200, blank=True)
     reference_url = models.URLField(blank=True)
@@ -117,6 +118,7 @@ class MultipartSessionUpload(models.Model):
     session = models.ForeignKey(Session, on_delete=models.SET_NULL, null=True, blank=True, related_name='multipart_upload_records')
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_INITIATED)
     title = models.CharField(max_length=200)
+    practice_series = models.CharField(max_length=200, blank=True)
     description = models.TextField(blank=True)
     reference_title = models.CharField(max_length=200, blank=True)
     reference_url = models.URLField(blank=True)

@@ -83,7 +83,7 @@ const writeLastTeacher = (teacher) => {
   } catch {}
 }
 
-function SessionDetail({ session: initialSession, token, onBack, onOpenReviewRequest, initialReviewRequestDraft = null, onReviewRequestDraftCleared, onSessionUpdate, onSessionDelete, justUploaded = false, onRecordAnother }) {
+function SessionDetail({ session: initialSession, token, onBack, onOpenReviewRequest, initialReviewRequestDraft = null, onReviewRequestDraftCleared, onSessionUpdate, onSessionDelete, justUploaded = false, onRecordAnother, onOpenSeries }) {
   const toast = useToast()
   const confirm = useConfirm()
   const videoRef = useRef(null)
@@ -96,6 +96,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const [retryingProcessing, setRetryingProcessing] = useState(false)
   const [revokingShare, setRevokingShare] = useState(false)
   const [editTitle, setEditTitle] = useState('')
+  const [editPracticeSeries, setEditPracticeSeries] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [activeReviewLink, setActiveReviewLink] = useState(initialSession?.active_review_link || null)
   const [reviewRequests, setReviewRequests] = useState([])
@@ -271,6 +272,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
 
   const startEditing = () => {
     setEditTitle(session.title || '')
+    setEditPracticeSeries(session.practice_series || '')
     setEditDescription(session.description || '')
     setEditing(true)
   }
@@ -292,7 +294,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       const res = await fetch(`/api/sessions/${session.id}/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({ title: editTitle.trim(), description: editDescription.trim() }),
+        body: JSON.stringify({ title: editTitle.trim(), practice_series: editPracticeSeries.trim(), description: editDescription.trim() }),
       })
       if (!res.ok) throw new Error('save')
       const data = await res.json()
@@ -585,6 +587,13 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 onChange={(event) => setEditTitle(event.target.value)}
                 className="w-full text-lg font-semibold text-gray-900 border-b border-gray-200 focus:border-gray-400 focus:outline-none pb-1"
               />
+              <input
+                type="text"
+                value={editPracticeSeries}
+                onChange={(event) => setEditPracticeSeries(event.target.value)}
+                placeholder="Practice thread"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+              />
               <textarea
                 value={editDescription}
                 onChange={(event) => setEditDescription(event.target.value)}
@@ -607,6 +616,14 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 <div>
                   <h1 className="text-lg font-semibold text-gray-900">{session.title}</h1>
                   <p className="text-xs text-gray-400 mt-1">Private library</p>
+                  {session.practice_series ? (
+                    <div className="flex items-center gap-2 flex-wrap mt-2">
+                      <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{session.practice_series}</span>
+                      <button type="button" onClick={() => onOpenSeries?.(session.practice_series)} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
+                        View thread
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               </div>
 

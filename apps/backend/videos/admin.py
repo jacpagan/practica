@@ -25,8 +25,8 @@ class ProfileAdmin(admin.ModelAdmin):
 
 @admin.register(Session)
 class SessionAdmin(admin.ModelAdmin):
-    list_display = ['title', 'user', 'processing_status', 'recorded_at']
-    search_fields = ['title', 'description']
+    list_display = ['title', 'practice_series', 'user', 'processing_status', 'recorded_at']
+    search_fields = ['title', 'practice_series', 'description']
     list_filter = ['user', 'processing_status']
     inlines = [ChapterInline, VideoFeedbackInline]
 
@@ -57,7 +57,7 @@ class SessionAssetAdmin(admin.ModelAdmin):
 class MultipartSessionUploadAdmin(admin.ModelAdmin):
     list_display = ['id', 'user', 'status', 'size_bytes', 'original_filename', 'created_at', 'expires_at', 'completed_at']
     list_filter = ['status']
-    search_fields = ['user__username', 'original_filename', 's3_key', 's3_upload_id']
+    search_fields = ['user__username', 'title', 'practice_series', 'original_filename', 's3_key', 's3_upload_id']
     raw_id_fields = ['user', 'session']
 
 

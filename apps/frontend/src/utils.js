@@ -188,6 +188,7 @@ const multipartFingerprint = ({ payload, videoFile }) => {
     videoFile?.size || 0,
     videoFile?.lastModified || 0,
     payload?.title || '',
+    payload?.practice_series || '',
     payload?.reference_title || '',
     payload?.reference_url || '',
     payload?.duration_seconds || '',
@@ -627,6 +628,7 @@ export const createSessionUpload = async ({ token, payload, videoFile, onProgres
 
     const fd = new FormData()
     fd.append('title', payload.title || '')
+    fd.append('practice_series', payload.practice_series || '')
     fd.append('description', payload.description || '')
     fd.append('reference_title', payload.reference_title || '')
     fd.append('reference_url', payload.reference_url || '')

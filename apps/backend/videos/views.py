@@ -908,6 +908,7 @@ class SessionViewSet(viewsets.ModelViewSet):
             user=request.user,
             status=MultipartSessionUpload.STATUS_INITIATED,
             title=title,
+            practice_series=str(request.data.get('practice_series', '')).strip(),
             description=str(request.data.get('description', '')).strip(),
             reference_title=str(request.data.get('reference_title', '')).strip(),
             reference_url=str(request.data.get('reference_url', '')).strip(),
@@ -1063,6 +1064,7 @@ class SessionViewSet(viewsets.ModelViewSet):
             session = Session.objects.create(
                 user=request.user,
                 title=upload.title,
+                practice_series=upload.practice_series,
                 description=upload.description,
                 reference_title=upload.reference_title,
                 reference_url=upload.reference_url,

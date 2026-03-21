@@ -8,6 +8,7 @@ import ReviewPage from './components/ReviewPage'
 import SessionUpload from './components/SessionUpload'
 import SessionDetail from './components/SessionDetail'
 import LibraryView from './components/LibraryView'
+import SeriesView from './components/SeriesView'
 
 const parseRoute = (pathname) => {
   if (pathname === '/' || pathname === '/library') {
@@ -16,14 +17,17 @@ const parseRoute = (pathname) => {
   if (pathname === '/upload') return { view: 'upload', sessionId: null }
   const reviewMatch = pathname.match(/^\/r\/(.+)$/)
   if (reviewMatch) return { view: 'review', token: reviewMatch[1], sessionId: null }
+  const seriesMatch = pathname.match(/^\/series\/(.+)$/)
+  if (seriesMatch) return { view: 'series', sessionId: null, seriesName: decodeURIComponent(seriesMatch[1]) }
   const sessionMatch = pathname.match(/^\/sessions\/(\d+)$/)
   if (sessionMatch) return { view: 'detail', sessionId: Number(sessionMatch[1]) }
   return { view: 'library', sessionId: null }
 }
 
-const routePath = ({ view, sessionId, token }) => {
+const routePath = ({ view, sessionId, token, seriesName }) => {
   if (view === 'library') return '/library'
   if (view === 'upload') return '/upload'
+  if (view === 'series' && seriesName) return `/series/${encodeURIComponent(seriesName)}`
   if (view === 'review' && token) return `/r/${token}`
   if (view === 'detail' && sessionId) return `/sessions/${sessionId}`
   return '/library'
@@ -36,20 +40,23 @@ function AppContent() {
   const initialRoute = useMemo(() => parseRoute(window.location.pathname), [])
   const [view, setView] = useState(initialRoute.view)
   const [routeSessionId, setRouteSessionId] = useState(initialRoute.sessionId)
+  const [routeSeriesName, setRouteSeriesName] = useState(initialRoute.seriesName || '')
   const [reviewToken, setReviewToken] = useState(initialRoute.token || '')
   const [selectedSession, setSelectedSession] = useState(null)
   const [sessions, setSessions] = useState([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
-  const [detailReturnView, setDetailReturnView] = useState('library')
+  const [detailReturnRoute, setDetailReturnRoute] = useState({ view: 'library', sessionId: null, seriesName: '' })
   const [openRecorderOnUpload, setOpenRecorderOnUpload] = useState(false)
   const [justUploadedSessionId, setJustUploadedSessionId] = useState(null)
   const [pendingFollowUpRequestDraft, setPendingFollowUpRequestDraft] = useState(null)
+  const [pendingPracticeSeries, setPendingPracticeSeries] = useState(initialRoute.seriesName || '')
   const uploadGuardRef = useRef({ active: false, abort: null })
   const currentPathRef = useRef(routePath(initialRoute))
 
   const applyRoute = useCallback((nextRoute, { replace = false } = {}) => {
     setView(nextRoute.view)
     setRouteSessionId(nextRoute.sessionId ?? null)
+    setRouteSeriesName(nextRoute.seriesName || '')
     setReviewToken(nextRoute.token || '')
     const path = routePath(nextRoute)
     if (path !== window.location.pathname) {
@@ -92,8 +99,8 @@ function AppContent() {
   }, [])
 
   useEffect(() => {
-    currentPathRef.current = routePath({ view, sessionId: routeSessionId, token: reviewToken })
-  }, [reviewToken, routeSessionId, view])
+    currentPathRef.current = routePath({ view, sessionId: routeSessionId, token: reviewToken, seriesName: routeSeriesName })
+  }, [reviewToken, routeSessionId, routeSeriesName, view])
 
   useEffect(() => {
     const onPopState = () => {
@@ -157,24 +164,25 @@ function AppContent() {
     }
   }, [navigate, token, toast])
 
-  const openSession = useCallback((session, returnView = view) => {
+  const openSession = useCallback((session, returnRoute = { view, sessionId: null, seriesName: routeSeriesName }) => {
     if (!session?.id) return
-    setDetailReturnView(returnView)
+    setDetailReturnRoute(returnRoute)
     setOpenRecorderOnUpload(false)
     openSessionById(session.id)
-  }, [openSessionById, view])
+  }, [openSessionById, routeSeriesName, view])
 
   const goBack = useCallback(() => {
-    navigate({ view: detailReturnView || 'library', sessionId: null })
+    navigate(detailReturnRoute?.view ? detailReturnRoute : { view: 'library', sessionId: null, seriesName: '' })
     setSelectedSession(null)
     setJustUploadedSessionId(null)
-  }, [detailReturnView, navigate])
+  }, [detailReturnRoute, navigate])
 
   const handleUploadComplete = useCallback((session) => {
     setSessions((current) => [session, ...current.filter((item) => item.id !== session.id)])
     setSelectedSession(session)
     setJustUploadedSessionId(session.id)
     setOpenRecorderOnUpload(false)
+    setPendingPracticeSeries('')
     navigate({ view: 'detail', sessionId: session.id })
   }, [navigate])
 
@@ -183,12 +191,13 @@ function AppContent() {
     setJustUploadedSessionId(null)
     setOpenRecorderOnUpload(true)
     setPendingFollowUpRequestDraft(draft || null)
+    setPendingPracticeSeries(String(draft?.practiceSeries || '').trim())
     navigate({ view: 'upload', sessionId: null })
   }, [navigate])
 
   useEffect(() => {
     if (!user) return
-    if (view === 'library') loadSessions()
+    if (view === 'library' || view === 'series') loadSessions()
   }, [user, view, loadSessions])
 
   useEffect(() => {
@@ -269,7 +278,21 @@ function AppContent() {
             sessions={sessions}
             sessionsLoading={sessionsLoading}
             onOpenSession={openSession}
+            onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
             onCreateVideo={() => navigate({ view: 'upload', sessionId: null })}
+          />
+        )}
+
+        {view === 'series' && (
+          <SeriesView
+            seriesName={routeSeriesName}
+            sessions={sessions}
+            onBack={() => navigate({ view: 'library', sessionId: null })}
+            onOpenSession={openSession}
+            onCreateVideo={() => {
+              setPendingPracticeSeries(routeSeriesName)
+              navigate({ view: 'upload', sessionId: null })
+            }}
           />
         )}
 
@@ -277,8 +300,15 @@ function AppContent() {
           <SessionUpload
             token={token}
             onComplete={handleUploadComplete}
-            onCancel={({ bypassUploadGuard = false } = {}) => navigate({ view: 'library', sessionId: null }, { bypassUploadGuard })}
+            onCancel={({ bypassUploadGuard = false } = {}) => navigate(
+              pendingPracticeSeries
+                ? { view: 'series', sessionId: null, seriesName: pendingPracticeSeries }
+                : { view: 'library', sessionId: null },
+              { bypassUploadGuard },
+            )}
             initialRecorderOpen={openRecorderOnUpload}
+            initialPracticeSeries={pendingPracticeSeries}
+            onPracticeSeriesHandled={() => setPendingPracticeSeries('')}
             onRecorderOpenHandled={() => setOpenRecorderOnUpload(false)}
             onUploadGuardChange={setUploadNavigationGuard}
           />
@@ -300,7 +330,8 @@ function AppContent() {
               navigate({ view: 'review', token: requestItem.review_link.token, sessionId: null })
             }}
             justUploaded={selectedSession.id === justUploadedSessionId}
-            onRecordAnother={handleRecordAnother}
+            onRecordAnother={() => handleRecordAnother({ practiceSeries: selectedSession.practice_series || '' })}
+            onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
             onSessionUpdate={(sessionData) => {
               setSelectedSession(sessionData)
               setSessions((current) => current.map((item) => (

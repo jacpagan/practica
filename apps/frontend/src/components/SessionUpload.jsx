@@ -4,17 +4,22 @@ import { createSessionUpload, isLikelyVideoFile, uploadErrorMessage, videoFileAc
 import VideoRecorder from './VideoRecorder'
 import { useConfirm } from './ConfirmDialog'
 
+const LAST_SERIES_KEY = 'practica.last_series.v1'
+
 function SessionUpload({
   token,
   onComplete,
   onCancel,
   initialRecorderOpen = false,
+  initialPracticeSeries = '',
+  onPracticeSeriesHandled,
   onRecorderOpenHandled,
   onUploadGuardChange,
 }) {
   const toast = useToast()
   const confirm = useConfirm()
   const [title, setTitle] = useState('')
+  const [practiceSeries, setPracticeSeries] = useState('')
   const [description, setDescription] = useState('')
   const [videoFile, setVideoFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState('')
@@ -39,6 +44,19 @@ function SessionUpload({
   }
 
   useEffect(() => () => replaceOwnedPreviewUrl(''), [])
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(LAST_SERIES_KEY)
+      if (saved) setPracticeSeries(saved)
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    if (!initialPracticeSeries) return
+    setPracticeSeries(initialPracticeSeries)
+    onPracticeSeriesHandled?.()
+  }, [initialPracticeSeries, onPracticeSeriesHandled])
 
   const requestUploadAbort = useCallback(() => {
     abortRequestedRef.current = true
@@ -167,6 +185,7 @@ function SessionUpload({
         token,
         payload: {
           title: title.trim(),
+          practice_series: practiceSeries.trim(),
           description: description.trim(),
         },
         videoFile,
@@ -180,6 +199,9 @@ function SessionUpload({
       }
 
       success = true
+      try {
+        if (practiceSeries.trim()) window.localStorage.setItem(LAST_SERIES_KEY, practiceSeries.trim())
+      } catch {}
       onUploadGuardChange?.({ active: false, abort: null })
       toast.success('Saved to your private library')
       onComplete?.({ ...res.data, local_preview_url: previewUrl || '' })
@@ -260,6 +282,18 @@ function SessionUpload({
               </div>
             </div>
           ) : null}
+
+          <div>
+            <label className="block text-sm text-gray-600 mb-1.5">Practice thread</label>
+            <input
+              type="text"
+              value={practiceSeries}
+              onChange={(event) => setPracticeSeries(event.target.value)}
+              disabled={isUploading}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+              placeholder="Optional, like Singles @ 120 BPM"
+            />
+          </div>
 
           <div>
             <label className="block text-sm text-gray-600 mb-1.5">Title</label>

@@ -169,7 +169,7 @@ class SessionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Session
-        fields = ['id', 'title', 'description', 'video_file',
+        fields = ['id', 'title', 'practice_series', 'description', 'video_file',
                   'reference_title', 'reference_url',
                   'duration_seconds', 'recorded_at', 'created_at', 'updated_at',
                   'processing_status', 'processing_error',
@@ -230,7 +230,7 @@ class SessionListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Session
-        fields = ['id', 'title', 'description', 'video_file',
+        fields = ['id', 'title', 'practice_series', 'description', 'video_file',
                   'duration_seconds', 'recorded_at', 'created_at',
                   'processing_status', 'processing_error',
                   'assets', 'video_feedback_count',
@@ -260,7 +260,7 @@ class PublicSessionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Session
-        fields = ['id', 'title', 'description', 'video_file', 'duration_seconds', 'recorded_at', 'assets', 'processing_status', 'processing_error']
+        fields = ['id', 'title', 'practice_series', 'description', 'video_file', 'duration_seconds', 'recorded_at', 'assets', 'processing_status', 'processing_error']
         read_only_fields = fields
 
 
