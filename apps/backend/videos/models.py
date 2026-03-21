@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+import secrets
 
 
 class Profile(models.Model):
@@ -9,6 +10,37 @@ class Profile(models.Model):
 
     def __str__(self):
         return self.display_name or self.user.username
+
+
+class SignupInviteCode(models.Model):
+    code = models.CharField(max_length=64, unique=True, blank=True)
+    label = models.CharField(max_length=120, blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_signup_invite_codes')
+    is_active = models.BooleanField(default=True)
+    max_uses = models.PositiveIntegerField(default=1)
+    use_count = models.PositiveIntegerField(default=0)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            while True:
+                candidate = secrets.token_urlsafe(8).replace('-', '').replace('_', '')[:12].upper()
+                if not SignupInviteCode.objects.filter(code=candidate).exists():
+                    self.code = candidate
+                    break
+        super().save(*args, **kwargs)
+
+    def can_redeem(self):
+        return self.is_active and self.use_count < self.max_uses
+
+    def __str__(self):
+        return f"SignupInviteCode {self.code} uses={self.use_count}/{self.max_uses} active={self.is_active}"
+
 class Exercise(models.Model):
     """A named exercise in the library."""
     name = models.CharField(max_length=200, unique=True)

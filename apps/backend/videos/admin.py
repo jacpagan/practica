@@ -2,6 +2,7 @@ from django.contrib import admin
 from .models import (
     Profile, Session, Chapter, VideoFeedback, MultipartSessionUpload, SessionAsset,
     SessionLastSeen,
+    SignupInviteCode,
     ReviewRequest, TeacherRosterMembership, FeedbackTemplate,
 )
 
@@ -21,6 +22,14 @@ class VideoFeedbackInline(admin.TabularInline):
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
     list_display = ['user', 'display_name']
+
+
+@admin.register(SignupInviteCode)
+class SignupInviteCodeAdmin(admin.ModelAdmin):
+    list_display = ['code', 'label', 'is_active', 'use_count', 'max_uses', 'last_used_at', 'created_at']
+    list_filter = ['is_active', 'created_at']
+    search_fields = ['code', 'label']
+    raw_id_fields = ['created_by']
 
 
 @admin.register(Session)

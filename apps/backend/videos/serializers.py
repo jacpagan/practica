@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 from django.core.files.storage import default_storage
 from rest_framework import serializers
@@ -10,6 +11,7 @@ from .models import (
     ReviewRequest,
     TeacherRosterMembership,
     FeedbackTemplate,
+    SignupInviteCode,
 )
 
 
@@ -83,21 +85,48 @@ class RegisterSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
     password = serializers.CharField(write_only=True, min_length=6)
     display_name = serializers.CharField(max_length=100, required=False, default='')
+    invite_code = serializers.CharField(max_length=64, write_only=True)
 
     def validate_username(self, value):
         if User.objects.filter(username__iexact=value).exists():
             raise serializers.ValidationError("Username already taken.")
         return value
 
+    def validate_invite_code(self, value):
+        normalized = str(value or '').strip().upper()
+        if not normalized:
+            raise serializers.ValidationError('Invite code is required.')
+        return normalized
+
+    def validate(self, attrs):
+        invite_code = attrs.get('invite_code', '')
+        invite = SignupInviteCode.objects.filter(code__iexact=invite_code).order_by('-created_at').first()
+        if not invite or not invite.can_redeem():
+            raise serializers.ValidationError({'invite_code': 'Invalid or exhausted invite code.'})
+        attrs['invite_record_id'] = invite.id
+        return attrs
+
     def create(self, validated_data):
-        user = User.objects.create_user(
-            username=validated_data['username'],
-            password=validated_data['password'],
-        )
-        Profile.objects.create(
-            user=user,
-            display_name=validated_data.get('display_name', ''),
-        )
+        invite_record_id = validated_data.pop('invite_record_id')
+        validated_data.pop('invite_code', None)
+
+        with transaction.atomic():
+            invite = SignupInviteCode.objects.select_for_update().get(pk=invite_record_id)
+            if not invite.can_redeem():
+                raise serializers.ValidationError({'invite_code': 'Invalid or exhausted invite code.'})
+
+            user = User.objects.create_user(
+                username=validated_data['username'],
+                password=validated_data['password'],
+            )
+            Profile.objects.create(
+                user=user,
+                display_name=validated_data.get('display_name', ''),
+            )
+
+            invite.use_count += 1
+            invite.last_used_at = timezone.now()
+            invite.save(update_fields=['use_count', 'last_used_at', 'updated_at'])
 
         return user
 

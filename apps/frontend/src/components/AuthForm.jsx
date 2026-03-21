@@ -7,6 +7,7 @@ function AuthForm() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -21,6 +22,7 @@ function AuthForm() {
         await register({
           username, password,
           display_name: displayName || username,
+          invite_code: inviteCode,
         })
       }
     } catch (err) {
@@ -70,6 +72,16 @@ function AuthForm() {
               <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
                 placeholder="How others see you" />
+            </div>
+          )}
+
+          {mode === 'register' && (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Invite code</label>
+              <input type="text" value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                placeholder="Enter your invite code"
+                required />
             </div>
           )}
 
