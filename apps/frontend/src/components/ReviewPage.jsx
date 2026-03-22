@@ -127,7 +127,7 @@ function ReviewPage({ reviewToken = '' }) {
         if (cancelled) return
         setSession(infoData.session)
         setLink(infoData.link)
-        setReviewRequest(infoData.review_request || null)
+        setReviewRequest(infoData.feedback_request || infoData.review_request || null)
         setFeedback(Array.isArray(feedbackData) ? feedbackData : [])
       } catch (loadFailure) {
         if (!cancelled) setLoadError(reviewLinkLoadErrorState(loadFailure || {}))
@@ -141,7 +141,8 @@ function ReviewPage({ reviewToken = '' }) {
   }, [authToken, token])
 
   useEffect(() => {
-    if (!authToken || reviewRequest?.current_user_role !== 'teacher') {
+    const memberRole = reviewRequest?.current_member_role || reviewRequest?.current_user_role || ''
+    if (!authToken || memberRole !== 'reviewer') {
       setTemplates([])
       setTemplatesLoading(false)
       return
@@ -162,7 +163,7 @@ function ReviewPage({ reviewToken = '' }) {
     }
     loadTemplates()
     return () => { cancelled = true }
-  }, [authToken, reviewRequest?.current_user_role])
+  }, [authToken, reviewRequest?.current_member_role, reviewRequest?.current_user_role])
 
   const canRespondToRequest = true
 
