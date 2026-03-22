@@ -10,7 +10,7 @@ from rest_framework.test import APITestCase
 from videos.models import FeedbackTemplate, Profile, ReviewRequest, Session, SessionLastSeen, TeacherRosterMembership, VideoFeedback
 
 
-class ReviewRequestApiTests(APITestCase):
+class FeedbackRequestApiTests(APITestCase):
     def setUp(self):
         self.student = User.objects.create_user(username='student-user', password='pass1234')
         self.teacher = User.objects.create_user(username='teacher-user', password='pass1234')
@@ -54,7 +54,7 @@ class ReviewRequestApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         return ReviewRequest.objects.get(pk=response.data['id'])
 
-    def test_student_can_create_review_request_with_link_and_roster_membership(self):
+    def test_owner_can_create_feedback_request_with_link_and_connection(self):
         review_request = self._create_review_request()
 
         self.assertEqual(review_request.student, self.student)
@@ -70,18 +70,18 @@ class ReviewRequestApiTests(APITestCase):
             ).exists()
         )
 
-    def test_teacher_inbox_lists_assigned_review_requests(self):
+    def test_feedback_inbox_lists_assigned_feedback_requests(self):
         review_request = self._create_review_request()
 
         self._auth(self.teacher)
-        response = self.client.get('/api/teacher/inbox/')
+        response = self.client.get('/api/inbox/')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['id'], review_request.id)
-        self.assertEqual(response.data[0]['current_user_role'], 'teacher')
+        self.assertEqual(response.data[0]['current_member_role'], 'reviewer')
 
-    def test_only_designated_teacher_can_reply_via_review_link(self):
+    def test_any_logged_in_member_can_reply_via_feedback_link(self):
         review_request = self._create_review_request()
 
         self._auth(self.outsider)
@@ -94,10 +94,10 @@ class ReviewRequestApiTests(APITestCase):
             format='multipart',
         )
 
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(response.data['code'], 'review_request_forbidden')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(bool(response.data['feedback_video']))
 
-    def test_designated_teacher_open_and_reply_updates_request_status(self):
+    def test_reviewer_open_and_reply_updates_feedback_request_status(self):
         review_request = self._create_review_request()
 
         self._auth(self.teacher)
@@ -127,7 +127,7 @@ class ReviewRequestApiTests(APITestCase):
         self.assertEqual(feedback.timestamp_seconds, 42)
         self.assertEqual(feedback.review_request, review_request)
 
-    def test_student_can_mark_review_request_viewed(self):
+    def test_owner_can_mark_feedback_request_viewed(self):
         review_request = self._create_review_request()
         review_request.status = ReviewRequest.STATUS_RESPONDED
         review_request.responded_at = timezone.now()
@@ -142,7 +142,7 @@ class ReviewRequestApiTests(APITestCase):
         self.assertIsNotNone(review_request.viewed_at)
         self.assertTrue(SessionLastSeen.objects.filter(user=self.student, session=self.session).exists())
 
-    def test_student_opening_review_request_link_auto_marks_viewed_after_response(self):
+    def test_owner_opening_feedback_request_link_auto_marks_viewed_after_response(self):
         review_request = self._create_review_request()
         review_request.status = ReviewRequest.STATUS_RESPONDED
         review_request.responded_at = timezone.now()
@@ -157,15 +157,15 @@ class ReviewRequestApiTests(APITestCase):
         self.assertIsNotNone(review_request.viewed_at)
         self.assertTrue(SessionLastSeen.objects.filter(user=self.student, session=self.session).exists())
 
-    def test_teacher_roster_includes_student_request_counts(self):
+    def test_member_connections_include_owner_request_counts(self):
         self._create_review_request()
 
         self._auth(self.teacher)
-        response = self.client.get('/api/teacher/roster/')
+        response = self.client.get('/api/connections/')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['student']['id'], self.student.id)
+        self.assertEqual(response.data[0]['member']['id'], self.student.id)
         self.assertEqual(response.data[0]['pending_review_count'], 1)
         self.assertEqual(response.data[0]['total_review_count'], 1)
 
@@ -207,11 +207,11 @@ class ReviewRequestApiTests(APITestCase):
         self.assertEqual(response.data[0]['text'], 'Feedback for request one')
         self.assertEqual(response.data[0]['review_request_id'], review_request.id)
 
-    def test_teacher_can_manage_feedback_templates(self):
+    def test_reviewer_can_manage_feedback_templates(self):
         self._auth(self.teacher)
 
         create_response = self.client.post(
-            '/api/teacher/templates/',
+            '/api/feedback-templates/',
             {
                 'title': 'Groove timing reminder',
                 'text': 'Relax your shoulders, lock with the click, and listen for consistent ghost-note volume.',
@@ -222,20 +222,20 @@ class ReviewRequestApiTests(APITestCase):
         self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
         template_id = create_response.data['id']
 
-        list_response = self.client.get('/api/teacher/templates/')
+        list_response = self.client.get('/api/feedback-templates/')
         self.assertEqual(list_response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(list_response.data), 1)
         self.assertEqual(list_response.data[0]['title'], 'Groove timing reminder')
 
         patch_response = self.client.patch(
-            f'/api/teacher/templates/{template_id}/',
+            f'/api/feedback-templates/{template_id}/',
             {'text': 'Listen for the click and let the snare stay heavy on beats 2 and 4.'},
             format='json',
         )
         self.assertEqual(patch_response.status_code, status.HTTP_200_OK)
         self.assertIn('snare stay heavy', patch_response.data['text'])
 
-        delete_response = self.client.delete(f'/api/teacher/templates/{template_id}/')
+        delete_response = self.client.delete(f'/api/feedback-templates/{template_id}/')
         self.assertEqual(delete_response.status_code, status.HTTP_200_OK)
         self.assertEqual(delete_response.data, {'ok': True})
         self.assertFalse(FeedbackTemplate.objects.filter(pk=template_id).exists())
@@ -263,7 +263,7 @@ class ReviewRequestApiTests(APITestCase):
         self.assertEqual(response.data['feedback_items'][0]['feedback_category'], 'timing')
         self.assertEqual(response.data['feedback_category_counts'], {'timing': 1})
 
-    def test_student_can_create_follow_up_review_request_on_new_session(self):
+    def test_owner_can_create_follow_up_feedback_request_on_new_session(self):
         parent_request = self._create_review_request()
         new_session = Session.objects.create(
             user=self.student,
@@ -296,7 +296,7 @@ class ReviewRequestApiTests(APITestCase):
         self.assertEqual(parent_request.status, ReviewRequest.STATUS_RESUBMITTED)
         self.assertIsNotNone(parent_request.resubmitted_at)
 
-    def test_follow_up_review_request_requires_same_teacher(self):
+    def test_follow_up_feedback_request_requires_same_reviewer(self):
         parent_request = self._create_review_request()
         another_teacher = User.objects.create_user(username='other-teacher', password='pass1234')
         Profile.objects.create(user=another_teacher, display_name='Other Teacher')
@@ -324,3 +324,53 @@ class ReviewRequestApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('same teacher', response.data['teacher_id'][0].lower())
+
+    def test_feedback_insights_returns_category_and_member_trends(self):
+        review_request = self._create_review_request()
+        follow_up_session = Session.objects.create(
+            user=self.student,
+            title='Trend Follow-up Session',
+            description='Third take',
+            video_file='sessions/trend-follow-up.mp4',
+            duration_seconds=120,
+            processing_status=Session.STATUS_READY,
+        )
+        follow_up_request = ReviewRequest.objects.create(
+            session=follow_up_session,
+            student=self.student,
+            teacher=self.teacher,
+            created_by=self.student,
+            parent_request=review_request,
+            instrument='drums',
+            goal='Keep tightening the groove',
+            status=ReviewRequest.STATUS_RESPONDED,
+        )
+        VideoFeedback.objects.create(
+            session=self.session,
+            review_request=review_request,
+            user=self.teacher,
+            feedback_category='timing',
+            text='Timing note one',
+            feedback_video=self._video_file('timing.mp4'),
+            is_legacy_text_feedback=False,
+        )
+        VideoFeedback.objects.create(
+            session=follow_up_session,
+            review_request=follow_up_request,
+            user=self.teacher,
+            feedback_category='groove',
+            text='Groove note one',
+            feedback_video=self._video_file('groove.mp4'),
+            is_legacy_text_feedback=False,
+        )
+
+        self._auth(self.teacher)
+        response = self.client.get('/api/feedback-insights/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['total_review_requests'], 2)
+        self.assertEqual(response.data['follow_up_review_requests'], 1)
+        self.assertEqual(response.data['category_counts'], {'timing': 1, 'groove': 1})
+        self.assertEqual(len(response.data['top_students']), 1)
+        self.assertEqual(response.data['top_students'][0]['request_count'], 2)
+        self.assertEqual(response.data['top_students'][0]['follow_up_request_count'], 1)

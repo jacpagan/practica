@@ -282,8 +282,32 @@ class TeacherRosterMembership(models.Model):
             models.UniqueConstraint(fields=['teacher', 'student'], name='teacher_roster_membership_teacher_student_uniq'),
         ]
 
+    @property
+    def reviewer(self):
+        return self.teacher
+
+    @reviewer.setter
+    def reviewer(self, value):
+        self.teacher = value
+
+    @property
+    def member(self):
+        return self.student
+
+    @member.setter
+    def member(self, value):
+        self.student = value
+
+    @property
+    def inviter(self):
+        return self.created_by
+
+    @inviter.setter
+    def inviter(self, value):
+        self.created_by = value
+
     def __str__(self):
-        return f"TeacherRosterMembership teacher={self.teacher_id} student={self.student_id} active={self.is_active}"
+        return f"MemberConnection reviewer={self.teacher_id} member={self.student_id} active={self.is_active}"
 
 
 class ReviewRequest(models.Model):
@@ -335,8 +359,53 @@ class ReviewRequest(models.Model):
             models.Index(fields=['student', 'status']),
         ]
 
+    @property
+    def owner(self):
+        return self.student
+
+    @owner.setter
+    def owner(self, value):
+        self.student = value
+
+    @property
+    def reviewer(self):
+        return self.teacher
+
+    @reviewer.setter
+    def reviewer(self, value):
+        self.teacher = value
+
+    @property
+    def feedback_link(self):
+        return self.review_link
+
+    @feedback_link.setter
+    def feedback_link(self, value):
+        self.review_link = value
+
+    @property
+    def parent_feedback_request(self):
+        return self.parent_request
+
+    @parent_feedback_request.setter
+    def parent_feedback_request(self, value):
+        self.parent_request = value
+
+    def member_role_for(self, user):
+        if not user or not getattr(user, 'is_authenticated', False):
+            return ''
+        if user.id == self.teacher_id:
+            return 'reviewer'
+        if user.id == self.student_id:
+            return 'owner'
+        return ''
+
     def __str__(self):
-        return f"ReviewRequest #{self.id} session={self.session_id} teacher={self.teacher_id} status={self.status}"
+        return f"FeedbackRequest #{self.id} session={self.session_id} reviewer={self.teacher_id} status={self.status}"
+
+
+MemberConnection = TeacherRosterMembership
+FeedbackRequest = ReviewRequest
 
 
 class FeedbackTemplate(models.Model):
