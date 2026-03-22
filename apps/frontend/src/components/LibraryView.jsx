@@ -192,6 +192,8 @@ function LibraryView({ sessions = [], sessionsLoading = false, onOpenSession, on
           </button>
         </div>
 
+        <InviteCodesPanel token={token} />
+
         {sessionsLoading ? (
           <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading library…</div>
         ) : ownSessions.length === 0 ? (
@@ -208,7 +210,6 @@ function LibraryView({ sessions = [], sessionsLoading = false, onOpenSession, on
           </div>
         ) : (
           <div className="space-y-6">
-            <InviteCodesPanel token={token} />
             {seriesGroups.length > 0 ? (
               <div className="space-y-2">
                 <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Practice threads</p>
