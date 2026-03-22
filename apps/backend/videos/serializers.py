@@ -564,3 +564,15 @@ class FeedbackTemplateSerializer(serializers.ModelSerializer):
         if existing.exists():
             raise serializers.ValidationError({'title': 'You already have a template with this title.'})
         return attrs
+
+
+class SignupInviteCodeSerializer(serializers.ModelSerializer):
+    redeemable = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SignupInviteCode
+        fields = ['id', 'code', 'label', 'is_active', 'max_uses', 'use_count', 'last_used_at', 'redeemable', 'created_at']
+        read_only_fields = ['id', 'code', 'is_active', 'use_count', 'last_used_at', 'redeemable', 'created_at']
+
+    def get_redeemable(self, obj):
+        return obj.can_redeem()

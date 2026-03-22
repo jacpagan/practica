@@ -80,22 +80,42 @@ class SessionLastSeenAdmin(admin.ModelAdmin):
 
 @admin.register(TeacherRosterMembership)
 class TeacherRosterMembershipAdmin(admin.ModelAdmin):
-    list_display = ['teacher', 'student', 'is_active', 'created_at']
+    list_display = ['reviewer_display', 'member_display', 'is_active', 'created_at']
     list_filter = ['is_active']
     search_fields = ['teacher__username', 'student__username']
     raw_id_fields = ['teacher', 'student', 'created_by']
 
+    @admin.display(description='Reviewer')
+    def reviewer_display(self, obj):
+        return obj.teacher
+
+    @admin.display(description='Member')
+    def member_display(self, obj):
+        return obj.student
+
 
 @admin.register(ReviewRequest)
 class ReviewRequestAdmin(admin.ModelAdmin):
-    list_display = ['id', 'session', 'student', 'teacher', 'instrument', 'status', 'created_at']
+    list_display = ['id', 'session', 'owner_display', 'reviewer_display', 'instrument', 'status', 'created_at']
     list_filter = ['status', 'instrument']
     search_fields = ['session__title', 'student__username', 'teacher__username', 'goal', 'exercise_or_song']
     raw_id_fields = ['session', 'student', 'teacher', 'created_by', 'review_link']
 
+    @admin.display(description='Owner')
+    def owner_display(self, obj):
+        return obj.student
+
+    @admin.display(description='Reviewer')
+    def reviewer_display(self, obj):
+        return obj.teacher
+
 
 @admin.register(FeedbackTemplate)
 class FeedbackTemplateAdmin(admin.ModelAdmin):
-    list_display = ['id', 'teacher', 'title', 'updated_at']
+    list_display = ['id', 'reviewer_display', 'title', 'updated_at']
     search_fields = ['teacher__username', 'teacher__profile__display_name', 'title', 'text']
     raw_id_fields = ['teacher']
+
+    @admin.display(description='Reviewer')
+    def reviewer_display(self, obj):
+        return obj.teacher

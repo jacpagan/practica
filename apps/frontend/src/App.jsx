@@ -277,6 +277,7 @@ function AppContent() {
           <LibraryView
             sessions={sessions}
             sessionsLoading={sessionsLoading}
+            token={token}
             onOpenSession={openSession}
             onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
             onCreateVideo={() => navigate({ view: 'upload', sessionId: null })}

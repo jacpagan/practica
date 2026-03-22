@@ -70,3 +70,41 @@ class AuthOnboardingTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('invite_code', response.data)
+
+
+class InviteCodeApiTests(APITestCase):
+    def setUp(self):
+        self.member = User.objects.create_user(username='member-user', password='pass1234')
+
+    def _auth(self):
+        self.client.force_authenticate(user=self.member)
+
+    def test_member_can_create_single_use_invite_code(self):
+        self._auth()
+
+        response = self.client.post('/api/invite-codes/', {'label': 'Friend invite'}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['label'], 'Friend invite')
+        self.assertEqual(response.data['max_uses'], 1)
+        self.assertTrue(bool(response.data['code']))
+
+    def test_member_can_list_own_invite_codes(self):
+        SignupInviteCode.objects.create(code='ONE123', created_by=self.member)
+        self._auth()
+
+        response = self.client.get('/api/invite-codes/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['code'], 'ONE123')
+
+    def test_member_can_turn_off_own_invite_code(self):
+        invite = SignupInviteCode.objects.create(code='ONE123', created_by=self.member)
+        self._auth()
+
+        response = self.client.delete(f'/api/invite-codes/{invite.id}/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        invite.refresh_from_db()
+        self.assertFalse(invite.is_active)

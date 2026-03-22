@@ -30,13 +30,14 @@ from .models import (
     ReviewLink,
     ReviewRequest, TeacherRosterMembership,
     FeedbackTemplate,
+    SignupInviteCode,
 )
 from .serializers import (
     UserSerializer, UserSummarySerializer, RegisterSerializer,
     SessionSerializer, SessionListSerializer,
     ChapterSerializer,
     PublicSessionSerializer, ReviewLinkSerializer, ReviewVideoFeedbackSerializer,
-    ReviewRequestSerializer, MemberConnectionSerializer, FeedbackTemplateSerializer,
+    ReviewRequestSerializer, MemberConnectionSerializer, FeedbackTemplateSerializer, SignupInviteCodeSerializer,
 )
 from .services.media_pipeline import enqueue_session_processing, enqueue_local_session_transcode, apply_processing_update
 
@@ -98,7 +99,7 @@ def _review_link_error_response(reason):
     )
 
 
-def _review_request_forbidden_response(message='You do not have access to this review request.'):
+def _feedback_request_forbidden_response(message='You do not have access to this feedback request.'):
     return Response(
         {
             'error': message,
@@ -108,7 +109,7 @@ def _review_request_forbidden_response(message='You do not have access to this r
     )
 
 
-def _review_request_visible_to_user(review_request, user):
+def _feedback_request_visible_to_user(review_request, user):
     if not user.is_authenticated:
         return False
     if user.is_staff:
@@ -116,7 +117,7 @@ def _review_request_visible_to_user(review_request, user):
     return user.id in {review_request.student_id, review_request.teacher_id}
 
 
-def _review_request_teacher_can_respond(review_request, user):
+def _feedback_request_reviewer_can_respond(review_request, user):
     if not user.is_authenticated:
         return False
     if user.is_staff:
@@ -124,7 +125,7 @@ def _review_request_teacher_can_respond(review_request, user):
     return user.id == review_request.teacher_id
 
 
-def _visible_review_requests_qs(user):
+def _visible_feedback_requests_qs(user):
     if not user.is_authenticated:
         return ReviewRequest.objects.none()
     if user.is_staff:
@@ -132,7 +133,7 @@ def _visible_review_requests_qs(user):
     return ReviewRequest.objects.filter(Q(student=user) | Q(teacher=user) | Q(created_by=user))
 
 
-def _ensure_teacher_roster_membership(*, teacher, student, created_by=None):
+def _ensure_member_connection(*, teacher, student, created_by=None):
     membership, created = TeacherRosterMembership.objects.get_or_create(
         teacher=teacher,
         student=student,
@@ -149,7 +150,7 @@ def _ensure_teacher_roster_membership(*, teacher, student, created_by=None):
     return membership
 
 
-def _mark_review_request_viewed(review_request, user):
+def _mark_feedback_request_viewed(review_request, user):
     if not review_request or not user.is_authenticated:
         return
     if user.id != review_request.student_id and not user.is_staff:
@@ -164,6 +165,14 @@ def _mark_review_request_viewed(review_request, user):
         session=review_request.session,
         defaults={},
     )
+
+
+_review_request_forbidden_response = _feedback_request_forbidden_response
+_review_request_visible_to_user = _feedback_request_visible_to_user
+_review_request_teacher_can_respond = _feedback_request_reviewer_can_respond
+_visible_review_requests_qs = _visible_feedback_requests_qs
+_ensure_teacher_roster_membership = _ensure_member_connection
+_mark_review_request_viewed = _mark_feedback_request_viewed
 
 
 def can_edit_session(user, session):
@@ -370,6 +379,44 @@ def user_search_view(request):
     if query:
         qs = qs.filter(Q(username__icontains=query) | Q(profile__display_name__icontains=query))
     return Response(UserSummarySerializer(qs[:10], many=True).data)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def invite_codes(request):
+    if request.method == 'GET':
+        codes = SignupInviteCode.objects.filter(created_by=request.user).order_by('-created_at')
+        return Response(SignupInviteCodeSerializer(codes, many=True).data)
+
+    active_count = SignupInviteCode.objects.filter(created_by=request.user, is_active=True).count()
+    if active_count >= 10:
+        return Response({'error': 'You already have too many active invite codes.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    label = str(request.data.get('label', '')).strip()
+    max_uses = 1
+    if request.user.is_staff:
+        try:
+            max_uses = max(1, min(100, int(request.data.get('max_uses', 1))))
+        except (TypeError, ValueError):
+            max_uses = 1
+
+    invite = SignupInviteCode.objects.create(
+        label=label,
+        created_by=request.user,
+        max_uses=max_uses,
+    )
+    return Response(SignupInviteCodeSerializer(invite).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def invite_code_detail(request, invite_id):
+    invite = get_object_or_404(SignupInviteCode, pk=invite_id)
+    if request.user != invite.created_by and not request.user.is_staff:
+        return Response({'error': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
+    invite.is_active = False
+    invite.save(update_fields=['is_active', 'updated_at'])
+    return Response({'ok': True})
 
 
 @csrf_exempt

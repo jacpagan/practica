@@ -1,7 +1,146 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { fmtDate } from '../utils'
+import { useToast } from './Toast'
 
-function LibraryView({ sessions = [], sessionsLoading = false, onOpenSession, onOpenSeries, onCreateVideo }) {
+function InviteCodesPanel({ token }) {
+  const toast = useToast()
+  const [inviteCodes, setInviteCodes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
+  const [label, setLabel] = useState('')
+
+  const loadInviteCodes = async () => {
+    if (!token) return
+    setLoading(true)
+    try {
+      const res = await fetch('/api/invite-codes/', { headers: { Authorization: `Token ${token}` } })
+      if (!res.ok) throw new Error('invite-codes')
+      const data = await res.json()
+      setInviteCodes(Array.isArray(data) ? data : [])
+    } catch {
+      setInviteCodes([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadInviteCodes()
+  }, [token])
+
+  const createInviteCode = async () => {
+    if (!token) return
+    setCreating(true)
+    try {
+      const res = await fetch('/api/invite-codes/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Token ${token}`,
+        },
+        body: JSON.stringify({ label: label.trim() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Could not create invite code')
+      setInviteCodes((current) => [data, ...current])
+      setLabel('')
+      try {
+        await navigator.clipboard.writeText(data.code)
+        toast.success('Invite code created and copied')
+      } catch {
+        toast.success('Invite code created')
+      }
+    } catch (error) {
+      toast.error(error?.message || 'Could not create invite code')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const revokeInviteCode = async (inviteId) => {
+    if (!token) return
+    try {
+      const res = await fetch(`/api/invite-codes/${inviteId}/`, {
+        method: 'DELETE',
+        headers: { Authorization: `Token ${token}` },
+      })
+      if (!res.ok) throw new Error('revoke-invite')
+      setInviteCodes((current) => current.map((item) => (item.id === inviteId ? { ...item, is_active: false } : item)))
+      toast.success('Invite code turned off')
+    } catch {
+      toast.error('Could not turn off invite code')
+    }
+  }
+
+  const copyInviteCode = async (code) => {
+    try {
+      await navigator.clipboard.writeText(code)
+      toast.success('Invite code copied')
+    } catch {
+      toast.error('Could not copy invite code')
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-4">
+      <div>
+        <p className="text-sm font-semibold text-gray-900">Invite someone</p>
+        <p className="text-xs text-gray-500 mt-1">Create a single-use invite code for a trusted person.</p>
+      </div>
+      <div className="flex gap-2 flex-wrap">
+        <input
+          type="text"
+          value={label}
+          onChange={(event) => setLabel(event.target.value)}
+          placeholder="Optional label"
+          className="flex-1 min-w-[180px] px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+        />
+        <button
+          type="button"
+          onClick={createInviteCode}
+          disabled={creating}
+          className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors"
+        >
+          {creating ? 'Creating…' : 'Create invite code'}
+        </button>
+      </div>
+      {loading ? (
+        <p className="text-sm text-gray-500">Loading invite codes…</p>
+      ) : inviteCodes.length === 0 ? (
+        <p className="text-sm text-gray-500">No invite codes yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {inviteCodes.map((invite) => (
+            <div key={invite.id} className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-medium text-gray-900 tracking-wide">{invite.code}</p>
+                  <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${invite.is_active && invite.redeemable ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
+                    {invite.is_active && invite.redeemable ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+                {invite.label ? <p className="text-xs text-gray-500 mt-1">{invite.label}</p> : null}
+                <p className="text-xs text-gray-400 mt-1">Uses {invite.use_count}/{invite.max_uses}</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button type="button" onClick={() => copyInviteCode(invite.code)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
+                  Copy
+                </button>
+                {invite.is_active ? (
+                  <button type="button" onClick={() => revokeInviteCode(invite.id)} className="text-xs text-red-600 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-50 transition-colors">
+                    Turn off
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LibraryView({ sessions = [], sessionsLoading = false, onOpenSession, onOpenSeries, onCreateVideo, token = '' }) {
   const ownSessions = useMemo(
     () => sessions
       .filter((session) => session.can_edit)
@@ -69,6 +208,7 @@ function LibraryView({ sessions = [], sessionsLoading = false, onOpenSession, on
           </div>
         ) : (
           <div className="space-y-6">
+            <InviteCodesPanel token={token} />
             {seriesGroups.length > 0 ? (
               <div className="space-y-2">
                 <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Practice threads</p>
