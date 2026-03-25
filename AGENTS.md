@@ -6,12 +6,13 @@ Use `docs/practica-v2-prd.md` as the strategic source of truth for product-facin
 
 Important product context:
 
-- Practica is moving from a private async video feedback tool toward a teacher-led private platform for async music instruction.
-- The initial wedge is independent drum teachers with their existing students.
-- The current shipped foundation remains the private student-owned library plus authenticated review flows described in `docs/platform-effects-mvp-playbook.md`.
-- Preserve `private by default`, `student-owned archive`, and `video-first feedback` as core product principles.
+- Practica uses a member-first identity model with a teacher workflow layer for async music instruction.
+- The initial wedge is independent drum teachers working with their existing students inside trusted networks.
+- The current shipped foundation remains the private member-owned library plus authenticated review flows described in `docs/platform-effects-mvp-playbook.md`.
+- Preserve `private by default`, `member-owned archive`, and `video-first feedback` as core product principles.
 - Prioritize teacher workflow primitives next: `ReviewRequest`, teacher inbox, roster, designated-teacher permissions, and reusable templates.
 - Optimize for completed review cycles: `submission -> feedback -> resubmission`.
+- Keep `teacher` and `student` as workflow-context labels, not global account identity types.
 - Do not introduce public marketplace mechanics, public discovery, heavy school-workspace abstractions, streaks, or practice-plan systems unless the user explicitly asks for that strategy shift.
 
 ## Documentation Source Of Truth
@@ -39,8 +40,9 @@ Use 4-space indentation in Python and standard React/JS formatting already prese
 
 For product terminology and naming in new code or docs:
 
-- Prefer `teacher`, `student`, `review request`, `private library`, and `video feedback` when working on v2 platform features.
-- Keep legacy `share link` terminology only where you are explicitly touching the shipped v1 flow.
+- Prefer identity terms like `member`, `session owner`, and `reviewer` for global product language.
+- Prefer workflow terms like `teacher`, `student`, `review request`, `teacher inbox`, and `roster` when discussing structured teaching workflows.
+- Keep `review link` or `share link` terminology only where you are explicitly touching the shipped v1 access flow.
 
 ## Testing Guidelines
 

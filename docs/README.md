@@ -16,12 +16,14 @@ This repository now has an explicit product-strategy source of truth.
 
 ## Current Strategic Direction
 
-Practica is a private learner-first video feedback platform.
+Practica is a private member-first video feedback platform with a teacher workflow layer.
 
 Key strategic decisions:
 
-- Treat everyone as a learner, not as a fixed teacher/student identity.
+- Keep `member` as the global account identity model.
+- Use `teacher`/`student` as workflow-context labels on explicit workflow objects.
 - Keep video archives private and member-owned.
 - Treat repeated takes and durable feedback history as the core unit of value.
+- Add `ReviewRequest`, teacher inbox, roster, and designated-teacher permissions as workflow primitives.
 - Grow through trusted invites, not open public signup or discovery.
-- Prefer product terms like `member`, `session owner`, `reviewer`, `feedback link`, and `practice thread`.
+- Preserve lightweight UX and avoid heavy LMS patterns.

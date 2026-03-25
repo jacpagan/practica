@@ -77,17 +77,17 @@ Primary shipped flows reviewed:
 - Review responses are already video-first and can include timestamps plus optional notes.
 - The product has stronger privacy semantics than general-purpose messaging or file-sharing tools.
 
-## Top Flow Gaps For The Teacher-Led v2 Direction
+## Top Flow Gaps For The Member-First v2 With Teacher Workflow Layer
 
-### P0 — The review flow is built for generic authenticated responders, not designated teachers
+### P0 — The review flow is built for generic authenticated responders, not assigned teacher workflow owners
 
-The current review flow enforces authenticated access and explicit invalid, expired, and revoked states, but it does not model a designated teacher workflow object.
+The current review flow enforces authenticated access and explicit invalid, expired, and revoked states, but it does not model an assigned teacher workflow object.
 
 Impact:
 
 - Any logged-in authorized responder can act like the reviewer.
 - Teacher queue ownership, response promises, and routing are not first-class.
-- This is good enough for private-link collaboration but not yet for a teacher OS.
+- This is good enough for private-link collaboration but not yet for a structured teacher workflow layer.
 
 ### P0 — `ReviewLink` is an access primitive, not a workflow primitive
 
@@ -109,13 +109,13 @@ Impact:
 - Repeated use depends on memory, ad hoc links, or external coordination.
 - The product still behaves more like a tool than a platform.
 
-### P1 — Student ownership is clear, but teacher workflow ownership is not
+### P1 — Member archive ownership is clear, but teacher workflow ownership is not
 
-The current data model keeps `Session.user` as the archive owner, which is strategically correct for v2. What is missing is a relationship and workflow layer that gives teachers controlled access without taking content ownership away from students.
+The current data model keeps `Session.user` as the archive owner, which is strategically correct for v2. What is missing is a relationship and workflow layer that gives teachers controlled access without taking content ownership away from members.
 
 Impact:
 
-- There is no explicit teacher-student roster model.
+- There is no explicit teacher-student roster model scoped to workflow context.
 - The system cannot express designated reviewer permissions cleanly.
 - Studio and multi-teacher expansion remain awkward until this layer exists.
 
@@ -131,11 +131,11 @@ Impact:
 
 ### P2 — The current low-pressure UX can be damaged by overbuilding v2
 
-The shipped product is intentionally simple, private, and low pressure. Reintroducing teacher workflow without discipline could turn the product into a heavy LMS too early.
+The shipped product is intentionally simple, private, and low pressure. Adding teacher workflow without identity/workflow separation could turn the product into a heavy LMS too early.
 
 Impact:
 
-- Student experience could become too administrative.
+- Member experience could become too administrative.
 - Teachers could face more overhead than value.
 - The product could lose its strongest emotional advantage: easy private sharing and clear video feedback.
 
@@ -150,8 +150,17 @@ Impact:
 
 ## Suggested Definition Of Done For v2 Foundation Work
 
-- The student can still record, upload, watch, and privately share without extra friction.
+- The member can still record, upload, watch, and privately share without extra friction.
 - A teacher can own a request from inbox to response without using external tools.
 - The system can distinguish a generic link from a formal teacher review request.
 - Permissions fail closed and are easy to explain in the UI.
 - Completed review cycles are measurable from backend events and visible in product surfaces.
+
+## Canonical Model Alignment Notes
+
+To stay aligned with the v2 PRD:
+
+- Keep `member` as the global identity model.
+- Treat `teacher` and `student` as workflow-context labels on `ReviewRequest`.
+- Keep `ReviewLink` for lightweight access and `ReviewRequest` for structured workflow.
+- Preserve member ownership of `Session` artifacts across all teacher workflows.

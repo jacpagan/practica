@@ -98,7 +98,7 @@ Avoid old product terms in v1-facing copy:
 
 ## Strategic Note
 
-Practica v2 no longer treats `teacher` and `student` as the primary product ontology.
+Practica v2 uses a member-first identity model with a teacher workflow layer.
 
 The v1 baseline still matters because it captures what Practica already does well:
 
@@ -109,9 +109,10 @@ The v1 baseline still matters because it captures what Practica already does wel
 
 The v2 direction builds on that baseline by emphasizing:
 
-- learner-first language,
+- member-first identity language,
 - trusted invite-only growth,
 - practice threads for repeated takes,
-- and private feedback between members.
+- private feedback between members,
+- and `ReviewRequest` for structured teacher-led cycles.
 
-Legacy teacher/student structures may remain in code for some time, but they should not be treated as the long-term product identity model.
+Teacher/student language remains valid in workflow contexts (for example teacher inbox, roster, designated teacher), but should not be treated as global account identity types.

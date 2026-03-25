@@ -5,7 +5,7 @@
 This document is the strategic source of truth for Practica v2.
 
 It replaces older role-heavy framing and clarifies the current direction:
-Practica is a private video practice archive with trusted feedback, built for people who are all still learning.
+Practica is a private video practice archive with trusted feedback, built on a member-first identity model with an explicit teacher workflow layer.
 
 Related docs:
 
@@ -18,11 +18,11 @@ Practica v2 is a private, video-first platform for ongoing practice and feedback
 
 The core bet is:
 
-- everyone is a learner,
+- identity should stay member-first and role-light,
 - every take should remain private by default,
 - feedback should stay attached to the video,
 - repeated takes should be easy to organize over time,
-- and the product should optimize for durable practice history rather than public discovery.
+- and the product should optimize for durable practice history and completed review cycles rather than public discovery.
 
 Practica is not a marketplace, a social feed, or a school workspace.
 It is a private place to record, revisit, and exchange trusted feedback.
@@ -37,18 +37,36 @@ The core value proposition is:
 
 ## Product Model
 
-Practica is a learner-first private platform.
+Practica is a member-first private platform with a teacher workflow layer.
 
 That means:
 
-- no permanent teacher/student identity model,
+- no permanent teacher/student identity model as the global account ontology,
 - no public discovery,
 - no public profiles or marketplace mechanics,
-- no role-based hierarchy as the foundation of the product,
-- and no assumption that one person is always the instructor and another is always the student.
+- no role-based hierarchy as the foundation of identity,
+- and explicit workflow objects for teacher-led operations where they add operational value.
 
-People can still mentor each other, coach each other, review each other, or invite each other.
-Those are relationship and permission patterns, not permanent platform identities.
+People can still mentor each other, teach each other, review each other, or invite each other.
+Those are relationship and permission patterns attached to workflows, not permanent platform identities.
+
+## Canonical Architecture Model
+
+Practica v2 should be implemented as two compatible layers:
+
+### 1. Identity layer (member-first)
+
+- `member` is the base account identity.
+- `session owner` owns archive artifacts and sharing intent.
+- `reviewer` can respond to feedback links and review requests.
+- `inviter` is a permission capability, not a separate identity class.
+
+### 2. Workflow layer (teacher-led where needed)
+
+- `ReviewRequest` is the primary workflow object for structured review cycles.
+- `teacher` and `student` are workflow-context labels, not global account types.
+- `teacher inbox`, `roster`, and `designated-teacher permissions` operate on top of member identities.
+- `ReviewLink` remains an access primitive and can coexist with `ReviewRequest`.
 
 ## Core Roles
 
@@ -76,12 +94,24 @@ Practica should prefer situational roles over fixed role labels.
 - A trusted person or platform admin who brings someone into Practica.
 - Invite permissions are product policy, not identity class.
 
+### Teacher (workflow role)
+
+- A member assigned to one or more `ReviewRequest` items.
+- Owns request execution from inbox to response.
+- Never takes ownership of the student archive artifact.
+
+### Student (workflow role)
+
+- A member who submits takes for teacher feedback within a request cycle.
+- Retains ownership of their private archive entries.
+
 ## Product Principles
 
 - `Private by default`: nothing is public unless explicitly shared.
 - `Video first`: the video is the center of the experience.
 - `Feedback attached to the artifact`: feedback belongs with the source video.
-- `Everyone is a learner`: the product should avoid rigid teacher/student ontology.
+- `Member-first identity`: the product should avoid rigid global teacher/student ontology.
+- `Teacher workflow primitives`: structured teacher operations should be modeled with explicit workflow objects.
 - `Progress through repetition`: the product should make repeated takes easy to organize.
 - `Low pressure`: no streaks, no gamified accountability loops, no public performance layer.
 - `Trusted network growth`: membership should expand through invites and existing trust, not open viral loops.
@@ -115,7 +145,7 @@ Practica should prefer situational roles over fixed role labels.
 
 ## Current Strategic Direction
 
-Practica is moving toward a private learner network, not a teacher-led operating system.
+Practica is moving toward a private member network with a first-class teacher workflow layer.
 
 Key decisions:
 
@@ -123,15 +153,18 @@ Key decisions:
 - keep private feedback links,
 - keep video-first responses,
 - add lightweight practice threads for repeated takes,
+- add `ReviewRequest` as a workflow primitive for structured cycles,
+- add teacher inbox + roster + designated-teacher permissions on top of member identity,
 - require trusted onboarding,
-- and avoid hard-coding fixed teacher/student product identity into the long-term model.
+- and avoid hard-coding fixed teacher/student identity into the long-term account model.
 
 ## What Practica Is
 
 - A private video archive
 - A trusted feedback tool
 - A place for repeated practice history
-- A learner-first product
+- A member-first product
+- A teacher-workflow-capable product
 - A lightweight private network
 
 ## What Practica Is Not
@@ -182,23 +215,30 @@ Preferred product language:
 - `responder`
 - `feedback`
 - `feedback link`
+- `review request`
 - `practice thread`
 - `take`
 - `private library`
 
-Avoid as foundational product language:
+Allowed workflow language (when discussing structured teaching workflows):
 
 - `teacher`
 - `student`
+- `teacher inbox`
 - `roster`
 - `designated teacher`
-- `teacher workflow`
 
-Those legacy terms may still exist in code and migrations, but product-facing language should move away from them.
+Avoid as foundational identity language:
+
+- rigid global `teacher` account type
+- rigid global `student` account type
+- role hierarchy as the basis of account identity
+
+Teacher/student terms are valid in workflow contexts, but should not define the global identity ontology.
 
 ## Success Metrics
 
-Practica should care more about retained practice behavior than role-specific workflow metrics.
+Practica should care about both retained practice behavior and completed review-cycle workflow quality.
 
 Early indicators:
 
@@ -206,7 +246,9 @@ Early indicators:
 - repeated takes inside the same practice thread,
 - feedback-link creation rate,
 - video feedback response rate,
-- and revisit behavior on older takes.
+- revisit behavior on older takes,
+- review-request completion rate,
+- and median submission-to-feedback turnaround.
 
 ## Near-Term Roadmap
 
@@ -225,14 +267,21 @@ Early indicators:
 - Support optional short captions attached to feedback videos.
 - Preserve author edit/delete for their own feedback.
 
-### 4. Invite-only membership
+### 4. Teacher workflow layer
+
+- Add `ReviewRequest` with assignee, goal, turnaround, and status.
+- Add teacher inbox for pending/in-progress/completed requests.
+- Add lightweight roster and designated-teacher permissions.
+- Preserve `Session` ownership with the submitting member.
+
+### 5. Invite-only membership
 
 - Gate signup through invite codes.
 - Keep onboarding inside trusted boundaries.
 
 ## Migration Note
 
-The repository still contains legacy naming and structures tied to `teacher`, `student`, `roster`, and `review request` concepts.
+The repository still contains mixed naming and structures tied to both learner-first and teacher-led phrasing.
 
 That should be treated as implementation history, not the long-term product ontology.
 
@@ -240,5 +289,5 @@ The practical direction is:
 
 - update product docs first,
 - rename product-facing UI next,
-- add neutral API aliases before deep model renames,
+- add member-first + workflow-aware API aliases before deep model renames,
 - and only later decide whether the database/domain model should be fully renamed.
