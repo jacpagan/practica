@@ -130,11 +130,11 @@ function TeachingView({ token, onOpenReviewRequest }) {
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="space-y-3">
-            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Teaching</h2>
-            <p className="text-sm text-gray-500 mt-1">Inbox first. Roster and templates when you need them.</p>
+            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Requests</h2>
+            <p className="text-sm text-gray-500 mt-1">Track who asked for feedback, who you’re connected to, and your saved response templates.</p>
             <div className="flex flex-wrap gap-2">
               <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{pendingCount} pending</span>
-              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{studentCount} students</span>
+              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{studentCount} connections</span>
               <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{templateCount} templates</span>
             </div>
           </div>
@@ -153,7 +153,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
             onClick={() => setTab('roster')}
             className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${tab === 'roster' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
           >
-            Roster
+            Connections
           </button>
           <button
             type="button"
@@ -166,11 +166,11 @@ function TeachingView({ token, onOpenReviewRequest }) {
 
         {tab === 'inbox' ? (
           requestsLoading ? (
-            <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading teaching inbox…</div>
+            <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading request inbox…</div>
           ) : requests.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
-              <p className="text-sm text-gray-700">No review requests yet.</p>
-              <p className="text-xs text-gray-500 mt-1">Once students send you private review requests, they will appear here.</p>
+              <p className="text-sm text-gray-700">No feedback requests yet.</p>
+              <p className="text-xs text-gray-500 mt-1">Requests from other members will appear here.</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -179,14 +179,14 @@ function TeachingView({ token, onOpenReviewRequest }) {
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold text-gray-900">{item.session?.title || 'Review request'}</p>
+                        <p className="text-sm font-semibold text-gray-900">{item.session?.title || 'Feedback request'}</p>
                         <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${statusTone[item.status] || 'bg-gray-100 text-gray-700'}`}>
                           {statusLabel(item.status)}
                         </span>
                         {item.parent_request ? <span className="text-[11px] uppercase tracking-wide bg-violet-100 text-violet-800 px-2 py-1 rounded-full">Follow-up</span> : null}
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
-                        {item.student?.display_name || item.student?.username || 'Student'} • {item.instrument}{item.student_level ? ` • ${item.student_level}` : ''}
+                        {item.owner?.display_name || item.student?.display_name || item.owner?.username || item.student?.username || 'Member'} • {item.instrument}{item.student_level ? ` • ${item.student_level}` : ''}
                       </p>
                       <p className="text-sm text-gray-700 mt-3">{item.goal}</p>
                       {item.exercise_or_song ? <p className="text-xs text-gray-500 mt-2">Focus: {item.exercise_or_song}</p> : null}
@@ -207,7 +207,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
                         onClick={() => onOpenReviewRequest?.(item)}
                         className="rounded-xl bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
                       >
-                        Open request
+                        Open thread
                       </button>
                     </div>
                   </div>
@@ -217,17 +217,17 @@ function TeachingView({ token, onOpenReviewRequest }) {
           )
         ) : tab === 'roster' ? (
           rosterLoading ? (
-            <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading roster…</div>
+            <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading connections…</div>
           ) : roster.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
-              <p className="text-sm text-gray-700">No students on your roster yet.</p>
-              <p className="text-xs text-gray-500 mt-1">Students appear here automatically when they send you a review request.</p>
+              <p className="text-sm text-gray-700">No connections yet.</p>
+              <p className="text-xs text-gray-500 mt-1">People appear here automatically after you exchange feedback requests.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {roster.map((item) => (
                 <div key={item.id} className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-2">
-                  <p className="text-sm font-semibold text-gray-900">{item.student?.display_name || item.student?.username}</p>
+                  <p className="text-sm font-semibold text-gray-900">{item.member?.display_name || item.student?.display_name || item.member?.username || item.student?.username}</p>
                   <p className="text-xs text-gray-500">Pending reviews: {item.pending_review_count}</p>
                   <p className="text-xs text-gray-500">Total requests: {item.total_review_count}</p>
                   <p className="text-xs text-gray-500">Last request: {item.last_request_at ? new Date(item.last_request_at).toLocaleString() : '—'}</p>

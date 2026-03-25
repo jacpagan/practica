@@ -329,11 +329,11 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   }
 
   const copyReviewRequestLink = async (requestItem) => {
-    const url = requestItem?.review_link?.url
+    const url = requestItem?.feedback_link?.url || requestItem?.review_link?.url
     if (!url) return
     try {
       await navigator.clipboard.writeText(url)
-      toast.success('Private teacher request link copied')
+      toast.success('Feedback request link copied')
     } catch {
       toast.error('Could not copy request link')
     }
@@ -379,11 +379,11 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const createReviewRequest = async () => {
     if (!token || !session?.id) return
     if (!selectedTeacher?.id) {
-      toast.error('Choose a teacher first')
+      toast.error('Choose a reviewer first')
       return
     }
     if (!requestGoal.trim()) {
-      toast.error('Add a goal for this review request')
+      toast.error('Add a goal for this feedback request')
       return
     }
 
@@ -424,14 +424,14 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       onReviewRequestDraftCleared?.()
       writeLastTeacher(selectedTeacher)
       toast.success(`Request sent to ${selectedTeacher.display_name || selectedTeacher.username}`)
-      if (data?.review_link?.url) {
+      if ((data?.feedback_link?.url || data?.review_link?.url)) {
         try {
-          await navigator.clipboard.writeText(data.review_link.url)
-          toast.success('Request link copied')
+          await navigator.clipboard.writeText(data.feedback_link?.url || data.review_link?.url)
+          toast.success('Feedback request link copied')
         } catch {}
       }
     } catch (error) {
-      toast.error(error?.message || 'Could not create review request')
+      toast.error(error?.message || 'Could not create feedback request')
     } finally {
       setCreatingRequest(false)
     }
@@ -708,12 +708,12 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 </div>
               ) : null}
 
-              {false ? (
+              {canEdit ? (
                 <div className="rounded-xl border border-gray-200 bg-white px-4 py-4 space-y-4">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">Ask a teacher</p>
-                      <p className="text-xs text-gray-500 mt-1">Choose your teacher, add one goal, and send.</p>
+                      <p className="text-sm font-semibold text-gray-900">Request feedback</p>
+                      <p className="text-xs text-gray-500 mt-1">Choose one person, add one goal, and start a repeatable thread.</p>
                     </div>
                     <button
                       type="button"
@@ -721,7 +721,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       disabled={!canCreateShareLink}
                       className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors"
                     >
-                      {showRequestComposer ? 'Close' : (selectedTeacherName ? `Send to ${selectedTeacherName}` : 'Ask teacher')}
+                      {showRequestComposer ? 'Close' : (selectedTeacherName ? `Request from ${selectedTeacherName}` : 'New request')}
                     </button>
                   </div>
 
@@ -730,19 +730,19 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       {!canCreateShareLink ? (
                         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
                           <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Playback ready required</p>
-                          <p className="text-sm text-amber-900 mt-1">Wait until this session is playback ready before sending a teacher review request.</p>
+                          <p className="text-sm text-amber-900 mt-1">Wait until this session is playback ready before sending a feedback request.</p>
                         </div>
                       ) : null}
 
                       {selectedTeacherName ? (
                         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3">
                           <p className="text-xs font-medium uppercase tracking-wide text-emerald-800">Ready</p>
-                          <p className="text-sm text-emerald-900 mt-1">This request will go to {selectedTeacherName}.</p>
+                          <p className="text-sm text-emerald-900 mt-1">This feedback request will go to {selectedTeacherName}.</p>
                         </div>
                       ) : null}
 
                       <div className="space-y-2">
-                        <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">Teacher</label>
+                        <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">Reviewer</label>
                         {selectedTeacher ? (
                           <div className="rounded-lg border border-gray-200 bg-white px-3 py-3 flex items-center justify-between gap-3">
                             <div>
@@ -772,7 +772,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                               type="text"
                               value={teacherQuery}
                               onChange={(event) => setTeacherQuery(event.target.value)}
-                              placeholder="Search by teacher name or username"
+                              placeholder="Search by member name or username"
                               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
                             />
                             {teacherSearchLoading ? <p className="text-xs text-gray-500">Searching…</p> : null}
@@ -790,7 +790,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                   </button>
                                 ))}
                               </div>
-                            ) : teacherQuery.trim().length >= 2 && !teacherSearchLoading ? <p className="text-xs text-gray-500">No matching users found yet.</p> : null}
+                            ) : teacherQuery.trim().length >= 2 && !teacherSearchLoading ? <p className="text-xs text-gray-500">No matching members found yet.</p> : null}
                           </div>
                         )}
                       </div>
@@ -857,11 +857,11 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                   ) : null}
 
                   {requestsLoading ? (
-                    <div className="rounded-xl border border-gray-200 px-4 py-5 text-center text-sm text-gray-500">Loading teacher requests…</div>
+                    <div className="rounded-xl border border-gray-200 px-4 py-5 text-center text-sm text-gray-500">Loading feedback requests…</div>
                   ) : reviewRequests.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-gray-200 px-4 py-5 text-center">
-                      <p className="text-sm text-gray-600">No teacher review requests for this video yet.</p>
-                      <p className="text-xs text-gray-400 mt-1">Create one when you want a structured response from one specific teacher.</p>
+                      <p className="text-sm text-gray-600">No feedback requests for this video yet.</p>
+                      <p className="text-xs text-gray-400 mt-1">Create one when you want a repeatable proof → feedback → retry loop with someone specific.</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -870,7 +870,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           <div className="flex items-start justify-between gap-3 flex-wrap">
                             <div>
                               <div className="flex items-center gap-2 flex-wrap">
-                                <p className="text-sm font-medium text-gray-900">{requestItem.teacher?.display_name || requestItem.teacher?.username || 'Teacher'}</p>
+                                <p className="text-sm font-medium text-gray-900">{requestItem.reviewer?.display_name || requestItem.teacher?.display_name || requestItem.reviewer?.username || requestItem.teacher?.username || 'Reviewer'}</p>
                                 <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${requestStatusTone[requestItem.status] || 'bg-gray-100 text-gray-700'}`}>
                                   {requestStatusLabel(requestItem.status)}
                                 </span>
@@ -928,14 +928,14 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                             </div>
                           ) : null}
                           <div className="flex flex-wrap gap-2">
-                            {requestItem.review_link?.url ? (
+                            {(requestItem.feedback_link?.url || requestItem.review_link?.url) ? (
                               <button type="button" onClick={() => copyReviewRequestLink(requestItem)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
-                                Copy request link
+                                Copy feedback request link
                               </button>
                             ) : null}
-                            {requestItem.review_link?.token ? (
+                            {(requestItem.feedback_link?.token || requestItem.review_link?.token) ? (
                               <button type="button" onClick={() => onOpenReviewRequest?.(requestItem)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
-                                Open request page
+                                Open request thread
                               </button>
                             ) : null}
                             {requestItem.status !== 'closed' && requestItem.teacher ? (
@@ -962,17 +962,17 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                               </button>
                             ) : null}
                             {['viewed', 'responded'].includes(requestItem.status) ? (
-                              <button type="button" onClick={() => patchReviewRequestStatus(requestItem, 'resubmitted', 'Marked as resubmitted')} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
-                                Mark resubmitted
+                              <button type="button" onClick={() => patchReviewRequestStatus(requestItem, 'resubmitted', 'Marked as retried')} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
+                                Mark retried
                               </button>
                             ) : null}
                             {['requested', 'opened'].includes(requestItem.status) ? (
-                              <button type="button" onClick={() => patchReviewRequestStatus(requestItem, 'revoked', 'Teacher request turned off')} className="text-xs text-red-600 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-50 transition-colors">
+                              <button type="button" onClick={() => patchReviewRequestStatus(requestItem, 'revoked', 'Feedback request turned off')} className="text-xs text-red-600 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-50 transition-colors">
                                 Turn off request
                               </button>
                             ) : null}
                             {['viewed', 'resubmitted'].includes(requestItem.status) ? (
-                              <button type="button" onClick={() => patchReviewRequestStatus(requestItem, 'closed', 'Teacher request closed')} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
+                              <button type="button" onClick={() => patchReviewRequestStatus(requestItem, 'closed', 'Feedback request closed')} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
                                 Close request
                               </button>
                             ) : null}

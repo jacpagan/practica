@@ -9,12 +9,14 @@ import SessionUpload from './components/SessionUpload'
 import SessionDetail from './components/SessionDetail'
 import LibraryView from './components/LibraryView'
 import SeriesView from './components/SeriesView'
+import RequestsView from './components/TeachingView'
 
 const parseRoute = (pathname) => {
   if (pathname === '/' || pathname === '/library') {
     return { view: 'library', sessionId: null }
   }
   if (pathname === '/upload') return { view: 'upload', sessionId: null }
+  if (pathname === '/requests') return { view: 'requests', sessionId: null }
   const reviewMatch = pathname.match(/^\/r\/(.+)$/)
   if (reviewMatch) return { view: 'review', token: reviewMatch[1], sessionId: null }
   const seriesMatch = pathname.match(/^\/series\/(.+)$/)
@@ -27,6 +29,7 @@ const parseRoute = (pathname) => {
 const routePath = ({ view, sessionId, token, seriesName }) => {
   if (view === 'library') return '/library'
   if (view === 'upload') return '/upload'
+  if (view === 'requests') return '/requests'
   if (view === 'series' && seriesName) return `/series/${encodeURIComponent(seriesName)}`
   if (view === 'review' && token) return `/r/${token}`
   if (view === 'detail' && sessionId) return `/sessions/${sessionId}`
@@ -237,6 +240,12 @@ function AppContent() {
               >
                 Library
               </button>
+              <button
+                onClick={() => navigate({ view: 'requests', sessionId: null })}
+                className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
+              >
+                Requests
+              </button>
             </nav>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -255,12 +264,18 @@ function AppContent() {
           </div>
         </div>
         <div className="max-w-4xl mx-auto mt-3 space-y-2 sm:hidden">
-          <nav className="grid grid-cols-1 gap-2">
+          <nav className="grid grid-cols-2 gap-2">
             <button
               onClick={() => navigate({ view: 'library', sessionId: null })}
               className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'library' || view === 'detail' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
             >
               Library
+            </button>
+            <button
+              onClick={() => navigate({ view: 'requests', sessionId: null })}
+              className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+            >
+              Requests
             </button>
           </nav>
           <button
@@ -295,6 +310,14 @@ function AppContent() {
               navigate({ view: 'upload', sessionId: null })
             }}
           />
+        )}
+
+        {view === 'requests' && (
+          <RequestsView token={token} onOpenReviewRequest={(requestItem) => {
+            const requestLink = requestItem?.feedback_link || requestItem?.review_link
+            if (!requestLink?.token) return
+            navigate({ view: 'review', token: requestLink.token, sessionId: null })
+          }} />
         )}
 
         {view === 'upload' && (
