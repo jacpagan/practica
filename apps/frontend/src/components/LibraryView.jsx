@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { fmtDate } from '../utils'
 import { useToast } from './Toast'
+import VideoThumbnail from './VideoThumbnail'
 
 function InviteCodesPanel({ token }) {
   const toast = useToast()
@@ -223,13 +224,16 @@ function LibraryView({ sessions = [], sessionsLoading = false, onOpenSession, on
                       className="w-full text-left rounded-2xl border border-gray-200 px-4 py-4 hover:bg-gray-50 transition-colors"
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <VideoThumbnail session={latest} className="relative w-24 h-16 rounded-xl shrink-0" />
+                          <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="text-sm font-medium text-gray-900 line-clamp-1">{seriesName}</p>
                             <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">{items.length} takes</span>
                           </div>
                           <p className="text-xs text-gray-500 mt-1">Latest {fmtDate(latest.recorded_at || latest.created_at)}</p>
                           <p className="text-xs text-gray-500 mt-2 line-clamp-2">Newest take: {latest.title}</p>
+                          </div>
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-xs text-gray-500">{items.reduce((sum, item) => sum + (item.video_feedback_count || 0), 0)} replies</p>
@@ -253,7 +257,9 @@ function LibraryView({ sessions = [], sessionsLoading = false, onOpenSession, on
                     className="w-full text-left rounded-2xl border border-gray-200 px-4 py-4 hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <VideoThumbnail session={session} className="relative w-24 h-16 rounded-xl shrink-0" />
+                        <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-sm font-medium text-gray-900 line-clamp-1">{session.title}</p>
                           <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">Private</span>
@@ -261,6 +267,7 @@ function LibraryView({ sessions = [], sessionsLoading = false, onOpenSession, on
                         </div>
                         <p className="text-xs text-gray-500 mt-1">{fmtDate(session.recorded_at || session.created_at)}</p>
                         {session.description ? <p className="text-xs text-gray-500 mt-2 line-clamp-2">{session.description}</p> : null}
+                        </div>
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-xs text-gray-500">{session.video_feedback_count || 0} replies</p>
