@@ -19,6 +19,7 @@ function SessionUpload({
   const toast = useToast()
   const confirm = useConfirm()
   const [title, setTitle] = useState('')
+  const [titleManuallyEdited, setTitleManuallyEdited] = useState(false)
   const [practiceSeries, setPracticeSeries] = useState('')
   const [description, setDescription] = useState('')
   const [videoFile, setVideoFile] = useState(null)
@@ -79,6 +80,18 @@ function SessionUpload({
     return `Video ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
   }
 
+  const seriesBasedTitle = (seriesName = '') => {
+    const normalizedSeries = String(seriesName || '').trim()
+    if (!normalizedSeries) return defaultPracticeTitle()
+    const now = new Date()
+    return `${normalizedSeries} ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+  }
+
+  useEffect(() => {
+    if (titleManuallyEdited || videoFile) return
+    setTitle(seriesBasedTitle(practiceSeries))
+  }, [practiceSeries, titleManuallyEdited, videoFile])
+
   useEffect(() => {
     if (!initialRecorderOpen) return
     setShowRecorder(true)
@@ -101,7 +114,7 @@ function SessionUpload({
         return
       }
       setVideoFile(file)
-      if (!title.trim()) setTitle(file.name.replace(/\.[^.]+$/, '') || defaultPracticeTitle())
+      if (!titleManuallyEdited) setTitle(file.name.replace(/\.[^.]+$/, '') || defaultPracticeTitle())
       replaceOwnedPreviewUrl(URL.createObjectURL(file))
     }
 
@@ -128,7 +141,7 @@ function SessionUpload({
       return
     }
     setVideoFile(file)
-    if (!title.trim()) setTitle(defaultPracticeTitle())
+    if (!titleManuallyEdited) setTitle(file.name.replace(/\.[^.]+$/, '') || defaultPracticeTitle())
     replaceOwnedPreviewUrl(URL.createObjectURL(file))
   }
 
@@ -140,13 +153,14 @@ function SessionUpload({
       return
     }
     setVideoFile(file)
-    if (!title.trim()) setTitle(defaultPracticeTitle())
+    if (!titleManuallyEdited) setTitle(seriesBasedTitle(practiceSeries))
     replaceOwnedPreviewUrl(URL.createObjectURL(file))
   }
 
   const clearSelectedVideo = () => {
     if (isUploading) return
     setVideoFile(null)
+    if (!titleManuallyEdited) setTitle(seriesBasedTitle(practiceSeries))
     replaceOwnedPreviewUrl('')
   }
 
@@ -300,7 +314,10 @@ function SessionUpload({
             <input
               type="text"
               value={title}
-              onChange={(event) => setTitle(event.target.value)}
+              onChange={(event) => {
+                setTitle(event.target.value)
+                setTitleManuallyEdited(true)
+              }}
               disabled={isUploading}
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
               placeholder={videoFile ? 'Give it a name' : 'Title'}
