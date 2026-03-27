@@ -27,6 +27,7 @@ function SessionUpload({
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(null)
   const [showNotes, setShowNotes] = useState(false)
+  const [showVideoDetails, setShowVideoDetails] = useState(false)
   const [showRecorder, setShowRecorder] = useState(false)
   const dropRef = useRef(null)
   const inputRef = useRef(null)
@@ -56,6 +57,7 @@ function SessionUpload({
   useEffect(() => {
     if (!initialPracticeSeries) return
     setPracticeSeries(initialPracticeSeries)
+    setShowVideoDetails(true)
     onPracticeSeriesHandled?.()
   }, [initialPracticeSeries, onPracticeSeriesHandled])
 
@@ -97,6 +99,12 @@ function SessionUpload({
     setShowRecorder(true)
     onRecorderOpenHandled?.()
   }, [initialRecorderOpen, onRecorderOpenHandled])
+
+  useEffect(() => {
+    if (videoFile || description.trim() || practiceSeries.trim() || titleManuallyEdited) {
+      setShowVideoDetails(true)
+    }
+  }, [description, practiceSeries, titleManuallyEdited, videoFile])
 
   useEffect(() => {
     const el = dropRef.current
@@ -305,54 +313,65 @@ function SessionUpload({
             </div>
           ) : null}
 
-          <div>
-            <label className="block text-sm text-gray-600 mb-1.5">Practice thread</label>
-            <input
-              type="text"
-              value={practiceSeries}
-              onChange={(event) => setPracticeSeries(event.target.value)}
-              disabled={isUploading}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
-              placeholder="Optional, like Singles @ 120 BPM"
-            />
-          </div>
+          <details className="rounded-2xl border border-gray-200 bg-white px-4 py-4" open={showVideoDetails}>
+            <summary onClick={() => setShowVideoDetails((current) => !current)} className="cursor-pointer list-none flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Video details</p>
+                <p className="text-xs text-gray-500 mt-1">Auto-filled by default. Only open this when you want to rename, thread, or add a note.</p>
+              </div>
+              <span className="text-xs text-gray-500">{showVideoDetails ? 'Hide' : 'Show'}</span>
+            </summary>
+            <div className="space-y-4 pt-4">
+              <div>
+                <label className="block text-sm text-gray-600 mb-1.5">Practice thread</label>
+                <input
+                  type="text"
+                  value={practiceSeries}
+                  onChange={(event) => setPracticeSeries(event.target.value)}
+                  disabled={isUploading}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                  placeholder="Optional, like Singles @ 120 BPM"
+                />
+              </div>
 
-          <div>
-            <label className="block text-sm text-gray-600 mb-1.5">Title</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(event) => {
-                setTitle(event.target.value)
-                setTitleManuallyEdited(true)
-              }}
-              disabled={isUploading}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
-              placeholder={videoFile ? 'Give it a name' : 'Title'}
-              required
-            />
-          </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1.5">Title</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(event) => {
+                    setTitle(event.target.value)
+                    setTitleManuallyEdited(true)
+                  }}
+                  disabled={isUploading}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                  placeholder={videoFile ? 'Give it a name' : 'Title'}
+                  required
+                />
+              </div>
 
-          <div>
-            <button
-              type="button"
-              onClick={() => setShowNotes((current) => !current)}
-              disabled={isUploading}
-              className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
-            >
-              {showNotes ? 'Hide note' : 'Add note (optional)'}
-            </button>
-            {showNotes ? (
-              <textarea
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                disabled={isUploading}
-                rows={3}
-                className="w-full mt-2 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
-                placeholder="Optional note"
-              />
-            ) : null}
-          </div>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowNotes((current) => !current)}
+                  disabled={isUploading}
+                  className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
+                >
+                  {showNotes ? 'Hide note' : 'Add note (optional)'}
+                </button>
+                {showNotes ? (
+                  <textarea
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    disabled={isUploading}
+                    rows={3}
+                    className="w-full mt-2 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
+                    placeholder="Optional note"
+                  />
+                ) : null}
+              </div>
+            </div>
+          </details>
 
           <div>
             <label className="block text-sm text-gray-600 mb-2">Video file</label>

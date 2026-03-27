@@ -233,6 +233,15 @@ function AppContent() {
     navigate({ view: 'upload', sessionId: null })
   }, [navigate])
 
+  const startQuickRecord = useCallback(() => {
+    setSelectedSession(null)
+    setJustUploadedSessionId(null)
+    setPendingFollowUpRequestDraft(null)
+    setPendingPracticeSeries('')
+    setOpenRecorderOnUpload(true)
+    navigate({ view: 'upload', sessionId: null })
+  }, [navigate])
+
   useEffect(() => {
     if (!user) return
     if (view === 'library' || view === 'series') loadSessions()
@@ -295,7 +304,7 @@ function AppContent() {
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <button
-              onClick={() => navigate({ view: 'upload', sessionId: null })}
+              onClick={startQuickRecord}
               className="hidden sm:inline-flex rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
             >
               Record
@@ -326,7 +335,7 @@ function AppContent() {
             </nav>
           ) : null}
           <button
-            onClick={() => navigate({ view: 'upload', sessionId: null })}
+            onClick={startQuickRecord}
             className="w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
           >
             Record
@@ -344,7 +353,7 @@ function AppContent() {
             token={token}
             onOpenSession={openSession}
             onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
-            onCreateVideo={() => navigate({ view: 'upload', sessionId: null })}
+            onCreateVideo={startQuickRecord}
             onOpenReviewRequest={(requestItem) => {
               const requestLink = requestItem?.feedback_link || requestItem?.review_link
               if (!requestLink?.token) return
