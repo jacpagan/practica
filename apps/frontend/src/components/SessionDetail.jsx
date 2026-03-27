@@ -103,6 +103,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const [requestsLoading, setRequestsLoading] = useState(false)
   const [showRequestComposer, setShowRequestComposer] = useState(false)
   const [creatingRequest, setCreatingRequest] = useState(false)
+  const [showLoopDetails, setShowLoopDetails] = useState(false)
   const [teacherQuery, setTeacherQuery] = useState('')
   const [teacherResults, setTeacherResults] = useState([])
   const [teacherSearchLoading, setTeacherSearchLoading] = useState(false)
@@ -162,6 +163,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     setTeacherResults([])
     setSelectedTeacher(null)
     setRecentTeachers([])
+    setShowLoopDetails(false)
     setShowRequestDetails(false)
     setShowRequestHistory(false)
     setShowLegacyLinkTools(false)
@@ -176,6 +178,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
 
   useEffect(() => {
     if (!initialReviewRequestDraft || !canEdit) return
+    setShowLoopDetails(true)
     setShowRequestComposer(true)
     setSelectedTeacher(initialReviewRequestDraft.teacher || null)
     setShowRequestDetails(true)
@@ -190,9 +193,16 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   useEffect(() => {
     if (!canEdit || !canCreateShareLink || requestsLoading || showRequestComposer || initialReviewRequestDraft) return
     if (justUploaded && reviewRequests.length === 0) {
+      setShowLoopDetails(true)
       setShowRequestComposer(true)
     }
   }, [canCreateShareLink, canEdit, initialReviewRequestDraft, justUploaded, requestsLoading, reviewRequests.length, showRequestComposer])
+
+  useEffect(() => {
+    if (showRequestComposer || showRequestHistory) {
+      setShowLoopDetails(true)
+    }
+  }, [showRequestComposer, showRequestHistory])
 
   useEffect(() => {
     if (!showRequestComposer) return
@@ -591,7 +601,19 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
 
   const openRequestComposer = () => {
     if (!canCreateShareLink) return
+    setShowLoopDetails(true)
     setShowRequestComposer(true)
+  }
+
+  const toggleLoopDetails = () => {
+    setShowLoopDetails((current) => {
+      const next = !current
+      if (!next) {
+        setShowRequestComposer(false)
+        setShowRequestHistory(false)
+      }
+      return next
+    })
   }
 
   const startFollowUp = (requestItem = currentLoopRequest) => {
@@ -744,11 +766,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                         <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
                           Open request thread
                         </button>
-                        {(currentLoopRequest.feedback_link?.url || currentLoopRequest.review_link?.url) ? (
-                          <button type="button" onClick={() => copyReviewRequestLink(currentLoopRequest)} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
-                            Copy request link
-                          </button>
-                        ) : null}
                       </>
                     ) : null}
                     {readyForFollowUp && currentLoopRequest ? (
@@ -824,22 +841,27 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 <div className="rounded-xl border border-gray-200 bg-white px-4 py-4 space-y-4">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">Request feedback</p>
-                      <p className="text-xs text-gray-500 mt-1">Choose one person, add one goal, and start a repeatable thread.</p>
+                      <p className="text-sm font-semibold text-gray-900">Loop details</p>
+                      <p className="text-xs text-gray-500 mt-1">Only open this when you need to change request details or browse older thread history.</p>
                     </div>
-                    {!showRequestComposer ? (
-                      <button
-                        type="button"
-                        onClick={openRequestComposer}
-                        disabled={!canCreateShareLink}
-                        className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors"
-                      >
-                        {selectedTeacherName ? `Request from ${selectedTeacherName}` : 'Request feedback'}
+                    <div className="flex items-center gap-2">
+                      {!showLoopDetails && !showRequestComposer ? (
+                        <button
+                          type="button"
+                          onClick={openRequestComposer}
+                          disabled={!canCreateShareLink}
+                          className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                        >
+                          {selectedTeacherName ? `Request from ${selectedTeacherName}` : 'Request feedback'}
+                        </button>
+                      ) : null}
+                      <button type="button" onClick={toggleLoopDetails} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                        {showLoopDetails ? 'Hide details' : 'Show details'}
                       </button>
-                    ) : null}
+                    </div>
                   </div>
 
-                  {showRequestComposer ? (
+                  {showLoopDetails && showRequestComposer ? (
                     <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-4">
                       {!canCreateShareLink ? (
                         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
@@ -970,7 +992,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                     </div>
                   ) : null}
 
-                  {requestsLoading ? (
+                  {!showLoopDetails ? null : requestsLoading ? (
                     <div className="rounded-xl border border-gray-200 px-4 py-5 text-center text-sm text-gray-500">Loading feedback requests…</div>
                   ) : reviewRequests.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-gray-200 px-4 py-5 text-center">
