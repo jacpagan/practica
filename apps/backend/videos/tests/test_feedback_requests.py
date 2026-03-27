@@ -81,7 +81,7 @@ class FeedbackRequestApiTests(APITestCase):
         self.assertEqual(response.data[0]['id'], review_request.id)
         self.assertEqual(response.data[0]['current_member_role'], 'reviewer')
 
-    def test_any_logged_in_member_can_reply_via_feedback_link(self):
+    def test_outsider_cannot_reply_via_review_request_link(self):
         review_request = self._create_review_request()
 
         self._auth(self.outsider)
@@ -94,8 +94,18 @@ class FeedbackRequestApiTests(APITestCase):
             format='multipart',
         )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertTrue(bool(response.data['feedback_video']))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data['code'], 'review_request_forbidden')
+        self.assertFalse(VideoFeedback.objects.filter(review_request=review_request).exists())
+
+    def test_outsider_cannot_open_review_request_link(self):
+        review_request = self._create_review_request()
+
+        self._auth(self.outsider)
+        response = self.client.get(f'/api/review/{review_request.review_link.token}/')
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data['code'], 'review_request_forbidden')
 
     def test_reviewer_open_and_reply_updates_feedback_request_status(self):
         review_request = self._create_review_request()

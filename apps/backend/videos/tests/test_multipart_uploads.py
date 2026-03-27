@@ -209,3 +209,55 @@ class MultipartUploadApiTests(APITestCase):
             )
 
         self.assertEqual(init_res.status_code, status.HTTP_201_CREATED)
+
+    def test_multipart_initiate_accepts_android_3gpp_with_generic_content_type(self):
+        fake_s3 = FakeS3Client()
+        self.client.force_authenticate(user=self.member)
+
+        with patch('videos.views._s3_client', return_value=fake_s3):
+            init_res = self.client.post(
+                '/api/sessions/multipart/initiate/',
+                {
+                    'title': 'Android upload',
+                    'description': 'short video',
+                    'size_bytes': 25 * 1024 * 1024,
+                    'filename': 'camera-short.3gpp',
+                    'content_type': 'application/octet-stream',
+                },
+                format='json',
+            )
+
+        self.assertEqual(init_res.status_code, status.HTTP_201_CREATED)
+
+    @patch('videos.views.enqueue_local_session_transcode', return_value=(True, ''))
+    def test_multipart_complete_queues_transcode_for_android_mp4_with_application_mime(self, enqueue_local_transcode):
+        fake_s3 = FakeS3Client()
+        self.client.force_authenticate(user=self.member)
+
+        with patch('videos.views._s3_client', return_value=fake_s3):
+            init_res = self.client.post(
+                '/api/sessions/multipart/initiate/',
+                {
+                    'title': 'Android mp4 upload',
+                    'description': 'needs compatible proxy',
+                    'size_bytes': 15 * 1024 * 1024,
+                    'filename': 'android-short.mp4',
+                    'content_type': 'application/mp4',
+                },
+                format='json',
+            )
+            self.assertEqual(init_res.status_code, status.HTTP_201_CREATED)
+
+            complete_res = self.client.post(
+                '/api/sessions/multipart/complete/',
+                {
+                    'multipart_upload_id': init_res.data['multipart_upload_id'],
+                    'parts': [{'part_number': 1, 'etag': '"etag-part-1"'}],
+                },
+                format='json',
+            )
+
+        self.assertEqual(complete_res.status_code, status.HTTP_201_CREATED)
+        session = Session.objects.get(id=complete_res.data['id'])
+        self.assertEqual(session.processing_status, Session.STATUS_PROCESSING)
+        enqueue_local_transcode.assert_called_once()

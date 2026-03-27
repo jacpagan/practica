@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useToast } from './Toast'
-import { createSessionUpload, isLikelyVideoFile, uploadErrorMessage, videoFileAccept } from '../utils'
+import { createSessionUpload, isLikelyVideoFile, MAX_RECORDER_DURATION_SECONDS, MAX_VIDEO_UPLOAD_BYTES, uploadErrorMessage, videoFileAccept } from '../utils'
 import VideoRecorder from './VideoRecorder'
 import { useConfirm } from './ConfirmDialog'
 
@@ -258,7 +258,11 @@ function SessionUpload({
                 Upload file
               </button>
             </div>
-            <p className="text-xs text-gray-500 mt-3">Supports `.mov`, `.mp4`, and `.webm`.</p>
+            <div className="mt-3 space-y-1">
+              <p className="text-xs text-gray-500">Supports `.mov`, `.mp4`, `.m4v`, `.webm`, `.avi`, `.mkv`, `.3gp`, and `.3gpp`.</p>
+              <p className="text-xs text-gray-500">Built-in recording is limited to {Math.round(MAX_RECORDER_DURATION_SECONDS / 60)} minutes. File uploads are limited to {Math.round(MAX_VIDEO_UPLOAD_BYTES / (1024 * 1024 * 1024))}GB.</p>
+              <p className="text-xs text-gray-500">Uploaded session videos are prepared for browser playback and may take a moment before they work on Mac, iPhone, and Android browsers.</p>
+            </div>
           </div>
         </div>
 
@@ -273,7 +277,11 @@ function SessionUpload({
                 Close
               </button>
             </div>
-            <VideoRecorder onRecorded={handleRecorded} onCancel={() => setShowRecorder(false)} maxDuration={300} />
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Recorder limits</p>
+              <p className="text-sm text-amber-900 mt-1">You can record up to {Math.round(MAX_RECORDER_DURATION_SECONDS / 60)} minutes in Practica’s built-in recorder.</p>
+            </div>
+            <VideoRecorder onRecorded={handleRecorded} onCancel={() => setShowRecorder(false)} maxDuration={MAX_RECORDER_DURATION_SECONDS} />
           </div>
         ) : null}
 

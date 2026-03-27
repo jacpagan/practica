@@ -52,6 +52,23 @@ class V1VideoFeaturesTests(APITestCase):
         self.assertFalse(feedback.is_legacy_text_feedback)
         self.assertTrue(bool(feedback.feedback_video))
 
+    def test_video_feedback_accepts_android_3gpp_with_generic_content_type(self):
+        session = self._create_session(user=self.owner)
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.post(
+            f'/api/sessions/{session.id}/video-feedback/',
+            {
+                'text': 'Android upload',
+                'feedback_video': self._video_file('reply.3gpp', content_type='application/octet-stream'),
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        feedback = VideoFeedback.objects.latest('id')
+        self.assertTrue(feedback.feedback_video.name.endswith('.3gpp'))
+
     def test_legacy_text_only_video_feedback_remains_visible(self):
         session = self._create_session()
         legacy = VideoFeedback.objects.create(
@@ -72,7 +89,8 @@ class V1VideoFeaturesTests(APITestCase):
         AWS_MEDIA_CONVERT_ROLE_ARN='',
         AWS_MEDIA_CONVERT_ENDPOINT_URL='',
     )
-    def test_session_create_falls_back_to_ready_with_proxy_asset(self):
+    @patch('videos.views.enqueue_local_session_transcode', return_value=(False, 'ffmpeg missing'))
+    def test_session_create_fails_when_conversion_is_unavailable(self, enqueue_local_transcode):
         self.client.force_authenticate(user=self.owner)
 
         res = self.client.post(
@@ -87,8 +105,62 @@ class V1VideoFeaturesTests(APITestCase):
 
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         created = Session.objects.get(id=res.data['id'])
-        self.assertEqual(created.processing_status, Session.STATUS_READY)
-        self.assertTrue(created.assets.filter(asset_type=SessionAsset.TYPE_PROXY_MP4).exists())
+        self.assertEqual(created.processing_status, Session.STATUS_FAILED)
+        self.assertIn('playback conversion is unavailable', created.processing_error.lower())
+        enqueue_local_transcode.assert_called_once()
+
+    @override_settings(
+        AWS_STORAGE_BUCKET_NAME='',
+        AWS_MEDIA_CONVERT_ROLE_ARN='',
+        AWS_MEDIA_CONVERT_ENDPOINT_URL='',
+    )
+    @patch('videos.views.enqueue_local_session_transcode', return_value=(True, ''))
+    def test_session_create_accepts_android_mp4_with_application_mime(self, enqueue_local_transcode):
+        self.client.force_authenticate(user=self.owner)
+
+        res = self.client.post(
+            '/api/sessions/',
+            {
+                'title': 'Android Session',
+                'description': 'uploaded from phone',
+                'video_file': self._video_file('android-short.mp4', content_type='application/mp4'),
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        created = Session.objects.get(id=res.data['id'])
+        self.assertEqual(created.processing_status, Session.STATUS_PROCESSING)
+        enqueue_local_transcode.assert_called_once()
+
+    @override_settings(
+        AWS_STORAGE_BUCKET_NAME='',
+        AWS_MEDIA_CONVERT_ROLE_ARN='',
+        AWS_MEDIA_CONVERT_ENDPOINT_URL='',
+    )
+    @patch('videos.views.enqueue_local_session_transcode', return_value=(True, ''))
+    def test_retry_processing_requeues_mobile_compatible_transcode(self, enqueue_local_transcode):
+        session = Session.objects.create(
+            user=self.owner,
+            title='Android upload',
+            description='',
+            video_file='sessions/android-short.mp4',
+            processing_status=Session.STATUS_READY,
+        )
+        session.assets.create(
+            asset_type=SessionAsset.TYPE_PROXY_MP4,
+            object_key='sessions/android-short.mp4',
+            content_type='video/mp4',
+            metadata_json={'source': 'original'},
+        )
+
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.post(f'/api/sessions/{session.id}/retry-processing/')
+
+        self.assertEqual(res.status_code, status.HTTP_202_ACCEPTED)
+        session.refresh_from_db()
+        self.assertEqual(session.processing_status, Session.STATUS_PROCESSING)
+        enqueue_local_transcode.assert_called_once()
 
     @override_settings(
         AWS_STORAGE_BUCKET_NAME='',

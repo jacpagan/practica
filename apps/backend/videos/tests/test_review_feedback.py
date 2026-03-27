@@ -151,6 +151,44 @@ class ReviewFeedbackApiTests(APITestCase):
         self.assertEqual(feedback.timestamp_seconds, 25)
         self.assertFalse(feedback.is_legacy_text_feedback)
 
+    def test_authenticated_reviewer_can_post_android_video_feedback(self):
+        self._auth(self.reviewer)
+        response = self.client.post(
+            f'/api/review/{self.link.token}/feedback/',
+            {
+                'text': 'Android clip',
+                'feedback_video': self._video_file('android-short.mp4', content_type='application/mp4'),
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(bool(response.data['feedback_video']))
+
+    def test_feedback_author_can_update_with_generic_3gpp_upload(self):
+        feedback = VideoFeedback.objects.create(
+            session=self.session,
+            user=self.reviewer,
+            text='Original note',
+            timestamp_seconds=12,
+            feedback_video=self._video_file('original.mp4'),
+            is_legacy_text_feedback=False,
+        )
+        self._auth(self.reviewer)
+
+        response = self.client.patch(
+            f'/api/review/{self.link.token}/feedback/',
+            {
+                'feedback_id': feedback.id,
+                'feedback_video': self._video_file('updated.3gpp', content_type='application/octet-stream'),
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        feedback.refresh_from_db()
+        self.assertTrue(feedback.feedback_video.name.endswith('.3gpp'))
+
     def test_session_detail_includes_video_feedback(self):
         VideoFeedback.objects.create(
             session=self.session,

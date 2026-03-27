@@ -39,7 +39,14 @@ from .serializers import (
     PublicSessionSerializer, ReviewLinkSerializer, ReviewVideoFeedbackSerializer,
     ReviewRequestSerializer, MemberConnectionSerializer, FeedbackTemplateSerializer, SignupInviteCodeSerializer,
 )
-from .services.media_pipeline import enqueue_session_processing, enqueue_local_session_transcode, apply_processing_update
+from .services.media_pipeline import (
+    apply_processing_update,
+    enqueue_local_session_transcode,
+    enqueue_session_processing,
+    local_transcode_enabled,
+    media_pipeline_enabled,
+)
+from .video_uploads import is_allowed_video_upload
 
 logger = logging.getLogger(__name__)
 
@@ -241,20 +248,6 @@ def _parse_tag_names(raw_tags):
     return []
 
 
-def _filename_has_video_extension(filename):
-    name = str(filename or '').strip().lower()
-    return name.endswith(('.mov', '.mp4', '.m4v', '.webm', '.avi', '.mkv', '.mpeg', '.mpg', '.wmv', '.3gp'))
-
-
-def _is_allowed_video_upload(content_type, filename=''):
-    normalized_type = str(content_type or '').strip().lower()
-    if normalized_type.startswith('video/'):
-        return True
-    if normalized_type in {'application/octet-stream', 'binary/octet-stream', ''} and _filename_has_video_extension(filename):
-        return True
-    return False
-
-
 def _attach_tags_to_session(session, raw_tags):
     for name in _parse_tag_names(raw_tags):
         tag, _ = Tag.objects.get_or_create(name__iexact=name, defaults={'name': name})
@@ -271,15 +264,6 @@ def _can_modify_session(user, session):
     return can_edit_session(user, session)
 
 
-def _browser_playable_source(filename):
-    name = str(filename or '').strip().lower()
-    return name.endswith(('.mp4', '.m4v'))
-
-
-def _fallback_content_type(filename):
-    return 'video/mp4'
-
-
 def _start_processing_pipeline(session):
     session.processing_status = Session.STATUS_PROCESSING
     session.processing_error = ''
@@ -291,28 +275,15 @@ def _start_processing_pipeline(session):
 
     # Fallback when managed transcoding is unavailable.
     if 'not configured' in error.lower():
-        if _browser_playable_source(session.video_file.name):
-            SessionAsset.objects.get_or_create(
-                session=session,
-                asset_type=SessionAsset.TYPE_PROXY_MP4,
-                defaults={
-                    'object_key': session.video_file.name,
-                    'content_type': _fallback_content_type(session.video_file.name),
-                    'metadata_json': {'source': 'original'},
-                },
-            )
-            session.processing_status = Session.STATUS_READY
-            session.processing_error = ''
-        else:
-            queued_local, local_error = enqueue_local_session_transcode(session)
-            if queued_local:
-                return
-            session.processing_status = Session.STATUS_FAILED
-            session.processing_error = (
-                'Upload finished, but browser playback needs transcoding for this file type. '
-                f'Local transcoding is unavailable: {local_error or "ffmpeg missing"}. '
-                'Please upload MP4 or enable AWS MediaConvert/local ffmpeg playback conversion.'
-            )
+        queued_local, local_error = enqueue_local_session_transcode(session)
+        if queued_local:
+            return
+        session.processing_status = Session.STATUS_FAILED
+        session.processing_error = (
+            'Upload finished, but playback conversion is unavailable. '
+            f'Local transcoding is unavailable: {local_error or "ffmpeg missing"}. '
+            'Enable AWS MediaConvert or local ffmpeg so uploaded videos can be converted for browser playback.'
+        )
     else:
         session.processing_status = Session.STATUS_FAILED
         session.processing_error = (error or 'Failed to enqueue media processing')[:2000]
@@ -459,6 +430,10 @@ def review_link_info(request, token):
     if error_reason:
         return _review_link_error_response(error_reason)
     review_request = getattr(link, 'review_request', None)
+    if review_request and not _review_request_visible_to_user(review_request, request.user):
+        return _review_request_forbidden_response(
+            'This review request is only available to the assigned teacher and student.'
+        )
     ReviewLink.objects.filter(pk=link.pk).update(last_accessed_at=timezone.now())
     link.refresh_from_db(fields=['last_accessed_at'])
     if review_request and review_request.status == ReviewRequest.STATUS_REQUESTED and request.user.id == review_request.teacher_id:
@@ -485,6 +460,10 @@ def review_link_feedback(request, token):
     if error_reason:
         return _review_link_error_response(error_reason)
     review_request = getattr(link, 'review_request', None)
+    if review_request and not _review_request_visible_to_user(review_request, request.user):
+        return _review_request_forbidden_response(
+            'This review request is only available to the assigned teacher and student.'
+        )
 
     if request.method == 'GET':
         feedback = link.session.video_feedback.select_related('user', 'user__profile')
@@ -531,7 +510,7 @@ def review_link_feedback(request, token):
         next_video = feedback.feedback_video
         if 'feedback_video' in request.FILES:
             uploaded_video = request.FILES.get('feedback_video')
-            if uploaded_video and not str(uploaded_video.content_type or '').startswith('video/'):
+            if uploaded_video and not is_allowed_video_upload(uploaded_video.content_type, uploaded_video.name):
                 return Response({'error': 'Only video files allowed'}, status=status.HTTP_400_BAD_REQUEST)
             next_video = uploaded_video
 
@@ -558,6 +537,10 @@ def review_link_feedback(request, token):
             },
             status=status.HTTP_403_FORBIDDEN,
         )
+    if review_request and not _review_request_teacher_can_respond(review_request, request.user):
+        return _review_request_forbidden_response(
+            'Only the assigned teacher can respond to this review request.'
+        )
 
     serializer = ReviewVideoFeedbackSerializer(data=request.data, context={'request': request, 'session': link.session})
     serializer.is_valid(raise_exception=True)
@@ -565,7 +548,7 @@ def review_link_feedback(request, token):
     text = str(serializer.validated_data.get('text', '') or '').strip()
     if not video_file:
         return Response({'error': 'Feedback video is required'}, status=status.HTTP_400_BAD_REQUEST)
-    if video_file and not str(video_file.content_type or '').startswith('video/'):
+    if video_file and not is_allowed_video_upload(video_file.content_type, video_file.name):
         return Response({'error': 'Only video files allowed'}, status=status.HTTP_400_BAD_REQUEST)
 
     item = VideoFeedback.objects.create(
@@ -927,7 +910,7 @@ class SessionViewSet(viewsets.ModelViewSet):
             return Response({'error': 'File exceeds max upload size (2GB)'}, status=status.HTTP_400_BAD_REQUEST)
 
         content_type = str(request.data.get('content_type', '')).strip().lower()
-        if not _is_allowed_video_upload(content_type, request.data.get('filename')):
+        if not is_allowed_video_upload(content_type, request.data.get('filename')):
             return Response({'error': 'Only video files allowed'}, status=status.HTTP_400_BAD_REQUEST)
 
         filename = _sanitize_filename(request.data.get('filename'))
@@ -936,8 +919,11 @@ class SessionViewSet(viewsets.ModelViewSet):
         total_parts = math.ceil(size_bytes / part_size)
 
         try:
-            duration_seconds = request.data.get('duration_seconds')
-            duration_seconds = int(duration_seconds) if str(duration_seconds).strip() else None
+            raw_duration_seconds = request.data.get('duration_seconds', '')
+            if raw_duration_seconds is None or str(raw_duration_seconds).strip().lower() in {'', 'none', 'null'}:
+                duration_seconds = None
+            else:
+                duration_seconds = int(raw_duration_seconds)
         except (TypeError, ValueError):
             return Response({'error': 'Invalid duration'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1303,7 +1289,7 @@ class SessionViewSet(viewsets.ModelViewSet):
         video_file = request.FILES.get('feedback_video')
         if not video_file:
             return Response({'error': 'Feedback video is required'}, status=status.HTTP_400_BAD_REQUEST)
-        if video_file and not video_file.content_type.startswith('video/'):
+        if video_file and not is_allowed_video_upload(video_file.content_type, video_file.name):
             return Response({'error': 'Only video files allowed'}, status=status.HTTP_400_BAD_REQUEST)
         VideoFeedback.objects.create(
             session=session, user=request.user,
@@ -1339,6 +1325,10 @@ def health_check(request):
         'status': 'healthy',
         'timestamp': timezone.now().isoformat(),
         'services': {},
+        'video_processing': {
+            'local_ffmpeg': local_transcode_enabled(),
+            'mediaconvert': media_pipeline_enabled(),
+        },
         'version': '3.0.0',
         'environment': 'development' if settings.DEBUG else 'production',
         'deployed_sha': os.getenv('DEPLOYED_GIT_SHA', ''),

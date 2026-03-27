@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { fmtTimer, sessionVideoSources, videoUrl, isLikelyVideoFile, videoFileAccept } from '../utils'
+import { fmtTimer, MAX_RECORDER_DURATION_SECONDS, MAX_VIDEO_UPLOAD_BYTES, sessionVideoSources, videoUrl, isLikelyVideoFile, videoFileAccept } from '../utils'
 import { useAuth } from '../auth'
 import VideoRecorder from './VideoRecorder'
 
@@ -469,7 +469,13 @@ function ReviewPage({ reviewToken = '' }) {
               <input ref={inputRef} type="file" accept={videoFileAccept()} className="hidden" onChange={pickFile} />
             </div>
 
-            {showRecorder ? <VideoRecorder onRecorded={handleRecorded} onCancel={() => setShowRecorder(false)} maxDuration={300} /> : null}
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 space-y-1">
+              <p className="text-xs text-gray-500">Recorder limit: {Math.round(MAX_RECORDER_DURATION_SECONDS / 60)} minutes.</p>
+              <p className="text-xs text-gray-500">Upload limit: {Math.round(MAX_VIDEO_UPLOAD_BYTES / (1024 * 1024 * 1024))}GB.</p>
+              <p className="text-xs text-gray-500">For best compatibility, use a recent phone or browser-supported video format when recording feedback.</p>
+            </div>
+
+            {showRecorder ? <VideoRecorder onRecorded={handleRecorded} onCancel={() => setShowRecorder(false)} maxDuration={MAX_RECORDER_DURATION_SECONDS} /> : null}
 
             {responsePreviewUrl ? (
               <div className="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-3">

@@ -110,6 +110,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const [recentTeachers, setRecentTeachers] = useState([])
   const [recentTeachersLoading, setRecentTeachersLoading] = useState(false)
   const [showRequestDetails, setShowRequestDetails] = useState(false)
+  const [showRequestHistory, setShowRequestHistory] = useState(false)
+  const [showLegacyLinkTools, setShowLegacyLinkTools] = useState(false)
   const [requestInstrument, setRequestInstrument] = useState('drums')
   const [requestStudentLevel, setRequestStudentLevel] = useState('')
   const [requestGoal, setRequestGoal] = useState('')
@@ -126,6 +128,19 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const [playbackFailed, setPlaybackFailed] = useState(false)
   const playableUrl = playbackSources[playbackSourceIndex] || null
   const selectedTeacherName = selectedTeacher?.display_name || selectedTeacher?.username || ''
+  const sortedReviewRequests = useMemo(
+    () => [...reviewRequests].sort((left, right) => new Date(right.created_at) - new Date(left.created_at)),
+    [reviewRequests],
+  )
+  const currentLoopRequest = sortedReviewRequests.find((item) => !['closed', 'revoked'].includes(item.status)) || sortedReviewRequests[0] || null
+  const currentLoopStatus = String(currentLoopRequest?.status || '').trim().toLowerCase()
+  const waitingOnTeacher = ['requested', 'opened'].includes(currentLoopStatus)
+  const readyForFollowUp = ['responded', 'viewed', 'resubmitted'].includes(currentLoopStatus)
+  const canStartNewRequest = canEdit && canCreateShareLink && !waitingOnTeacher
+  const defaultRequestGoal = useMemo(() => {
+    if (session?.practice_series) return `${session.practice_series} follow-up`
+    return LESSON_GOAL_PRESETS[0]
+  }, [session?.practice_series])
   const videoFeedback = Array.isArray(session?.video_feedback)
     ? session.video_feedback
     : []
@@ -148,6 +163,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     setSelectedTeacher(null)
     setRecentTeachers([])
     setShowRequestDetails(false)
+    setShowRequestHistory(false)
+    setShowLegacyLinkTools(false)
     setRequestInstrument('drums')
     setRequestStudentLevel('')
     setRequestGoal('')
@@ -169,6 +186,19 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     setRequestNotes(initialReviewRequestDraft.notes || '')
     setRequestTurnaroundHours(initialReviewRequestDraft.requested_turnaround_hours ? String(initialReviewRequestDraft.requested_turnaround_hours) : '24')
   }, [initialReviewRequestDraft, canEdit])
+
+  useEffect(() => {
+    if (!canEdit || !canCreateShareLink || requestsLoading || showRequestComposer || initialReviewRequestDraft) return
+    if (justUploaded && reviewRequests.length === 0) {
+      setShowRequestComposer(true)
+    }
+  }, [canCreateShareLink, canEdit, initialReviewRequestDraft, justUploaded, requestsLoading, reviewRequests.length, showRequestComposer])
+
+  useEffect(() => {
+    if (!showRequestComposer) return
+    if (String(requestGoal || '').trim()) return
+    setRequestGoal(defaultRequestGoal)
+  }, [defaultRequestGoal, requestGoal, showRequestComposer])
 
   const loadReviewRequests = async () => {
     if (!token || !session?.id || !canEdit) return
@@ -559,6 +589,26 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     setPlaybackFailed(true)
   }
 
+  const openRequestComposer = () => {
+    if (!canCreateShareLink) return
+    setShowRequestComposer(true)
+  }
+
+  const startFollowUp = (requestItem = currentLoopRequest) => {
+    if (!requestItem?.teacher) return
+    onRecordAnother?.({
+      parent_request_id: requestItem.id,
+      teacher: requestItem.teacher,
+      instrument: requestItem.instrument,
+      student_level: requestItem.student_level,
+      goal: requestItem.goal,
+      exercise_or_song: requestItem.exercise_or_song,
+      notes: requestItem.notes,
+      requested_turnaround_hours: requestItem.requested_turnaround_hours,
+      practiceSeries: session?.practice_series || '',
+    })
+  }
+
   return (
     <div className="px-4 sm:px-6 py-4 pb-28 max-w-3xl mx-auto">
       <div className="mb-4">
@@ -630,14 +680,11 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               {justUploaded ? (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4">
                   <p className="text-sm font-medium text-emerald-900">Your video is saved.</p>
-                  <p className="text-sm text-emerald-800 mt-1">It is already in your private library. Watch it, share a feedback link, or record another one.</p>
+                  <p className="text-sm text-emerald-800 mt-1">It is already in your private library. The fastest next step is to request feedback or record another take in this thread.</p>
                   <div className="flex flex-wrap gap-2 mt-3">
-                    <button type="button" onClick={() => videoRef.current?.play?.().catch?.(() => {})} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
-                      Watch video
-                    </button>
-                    {canEdit && canCreateShareLink ? (
-                      <button type="button" onClick={() => (activeReviewLink?.url ? copyShareLink() : createShare())} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
-                        {activeReviewLink?.url ? 'Copy feedback link' : 'Create feedback link'}
+                    {canStartNewRequest ? (
+                      <button type="button" onClick={openRequestComposer} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
+                        {selectedTeacherName ? `Request from ${selectedTeacherName}` : 'Request feedback'}
                       </button>
                     ) : null}
                     <button type="button" onClick={onRecordAnother} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
@@ -667,8 +714,72 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 </div>
               ) : null}
 
+              {playbackFailed && session.processing_status === 'ready' ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4">
+                  <p className="text-sm font-medium text-amber-900">Playback failed on this device.</p>
+                  <p className="text-sm text-amber-800 mt-1">Retry processing to generate a more compatible playback version for Mac and phone browsers.</p>
+                  {canEdit ? (
+                    <button type="button" onClick={retryProcessing} disabled={retryingProcessing} className="mt-3 text-sm font-medium text-amber-900 border border-amber-300 rounded-lg px-4 py-2.5 hover:bg-amber-100 disabled:opacity-50 transition-colors">
+                      {retryingProcessing ? 'Retrying…' : 'Retry playback processing'}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+
               {canEdit ? (
                 <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Next step</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {waitingOnTeacher
+                        ? 'This video is out for review. Stay in the thread until feedback comes back.'
+                        : readyForFollowUp
+                          ? 'Feedback is back. Record the next take with as little friction as possible.'
+                          : 'Keep the loop moving: send this take to one teacher and keep everything in one thread.'}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {waitingOnTeacher && currentLoopRequest ? (
+                      <>
+                        <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
+                          Open request thread
+                        </button>
+                        {(currentLoopRequest.feedback_link?.url || currentLoopRequest.review_link?.url) ? (
+                          <button type="button" onClick={() => copyReviewRequestLink(currentLoopRequest)} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
+                            Copy request link
+                          </button>
+                        ) : null}
+                      </>
+                    ) : null}
+                    {readyForFollowUp && currentLoopRequest ? (
+                      <>
+                        <button type="button" onClick={() => startFollowUp(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
+                          Record follow-up
+                        </button>
+                        <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
+                          Open request thread
+                        </button>
+                      </>
+                    ) : null}
+                    {!waitingOnTeacher && !readyForFollowUp ? (
+                      <button type="button" onClick={openRequestComposer} disabled={!canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
+                        {selectedTeacherName ? `Request from ${selectedTeacherName}` : 'Request feedback'}
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
+              {canEdit ? (
+                <details className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4" open={showLegacyLinkTools}>
+                  <summary onClick={() => setShowLegacyLinkTools((current) => !current)} className="cursor-pointer list-none flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">Private link options</p>
+                      <p className="text-xs text-gray-500 mt-1">Keep this for edge cases. The main flow is request → feedback → follow-up.</p>
+                    </div>
+                    <span className="text-xs text-gray-500">{showLegacyLinkTools ? 'Hide' : 'Show'}</span>
+                  </summary>
+                  <div className="space-y-3 pt-4">
                   <div>
                     <p className="text-sm font-semibold text-gray-900">Feedback link</p>
                     <p className="text-xs text-gray-500 mt-1">Anyone with this link can log in and leave feedback.</p>
@@ -705,7 +816,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       </button>
                     </div>
                   )}
-                </div>
+                  </div>
+                </details>
               ) : null}
 
               {canEdit ? (
@@ -715,14 +827,16 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       <p className="text-sm font-semibold text-gray-900">Request feedback</p>
                       <p className="text-xs text-gray-500 mt-1">Choose one person, add one goal, and start a repeatable thread.</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowRequestComposer((current) => !current)}
-                      disabled={!canCreateShareLink}
-                      className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors"
-                    >
-                      {showRequestComposer ? 'Close' : (selectedTeacherName ? `Request from ${selectedTeacherName}` : 'New request')}
-                    </button>
+                    {!showRequestComposer ? (
+                      <button
+                        type="button"
+                        onClick={openRequestComposer}
+                        disabled={!canCreateShareLink}
+                        className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                      >
+                        {selectedTeacherName ? `Request from ${selectedTeacherName}` : 'Request feedback'}
+                      </button>
+                    ) : null}
                   </div>
 
                   {showRequestComposer ? (
@@ -865,6 +979,14 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                     </div>
                   ) : (
                     <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs text-gray-500">{reviewRequests.length} request{reviewRequests.length === 1 ? '' : 's'} on this video</p>
+                        <button type="button" onClick={() => setShowRequestHistory((current) => !current)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
+                          {showRequestHistory ? 'Hide request history' : 'Show request history'}
+                        </button>
+                      </div>
+                      {!showRequestHistory ? null : (
+                        <div className="space-y-3">
                       {reviewRequests.map((requestItem) => (
                         <div key={requestItem.id} className="rounded-xl bg-gray-50 px-3 py-3 space-y-3">
                           <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -941,16 +1063,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                             {requestItem.status !== 'closed' && requestItem.teacher ? (
                               <button
                                 type="button"
-                                onClick={() => onRecordAnother?.({
-                                  parent_request_id: requestItem.id,
-                                  teacher: requestItem.teacher,
-                                  instrument: requestItem.instrument,
-                                  student_level: requestItem.student_level,
-                                  goal: requestItem.goal,
-                                  exercise_or_song: requestItem.exercise_or_song,
-                                  notes: requestItem.notes,
-                                  requested_turnaround_hours: requestItem.requested_turnaround_hours,
-                                })}
+                                onClick={() => startFollowUp(requestItem)}
                                 className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
                               >
                                 Record follow-up
@@ -979,31 +1092,36 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           </div>
                         </div>
                       ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               ) : null}
 
-              <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-4">
-                <button type="button" onClick={refreshSession} disabled={refreshing} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 disabled:opacity-50 transition-colors">
-                  {refreshing ? 'Refreshing…' : 'Refresh'}
-                </button>
-                {canEdit ? (
-                  <button type="button" onClick={startEditing} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors">
-                    Edit
+              <details className="border-t border-gray-100 pt-4">
+                <summary className="cursor-pointer list-none text-sm text-gray-500 hover:text-gray-900 transition-colors">More options</summary>
+                <div className="flex flex-wrap gap-2 pt-4">
+                  <button type="button" onClick={refreshSession} disabled={refreshing} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 disabled:opacity-50 transition-colors">
+                    {refreshing ? 'Refreshing…' : 'Refresh'}
                   </button>
-                ) : null}
-                {canEdit && session.video_file ? (
-                  <a href={videoUrl(session.video_file)} download className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors">
-                    Download original
-                  </a>
-                ) : null}
-                {canEdit ? (
-                  <button type="button" onClick={deleteSession} disabled={deleting} className="text-sm text-red-600 border border-red-200 rounded-lg px-4 py-2.5 hover:bg-red-50 disabled:opacity-50 transition-colors">
-                    {deleting ? 'Deleting…' : 'Delete'}
-                  </button>
-                ) : null}
-              </div>
+                  {canEdit ? (
+                    <button type="button" onClick={startEditing} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                      Edit
+                    </button>
+                  ) : null}
+                  {canEdit && session.video_file ? (
+                    <a href={videoUrl(session.video_file)} download className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                      Download original
+                    </a>
+                  ) : null}
+                  {canEdit ? (
+                    <button type="button" onClick={deleteSession} disabled={deleting} className="text-sm text-red-600 border border-red-200 rounded-lg px-4 py-2.5 hover:bg-red-50 disabled:opacity-50 transition-colors">
+                      {deleting ? 'Deleting…' : 'Delete'}
+                    </button>
+                  ) : null}
+                </div>
+              </details>
 
               <div className="rounded-xl border border-gray-200 bg-white px-4 py-4 space-y-3">
                 <div>

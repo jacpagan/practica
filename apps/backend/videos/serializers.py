@@ -13,24 +13,7 @@ from .models import (
     FeedbackTemplate,
     SignupInviteCode,
 )
-
-
-KNOWN_VIDEO_EXTENSIONS = ('mov', 'mp4', 'm4v', 'webm', 'avi', 'mkv', 'mpeg', 'mpg', 'wmv', '3gp')
-
-
-def _filename_has_video_extension(filename):
-    name = str(filename or '').strip().lower()
-    return any(name.endswith(f'.{extension}') for extension in KNOWN_VIDEO_EXTENSIONS)
-
-
-def _is_allowed_video_upload(file_obj):
-    content_type = str(getattr(file_obj, 'content_type', '') or '').strip().lower()
-    filename = str(getattr(file_obj, 'name', '') or '').strip()
-    if content_type.startswith('video/'):
-        return True
-    if content_type in {'application/octet-stream', 'binary/octet-stream', ''} and _filename_has_video_extension(filename):
-        return True
-    return False
+from .video_uploads import is_allowed_video_upload
 
 
 class SafeFileField(serializers.FileField):
@@ -245,7 +228,7 @@ class SessionSerializer(serializers.ModelSerializer):
         return user.is_staff or obj.user_id == user.id
 
     def validate_video_file(self, value):
-        if value and not _is_allowed_video_upload(value):
+        if value and not is_allowed_video_upload(getattr(value, 'content_type', ''), getattr(value, 'name', '')):
             raise serializers.ValidationError('Only video files allowed.')
         return value
 
@@ -350,6 +333,11 @@ class ReviewVideoFeedbackSerializer(serializers.ModelSerializer):
 
     def validate_feedback_category(self, value):
         return str(value or '').strip().lower()
+
+    def validate_feedback_video(self, value):
+        if value and not is_allowed_video_upload(getattr(value, 'content_type', ''), getattr(value, 'name', '')):
+            raise serializers.ValidationError('Only video files allowed.')
+        return value
 
 
 class ReviewRequestSerializer(serializers.ModelSerializer):

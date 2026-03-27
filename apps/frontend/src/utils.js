@@ -8,14 +8,17 @@ const RETRY_BASE_DELAY_MS = 500
 const RETRY_MAX_DELAY_MS = 4000
 const MULTIPART_RESUME_PREFIX = 'practica.multipart.resume.v1'
 const CLIENT_TRACE_ID_KEY = 'practica.client_trace_id.v1'
+export const MAX_RECORDER_DURATION_SECONDS = 300
+export const MAX_VIDEO_UPLOAD_BYTES = 2147483648
 const RECORDER_MIME_CANDIDATES = [
   'video/webm;codecs=vp9',
   'video/webm;codecs=vp8',
   'video/webm',
   'video/mp4',
 ]
-const VIDEO_FILE_ACCEPT = '.mov,.mp4,.m4v,.webm,.avi,.mkv,video/*,video/quicktime'
-const KNOWN_VIDEO_EXTENSIONS = ['mov', 'mp4', 'm4v', 'webm', 'avi', 'mkv', 'mpeg', 'mpg', 'wmv', '3gp']
+const VIDEO_FILE_ACCEPT = '.mov,.mp4,.m4v,.webm,.avi,.mkv,.mpeg,.mpg,.wmv,.3gp,.3gpp,.3g2,video/*,video/quicktime,video/3gpp,video/3gpp2'
+const KNOWN_VIDEO_EXTENSIONS = ['mov', 'mp4', 'm4v', 'webm', 'avi', 'mkv', 'mpeg', 'mpg', 'wmv', '3gp', '3gpp', '3g2']
+const VIDEO_CONTENT_TYPE_ALIASES = ['application/mp4', 'application/x-mp4', 'audio/mp4', 'application/quicktime', 'application/3gpp', 'application/3gpp2', 'audio/3gpp', 'audio/3gpp2']
 
 export const videoFileAccept = () => VIDEO_FILE_ACCEPT
 
@@ -23,6 +26,7 @@ export const isLikelyVideoFile = (file) => {
   const name = String(file?.name || '').toLowerCase()
   const type = String(file?.type || '').toLowerCase()
   if (type.startsWith('video/')) return true
+  if (VIDEO_CONTENT_TYPE_ALIASES.includes(type)) return true
   const extension = name.includes('.') ? name.split('.').pop() : ''
   return KNOWN_VIDEO_EXTENSIONS.includes(extension)
 }
@@ -30,6 +34,10 @@ export const isLikelyVideoFile = (file) => {
 export const normalizedVideoContentType = (file) => {
   const type = String(file?.type || '').trim().toLowerCase()
   if (type.startsWith('video/')) return type
+  if (['application/mp4', 'application/x-mp4', 'audio/mp4'].includes(type)) return 'video/mp4'
+  if (type === 'application/quicktime') return 'video/quicktime'
+  if (['application/3gpp', 'audio/3gpp'].includes(type)) return 'video/3gpp'
+  if (['application/3gpp2', 'audio/3gpp2'].includes(type)) return 'video/3gpp2'
 
   const name = String(file?.name || '').toLowerCase()
   if (name.endsWith('.mov')) return 'video/quicktime'
@@ -37,6 +45,10 @@ export const normalizedVideoContentType = (file) => {
   if (name.endsWith('.webm')) return 'video/webm'
   if (name.endsWith('.avi')) return 'video/x-msvideo'
   if (name.endsWith('.mkv')) return 'video/x-matroska'
+  if (name.endsWith('.mpeg') || name.endsWith('.mpg')) return 'video/mpeg'
+  if (name.endsWith('.wmv')) return 'video/x-ms-wmv'
+  if (name.endsWith('.3gp') || name.endsWith('.3gpp')) return 'video/3gpp'
+  if (name.endsWith('.3g2')) return 'video/3gpp2'
   return type || 'application/octet-stream'
 }
 
