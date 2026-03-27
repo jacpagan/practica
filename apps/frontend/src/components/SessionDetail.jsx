@@ -87,6 +87,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const toast = useToast()
   const confirm = useConfirm()
   const videoRef = useRef(null)
+  const loopDetailsRef = useRef(null)
   const [session, setSession] = useState(initialSession)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -142,6 +143,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     if (session?.practice_series) return `${session.practice_series} follow-up`
     return LESSON_GOAL_PRESETS[0]
   }, [session?.practice_series])
+  const justUploadedWithoutRequest = justUploaded && reviewRequests.length === 0
   const videoFeedback = Array.isArray(session?.video_feedback)
     ? session.video_feedback
     : []
@@ -209,6 +211,14 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     if (String(requestGoal || '').trim()) return
     setRequestGoal(defaultRequestGoal)
   }, [defaultRequestGoal, requestGoal, showRequestComposer])
+
+  useEffect(() => {
+    if (!justUploadedWithoutRequest || !showLoopDetails || !showRequestComposer) return
+    const timer = window.setTimeout(() => {
+      loopDetailsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+    }, 80)
+    return () => window.clearTimeout(timer)
+  }, [justUploadedWithoutRequest, showLoopDetails, showRequestComposer])
 
   const loadReviewRequests = async () => {
     if (!token || !session?.id || !canEdit) return
@@ -700,19 +710,9 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               </div>
 
               {justUploaded ? (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4">
-                  <p className="text-sm font-medium text-emerald-900">Your video is saved.</p>
-                  <p className="text-sm text-emerald-800 mt-1">It is already in your private library. The fastest next step is to request feedback or record another take in this thread.</p>
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {canStartNewRequest ? (
-                      <button type="button" onClick={openRequestComposer} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
-                        {selectedTeacherName ? `Request from ${selectedTeacherName}` : 'Request feedback'}
-                      </button>
-                    ) : null}
-                    <button type="button" onClick={onRecordAnother} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
-                      Record another
-                    </button>
-                  </div>
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                  <p className="text-sm font-medium text-emerald-900">Saved to your private library.</p>
+                  <p className="text-xs text-emerald-800 mt-1">The next step is below.</p>
                 </div>
               ) : null}
 
@@ -838,11 +838,11 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               ) : null}
 
               {canEdit ? (
-                <div className="rounded-xl border border-gray-200 bg-white px-4 py-4 space-y-4">
+                <div ref={loopDetailsRef} className="rounded-xl border border-gray-200 bg-white px-4 py-4 space-y-4">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">Loop details</p>
-                      <p className="text-xs text-gray-500 mt-1">Only open this when you need to change request details or browse older thread history.</p>
+                      <p className="text-sm font-semibold text-gray-900">{justUploadedWithoutRequest ? 'Send this take' : 'Loop details'}</p>
+                      <p className="text-xs text-gray-500 mt-1">{justUploadedWithoutRequest ? 'Send it now and keep the loop moving.' : 'Only open this when you need to change request details or browse older thread history.'}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       {!showLoopDetails && !showRequestComposer ? (
@@ -855,9 +855,11 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           {selectedTeacherName ? `Request from ${selectedTeacherName}` : 'Request feedback'}
                         </button>
                       ) : null}
-                      <button type="button" onClick={toggleLoopDetails} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors">
-                        {showLoopDetails ? 'Hide details' : 'Show details'}
-                      </button>
+                      {!justUploadedWithoutRequest ? (
+                        <button type="button" onClick={toggleLoopDetails} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                          {showLoopDetails ? 'Hide details' : 'Show details'}
+                        </button>
+                      ) : null}
                     </div>
                   </div>
 
