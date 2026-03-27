@@ -58,6 +58,7 @@ function AppContent() {
   const [pendingPracticeSeries, setPendingPracticeSeries] = useState(initialRoute.seriesName || '')
   const uploadGuardRef = useRef({ active: false, abort: null })
   const currentPathRef = useRef(routePath(initialRoute))
+  const autoQuickRecordCheckedRef = useRef(false)
 
   const applyRoute = useCallback((nextRoute, { replace = false } = {}) => {
     setView(nextRoute.view)
@@ -224,6 +225,15 @@ function AppContent() {
     navigate({ view: 'detail', sessionId: session.id })
   }, [navigate])
 
+  const hasActiveStudentLoop = useMemo(
+    () => studentReviewRequests.some((item) => !['closed', 'revoked'].includes(String(item?.status || '').trim().toLowerCase())),
+    [studentReviewRequests],
+  )
+  const ownReadySessionCount = useMemo(
+    () => sessions.filter((item) => item?.can_edit && item?.processing_status === 'ready').length,
+    [sessions],
+  )
+
   const handleRecordAnother = useCallback((draft = null) => {
     setSelectedSession(null)
     setJustUploadedSessionId(null)
@@ -248,6 +258,17 @@ function AppContent() {
     if (view === 'library') loadStudentReviewRequests()
     loadTeacherWorkspaceAvailability()
   }, [user, view, loadSessions, loadStudentReviewRequests, loadTeacherWorkspaceAvailability])
+
+  useEffect(() => {
+    if (autoQuickRecordCheckedRef.current) return
+    if (!user || view !== 'library') return
+    if (sessionsLoading || studentReviewRequestsLoading) return
+
+    autoQuickRecordCheckedRef.current = true
+    if (!hasActiveStudentLoop && ownReadySessionCount === 0) {
+      startQuickRecord()
+    }
+  }, [hasActiveStudentLoop, ownReadySessionCount, sessionsLoading, startQuickRecord, studentReviewRequestsLoading, user, view])
 
   useEffect(() => {
     if (view === 'requests' && !hasTeacherWorkspace) {
