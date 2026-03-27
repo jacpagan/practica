@@ -48,6 +48,8 @@ function AppContent() {
   const [selectedSession, setSelectedSession] = useState(null)
   const [sessions, setSessions] = useState([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
+  const [studentReviewRequests, setStudentReviewRequests] = useState([])
+  const [studentReviewRequestsLoading, setStudentReviewRequestsLoading] = useState(false)
   const [detailReturnRoute, setDetailReturnRoute] = useState({ view: 'library', sessionId: null, seriesName: '' })
   const [openRecorderOnUpload, setOpenRecorderOnUpload] = useState(false)
   const [justUploadedSessionId, setJustUploadedSessionId] = useState(null)
@@ -151,6 +153,23 @@ function AppContent() {
     }
   }, [token, toast])
 
+  const loadStudentReviewRequests = useCallback(async () => {
+    if (!token) return
+    setStudentReviewRequestsLoading(true)
+    try {
+      const res = await fetch('/api/review-requests/?role=student', {
+        headers: { Authorization: `Token ${token}` },
+      })
+      if (!res.ok) throw new Error('student-review-requests')
+      const data = await res.json()
+      setStudentReviewRequests(Array.isArray(data) ? data : data.results || [])
+    } catch {
+      setStudentReviewRequests([])
+    } finally {
+      setStudentReviewRequestsLoading(false)
+    }
+  }, [token])
+
   const openSessionById = useCallback(async (sessionId, { updateUrl = true } = {}) => {
     if (!token) return
     try {
@@ -201,7 +220,8 @@ function AppContent() {
   useEffect(() => {
     if (!user) return
     if (view === 'library' || view === 'series') loadSessions()
-  }, [user, view, loadSessions])
+    if (view === 'library') loadStudentReviewRequests()
+  }, [user, view, loadSessions, loadStudentReviewRequests])
 
   useEffect(() => {
     if (!user) return
@@ -238,7 +258,7 @@ function AppContent() {
                 onClick={() => navigate({ view: 'library', sessionId: null })}
                 className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'library' || view === 'detail' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
               >
-                Library
+                Home
               </button>
               <button
                 onClick={() => navigate({ view: 'requests', sessionId: null })}
@@ -265,12 +285,12 @@ function AppContent() {
         </div>
         <div className="max-w-4xl mx-auto mt-3 space-y-2 sm:hidden">
           <nav className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => navigate({ view: 'library', sessionId: null })}
-              className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'library' || view === 'detail' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
-            >
-              Library
-            </button>
+              <button
+                onClick={() => navigate({ view: 'library', sessionId: null })}
+                className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'library' || view === 'detail' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+              >
+                Home
+              </button>
             <button
               onClick={() => navigate({ view: 'requests', sessionId: null })}
               className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
@@ -292,10 +312,18 @@ function AppContent() {
           <LibraryView
             sessions={sessions}
             sessionsLoading={sessionsLoading}
+            reviewRequests={studentReviewRequests}
+            reviewRequestsLoading={studentReviewRequestsLoading}
             token={token}
             onOpenSession={openSession}
             onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
             onCreateVideo={() => navigate({ view: 'upload', sessionId: null })}
+            onOpenReviewRequest={(requestItem) => {
+              const requestLink = requestItem?.feedback_link || requestItem?.review_link
+              if (!requestLink?.token) return
+              navigate({ view: 'review', token: requestLink.token, sessionId: null })
+            }}
+            onRecordFollowUp={(draft) => handleRecordAnother(draft)}
           />
         )}
 

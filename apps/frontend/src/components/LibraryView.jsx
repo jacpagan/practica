@@ -3,6 +3,22 @@ import { fmtDate } from '../utils'
 import { useToast } from './Toast'
 import VideoThumbnail from './VideoThumbnail'
 
+const requestStatusTone = {
+  requested: 'bg-amber-100 text-amber-800',
+  opened: 'bg-blue-100 text-blue-800',
+  responded: 'bg-emerald-100 text-emerald-800',
+  viewed: 'bg-violet-100 text-violet-800',
+  resubmitted: 'bg-fuchsia-100 text-fuchsia-800',
+  closed: 'bg-gray-100 text-gray-700',
+  revoked: 'bg-red-100 text-red-700',
+}
+
+const requestStatusLabel = (value = '') => {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (!normalized) return 'Unknown'
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1)
+}
+
 function InviteCodesPanel({ token }) {
   const toast = useToast()
   const [inviteCodes, setInviteCodes] = useState([])
@@ -141,7 +157,18 @@ function InviteCodesPanel({ token }) {
   )
 }
 
-function LibraryView({ sessions = [], sessionsLoading = false, onOpenSession, onOpenSeries, onCreateVideo, token = '' }) {
+function LibraryView({
+  sessions = [],
+  sessionsLoading = false,
+  reviewRequests = [],
+  reviewRequestsLoading = false,
+  onOpenSession,
+  onOpenSeries,
+  onCreateVideo,
+  onOpenReviewRequest,
+  onRecordFollowUp,
+  token = '',
+}) {
   const ownSessions = useMemo(
     () => sessions
       .filter((session) => session.can_edit)
@@ -164,6 +191,17 @@ function LibraryView({ sessions = [], sessionsLoading = false, onOpenSession, on
     () => ownSessions.filter((session) => !String(session.practice_series || '').trim()),
     [ownSessions],
   )
+  const studentRequests = useMemo(
+    () => [...reviewRequests].sort((left, right) => new Date(right.created_at) - new Date(left.created_at)),
+    [reviewRequests],
+  )
+  const activeRequest = useMemo(
+    () => studentRequests.find((item) => !['closed', 'revoked'].includes(String(item.status || '').trim().toLowerCase())) || null,
+    [studentRequests],
+  )
+  const activeRequestStatus = String(activeRequest?.status || '').trim().toLowerCase()
+  const latestSeries = seriesGroups[0] || null
+  const latestSessionNeedingRequest = ownSessions.find((session) => session.processing_status === 'ready') || ownSessions[0] || null
   const readyCount = ownSessions.filter((session) => session.processing_status === 'ready').length
   const feedbackCount = ownSessions.reduce((sum, session) => sum + (session.video_feedback_count || 0), 0)
 
@@ -173,8 +211,8 @@ function LibraryView({ sessions = [], sessionsLoading = false, onOpenSession, on
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="space-y-3">
             <div>
-              <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Library</h2>
-              <p className="text-sm text-gray-500 mt-1">Private by default.</p>
+              <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Home</h2>
+              <p className="text-sm text-gray-500 mt-1">The shortest path back into the practice loop.</p>
             </div>
             {!sessionsLoading ? (
               <div className="flex flex-wrap gap-2">
@@ -193,8 +231,6 @@ function LibraryView({ sessions = [], sessionsLoading = false, onOpenSession, on
           </button>
         </div>
 
-        <InviteCodesPanel token={token} />
-
         {sessionsLoading ? (
           <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading library…</div>
         ) : ownSessions.length === 0 ? (
@@ -211,9 +247,115 @@ function LibraryView({ sessions = [], sessionsLoading = false, onOpenSession, on
           </div>
         ) : (
           <div className="space-y-6">
+            <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-4">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Up next</p>
+                <p className="text-xs text-gray-500 mt-1">Less browsing. More submit → feedback → retry.</p>
+              </div>
+
+              {reviewRequestsLoading ? (
+                <div className="rounded-xl bg-gray-50 px-4 py-4 text-sm text-gray-500">Loading your next step…</div>
+              ) : activeRequest && ['requested', 'opened'].includes(activeRequestStatus) ? (
+                <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium text-gray-900">Waiting on {activeRequest.teacher?.display_name || activeRequest.teacher?.username || 'teacher'}</p>
+                        <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${requestStatusTone[activeRequestStatus] || 'bg-gray-100 text-gray-700'}`}>
+                          {requestStatusLabel(activeRequest.status)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">{activeRequest.goal || 'Feedback requested'} • {fmtDate(activeRequest.created_at)}</p>
+                    </div>
+                    <div className="text-xs text-gray-500">Session: {activeRequest.session?.title || 'Video'}</div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={() => onOpenReviewRequest?.(activeRequest)} className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors">
+                      Open request thread
+                    </button>
+                    {activeRequest.session?.id ? (
+                      <button type="button" onClick={() => onOpenSession?.(activeRequest.session, { view: 'library', sessionId: null, seriesName: '' })} className="rounded-full border border-gray-200 bg-white text-gray-900 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors">
+                        Open video
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : activeRequest && ['responded', 'viewed', 'resubmitted'].includes(activeRequestStatus) ? (
+                <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium text-gray-900">Feedback is back</p>
+                        <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${requestStatusTone[activeRequestStatus] || 'bg-gray-100 text-gray-700'}`}>
+                          {requestStatusLabel(activeRequest.status)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">{activeRequest.goal || 'Ready for another take'} • {activeRequest.teacher?.display_name || activeRequest.teacher?.username || 'Teacher'}</p>
+                    </div>
+                    <div className="text-xs text-gray-500">Session: {activeRequest.session?.title || 'Video'}</div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onRecordFollowUp?.({
+                        parent_request_id: activeRequest.id,
+                        teacher: activeRequest.teacher,
+                        instrument: activeRequest.instrument,
+                        student_level: activeRequest.student_level,
+                        goal: activeRequest.goal,
+                        exercise_or_song: activeRequest.exercise_or_song,
+                        notes: activeRequest.notes,
+                        requested_turnaround_hours: activeRequest.requested_turnaround_hours,
+                        practiceSeries: activeRequest.session?.practice_series || '',
+                      })}
+                      className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
+                    >
+                      Record follow-up
+                    </button>
+                    <button type="button" onClick={() => onOpenReviewRequest?.(activeRequest)} className="rounded-full border border-gray-200 bg-white text-gray-900 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors">
+                      Open feedback thread
+                    </button>
+                  </div>
+                </div>
+              ) : latestSessionNeedingRequest ? (
+                <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Pick up your latest take</p>
+                      <p className="text-xs text-gray-500 mt-1">Open your most recent ready video and send it for feedback.</p>
+                    </div>
+                    <div className="text-xs text-gray-500">{fmtDate(latestSessionNeedingRequest.recorded_at || latestSessionNeedingRequest.created_at)}</div>
+                  </div>
+                  <button type="button" onClick={() => onOpenSession?.(latestSessionNeedingRequest, { view: 'library', sessionId: null, seriesName: '' })} className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors">
+                    Open latest video
+                  </button>
+                </div>
+              ) : null}
+
+              {latestSeries ? (
+                <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Keep the thread going</p>
+                      <p className="text-xs text-gray-500 mt-1">Your latest practice thread is {latestSeries.seriesName}.</p>
+                    </div>
+                    <div className="text-xs text-gray-500">{latestSeries.items.length} takes</div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={() => onOpenSeries?.(latestSeries.seriesName)} className="rounded-full border border-gray-200 bg-white text-gray-900 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors">
+                      Open thread
+                    </button>
+                    <button type="button" onClick={onCreateVideo} className="rounded-full border border-gray-200 bg-white text-gray-900 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors">
+                      Record another take
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
             {seriesGroups.length > 0 ? (
               <div className="space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Practice threads</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Archive • Practice threads</p>
                 {seriesGroups.map(({ seriesName, items }) => {
                   const latest = items[0]
                   return (
@@ -248,7 +390,7 @@ function LibraryView({ sessions = [], sessionsLoading = false, onOpenSession, on
 
             {standaloneSessions.length > 0 ? (
               <div className="space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Standalone videos</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Archive • Standalone videos</p>
                 {standaloneSessions.map((session) => (
                   <button
                     key={session.id}
@@ -278,6 +420,19 @@ function LibraryView({ sessions = [], sessionsLoading = false, onOpenSession, on
                 ))}
               </div>
             ) : null}
+
+            <details className="rounded-2xl border border-gray-200 bg-white px-4 py-4">
+              <summary className="cursor-pointer list-none flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Invite tools</p>
+                  <p className="text-xs text-gray-500 mt-1">Keep this out of the main practice loop.</p>
+                </div>
+                <span className="text-xs text-gray-500">Show</span>
+              </summary>
+              <div className="pt-4">
+                <InviteCodesPanel token={token} />
+              </div>
+            </details>
           </div>
         )}
       </div>
