@@ -50,6 +50,7 @@ function AppContent() {
   const [sessionsLoading, setSessionsLoading] = useState(false)
   const [studentReviewRequests, setStudentReviewRequests] = useState([])
   const [studentReviewRequestsLoading, setStudentReviewRequestsLoading] = useState(false)
+  const [hasTeacherWorkspace, setHasTeacherWorkspace] = useState(false)
   const [detailReturnRoute, setDetailReturnRoute] = useState({ view: 'library', sessionId: null, seriesName: '' })
   const [openRecorderOnUpload, setOpenRecorderOnUpload] = useState(false)
   const [justUploadedSessionId, setJustUploadedSessionId] = useState(null)
@@ -170,6 +171,21 @@ function AppContent() {
     }
   }, [token])
 
+  const loadTeacherWorkspaceAvailability = useCallback(async () => {
+    if (!token) return
+    try {
+      const res = await fetch('/api/review-requests/?role=teacher', {
+        headers: { Authorization: `Token ${token}` },
+      })
+      if (!res.ok) throw new Error('teacher-review-requests')
+      const data = await res.json()
+      const requests = Array.isArray(data) ? data : data.results || []
+      setHasTeacherWorkspace(requests.length > 0)
+    } catch {
+      setHasTeacherWorkspace(false)
+    }
+  }, [token])
+
   const openSessionById = useCallback(async (sessionId, { updateUrl = true } = {}) => {
     if (!token) return
     try {
@@ -221,7 +237,14 @@ function AppContent() {
     if (!user) return
     if (view === 'library' || view === 'series') loadSessions()
     if (view === 'library') loadStudentReviewRequests()
-  }, [user, view, loadSessions, loadStudentReviewRequests])
+    loadTeacherWorkspaceAvailability()
+  }, [user, view, loadSessions, loadStudentReviewRequests, loadTeacherWorkspaceAvailability])
+
+  useEffect(() => {
+    if (view === 'requests' && !hasTeacherWorkspace) {
+      navigate({ view: 'library', sessionId: null }, { replace: true })
+    }
+  }, [hasTeacherWorkspace, navigate, view])
 
   useEffect(() => {
     if (!user) return
@@ -260,12 +283,14 @@ function AppContent() {
               >
                 Home
               </button>
-              <button
-                onClick={() => navigate({ view: 'requests', sessionId: null })}
-                className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
-              >
-                Requests
-              </button>
+              {hasTeacherWorkspace ? (
+                <button
+                  onClick={() => navigate({ view: 'requests', sessionId: null })}
+                  className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
+                >
+                  Requests
+                </button>
+              ) : null}
             </nav>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -291,12 +316,14 @@ function AppContent() {
               >
                 Home
               </button>
-            <button
-              onClick={() => navigate({ view: 'requests', sessionId: null })}
-              className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
-            >
-              Requests
-            </button>
+            {hasTeacherWorkspace ? (
+              <button
+                onClick={() => navigate({ view: 'requests', sessionId: null })}
+                className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+              >
+                Requests
+              </button>
+            ) : null}
           </nav>
           <button
             onClick={() => navigate({ view: 'upload', sessionId: null })}
@@ -340,7 +367,7 @@ function AppContent() {
           />
         )}
 
-        {view === 'requests' && (
+        {view === 'requests' && hasTeacherWorkspace && (
           <RequestsView token={token} onOpenReviewRequest={(requestItem) => {
             const requestLink = requestItem?.feedback_link || requestItem?.review_link
             if (!requestLink?.token) return
