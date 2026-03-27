@@ -276,29 +276,29 @@ function AppContent() {
             <button onClick={() => navigate({ view: 'library', sessionId: null })} className="text-lg font-semibold text-gray-900 tracking-tight">
               Practica
             </button>
-            <nav className="hidden sm:flex items-center gap-2 rounded-full border border-gray-200 p-1">
-              <button
-                onClick={() => navigate({ view: 'library', sessionId: null })}
-                className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'library' || view === 'detail' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
-              >
-                Home
-              </button>
-              {hasTeacherWorkspace ? (
+            {hasTeacherWorkspace ? (
+              <nav className="hidden sm:flex items-center gap-2 rounded-full border border-gray-200 p-1">
+                <button
+                  onClick={() => navigate({ view: 'library', sessionId: null })}
+                  className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'library' || view === 'detail' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
+                >
+                  Home
+                </button>
                 <button
                   onClick={() => navigate({ view: 'requests', sessionId: null })}
                   className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
                 >
                   Requests
                 </button>
-              ) : null}
-            </nav>
+              </nav>
+            ) : null}
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={() => navigate({ view: 'upload', sessionId: null })}
               className="hidden sm:inline-flex rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
             >
-              New video
+              Record
             </button>
             <div className="flex items-center gap-2 sm:border-l sm:border-gray-100 sm:pl-3">
               <span className="hidden sm:inline text-xs text-gray-400">{user.display_name}</span>
@@ -309,27 +309,27 @@ function AppContent() {
           </div>
         </div>
         <div className="max-w-4xl mx-auto mt-3 space-y-2 sm:hidden">
-          <nav className="grid grid-cols-2 gap-2">
+          {hasTeacherWorkspace ? (
+            <nav className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => navigate({ view: 'library', sessionId: null })}
                 className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'library' || view === 'detail' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
               >
                 Home
               </button>
-            {hasTeacherWorkspace ? (
               <button
                 onClick={() => navigate({ view: 'requests', sessionId: null })}
                 className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
               >
                 Requests
               </button>
-            ) : null}
-          </nav>
+            </nav>
+          ) : null}
           <button
             onClick={() => navigate({ view: 'upload', sessionId: null })}
             className="w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
           >
-            New video
+            Record
           </button>
         </div>
       </header>

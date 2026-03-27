@@ -353,73 +353,84 @@ function LibraryView({
               ) : null}
             </div>
 
-            {seriesGroups.length > 0 ? (
-              <div className="space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Archive • Practice threads</p>
-                {seriesGroups.map(({ seriesName, items }) => {
-                  const latest = items[0]
-                  return (
-                    <button
-                      key={seriesName}
-                      type="button"
-                      onClick={() => onOpenSeries?.(seriesName)}
-                      className="w-full text-left rounded-2xl border border-gray-200 px-4 py-4 hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3 min-w-0">
-                          <VideoThumbnail session={latest} className="relative w-24 h-16 rounded-xl shrink-0" />
-                          <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-sm font-medium text-gray-900 line-clamp-1">{seriesName}</p>
-                            <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">{items.length} takes</span>
+            <details className="rounded-2xl border border-gray-200 bg-white px-4 py-4">
+              <summary className="cursor-pointer list-none flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Browse archive</p>
+                  <p className="text-xs text-gray-500 mt-1">Only open this when you want to dig through older takes.</p>
+                </div>
+                <span className="text-xs text-gray-500">Show</span>
+              </summary>
+              <div className="space-y-6 pt-4">
+                {seriesGroups.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Practice threads</p>
+                    {seriesGroups.map(({ seriesName, items }) => {
+                      const latest = items[0]
+                      return (
+                        <button
+                          key={seriesName}
+                          type="button"
+                          onClick={() => onOpenSeries?.(seriesName)}
+                          className="w-full text-left rounded-2xl border border-gray-200 px-4 py-4 hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3 min-w-0">
+                              <VideoThumbnail session={latest} className="relative w-24 h-16 rounded-xl shrink-0" />
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="text-sm font-medium text-gray-900 line-clamp-1">{seriesName}</p>
+                                  <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">{items.length} takes</span>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">Latest {fmtDate(latest.recorded_at || latest.created_at)}</p>
+                                <p className="text-xs text-gray-500 mt-2 line-clamp-2">Newest take: {latest.title}</p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="text-xs text-gray-500">{items.reduce((sum, item) => sum + (item.video_feedback_count || 0), 0)} replies</p>
+                              <p className="text-xs text-gray-400 mt-2">Open thread</p>
+                            </div>
                           </div>
-                          <p className="text-xs text-gray-500 mt-1">Latest {fmtDate(latest.recorded_at || latest.created_at)}</p>
-                          <p className="text-xs text-gray-500 mt-2 line-clamp-2">Newest take: {latest.title}</p>
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-xs text-gray-500">{items.reduce((sum, item) => sum + (item.video_feedback_count || 0), 0)} replies</p>
-                          <p className="text-xs text-gray-400 mt-2">Open thread</p>
-                        </div>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            ) : null}
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : null}
 
-            {standaloneSessions.length > 0 ? (
-              <div className="space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Archive • Standalone videos</p>
-                {standaloneSessions.map((session) => (
-                  <button
-                    key={session.id}
-                    type="button"
-                    onClick={() => onOpenSession?.(session, { view: 'library', sessionId: null, seriesName: '' })}
-                    className="w-full text-left rounded-2xl border border-gray-200 px-4 py-4 hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3 min-w-0">
-                        <VideoThumbnail session={session} className="relative w-24 h-16 rounded-xl shrink-0" />
-                        <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-medium text-gray-900 line-clamp-1">{session.title}</p>
-                          <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">Private</span>
-                          {session.processing_status === 'ready' ? <span className="text-[11px] uppercase tracking-wide bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full">Ready</span> : null}
+                {standaloneSessions.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Standalone videos</p>
+                    {standaloneSessions.map((session) => (
+                      <button
+                        key={session.id}
+                        type="button"
+                        onClick={() => onOpenSession?.(session, { view: 'library', sessionId: null, seriesName: '' })}
+                        className="w-full text-left rounded-2xl border border-gray-200 px-4 py-4 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3 min-w-0">
+                            <VideoThumbnail session={session} className="relative w-24 h-16 rounded-xl shrink-0" />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-medium text-gray-900 line-clamp-1">{session.title}</p>
+                                <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">Private</span>
+                                {session.processing_status === 'ready' ? <span className="text-[11px] uppercase tracking-wide bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full">Ready</span> : null}
+                              </div>
+                              <p className="text-xs text-gray-500 mt-1">{fmtDate(session.recorded_at || session.created_at)}</p>
+                              {session.description ? <p className="text-xs text-gray-500 mt-2 line-clamp-2">{session.description}</p> : null}
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-xs text-gray-500">{session.video_feedback_count || 0} replies</p>
+                            <p className="text-xs text-gray-400 mt-2">Open</p>
+                          </div>
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">{fmtDate(session.recorded_at || session.created_at)}</p>
-                        {session.description ? <p className="text-xs text-gray-500 mt-2 line-clamp-2">{session.description}</p> : null}
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-xs text-gray-500">{session.video_feedback_count || 0} replies</p>
-                        <p className="text-xs text-gray-400 mt-2">Open</p>
-                      </div>
-                    </div>
-                  </button>
-                ))}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
-            ) : null}
+            </details>
 
             <details className="rounded-2xl border border-gray-200 bg-white px-4 py-4">
               <summary className="cursor-pointer list-none flex items-center justify-between gap-3">
