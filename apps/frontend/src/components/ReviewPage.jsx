@@ -390,14 +390,14 @@ function ReviewPage({ reviewToken = '' }) {
 
   return (
     <div className="min-h-screen bg-white px-4 py-6 sm:px-6">
-      <main className="max-w-3xl mx-auto space-y-6">
+      <main className="max-w-3xl mx-auto space-y-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Leave video feedback</h1>
           <p className="text-xs text-gray-500 mt-2">Signed in as {user.display_name || user.username}.</p>
         </div>
 
         {reviewRequest ? (
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-2">
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-2">
             <p className="text-sm font-semibold text-gray-900">{reviewRequest.goal}</p>
             {(reviewRequest.exercise_or_song || reviewRequest.notes || reviewRequest.deadline || reviewRequest.student_level) ? (
               <details className="text-xs text-gray-500">
@@ -439,14 +439,14 @@ function ReviewPage({ reviewToken = '' }) {
               </div>
             )}
           </div>
-          <div className="p-4 space-y-1">
+          <div className="p-3 space-y-1">
             <h2 className="text-lg font-semibold text-gray-900">{session.title}</h2>
             {session.description ? <p className="text-sm text-gray-600">{session.description}</p> : null}
           </div>
         </div>
 
         {link?.allow_video_feedback && canRespondToRequest ? (
-          <div ref={responseComposerRef} className="rounded-xl border border-gray-200 p-4 space-y-4">
+          <div ref={responseComposerRef} className="rounded-xl border border-gray-200 p-3 space-y-4">
             <div>
               <p className="text-sm font-semibold text-gray-900">{reviewerShouldRespond && !hasCurrentUserFeedback ? 'Respond now' : 'Add your video'}</p>
               <p className="text-xs text-gray-500 mt-1">{reviewerShouldRespond && !hasCurrentUserFeedback ? 'Record now.' : 'Record or upload.'}</p>
@@ -573,7 +573,7 @@ function ReviewPage({ reviewToken = '' }) {
             </form>
           </div>
         ) : (
-          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-2">
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 space-y-2">
             <p className="text-sm font-semibold text-blue-900">Feedback is turned off</p>
             <p className="text-sm text-blue-800">The owner left this page open for viewing, but new feedback is currently disabled.</p>
           </div>

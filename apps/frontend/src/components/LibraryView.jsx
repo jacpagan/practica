@@ -202,25 +202,15 @@ function LibraryView({
   const activeRequestStatus = String(activeRequest?.status || '').trim().toLowerCase()
   const latestSeries = seriesGroups[0] || null
   const latestSessionNeedingRequest = ownSessions.find((session) => session.processing_status === 'ready') || ownSessions[0] || null
-  const readyCount = ownSessions.filter((session) => session.processing_status === 'ready').length
-  const feedbackCount = ownSessions.reduce((sum, session) => sum + (session.video_feedback_count || 0), 0)
-
   return (
     <div className="px-4 sm:px-6 py-6">
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-4">
         <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div>
               <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Home</h2>
               <p className="text-sm text-gray-500 mt-1">Your next step.</p>
             </div>
-            {!sessionsLoading ? (
-              <div className="flex flex-wrap gap-2">
-                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{ownSessions.length} videos</span>
-                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{readyCount} ready</span>
-                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{feedbackCount} replies</span>
-              </div>
-            ) : null}
           </div>
           <button
             type="button"
@@ -246,8 +236,8 @@ function LibraryView({
             </button>
           </div>
         ) : (
-          <div className="space-y-6">
-            <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-4">
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 space-y-3">
             <div>
               <p className="text-sm font-semibold text-gray-900">Up next</p>
               <p className="text-xs text-gray-500 mt-1">Submit, get feedback, retry.</p>
@@ -256,7 +246,7 @@ function LibraryView({
               {reviewRequestsLoading ? (
                 <div className="rounded-xl bg-gray-50 px-4 py-4 text-sm text-gray-500">Loading…</div>
               ) : activeRequest && ['requested', 'opened'].includes(activeRequestStatus) ? (
-                <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-4 space-y-3">
+                <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 space-y-3">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
@@ -281,7 +271,7 @@ function LibraryView({
                   </div>
                 </div>
               ) : activeRequest && ['responded', 'viewed', 'resubmitted'].includes(activeRequestStatus) ? (
-                <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-4 space-y-3">
+                <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 space-y-3">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
@@ -318,7 +308,7 @@ function LibraryView({
                   </div>
                 </div>
               ) : latestSessionNeedingRequest ? (
-                <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-4 space-y-3">
+                <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 space-y-3">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                       <p className="text-sm font-medium text-gray-900">Pick up your latest take</p>
@@ -333,7 +323,7 @@ function LibraryView({
               ) : null}
 
               {latestSeries ? (
-                <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-4 space-y-3">
+                <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 space-y-3">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                       <p className="text-sm font-medium text-gray-900">Keep the thread going</p>
@@ -353,7 +343,7 @@ function LibraryView({
               ) : null}
             </div>
 
-            <details className="rounded-2xl border border-gray-200 bg-white px-4 py-4">
+            <details className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
               <summary className="cursor-pointer list-none flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">Browse archive</p>
@@ -361,7 +351,7 @@ function LibraryView({
                 </div>
                 <span className="text-xs text-gray-500">Show</span>
               </summary>
-              <div className="space-y-6 pt-4">
+              <div className="space-y-4 pt-3">
                 {seriesGroups.length > 0 ? (
                   <div className="space-y-2">
                     <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Practice threads</p>
@@ -372,7 +362,7 @@ function LibraryView({
                           key={seriesName}
                           type="button"
                           onClick={() => onOpenSeries?.(seriesName)}
-                          className="w-full text-left rounded-2xl border border-gray-200 px-4 py-4 hover:bg-gray-50 transition-colors"
+                          className="w-full text-left rounded-2xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex items-start gap-3 min-w-0">
@@ -405,7 +395,7 @@ function LibraryView({
                         key={session.id}
                         type="button"
                         onClick={() => onOpenSession?.(session, { view: 'library', sessionId: null, seriesName: '' })}
-                        className="w-full text-left rounded-2xl border border-gray-200 px-4 py-4 hover:bg-gray-50 transition-colors"
+                        className="w-full text-left rounded-2xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-start gap-3 min-w-0">
@@ -432,7 +422,7 @@ function LibraryView({
               </div>
             </details>
 
-            <details className="rounded-2xl border border-gray-200 bg-white px-4 py-4">
+            <details className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
               <summary className="cursor-pointer list-none flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">Invite tools</p>

@@ -660,7 +660,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
           )}
         </div>
 
-        <div className="p-4 sm:p-5 space-y-4">
+        <div className="p-4 sm:p-4 space-y-3">
           {editing ? (
             <div className="space-y-4">
               <input
@@ -728,7 +728,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               ) : null}
 
               {session.processing_status === 'failed' ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
                   <p className="text-sm font-medium text-amber-900">Playback needs processing help.</p>
                   <p className="text-sm text-amber-800 mt-1">{session.processing_error || 'This video is not ready for browser playback yet.'}</p>
                   {canEdit ? (
@@ -740,7 +740,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               ) : null}
 
               {playbackFailed && session.processing_status === 'ready' ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
                   <p className="text-sm font-medium text-amber-900">Playback failed on this device.</p>
                   <p className="text-sm text-amber-800 mt-1">Retry processing to generate a more compatible playback version for Mac and phone browsers.</p>
                   {canEdit ? (
@@ -752,7 +752,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               ) : null}
 
               {canEdit ? (
-                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 space-y-3">
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 space-y-3">
                   <div>
                     <p className="text-sm font-semibold text-gray-900">Next step</p>
                     <p className="text-xs text-gray-500 mt-1">
@@ -791,7 +791,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               ) : null}
 
               {canEdit ? (
-                <details className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4" open={showLegacyLinkTools}>
+                <details className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3" open={showLegacyLinkTools}>
                   <summary onClick={() => setShowLegacyLinkTools((current) => !current)} className="cursor-pointer list-none flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-gray-900">Private link options</p>
@@ -841,7 +841,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               ) : null}
 
               {canEdit ? (
-                <div ref={loopDetailsRef} className="rounded-xl border border-gray-200 bg-white px-4 py-4 space-y-4">
+                <div ref={loopDetailsRef} className="rounded-xl border border-gray-200 bg-white px-4 py-3 space-y-4">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
                       <p className="text-sm font-semibold text-gray-900">{justUploadedWithoutRequest ? 'Send this take' : 'Loop details'}</p>

@@ -123,8 +123,6 @@ function TeachingView({ token, onOpenReviewRequest }) {
   }
 
   const pendingCount = requests.filter((item) => ['requested', 'opened'].includes(item.status)).length
-  const studentCount = roster.length
-  const templateCount = templates.length
   const sortedRequests = useMemo(() => {
     const priority = { requested: 0, opened: 1, responded: 2, viewed: 3, resubmitted: 4, closed: 5, revoked: 6 }
     return [...requests].sort((left, right) => {
@@ -139,15 +137,13 @@ function TeachingView({ token, onOpenReviewRequest }) {
 
   return (
     <div className="px-4 sm:px-6 py-6">
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-4xl mx-auto space-y-4">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="space-y-3">
             <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Requests</h2>
             <p className="text-sm text-gray-500 mt-1">Open the next request fast.</p>
             <div className="flex flex-wrap gap-2">
               <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{pendingCount} pending</span>
-              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{studentCount} connections</span>
-              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{templateCount} templates</span>
             </div>
           </div>
         </div>
@@ -155,12 +151,12 @@ function TeachingView({ token, onOpenReviewRequest }) {
         {requestsLoading ? (
           <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading…</div>
         ) : nextRequest ? (
-          <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-4">
+          <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 space-y-3">
             <div>
               <p className="text-sm font-semibold text-gray-900">Up next</p>
               <p className="text-xs text-gray-500 mt-1">Your next review.</p>
             </div>
-            <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-4">
+            <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3">
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -195,7 +191,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
           </div>
         )}
 
-        <details className="rounded-2xl border border-gray-200 bg-white px-4 py-4" open={showWorkspaceDetails}>
+        <details className="rounded-2xl border border-gray-200 bg-white px-4 py-3" open={showWorkspaceDetails}>
           <summary onClick={() => setShowWorkspaceDetails((current) => !current)} className="cursor-pointer list-none flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-gray-900">Workspace details</p>
@@ -203,7 +199,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
             </div>
             <span className="text-xs text-gray-500">{showWorkspaceDetails ? 'Hide' : 'Show'}</span>
           </summary>
-          <div className="pt-4 space-y-4">
+          <div className="pt-3 space-y-4">
             <div className="flex gap-2 rounded-2xl bg-gray-100 p-1 w-full sm:w-fit">
               <button
                 type="button"
@@ -239,7 +235,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
               ) : (
             <div className="space-y-3">
               {requests.map((item) => (
-                <div key={item.id} className="rounded-2xl border border-gray-200 bg-white px-4 py-4">
+                <div key={item.id} className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -290,7 +286,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {roster.map((item) => (
-                <div key={item.id} className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-2">
+                <div key={item.id} className="rounded-2xl border border-gray-200 bg-white px-4 py-3 space-y-2">
                   <p className="text-sm font-semibold text-gray-900">{item.member?.display_name || item.student?.display_name || item.member?.username || item.student?.username}</p>
                   <p className="text-xs text-gray-500">Pending reviews: {item.pending_review_count}</p>
                   <p className="text-xs text-gray-500">Total requests: {item.total_review_count}</p>
@@ -301,7 +297,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
               )
             ) : tab === 'templates' ? (
           <div className="space-y-4">
-            <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
+            <div className="rounded-2xl border border-gray-200 bg-white p-3 space-y-3">
               <div>
                 <p className="text-sm font-semibold text-gray-900">New template</p>
                 <p className="text-xs text-gray-500 mt-1">Keep common coaching notes ready.</p>
@@ -342,7 +338,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
             ) : (
               <div className="space-y-3">
                 {templates.map((template) => (
-                  <div key={template.id} className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-3">
+                  <div key={template.id} className="rounded-2xl border border-gray-200 bg-white px-4 py-3 space-y-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-sm font-semibold text-gray-900">{template.title}</p>
