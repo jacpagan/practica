@@ -43,6 +43,8 @@ function ReviewPage({ reviewToken = '' }) {
   const videoRef = useRef(null)
   const inputRef = useRef(null)
   const editInputRef = useRef(null)
+  const responseComposerRef = useRef(null)
+  const autoOpenRecorderRef = useRef(false)
   const [session, setSession] = useState(null)
   const [link, setLink] = useState(null)
   const [reviewRequest, setReviewRequest] = useState(null)
@@ -58,6 +60,7 @@ function ReviewPage({ reviewToken = '' }) {
   const [durationSeconds, setDurationSeconds] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
   const [submitting, setSubmitting] = useState(false)
+  const [showResponseDetails, setShowResponseDetails] = useState(false)
   const [editingFeedbackId, setEditingFeedbackId] = useState(null)
   const [editingText, setEditingText] = useState('')
   const [editingTimestampSeconds, setEditingTimestampSeconds] = useState('')
@@ -166,6 +169,21 @@ function ReviewPage({ reviewToken = '' }) {
   }, [authToken, reviewRequest?.current_member_role, reviewRequest?.current_user_role])
 
   const canRespondToRequest = true
+  const memberRole = reviewRequest?.current_member_role || reviewRequest?.current_user_role || ''
+  const reviewerShouldRespond = memberRole === 'reviewer' && ['requested', 'opened', 'resubmitted'].includes(String(reviewRequest?.status || '').trim().toLowerCase())
+  const hasCurrentUserFeedback = feedback.some((item) => item.authored_by_current_user)
+
+  useEffect(() => {
+    if (autoOpenRecorderRef.current) return
+    if (!link?.allow_video_feedback || !canRespondToRequest) return
+    if (!reviewerShouldRespond || hasCurrentUserFeedback || showRecorder || responseFile) return
+    autoOpenRecorderRef.current = true
+    setShowRecorder(true)
+    const timer = window.setTimeout(() => {
+      responseComposerRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+    }, 80)
+    return () => window.clearTimeout(timer)
+  }, [canRespondToRequest, hasCurrentUserFeedback, link?.allow_video_feedback, responseFile, reviewerShouldRespond, showRecorder])
 
   const applyTemplate = (template) => {
     if (!template) return
@@ -426,10 +444,10 @@ function ReviewPage({ reviewToken = '' }) {
         </div>
 
         {link?.allow_video_feedback && canRespondToRequest ? (
-          <div className="rounded-xl border border-gray-200 p-4 space-y-4">
+          <div ref={responseComposerRef} className="rounded-xl border border-gray-200 p-4 space-y-4">
             <div>
-              <p className="text-sm font-semibold text-gray-900">Add your video</p>
-              <p className="text-xs text-gray-500 mt-1">Record or upload a video response. Add an optional caption if you want.</p>
+              <p className="text-sm font-semibold text-gray-900">{reviewerShouldRespond && !hasCurrentUserFeedback ? 'Respond now' : 'Add your video'}</p>
+              <p className="text-xs text-gray-500 mt-1">{reviewerShouldRespond && !hasCurrentUserFeedback ? 'The shortest path is to record a response now.' : 'Record or upload a video response. Add details only if you need them.'}</p>
             </div>
 
             {false ? (
@@ -461,7 +479,7 @@ function ReviewPage({ reviewToken = '' }) {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button type="button" onClick={() => setShowRecorder(true)} className="rounded-2xl bg-gray-900 text-white px-4 py-3 text-sm font-medium hover:bg-gray-800 transition-colors">
-                Record video
+                {responseFile ? 'Record again' : 'Record now'}
               </button>
               <button type="button" onClick={() => inputRef.current?.click()} className="rounded-2xl border border-gray-200 bg-white text-gray-900 px-4 py-3 text-sm font-medium hover:bg-gray-50 transition-colors">
                 Upload video
@@ -492,49 +510,58 @@ function ReviewPage({ reviewToken = '' }) {
             ) : null}
 
             <form onSubmit={submit} className="space-y-3">
-              <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-3 space-y-3">
-                <div className="flex items-center justify-between gap-3">
+              <details className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-3" open={showResponseDetails}>
+                <summary onClick={() => setShowResponseDetails((current) => !current)} className="cursor-pointer list-none flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Timestamp</p>
-                    <p className="text-sm text-gray-700 mt-1">{typeof selectedTimestampSeconds === 'number' ? `Attach at ${fmtTimer(selectedTimestampSeconds)}` : 'No timestamp attached'}</p>
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Response details</p>
+                    <p className="text-sm text-gray-700 mt-1">Optional caption and timestamp.</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button type="button" onClick={useCurrentVideoTime} className="text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-white transition-colors">
-                      Use current time
-                    </button>
-                    <button type="button" onClick={clearTimestamp} className="text-xs text-gray-500 hover:text-gray-700 transition-colors">
-                      Clear
-                    </button>
-                  </div>
-                </div>
-
-                {durationSeconds > 0 ? (
-                  <div>
-                    <input
-                      type="range"
-                      min="0"
-                      max={durationSeconds}
-                      step="1"
-                      value={typeof selectedTimestampSeconds === 'number' ? selectedTimestampSeconds : 0}
-                      onChange={(event) => setSelectedTimestampSeconds(Number(event.target.value))}
-                      className="w-full"
-                    />
-                    <div className="flex items-center justify-between text-[11px] text-gray-400 mt-1">
-                      <span>0:00</span>
-                      <span>Now: {fmtTimer(currentTime)}</span>
-                      <span>{fmtTimer(durationSeconds)}</span>
+                  <span className="text-xs text-gray-500">{showResponseDetails ? 'Hide' : 'Show'}</span>
+                </summary>
+                <div className="space-y-3 pt-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Timestamp</p>
+                      <p className="text-sm text-gray-700 mt-1">{typeof selectedTimestampSeconds === 'number' ? `Attach at ${fmtTimer(selectedTimestampSeconds)}` : 'No timestamp attached'}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={useCurrentVideoTime} className="text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-white transition-colors">
+                        Use current time
+                      </button>
+                      <button type="button" onClick={clearTimestamp} className="text-xs text-gray-500 hover:text-gray-700 transition-colors">
+                        Clear
+                      </button>
                     </div>
                   </div>
-                ) : null}
-              </div>
 
-              <textarea
-                value={responseNotes}
-                onChange={(event) => setResponseNotes(event.target.value)}
-                rows={3}
-                placeholder="Optional caption"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
-              />
+                  {durationSeconds > 0 ? (
+                    <div>
+                      <input
+                        type="range"
+                        min="0"
+                        max={durationSeconds}
+                        step="1"
+                        value={typeof selectedTimestampSeconds === 'number' ? selectedTimestampSeconds : 0}
+                        onChange={(event) => setSelectedTimestampSeconds(Number(event.target.value))}
+                        className="w-full"
+                      />
+                      <div className="flex items-center justify-between text-[11px] text-gray-400 mt-1">
+                        <span>0:00</span>
+                        <span>Now: {fmtTimer(currentTime)}</span>
+                        <span>{fmtTimer(durationSeconds)}</span>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <textarea
+                    value={responseNotes}
+                    onChange={(event) => setResponseNotes(event.target.value)}
+                    rows={3}
+                    placeholder="Optional caption"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
+                  />
+                </div>
+              </details>
 
               {error ? <p className="text-xs text-red-500">{error}</p> : null}
 
