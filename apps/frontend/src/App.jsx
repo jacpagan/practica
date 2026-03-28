@@ -229,6 +229,18 @@ function AppContent() {
     () => studentReviewRequests.some((item) => !['closed', 'revoked'].includes(String(item?.status || '').trim().toLowerCase())),
     [studentReviewRequests],
   )
+  const activeStudentRequestBySessionId = useMemo(() => {
+    const bySessionId = new Map()
+    const requests = [...studentReviewRequests].sort((left, right) => new Date(right.created_at) - new Date(left.created_at))
+    requests.forEach((item) => {
+      const status = String(item?.status || '').trim().toLowerCase()
+      if (['closed', 'revoked'].includes(status)) return
+      const sessionId = Number(item?.session?.id || item?.session_id || 0)
+      if (!sessionId || bySessionId.has(sessionId)) return
+      bySessionId.set(sessionId, item)
+    })
+    return bySessionId
+  }, [studentReviewRequests])
   const ownReadySessionCount = useMemo(
     () => sessions.filter((item) => item?.can_edit && item?.processing_status === 'ready').length,
     [sessions],
@@ -251,6 +263,20 @@ function AppContent() {
     setOpenRecorderOnUpload(true)
     navigate({ view: 'upload', sessionId: null })
   }, [navigate])
+
+  const openHomeWorkItem = useCallback((session, returnRoute = { view: 'library', sessionId: null, seriesName: '' }) => {
+    if (!session?.id) return
+    const activeRequest = activeStudentRequestBySessionId.get(Number(session.id))
+    const tokenValue = activeRequest?.feedback_link?.token || activeRequest?.review_link?.token || ''
+    if (tokenValue) {
+      setDetailReturnRoute(returnRoute)
+      setSelectedSession(null)
+      setOpenRecorderOnUpload(false)
+      navigate({ view: 'review', token: tokenValue, sessionId: null })
+      return
+    }
+    openSession(session, returnRoute)
+  }, [activeStudentRequestBySessionId, navigate, openSession])
 
   useEffect(() => {
     if (!user) return
@@ -372,7 +398,7 @@ function AppContent() {
             reviewRequests={studentReviewRequests}
             reviewRequestsLoading={studentReviewRequestsLoading}
             token={token}
-            onOpenSession={openSession}
+            onOpenSession={openHomeWorkItem}
             onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
             onCreateVideo={startQuickRecord}
             onOpenReviewRequest={(requestItem) => {

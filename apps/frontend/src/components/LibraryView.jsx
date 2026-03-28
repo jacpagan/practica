@@ -195,6 +195,17 @@ function LibraryView({
     () => [...reviewRequests].sort((left, right) => new Date(right.created_at) - new Date(left.created_at)),
     [reviewRequests],
   )
+  const activeRequestBySessionId = useMemo(() => {
+    const bySessionId = new Map()
+    studentRequests.forEach((item) => {
+      const status = String(item?.status || '').trim().toLowerCase()
+      if (['closed', 'revoked'].includes(status)) return
+      const sessionId = Number(item?.session?.id || item?.session_id || 0)
+      if (!sessionId || bySessionId.has(sessionId)) return
+      bySessionId.set(sessionId, item)
+    })
+    return bySessionId
+  }, [studentRequests])
   const activeRequest = useMemo(
     () => studentRequests.find((item) => !['closed', 'revoked'].includes(String(item.status || '').trim().toLowerCase())) || null,
     [studentRequests],
@@ -355,11 +366,13 @@ function LibraryView({
                 {seriesGroups.length > 0 ? (
                   <div className="space-y-2">
                     <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Practice threads</p>
-                    {seriesGroups.map(({ seriesName, items }) => {
-                      const latest = items[0]
-                      return (
-                        <button
-                          key={seriesName}
+                {seriesGroups.map(({ seriesName, items }) => {
+                  const latest = items[0]
+                  const latestRequest = activeRequestBySessionId.get(Number(latest.id))
+                  const latestRequestStatus = String(latestRequest?.status || '').trim().toLowerCase()
+                  return (
+                    <button
+                      key={seriesName}
                           type="button"
                           onClick={() => onOpenSeries?.(seriesName)}
                           className="w-full text-left rounded-2xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors"
@@ -371,6 +384,7 @@ function LibraryView({
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <p className="text-sm font-medium text-gray-900 line-clamp-1">{seriesName}</p>
                                   <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">{items.length} takes</span>
+                                  {latestRequest ? <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${requestStatusTone[latestRequestStatus] || 'bg-gray-100 text-gray-700'}`}>{requestStatusLabel(latestRequest.status)}</span> : null}
                                 </div>
                                 <p className="text-xs text-gray-500 mt-1">Latest {fmtDate(latest.recorded_at || latest.created_at)}</p>
                                 <p className="text-xs text-gray-500 mt-2 line-clamp-2">Newest take: {latest.title}</p>
@@ -378,7 +392,7 @@ function LibraryView({
                             </div>
                             <div className="text-right shrink-0">
                               <p className="text-xs text-gray-500">{items.reduce((sum, item) => sum + (item.video_feedback_count || 0), 0)} replies</p>
-                              <p className="text-xs text-gray-400 mt-2">Open thread</p>
+                              <p className="text-xs text-gray-400 mt-2">{latestRequest ? 'Open loop' : 'Open thread'}</p>
                             </div>
                           </div>
                         </button>
@@ -391,6 +405,10 @@ function LibraryView({
                   <div className="space-y-2">
                     <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Standalone videos</p>
                     {standaloneSessions.map((session) => (
+                      (() => {
+                        const activeSessionRequest = activeRequestBySessionId.get(Number(session.id))
+                        const activeSessionRequestStatus = String(activeSessionRequest?.status || '').trim().toLowerCase()
+                        return (
                       <button
                         key={session.id}
                         type="button"
@@ -403,8 +421,7 @@ function LibraryView({
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <p className="text-sm font-medium text-gray-900 line-clamp-1">{session.title}</p>
-                                <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">Private</span>
-                                {session.processing_status === 'ready' ? <span className="text-[11px] uppercase tracking-wide bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full">Ready</span> : null}
+                                {activeSessionRequest ? <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${requestStatusTone[activeSessionRequestStatus] || 'bg-gray-100 text-gray-700'}`}>{requestStatusLabel(activeSessionRequest.status)}</span> : null}
                               </div>
                               <p className="text-xs text-gray-500 mt-1">{fmtDate(session.recorded_at || session.created_at)}</p>
                               {session.description ? <p className="text-xs text-gray-500 mt-2 line-clamp-2">{session.description}</p> : null}
@@ -412,10 +429,12 @@ function LibraryView({
                           </div>
                           <div className="text-right shrink-0">
                             <p className="text-xs text-gray-500">{session.video_feedback_count || 0} replies</p>
-                            <p className="text-xs text-gray-400 mt-2">Open</p>
+                            <p className="text-xs text-gray-400 mt-2">{activeSessionRequest ? 'Open loop' : 'Open'}</p>
                           </div>
                         </div>
                       </button>
+                        )
+                      })()
                     ))}
                   </div>
                 ) : null}
