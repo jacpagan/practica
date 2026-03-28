@@ -254,7 +254,7 @@ function SessionUpload({
         <div className="mb-6 space-y-3">
           <div>
             <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">New video</h2>
-            <p className="text-sm text-gray-500 mt-1">Record or upload. Save when it looks right.</p>
+            <p className="text-sm text-gray-500 mt-1">Record or upload.</p>
           </div>
 
           <div className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-4">
@@ -269,7 +269,7 @@ function SessionUpload({
             <div className="mt-3 space-y-1">
               <p className="text-xs text-gray-500">Supports `.mov`, `.mp4`, `.m4v`, `.webm`, `.avi`, `.mkv`, `.3gp`, and `.3gpp`.</p>
               <p className="text-xs text-gray-500">Built-in recording is limited to {Math.round(MAX_RECORDER_DURATION_SECONDS / 60)} minutes. File uploads are limited to {Math.round(MAX_VIDEO_UPLOAD_BYTES / (1024 * 1024 * 1024))}GB.</p>
-              <p className="text-xs text-gray-500">Uploaded session videos are prepared for browser playback and may take a moment before they work on Mac, iPhone, and Android browsers.</p>
+              <p className="text-xs text-gray-500">Playback may take a moment to prepare.</p>
             </div>
           </div>
         </div>
@@ -279,7 +279,7 @@ function SessionUpload({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-semibold text-gray-900">Recorder</h3>
-                <p className="text-xs text-gray-500 mt-1">Make a take, then save it.</p>
+                <p className="text-xs text-gray-500 mt-1">Record, then save.</p>
               </div>
               <button type="button" onClick={() => setShowRecorder(false)} disabled={isUploading} className="text-xs text-gray-500 hover:text-gray-900 disabled:opacity-50 transition-colors">
                 Close
@@ -317,7 +317,7 @@ function SessionUpload({
             <summary onClick={() => setShowVideoDetails((current) => !current)} className="cursor-pointer list-none flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-gray-900">Video details</p>
-                <p className="text-xs text-gray-500 mt-1">Auto-filled by default. Only open this when you want to rename, thread, or add a note.</p>
+                <p className="text-xs text-gray-500 mt-1">Optional.</p>
               </div>
               <span className="text-xs text-gray-500">{showVideoDetails ? 'Hide' : 'Show'}</span>
             </summary>

@@ -449,7 +449,7 @@ function ReviewPage({ reviewToken = '' }) {
           <div ref={responseComposerRef} className="rounded-xl border border-gray-200 p-4 space-y-4">
             <div>
               <p className="text-sm font-semibold text-gray-900">{reviewerShouldRespond && !hasCurrentUserFeedback ? 'Respond now' : 'Add your video'}</p>
-              <p className="text-xs text-gray-500 mt-1">{reviewerShouldRespond && !hasCurrentUserFeedback ? 'The shortest path is to record a response now.' : 'Record or upload a video response. Add details only if you need them.'}</p>
+              <p className="text-xs text-gray-500 mt-1">{reviewerShouldRespond && !hasCurrentUserFeedback ? 'Record now.' : 'Record or upload.'}</p>
             </div>
 
             {false ? (
@@ -492,7 +492,7 @@ function ReviewPage({ reviewToken = '' }) {
             <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 space-y-1">
               <p className="text-xs text-gray-500">Recorder limit: {Math.round(MAX_RECORDER_DURATION_SECONDS / 60)} minutes.</p>
               <p className="text-xs text-gray-500">Upload limit: {Math.round(MAX_VIDEO_UPLOAD_BYTES / (1024 * 1024 * 1024))}GB.</p>
-              <p className="text-xs text-gray-500">For best compatibility, use a recent phone or browser-supported video format when recording feedback.</p>
+              <p className="text-xs text-gray-500">Use a browser-supported format.</p>
             </div>
 
             {showRecorder ? <VideoRecorder onRecorded={handleRecorded} onCancel={() => setShowRecorder(false)} maxDuration={MAX_RECORDER_DURATION_SECONDS} /> : null}
@@ -516,7 +516,7 @@ function ReviewPage({ reviewToken = '' }) {
                 <summary onClick={() => setShowResponseDetails((current) => !current)} className="cursor-pointer list-none flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Response details</p>
-                    <p className="text-sm text-gray-700 mt-1">Optional caption and timestamp.</p>
+                    <p className="text-sm text-gray-700 mt-1">Optional.</p>
                   </div>
                   <span className="text-xs text-gray-500">{showResponseDetails ? 'Hide' : 'Show'}</span>
                 </summary>

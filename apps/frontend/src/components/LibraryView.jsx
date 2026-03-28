@@ -212,7 +212,7 @@ function LibraryView({
           <div className="space-y-3">
             <div>
               <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Home</h2>
-              <p className="text-sm text-gray-500 mt-1">The shortest path back into the practice loop.</p>
+              <p className="text-sm text-gray-500 mt-1">Your next step.</p>
             </div>
             {!sessionsLoading ? (
               <div className="flex flex-wrap gap-2">
@@ -248,10 +248,10 @@ function LibraryView({
         ) : (
           <div className="space-y-6">
             <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-4">
-              <div>
-                <p className="text-sm font-semibold text-gray-900">Up next</p>
-                <p className="text-xs text-gray-500 mt-1">Less browsing. More submit → feedback → retry.</p>
-              </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Up next</p>
+              <p className="text-xs text-gray-500 mt-1">Submit, get feedback, retry.</p>
+            </div>
 
               {reviewRequestsLoading ? (
                 <div className="rounded-xl bg-gray-50 px-4 py-4 text-sm text-gray-500">Loading your next step…</div>
@@ -322,7 +322,7 @@ function LibraryView({
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                       <p className="text-sm font-medium text-gray-900">Pick up your latest take</p>
-                      <p className="text-xs text-gray-500 mt-1">Open your most recent ready video and send it for feedback.</p>
+                      <p className="text-xs text-gray-500 mt-1">Open your latest ready video.</p>
                     </div>
                     <div className="text-xs text-gray-500">{fmtDate(latestSessionNeedingRequest.recorded_at || latestSessionNeedingRequest.created_at)}</div>
                   </div>
@@ -337,7 +337,7 @@ function LibraryView({
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                       <p className="text-sm font-medium text-gray-900">Keep the thread going</p>
-                      <p className="text-xs text-gray-500 mt-1">Your latest practice thread is {latestSeries.seriesName}.</p>
+                      <p className="text-xs text-gray-500 mt-1">Latest thread: {latestSeries.seriesName}.</p>
                     </div>
                     <div className="text-xs text-gray-500">{latestSeries.items.length} takes</div>
                   </div>
@@ -357,7 +357,7 @@ function LibraryView({
               <summary className="cursor-pointer list-none flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">Browse archive</p>
-                  <p className="text-xs text-gray-500 mt-1">Only open this when you want to dig through older takes.</p>
+                  <p className="text-xs text-gray-500 mt-1">Older takes.</p>
                 </div>
                 <span className="text-xs text-gray-500">Show</span>
               </summary>
@@ -436,7 +436,7 @@ function LibraryView({
               <summary className="cursor-pointer list-none flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">Invite tools</p>
-                  <p className="text-xs text-gray-500 mt-1">Keep this out of the main practice loop.</p>
+                  <p className="text-xs text-gray-500 mt-1">Secondary.</p>
                 </div>
                 <span className="text-xs text-gray-500">Show</span>
               </summary>

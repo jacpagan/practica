@@ -711,7 +711,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               {justUploaded ? (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
                   <p className="text-sm font-medium text-emerald-900">Saved to your private library.</p>
-                  <p className="text-xs text-emerald-800 mt-1">The next step is below.</p>
+                  <p className="text-xs text-emerald-800 mt-1">Next step below.</p>
                 </div>
               ) : null}
 
@@ -757,10 +757,10 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                     <p className="text-sm font-semibold text-gray-900">Next step</p>
                     <p className="text-xs text-gray-500 mt-1">
                       {waitingOnTeacher
-                        ? 'This video is out for review. Stay in the thread until feedback comes back.'
+                        ? 'Waiting on feedback.'
                         : readyForFollowUp
-                          ? 'Feedback is back. Record the next take with as little friction as possible.'
-                          : 'Keep the loop moving: send this take to one teacher and keep everything in one thread.'}
+                          ? 'Feedback is back. Record the next take.'
+                          : 'Send this take for feedback.'}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -795,7 +795,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                   <summary onClick={() => setShowLegacyLinkTools((current) => !current)} className="cursor-pointer list-none flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-gray-900">Private link options</p>
-                      <p className="text-xs text-gray-500 mt-1">Keep this for edge cases. The main flow is request → feedback → follow-up.</p>
+                      <p className="text-xs text-gray-500 mt-1">Secondary.</p>
                     </div>
                     <span className="text-xs text-gray-500">{showLegacyLinkTools ? 'Hide' : 'Show'}</span>
                   </summary>
@@ -845,7 +845,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
                       <p className="text-sm font-semibold text-gray-900">{justUploadedWithoutRequest ? 'Send this take' : 'Loop details'}</p>
-                      <p className="text-xs text-gray-500 mt-1">{justUploadedWithoutRequest ? 'Send it now and keep the loop moving.' : 'Only open this when you need to change request details or browse older thread history.'}</p>
+                      <p className="text-xs text-gray-500 mt-1">{justUploadedWithoutRequest ? 'Send it now.' : 'Optional.'}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       {!showLoopDetails && !showRequestComposer ? (

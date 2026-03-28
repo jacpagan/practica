@@ -143,7 +143,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="space-y-3">
             <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Requests</h2>
-            <p className="text-sm text-gray-500 mt-1">Open the next request fast. Keep management tools in the background.</p>
+            <p className="text-sm text-gray-500 mt-1">Open the next request fast.</p>
             <div className="flex flex-wrap gap-2">
               <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{pendingCount} pending</span>
               <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{studentCount} connections</span>
@@ -158,7 +158,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
           <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-4">
             <div>
               <p className="text-sm font-semibold text-gray-900">Up next</p>
-              <p className="text-xs text-gray-500 mt-1">Stay with the next feedback cycle instead of browsing the whole inbox.</p>
+              <p className="text-xs text-gray-500 mt-1">Your next review.</p>
             </div>
             <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-4">
               <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -199,7 +199,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
           <summary onClick={() => setShowWorkspaceDetails((current) => !current)} className="cursor-pointer list-none flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-gray-900">Workspace details</p>
-              <p className="text-xs text-gray-500 mt-1">Open this when you need the full inbox, connections, or templates.</p>
+              <p className="text-xs text-gray-500 mt-1">Optional.</p>
             </div>
             <span className="text-xs text-gray-500">{showWorkspaceDetails ? 'Hide' : 'Show'}</span>
           </summary>
