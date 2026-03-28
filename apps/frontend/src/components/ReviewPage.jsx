@@ -401,7 +401,7 @@ function ReviewPage({ reviewToken = '' }) {
             <p className="text-sm font-semibold text-gray-900">{reviewRequest.goal}</p>
             {(reviewRequest.exercise_or_song || reviewRequest.notes || reviewRequest.deadline || reviewRequest.student_level) ? (
               <details className="text-xs text-gray-500">
-                <summary className="cursor-pointer list-none hover:text-gray-900 transition-colors">Request details</summary>
+                <summary className="cursor-pointer list-none hover:text-gray-900 transition-colors">Details</summary>
                 <div className="space-y-1 pt-2">
                   <p>{reviewRequest.instrument}{reviewRequest.student_level ? ` • ${reviewRequest.student_level}` : ''}</p>
                   {reviewRequest.exercise_or_song ? <p>Focus: {reviewRequest.exercise_or_song}</p> : null}
@@ -490,9 +490,7 @@ function ReviewPage({ reviewToken = '' }) {
             </div>
 
             <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 space-y-1">
-              <p className="text-xs text-gray-500">Recorder limit: {Math.round(MAX_RECORDER_DURATION_SECONDS / 60)} minutes.</p>
-              <p className="text-xs text-gray-500">Upload limit: {Math.round(MAX_VIDEO_UPLOAD_BYTES / (1024 * 1024 * 1024))}GB.</p>
-              <p className="text-xs text-gray-500">Use a browser-supported format.</p>
+              <p className="text-xs text-gray-500">Recorder: {Math.round(MAX_RECORDER_DURATION_SECONDS / 60)} min • Upload: {Math.round(MAX_VIDEO_UPLOAD_BYTES / (1024 * 1024 * 1024))}GB</p>
             </div>
 
             {showRecorder ? <VideoRecorder onRecorded={handleRecorded} onCancel={() => setShowRecorder(false)} maxDuration={MAX_RECORDER_DURATION_SECONDS} /> : null}
@@ -515,7 +513,7 @@ function ReviewPage({ reviewToken = '' }) {
               <details className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-3" open={showResponseDetails}>
                 <summary onClick={() => setShowResponseDetails((current) => !current)} className="cursor-pointer list-none flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Response details</p>
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Details</p>
                     <p className="text-sm text-gray-700 mt-1">Optional.</p>
                   </div>
                   <span className="text-xs text-gray-500">{showResponseDetails ? 'Hide' : 'Show'}</span>

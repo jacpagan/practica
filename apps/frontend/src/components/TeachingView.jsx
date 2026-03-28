@@ -153,7 +153,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
         </div>
 
         {requestsLoading ? (
-          <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading request inbox…</div>
+          <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading…</div>
         ) : nextRequest ? (
           <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-4">
             <div>
@@ -182,7 +182,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
                     onClick={() => onOpenReviewRequest?.(nextRequest)}
                     className="rounded-xl bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
                   >
-                    {['requested', 'opened'].includes(nextRequestStatus) ? 'Review now' : 'Open thread'}
+                    {['requested', 'opened'].includes(nextRequestStatus) ? 'Review' : 'Open'}
                   </button>
                 </div>
               </div>
@@ -191,7 +191,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
         ) : (
           <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
             <p className="text-sm text-gray-700">No feedback requests yet.</p>
-            <p className="text-xs text-gray-500 mt-1">Requests from other members will appear here.</p>
+            <p className="text-xs text-gray-500 mt-1">New requests show up here.</p>
           </div>
         )}
 
@@ -230,11 +230,11 @@ function TeachingView({ token, onOpenReviewRequest }) {
 
             {tab === 'inbox' ? (
               requestsLoading ? (
-                <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading request inbox…</div>
+                <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading…</div>
               ) : requests.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
                   <p className="text-sm text-gray-700">No feedback requests yet.</p>
-                  <p className="text-xs text-gray-500 mt-1">Requests from other members will appear here.</p>
+                  <p className="text-xs text-gray-500 mt-1">New requests show up here.</p>
                 </div>
               ) : (
             <div className="space-y-3">
@@ -271,7 +271,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
                         onClick={() => onOpenReviewRequest?.(item)}
                         className="rounded-xl bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
                       >
-                        Open thread
+                        Open
                       </button>
                     </div>
                   </div>
@@ -281,11 +281,11 @@ function TeachingView({ token, onOpenReviewRequest }) {
               )
             ) : tab === 'roster' ? (
           rosterLoading ? (
-            <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading connections…</div>
+            <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading…</div>
           ) : roster.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
               <p className="text-sm text-gray-700">No connections yet.</p>
-              <p className="text-xs text-gray-500 mt-1">People appear here automatically after you exchange feedback requests.</p>
+              <p className="text-xs text-gray-500 mt-1">People appear here after a request.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -333,11 +333,11 @@ function TeachingView({ token, onOpenReviewRequest }) {
             </div>
 
             {templatesLoading ? (
-              <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading templates…</div>
+              <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading…</div>
             ) : templates.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
                 <p className="text-sm text-gray-700">No templates yet.</p>
-                <p className="text-xs text-gray-500 mt-1">Create your first reusable coaching note here.</p>
+                <p className="text-xs text-gray-500 mt-1">Save a note to reuse it.</p>
               </div>
             ) : (
               <div className="space-y-3">
