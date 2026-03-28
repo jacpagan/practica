@@ -21,6 +21,7 @@ const statusLabel = (value = '') => {
 function TeachingView({ token, onOpenReviewRequest }) {
   const toast = useToast()
   const [tab, setTab] = useState('inbox')
+  const [showWorkspaceDetails, setShowWorkspaceDetails] = useState(false)
   const [requests, setRequests] = useState([])
   const [requestsLoading, setRequestsLoading] = useState(true)
   const [roster, setRoster] = useState([])
@@ -124,6 +125,17 @@ function TeachingView({ token, onOpenReviewRequest }) {
   const pendingCount = requests.filter((item) => ['requested', 'opened'].includes(item.status)).length
   const studentCount = roster.length
   const templateCount = templates.length
+  const sortedRequests = useMemo(() => {
+    const priority = { requested: 0, opened: 1, responded: 2, viewed: 3, resubmitted: 4, closed: 5, revoked: 6 }
+    return [...requests].sort((left, right) => {
+      const leftPriority = priority[String(left.status || '').trim().toLowerCase()] ?? 99
+      const rightPriority = priority[String(right.status || '').trim().toLowerCase()] ?? 99
+      if (leftPriority !== rightPriority) return leftPriority - rightPriority
+      return new Date(right.created_at) - new Date(left.created_at)
+    })
+  }, [requests])
+  const nextRequest = sortedRequests[0] || null
+  const nextRequestStatus = String(nextRequest?.status || '').trim().toLowerCase()
 
   return (
     <div className="px-4 sm:px-6 py-6">
@@ -131,7 +143,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="space-y-3">
             <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Requests</h2>
-            <p className="text-sm text-gray-500 mt-1">Track who asked for feedback, who you’re connected to, and your saved response templates.</p>
+            <p className="text-sm text-gray-500 mt-1">Open the next request fast. Keep management tools in the background.</p>
             <div className="flex flex-wrap gap-2">
               <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{pendingCount} pending</span>
               <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{studentCount} connections</span>
@@ -140,39 +152,91 @@ function TeachingView({ token, onOpenReviewRequest }) {
           </div>
         </div>
 
-        <div className="flex gap-2 rounded-2xl bg-gray-100 p-1 w-full sm:w-fit">
-          <button
-            type="button"
-            onClick={() => setTab('inbox')}
-            className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${tab === 'inbox' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
-          >
-            Inbox
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('roster')}
-            className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${tab === 'roster' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
-          >
-            Connections
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('templates')}
-            className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${tab === 'templates' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
-          >
-            Templates
-          </button>
-        </div>
-
-        {tab === 'inbox' ? (
-          requestsLoading ? (
-            <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading request inbox…</div>
-          ) : requests.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
-              <p className="text-sm text-gray-700">No feedback requests yet.</p>
-              <p className="text-xs text-gray-500 mt-1">Requests from other members will appear here.</p>
+        {requestsLoading ? (
+          <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading request inbox…</div>
+        ) : nextRequest ? (
+          <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-4">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Up next</p>
+              <p className="text-xs text-gray-500 mt-1">Stay with the next feedback cycle instead of browsing the whole inbox.</p>
             </div>
-          ) : (
+            <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-4">
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold text-gray-900">{nextRequest.session?.title || 'Feedback request'}</p>
+                    <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${statusTone[nextRequest.status] || 'bg-gray-100 text-gray-700'}`}>
+                      {statusLabel(nextRequest.status)}
+                    </span>
+                    {nextRequest.parent_request ? <span className="text-[11px] uppercase tracking-wide bg-violet-100 text-violet-800 px-2 py-1 rounded-full">Follow-up</span> : null}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {nextRequest.owner?.display_name || nextRequest.student?.display_name || nextRequest.owner?.username || nextRequest.student?.username || 'Member'} • {nextRequest.instrument}{nextRequest.student_level ? ` • ${nextRequest.student_level}` : ''}
+                  </p>
+                  <p className="text-sm text-gray-700 mt-3">{nextRequest.goal}</p>
+                  {nextRequest.deadline ? <p className="text-xs text-gray-500 mt-2">Due {new Date(nextRequest.deadline).toLocaleString()}</p> : <p className="text-xs text-gray-500 mt-2">Requested {fmtDate(nextRequest.created_at)}</p>}
+                </div>
+                <div className="shrink-0 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onOpenReviewRequest?.(nextRequest)}
+                    className="rounded-xl bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
+                  >
+                    {['requested', 'opened'].includes(nextRequestStatus) ? 'Review now' : 'Open thread'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
+            <p className="text-sm text-gray-700">No feedback requests yet.</p>
+            <p className="text-xs text-gray-500 mt-1">Requests from other members will appear here.</p>
+          </div>
+        )}
+
+        <details className="rounded-2xl border border-gray-200 bg-white px-4 py-4" open={showWorkspaceDetails}>
+          <summary onClick={() => setShowWorkspaceDetails((current) => !current)} className="cursor-pointer list-none flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Workspace details</p>
+              <p className="text-xs text-gray-500 mt-1">Open this when you need the full inbox, connections, or templates.</p>
+            </div>
+            <span className="text-xs text-gray-500">{showWorkspaceDetails ? 'Hide' : 'Show'}</span>
+          </summary>
+          <div className="pt-4 space-y-4">
+            <div className="flex gap-2 rounded-2xl bg-gray-100 p-1 w-full sm:w-fit">
+              <button
+                type="button"
+                onClick={() => setTab('inbox')}
+                className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${tab === 'inbox' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+              >
+                Inbox
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab('roster')}
+                className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${tab === 'roster' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+              >
+                Connections
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab('templates')}
+                className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${tab === 'templates' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+              >
+                Templates
+              </button>
+            </div>
+
+            {tab === 'inbox' ? (
+              requestsLoading ? (
+                <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading request inbox…</div>
+              ) : requests.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
+                  <p className="text-sm text-gray-700">No feedback requests yet.</p>
+                  <p className="text-xs text-gray-500 mt-1">Requests from other members will appear here.</p>
+                </div>
+              ) : (
             <div className="space-y-3">
               {requests.map((item) => (
                 <div key={item.id} className="rounded-2xl border border-gray-200 bg-white px-4 py-4">
@@ -214,8 +278,8 @@ function TeachingView({ token, onOpenReviewRequest }) {
                 </div>
               ))}
             </div>
-          )
-        ) : tab === 'roster' ? (
+              )
+            ) : tab === 'roster' ? (
           rosterLoading ? (
             <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading connections…</div>
           ) : roster.length === 0 ? (
@@ -234,8 +298,8 @@ function TeachingView({ token, onOpenReviewRequest }) {
                 </div>
               ))}
             </div>
-          )
-        ) : tab === 'templates' ? (
+              )
+            ) : tab === 'templates' ? (
           <div className="space-y-4">
             <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
               <div>
@@ -297,8 +361,10 @@ function TeachingView({ token, onOpenReviewRequest }) {
                 ))}
               </div>
             )}
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        </details>
       </div>
     </div>
   )
