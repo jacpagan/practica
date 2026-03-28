@@ -392,22 +392,24 @@ function ReviewPage({ reviewToken = '' }) {
     <div className="min-h-screen bg-white px-4 py-6 sm:px-6">
       <main className="max-w-3xl mx-auto space-y-6">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Private feedback link</p>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">Leave video feedback</h1>
-          <p className="text-sm text-gray-500 mt-2">Signed in as {user.display_name || user.username}.</p>
+          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Leave video feedback</h1>
+          <p className="text-xs text-gray-500 mt-2">Signed in as {user.display_name || user.username}.</p>
         </div>
 
         {reviewRequest ? (
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-sm font-semibold text-gray-900">Feedback request</p>
-              <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">{reviewRequest.instrument}</span>
-              {reviewRequest.student_level ? <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">{reviewRequest.student_level}</span> : null}
-            </div>
-            <p className="text-sm text-gray-800">{reviewRequest.goal}</p>
-            {reviewRequest.exercise_or_song ? <p className="text-xs text-gray-500">Focus: {reviewRequest.exercise_or_song}</p> : null}
-            {reviewRequest.notes ? <p className="text-xs text-gray-500 whitespace-pre-wrap">{reviewRequest.notes}</p> : null}
-            {reviewRequest.deadline ? <p className="text-xs text-gray-500">Requested deadline: {new Date(reviewRequest.deadline).toLocaleString()}</p> : null}
+            <p className="text-sm font-semibold text-gray-900">{reviewRequest.goal}</p>
+            {(reviewRequest.exercise_or_song || reviewRequest.notes || reviewRequest.deadline || reviewRequest.student_level) ? (
+              <details className="text-xs text-gray-500">
+                <summary className="cursor-pointer list-none hover:text-gray-900 transition-colors">Request details</summary>
+                <div className="space-y-1 pt-2">
+                  <p>{reviewRequest.instrument}{reviewRequest.student_level ? ` • ${reviewRequest.student_level}` : ''}</p>
+                  {reviewRequest.exercise_or_song ? <p>Focus: {reviewRequest.exercise_or_song}</p> : null}
+                  {reviewRequest.notes ? <p className="whitespace-pre-wrap">{reviewRequest.notes}</p> : null}
+                  {reviewRequest.deadline ? <p>Requested deadline: {new Date(reviewRequest.deadline).toLocaleString()}</p> : null}
+                </div>
+              </details>
+            ) : null}
           </div>
         ) : null}
 

@@ -697,7 +697,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h1 className="text-lg font-semibold text-gray-900">{session.title}</h1>
-                  <p className="text-xs text-gray-400 mt-1">Private library</p>
                   {session.practice_series ? (
                     <div className="flex items-center gap-2 flex-wrap mt-2">
                       <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{session.practice_series}</span>
@@ -718,11 +717,15 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
 
               {session.description ? <p className="text-sm text-gray-600">{session.description}</p> : null}
 
-              <div className="flex flex-wrap gap-2 text-xs text-gray-500">
-                {session.recorded_at ? <span className="rounded-full bg-gray-100 px-3 py-1">{new Date(session.recorded_at).toLocaleString()}</span> : null}
-                <span className="rounded-full bg-gray-100 px-3 py-1">{session.processing_status === 'ready' ? 'Playback ready' : session.processing_status || 'Saved'}</span>
-                {session.duration_seconds ? <span className="rounded-full bg-gray-100 px-3 py-1">{fmtTimer(session.duration_seconds)}</span> : null}
-              </div>
+              {(session.recorded_at || session.duration_seconds) ? (
+                <details className="text-xs text-gray-500">
+                  <summary className="cursor-pointer list-none hover:text-gray-900 transition-colors">Video details</summary>
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    {session.recorded_at ? <span className="rounded-full bg-gray-100 px-3 py-1">{new Date(session.recorded_at).toLocaleString()}</span> : null}
+                    {session.duration_seconds ? <span className="rounded-full bg-gray-100 px-3 py-1">{fmtTimer(session.duration_seconds)}</span> : null}
+                  </div>
+                </details>
+              ) : null}
 
               {session.processing_status === 'failed' ? (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4">
