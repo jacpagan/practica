@@ -4,7 +4,12 @@ name: Deploy via SSM
 # - main -> production only
 # - no staging promotion path enabled
 on:
-  # Manual only to reduce noise and give you explicit control
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - 'AGENTS.md'
   workflow_dispatch:
     inputs:
       ref:
@@ -14,7 +19,7 @@ on:
 
 concurrency:
   group: production-deploy-main
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -34,7 +39,11 @@ jobs:
       - name: Resolve ref
         id: ref
         run: |
-          REF="${{ github.event.inputs.ref || 'main' }}"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            REF="$GITHUB_SHA"
+          else
+            REF="${{ github.event.inputs.ref || 'main' }}"
+          fi
           echo "ref=$REF" >> $GITHUB_OUTPUT
 
       - name: Configure AWS credentials (OIDC)
