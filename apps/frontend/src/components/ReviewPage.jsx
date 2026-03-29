@@ -32,6 +32,7 @@ const reviewLinkLoadErrorState = ({ status, data }) => {
 const reviewLinkSubmitErrorMessage = ({ status, data }) => {
   const code = data?.code || ''
   if (code === 'review_link_feedback_disabled') return 'Video feedback is turned off for this link.'
+  if (code === 'review_request_forbidden') return data?.error || 'Only the assigned teacher can respond to this review request.'
   if (code === 'review_link_expired' || status === 410) return 'This private feedback link expired. Ask for a new link.'
   if (code === 'review_link_revoked' || status === 403) return 'This private feedback link has been turned off.'
   if (code === 'review_link_invalid' || status === 404) return 'This private feedback link is no longer available.'
@@ -168,8 +169,8 @@ function ReviewPage({ reviewToken = '' }) {
     return () => { cancelled = true }
   }, [authToken, reviewRequest?.current_member_role, reviewRequest?.current_user_role])
 
-  const canRespondToRequest = true
   const memberRole = reviewRequest?.current_member_role || reviewRequest?.current_user_role || ''
+  const canRespondToRequest = !reviewRequest || memberRole === 'reviewer'
   const reviewerShouldRespond = memberRole === 'reviewer' && ['requested', 'opened', 'resubmitted'].includes(String(reviewRequest?.status || '').trim().toLowerCase())
   const hasCurrentUserFeedback = feedback.some((item) => item.authored_by_current_user)
 
@@ -571,6 +572,11 @@ function ReviewPage({ reviewToken = '' }) {
                 </button>
               </div>
             </form>
+          </div>
+        ) : link?.allow_video_feedback ? (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 space-y-2">
+            <p className="text-sm font-semibold text-blue-900">Review replies are teacher-only</p>
+            <p className="text-sm text-blue-800">This page is for {reviewRequest?.teacher?.display_name || reviewRequest?.teacher?.username || 'the assigned teacher'} to leave video feedback. To follow up, add a new session from your private library and send a new review request.</p>
           </div>
         ) : (
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 space-y-2">
