@@ -244,7 +244,9 @@ CMD_ID=$(aws ssm send-command \
 echo "SSM CommandId: $CMD_ID"
 
 FINAL_STATUS="PENDING"
-for i in $(seq 1 30); do
+SSM_LAUNCH_MAX_POLLS="${SSM_LAUNCH_MAX_POLLS:-300}"
+SSM_LAUNCH_POLL_INTERVAL="${SSM_LAUNCH_POLL_INTERVAL:-2}"
+for i in $(seq 1 "$SSM_LAUNCH_MAX_POLLS"); do
   STATUS=$(aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" --query 'Status' --output text 2>/dev/null || echo "PENDING")
   echo "SSM status: $STATUS"
   if [ "$STATUS" = "Success" ]; then
@@ -256,7 +258,7 @@ for i in $(seq 1 30); do
     FINAL_STATUS="$STATUS"
     exit 1
   fi
-  sleep 1
+  sleep "$SSM_LAUNCH_POLL_INTERVAL"
 done
 if [ "$FINAL_STATUS" != "Success" ]; then
   echo "SSM launch command timed out" >&2
