@@ -4,8 +4,7 @@ name: Deploy via SSM
 # - main -> production only
 # - no staging promotion path enabled
 on:
-  push:
-    branches: [ main ]
+  # Manual only to reduce noise and give you explicit control
   workflow_dispatch:
     inputs:
       ref:
