@@ -192,7 +192,7 @@ EOS
 REMOTE_SCRIPT="${REMOTE_SCRIPT//__ENV_B64__/$ENV_B64}"
 REMOTE_SCRIPT="${REMOTE_SCRIPT//__GIT_REF__/${GIT_REF:-main}}"
 REMOTE_B64=$(printf '%s' "$REMOTE_SCRIPT" | base64 | tr -d '\n')
-COMMAND="mkdir -p /opt/practica && rm -f /opt/practica/.deploy-success /opt/practica/.deploy-failed && : > /opt/practica/deploy.log && echo '$REMOTE_B64' | base64 -d > /tmp/practica-deploy.sh && chmod +x /tmp/practica-deploy.sh && /bin/bash -lc '/tmp/practica-deploy.sh >> /opt/practica/deploy.log 2>&1'"
+COMMAND="mkdir -p /opt/practica && rm -f /opt/practica/.deploy-success /opt/practica/.deploy-failed && : > /opt/practica/deploy.log && echo '$REMOTE_B64' | base64 -d > /tmp/practica-deploy.sh && chmod +x /tmp/practica-deploy.sh && nohup /bin/bash /tmp/practica-deploy.sh >> /opt/practica/deploy.log 2>&1 </dev/null >/dev/null 2>&1 & echo launched"
 COMMAND_ESCAPED=$(printf '%s' "$COMMAND" | sed 's/\\/\\\\/g; s/"/\\"/g')
 PARAMS_JSON="{\"commands\":[\"$COMMAND_ESCAPED\"]}"
 
