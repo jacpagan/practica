@@ -56,18 +56,43 @@ class V1VideoFeaturesTests(APITestCase):
         session = self._create_session(user=self.owner)
         self.client.force_authenticate(user=self.owner)
 
+        with patch(
+            'videos.views.prepare_feedback_video_upload',
+            return_value=self._video_file('reply-browser.mp4', content_type='video/mp4'),
+        ):
+            response = self.client.post(
+                f'/api/sessions/{session.id}/video-feedback/',
+                {
+                    'text': 'Android upload',
+                    'feedback_video': self._video_file('reply.3gpp', content_type='application/octet-stream'),
+                },
+                format='multipart',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        feedback = VideoFeedback.objects.latest('id')
+        self.assertTrue(feedback.feedback_video.name.endswith('.mp4'))
+
+    @patch(
+        'videos.views.prepare_feedback_video_upload',
+        side_effect=ValueError('This feedback video needs browser playback conversion before Chrome and iPhone can open it, but conversion is unavailable right now. Please upload an MP4 or try again later.'),
+    )
+    def test_video_feedback_returns_clear_error_when_conversion_is_unavailable(self, prepare_feedback_video_upload):
+        session = self._create_session(user=self.owner)
+        self.client.force_authenticate(user=self.owner)
+
         response = self.client.post(
             f'/api/sessions/{session.id}/video-feedback/',
             {
-                'text': 'Android upload',
-                'feedback_video': self._video_file('reply.3gpp', content_type='application/octet-stream'),
+                'text': 'Needs conversion',
+                'feedback_video': self._video_file('reply.mov', content_type='video/quicktime'),
             },
             format='multipart',
         )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        feedback = VideoFeedback.objects.latest('id')
-        self.assertTrue(feedback.feedback_video.name.endswith('.3gpp'))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('chrome and iphone', response.data['error'].lower())
+        prepare_feedback_video_upload.assert_called_once()
 
     def test_legacy_text_only_video_feedback_remains_visible(self):
         session = self._create_session()

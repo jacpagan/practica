@@ -150,6 +150,10 @@ if [ "$backend_ok" != "1" ]; then
   exit 1
 fi
 
+echo 'Backfilling browser-safe feedback video playback files...'
+compose -f docker-compose.prod.yml run --rm backend \
+  python /app/apps/backend/manage.py backfill_feedback_video_playback
+
 POST_COUNTS=$(count_records)
 POST_USERS=$(extract_metric users "$POST_COUNTS")
 POST_SESSIONS=$(extract_metric sessions "$POST_COUNTS")

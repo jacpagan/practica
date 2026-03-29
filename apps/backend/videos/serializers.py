@@ -13,6 +13,7 @@ from .models import (
     FeedbackTemplate,
     SignupInviteCode,
 )
+from .services.feedback_video_processing import feedback_video_playback_url
 from .video_uploads import is_allowed_video_upload
 
 
@@ -163,7 +164,7 @@ class VideoFeedbackSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     display_name = serializers.SerializerMethodField()
     review_request_id = serializers.IntegerField(read_only=True)
-    feedback_video = SafeFileField(required=False, allow_null=True)
+    feedback_video = serializers.SerializerMethodField()
 
     class Meta:
         model = VideoFeedback
@@ -175,6 +176,9 @@ class VideoFeedbackSerializer(serializers.ModelSerializer):
         if hasattr(obj.user, 'profile') and obj.user.profile.display_name:
             return obj.user.profile.display_name
         return obj.user.username
+
+    def get_feedback_video(self, obj):
+        return feedback_video_playback_url(obj)
 
 
 class ChapterSerializer(serializers.ModelSerializer):
@@ -323,7 +327,7 @@ class ReviewVideoFeedbackSerializer(serializers.ModelSerializer):
     text = serializers.CharField(required=False, allow_blank=True, default='')
     review_request_id = serializers.IntegerField(read_only=True)
     feedback_category = serializers.ChoiceField(choices=VideoFeedback.CATEGORY_CHOICES, required=False, allow_blank=True, default='')
-    feedback_video = SafeFileField(required=False, allow_null=True)
+    feedback_video = serializers.SerializerMethodField()
 
     class Meta:
         model = VideoFeedback
@@ -337,6 +341,9 @@ class ReviewVideoFeedbackSerializer(serializers.ModelSerializer):
         if hasattr(obj.user, 'profile') and obj.user.profile.display_name:
             return obj.user.profile.display_name
         return obj.user.username
+
+    def get_feedback_video(self, obj):
+        return feedback_video_playback_url(obj)
 
     def get_authored_by_current_user(self, obj):
         request = self.context.get('request')

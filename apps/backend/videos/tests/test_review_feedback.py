@@ -176,18 +176,41 @@ class ReviewFeedbackApiTests(APITestCase):
         )
         self._auth(self.reviewer)
 
-        response = self.client.patch(
-            f'/api/review/{self.link.token}/feedback/',
-            {
-                'feedback_id': feedback.id,
-                'feedback_video': self._video_file('updated.3gpp', content_type='application/octet-stream'),
-            },
-            format='multipart',
-        )
+        with patch(
+            'videos.views.prepare_feedback_video_upload',
+            return_value=self._video_file('updated-browser.mp4', content_type='video/mp4'),
+        ):
+            response = self.client.patch(
+                f'/api/review/{self.link.token}/feedback/',
+                {
+                    'feedback_id': feedback.id,
+                    'feedback_video': self._video_file('updated.3gpp', content_type='application/octet-stream'),
+                },
+                format='multipart',
+            )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         feedback.refresh_from_db()
-        self.assertTrue(feedback.feedback_video.name.endswith('.3gpp'))
+        self.assertTrue(feedback.feedback_video.name.endswith('.mp4'))
+
+    def test_review_link_feedback_returns_clear_error_when_conversion_is_unavailable(self):
+        self._auth(self.reviewer)
+
+        with patch(
+            'videos.views.prepare_feedback_video_upload',
+            side_effect=ValueError('This feedback video needs browser playback conversion before Chrome and iPhone can open it, but conversion is unavailable right now. Please upload an MP4 or try again later.'),
+        ):
+            response = self.client.post(
+                f'/api/review/{self.link.token}/feedback/',
+                {
+                    'text': 'Needs conversion',
+                    'feedback_video': self._video_file('iphone.mov', content_type='video/quicktime'),
+                },
+                format='multipart',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('chrome and iphone', response.data['error'].lower())
 
     def test_session_detail_includes_video_feedback(self):
         VideoFeedback.objects.create(

@@ -46,6 +46,7 @@ from .services.media_pipeline import (
     local_transcode_enabled,
     media_pipeline_enabled,
 )
+from .services.feedback_video_processing import prepare_feedback_video_upload
 from .video_uploads import is_allowed_video_upload
 
 logger = logging.getLogger(__name__)
@@ -512,7 +513,10 @@ def review_link_feedback(request, token):
             uploaded_video = request.FILES.get('feedback_video')
             if uploaded_video and not is_allowed_video_upload(uploaded_video.content_type, uploaded_video.name):
                 return Response({'error': 'Only video files allowed'}, status=status.HTTP_400_BAD_REQUEST)
-            next_video = uploaded_video
+            try:
+                next_video = prepare_feedback_video_upload(uploaded_video)
+            except ValueError as exc:
+                return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         if not next_video:
             return Response({'error': 'Feedback video is required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -550,6 +554,10 @@ def review_link_feedback(request, token):
         return Response({'error': 'Feedback video is required'}, status=status.HTTP_400_BAD_REQUEST)
     if video_file and not is_allowed_video_upload(video_file.content_type, video_file.name):
         return Response({'error': 'Only video files allowed'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        video_file = prepare_feedback_video_upload(video_file)
+    except ValueError as exc:
+        return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
     item = VideoFeedback.objects.create(
         session=link.session,
@@ -1291,6 +1299,10 @@ class SessionViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Feedback video is required'}, status=status.HTTP_400_BAD_REQUEST)
         if video_file and not is_allowed_video_upload(video_file.content_type, video_file.name):
             return Response({'error': 'Only video files allowed'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            video_file = prepare_feedback_video_upload(video_file)
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         VideoFeedback.objects.create(
             session=session, user=request.user,
             timestamp_seconds=timestamp, text=text, feedback_video=video_file, is_legacy_text_feedback=False,
