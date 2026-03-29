@@ -18,13 +18,108 @@ _BROWSER_SAFE_CONTENT_TYPES = {
     'application/x-mp4',
     'audio/mp4',
 }
+_BROWSER_SAFE_VIDEO_CODECS = {'h264'}
+_BROWSER_SAFE_AUDIO_CODECS = {'', 'aac'}
+_BROWSER_SAFE_PIXEL_FORMATS = {'', 'yuv420p', 'yuvj420p'}
 
 
-def feedback_video_is_browser_safe(uploaded_file):
+def _is_generated_browser_mp4(name):
+    normalized = str(name or '').strip().lower()
+    return '/browser/' in normalized or normalized.endswith('-browser.mp4')
+
+
+def _looks_like_browser_safe_upload(uploaded_file):
     name = str(getattr(uploaded_file, 'name', '') or '').strip().lower()
     content_type = str(getattr(uploaded_file, 'content_type', '') or '').strip().lower()
     extension = Path(name).suffix.lower().lstrip('.')
     return extension in _BROWSER_SAFE_EXTENSIONS or content_type in _BROWSER_SAFE_CONTENT_TYPES
+
+
+def _probe_browser_compatibility(path):
+    video_raw = subprocess.check_output(
+        [
+            'ffprobe',
+            '-v',
+            'error',
+            '-select_streams',
+            'v:0',
+            '-show_entries',
+            'stream=codec_name,pix_fmt',
+            '-of',
+            'json',
+            str(path),
+        ],
+        text=True,
+    )
+    audio_raw = subprocess.check_output(
+        [
+            'ffprobe',
+            '-v',
+            'error',
+            '-select_streams',
+            'a:0',
+            '-show_entries',
+            'stream=codec_name',
+            '-of',
+            'json',
+            str(path),
+        ],
+        text=True,
+    )
+
+    import json
+
+    video_streams = json.loads(video_raw).get('streams', [])
+    if not video_streams:
+        return False
+    video_stream = video_streams[0]
+    video_codec = str(video_stream.get('codec_name', '') or '').strip().lower()
+    pixel_format = str(video_stream.get('pix_fmt', '') or '').strip().lower()
+
+    audio_streams = json.loads(audio_raw).get('streams', [])
+    audio_codec = ''
+    if audio_streams:
+        audio_codec = str(audio_streams[0].get('codec_name', '') or '').strip().lower()
+
+    return (
+        video_codec in _BROWSER_SAFE_VIDEO_CODECS
+        and pixel_format in _BROWSER_SAFE_PIXEL_FORMATS
+        and audio_codec in _BROWSER_SAFE_AUDIO_CODECS
+    )
+
+
+def _stored_feedback_key_is_browser_safe(key):
+    normalized_key = str(key or '').strip()
+    if not normalized_key:
+        return False
+    if _is_generated_browser_mp4(normalized_key):
+        return True
+    if not local_transcode_enabled():
+        return _looks_like_browser_safe_upload(type('StoredFile', (), {'name': normalized_key, 'content_type': ''})())
+
+    with tempfile.TemporaryDirectory(prefix='practica-feedback-probe-') as tmpdir:
+        tmp_path = Path(tmpdir)
+        source_path = tmp_path / Path(normalized_key).name
+
+        with default_storage.open(normalized_key, 'rb') as source_file:
+            with open(source_path, 'wb') as destination:
+                shutil.copyfileobj(source_file, destination, length=1024 * 1024)
+
+        return _probe_browser_compatibility(source_path)
+
+
+def feedback_video_is_browser_safe(uploaded_file):
+    name = str(getattr(uploaded_file, 'name', '') or '').strip()
+    if not name:
+        return False
+    if _is_generated_browser_mp4(name):
+        return True
+    try:
+        if default_storage.exists(name):
+            return _stored_feedback_key_is_browser_safe(name)
+    except Exception:
+        pass
+    return _looks_like_browser_safe_upload(uploaded_file)
 
 
 def _storage_url_for_key(key):
@@ -90,7 +185,7 @@ def _run_browser_transcode(source_path, output_path):
 def _transcode_uploaded_feedback_video(uploaded_file):
     source_name = Path(str(getattr(uploaded_file, 'name', '') or 'feedback-video')).name
     safe_stem = Path(source_name).stem.strip() or 'feedback-video'
-    target_name = f'{safe_stem[:80]}-{uuid.uuid4().hex[:12]}.mp4'
+    target_name = f'{safe_stem[:80]}-{uuid.uuid4().hex[:12]}-browser.mp4'
 
     with tempfile.TemporaryDirectory(prefix='practica-feedback-video-') as tmpdir:
         tmp_path = Path(tmpdir)
@@ -118,7 +213,7 @@ def ensure_feedback_video_playback_key(feedback):
     source_key = str(getattr(video_field, 'name', '') or '').strip()
     if not source_key:
         return ''
-    if feedback_video_is_browser_safe(video_field):
+    if _is_generated_browser_mp4(source_key):
         return source_key
 
     proxy_key = _feedback_proxy_key(feedback)
@@ -127,6 +222,9 @@ def ensure_feedback_video_playback_key(feedback):
             return proxy_key
     except Exception:
         pass
+
+    if feedback_video_is_browser_safe(video_field):
+        return source_key
 
     if not local_transcode_enabled():
         return source_key
