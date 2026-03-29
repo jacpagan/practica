@@ -135,6 +135,19 @@ function TeachingView({ token, onOpenReviewRequest }) {
   const nextRequest = sortedRequests[0] || null
   const nextRequestStatus = String(nextRequest?.status || '').trim().toLowerCase()
 
+  const uniqueSessions = useMemo(() => {
+    const bySessionId = new Map()
+    requests.forEach((req) => {
+      const sid = Number(req?.session?.id || 0)
+      if (!sid) return
+      const prev = bySessionId.get(sid)
+      if (!prev || new Date(req.created_at) > new Date(prev.request.created_at)) {
+        bySessionId.set(sid, { session: req.session, request: req })
+      }
+    })
+    return Array.from(bySessionId.values()).sort((l, r) => new Date(r.request.created_at) - new Date(l.request.created_at))
+  }, [requests])
+
   return (
     <div className="px-4 sm:px-6 py-6">
       <div className="max-w-4xl mx-auto space-y-4">
@@ -221,6 +234,13 @@ function TeachingView({ token, onOpenReviewRequest }) {
                 className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${tab === 'templates' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
               >
                 Templates
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab('videos')}
+                className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${tab === 'videos' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+              >
+                Videos
               </button>
             </div>
 
@@ -358,6 +378,42 @@ function TeachingView({ token, onOpenReviewRequest }) {
               </div>
             )}
               </div>
+            ) : tab === 'videos' ? (
+          <div className="space-y-4">
+            {requestsLoading ? (
+              <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading…</div>
+            ) : uniqueSessions.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
+                <p className="text-sm text-gray-700">No student videos yet.</p>
+                <p className="text-xs text-gray-500 mt-1">Assigned sessions appear here.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {uniqueSessions.map(({ session, request }) => (
+                  <div key={session.id} className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold text-gray-900">{session.title || 'Video'}</p>
+                          <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${statusTone[request.status] || 'bg-gray-100 text-gray-700'}`}>{statusLabel(request.status)}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">{request.owner?.display_name || request.student?.display_name || request.owner?.username || request.student?.username || 'Member'} • {fmtDate(request.created_at)}</p>
+                      </div>
+                      <div className="shrink-0 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onOpenReviewRequest?.(request)}
+                          className="rounded-xl bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
+                        >
+                          Open
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
             ) : null}
           </div>
         </details>

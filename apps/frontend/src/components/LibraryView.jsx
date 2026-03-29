@@ -213,6 +213,31 @@ function LibraryView({
   const activeRequestStatus = String(activeRequest?.status || '').trim().toLowerCase()
   const latestSeries = seriesGroups[0] || null
   const latestSessionNeedingRequest = ownSessions.find((session) => session.processing_status === 'ready') || ownSessions[0] || null
+
+  const toast = useToast()
+
+  const moveToThread = async (session) => {
+    if (!token || !session?.id) return
+    const current = String(session.practice_series || '').trim()
+    const next = window.prompt('Move to practice thread (name)', current)
+    if (next === null) return
+    try {
+      const res = await fetch(`/api/sessions/${session.id}/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Token ${token}`,
+        },
+        body: JSON.stringify({ practice_series: String(next || '').trim() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Could not move video')
+      toast.success(next ? 'Moved to thread' : 'Removed from thread')
+      // Soft refresh hint: user can open thread via button labels below.
+    } catch (error) {
+      toast.error(error?.message || 'Could not move video')
+    }
+  }
   return (
     <div className="px-4 sm:px-6 py-6">
       <div className="max-w-4xl mx-auto space-y-4">
@@ -323,7 +348,7 @@ function LibraryView({
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                       <p className="text-sm font-medium text-gray-900">Pick up your latest take</p>
-                      <p className="text-xs text-gray-500 mt-1">Open your latest ready video.</p>
+                      <p className="text-xs text-gray-500 mt-1">Open your latest video{latestSessionNeedingRequest.processing_status !== 'ready' ? ' (processing)' : ''}.</p>
                     </div>
                     <div className="text-xs text-gray-500">{fmtDate(latestSessionNeedingRequest.recorded_at || latestSessionNeedingRequest.created_at)}</div>
                   </div>
@@ -425,6 +450,11 @@ function LibraryView({
                               </div>
                               <p className="text-xs text-gray-500 mt-1">{fmtDate(session.recorded_at || session.created_at)}</p>
                               {session.description ? <p className="text-xs text-gray-500 mt-2 line-clamp-2">{session.description}</p> : null}
+                              <div className="mt-2">
+                                <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); moveToThread(session) }} className="text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-white transition-colors">
+                                  Add to thread
+                                </button>
+                              </div>
                             </div>
                           </div>
                           <div className="text-right shrink-0">

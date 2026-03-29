@@ -179,6 +179,15 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   }, [initialSession?.id])
 
   useEffect(() => {
+    if (!justUploaded) return
+    if (!canEdit) return
+    if (reviewRequests.length > 0) return
+    // Nudge: auto-open the request composer for fresh uploads.
+    setShowRequestComposer(true)
+    try { loopDetailsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }) } catch {}
+  }, [canEdit, justUploaded, reviewRequests.length])
+
+  useEffect(() => {
     if (!initialReviewRequestDraft || !canEdit) return
     setShowLoopDetails(true)
     setShowRequestComposer(true)
