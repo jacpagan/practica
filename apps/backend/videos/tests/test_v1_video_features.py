@@ -162,6 +162,23 @@ class V1VideoFeaturesTests(APITestCase):
         self.assertEqual(session.processing_status, Session.STATUS_PROCESSING)
         enqueue_local_transcode.assert_called_once()
 
+    def test_session_asset_urls_fall_back_to_media_urls_when_storage_lookup_fails(self):
+        session = self._create_session(user=self.owner)
+        SessionAsset.objects.create(
+            session=session,
+            asset_type=SessionAsset.TYPE_PROXY_MP4,
+            object_key='processed/sessions/1/proxy/video_proxy.mp4',
+            content_type='video/mp4',
+        )
+        self.client.force_authenticate(user=self.owner)
+
+        with patch('django.core.files.storage.FileSystemStorage.url', side_effect=RuntimeError('storage unavailable')):
+            response = self.client.get(f'/api/sessions/{session.id}/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['assets']), 1)
+        self.assertTrue(response.data['assets'][0]['url'].endswith('/processed/sessions/1/proxy/video_proxy.mp4'))
+
     @override_settings(
         AWS_STORAGE_BUCKET_NAME='',
         AWS_MEDIA_CONVERT_ROLE_ARN='',

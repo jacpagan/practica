@@ -16,12 +16,35 @@ from .models import (
 from .video_uploads import is_allowed_video_upload
 
 
+def _media_url_for_key(key):
+    normalized_key = str(key or '').strip().lstrip('/')
+    if not normalized_key:
+        return ''
+    media_base = str(getattr(settings, 'MEDIA_URL', '/media/') or '/media/').strip()
+    if not media_base.endswith('/'):
+        media_base = f'{media_base}/'
+    if media_base.startswith('http://') or media_base.startswith('https://') or media_base.startswith('/'):
+        return f'{media_base}{normalized_key}'
+    return f"/{media_base.lstrip('/')}{normalized_key}"
+
+
+def _normalize_storage_url(raw_value, key=''):
+    candidate = str(raw_value or '').strip()
+    if not candidate:
+        return _media_url_for_key(key)
+    if candidate.startswith('http://') or candidate.startswith('https://') or candidate.startswith('/'):
+        return candidate
+    return _media_url_for_key(candidate or key)
+
+
 class SafeFileField(serializers.FileField):
     def to_representation(self, value):
+        fallback_key = str(getattr(value, 'name', '') or '')
         try:
-            return super().to_representation(value)
+            rendered = super().to_representation(value)
         except Exception:
-            return str(getattr(value, 'name', '') or '')
+            rendered = fallback_key
+        return _normalize_storage_url(rendered, key=fallback_key)
 
 
 class ProfileSerializer(serializers.ModelSerializer):
@@ -130,9 +153,10 @@ class SessionAssetSerializer(serializers.ModelSerializer):
         if key.startswith('http://') or key.startswith('https://') or key.startswith('/'):
             return key
         try:
-            return default_storage.url(key)
+            raw_url = default_storage.url(key)
         except Exception:
-            return key
+            raw_url = key
+        return _normalize_storage_url(raw_url, key=key)
 
 
 class VideoFeedbackSerializer(serializers.ModelSerializer):

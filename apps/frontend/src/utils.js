@@ -54,9 +54,13 @@ export const normalizedVideoContentType = (file) => {
 
 export const videoUrl = (path) => {
   if (!path) return null
+  if (path.startsWith('s3://')) return path
   if (path.startsWith('http')) return path
+  if (path.startsWith('/')) return `${API_BASE}${path}`
+  if (path.includes('://')) return path
+  if (path.startsWith('sessions/') || path.startsWith('feedback_videos/')) return `${API_BASE}/media/${path}`
   if (path.startsWith('/media/')) return `${API_BASE}${path}`
-  return path
+  return `${API_BASE}/${path.replace(/^\/+/, '')}`
 }
 
 export const assetUrl = (asset) => {

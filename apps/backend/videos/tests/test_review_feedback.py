@@ -222,8 +222,8 @@ class ReviewFeedbackApiTests(APITestCase):
             response = self.client.get(f'/api/sessions/{self.session.id}/')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['video_file'], 'sessions/review-owner.mp4')
-        self.assertEqual(response.data['video_feedback'][0]['feedback_video'], 'feedback_videos/reply.mp4')
+        self.assertTrue(response.data['video_file'].endswith('/sessions/review-owner.mp4'))
+        self.assertTrue(response.data['video_feedback'][0]['feedback_video'].endswith('/feedback_videos/reply.mp4'))
 
     def test_owner_can_create_and_reuse_private_share_link(self):
         self.link.is_active = False
