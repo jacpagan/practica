@@ -3,6 +3,7 @@ import { useToast } from './Toast'
 import { createSessionUpload, isLikelyVideoFile, MAX_RECORDER_DURATION_SECONDS, MAX_VIDEO_UPLOAD_BYTES, uploadErrorMessage, videoFileAccept } from '../utils'
 import VideoRecorder from './VideoRecorder'
 import { useConfirm } from './ConfirmDialog'
+import PracticeThreadField from './PracticeThreadField'
 
 const LAST_SERIES_KEY = 'practica.last_series.v1'
 
@@ -12,6 +13,7 @@ function SessionUpload({
   onCancel,
   initialRecorderOpen = false,
   initialPracticeSeries = '',
+  practiceThreadOptions = [],
   onPracticeSeriesHandled,
   onRecorderOpenHandled,
   onUploadGuardChange,
@@ -324,13 +326,12 @@ function SessionUpload({
             <div className="space-y-4 pt-4">
               <div>
                 <label className="block text-sm text-gray-600 mb-1.5">Practice thread</label>
-                <input
-                  type="text"
+                <PracticeThreadField
                   value={practiceSeries}
-                  onChange={(event) => setPracticeSeries(event.target.value)}
+                  onChange={setPracticeSeries}
+                  options={practiceThreadOptions}
                   disabled={isUploading}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
-                  placeholder="Optional, like Singles @ 120 BPM"
+                  placeholder="Choose a thread or create a new one"
                 />
               </div>
 

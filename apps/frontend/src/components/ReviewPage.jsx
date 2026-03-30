@@ -400,14 +400,13 @@ function ReviewPage({ reviewToken = '' }) {
         {reviewRequest ? (
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-2">
             <p className="text-sm font-semibold text-gray-900">{reviewRequest.goal}</p>
-            {(reviewRequest.exercise_or_song || reviewRequest.notes || reviewRequest.deadline || reviewRequest.student_level) ? (
+            {(reviewRequest.exercise_or_song || reviewRequest.notes) ? (
               <details className="text-xs text-gray-500">
                 <summary className="cursor-pointer list-none hover:text-gray-900 transition-colors">Details</summary>
                 <div className="space-y-1 pt-2">
-                  <p>{reviewRequest.instrument}{reviewRequest.student_level ? ` • ${reviewRequest.student_level}` : ''}</p>
+                  <p>{reviewRequest.instrument}</p>
                   {reviewRequest.exercise_or_song ? <p>Focus: {reviewRequest.exercise_or_song}</p> : null}
                   {reviewRequest.notes ? <p className="whitespace-pre-wrap">{reviewRequest.notes}</p> : null}
-                  {reviewRequest.deadline ? <p>Requested deadline: {new Date(reviewRequest.deadline).toLocaleString()}</p> : null}
                 </div>
               </details>
             ) : null}

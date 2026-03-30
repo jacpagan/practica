@@ -245,6 +245,15 @@ function AppContent() {
     () => sessions.filter((item) => item?.can_edit && item?.processing_status === 'ready').length,
     [sessions],
   )
+  const practiceThreadOptions = useMemo(
+    () => Array.from(new Set(
+      sessions
+        .filter((item) => item?.can_edit)
+        .map((item) => String(item?.practice_series || '').trim())
+        .filter(Boolean),
+    )).sort((left, right) => left.localeCompare(right)),
+    [sessions],
+  )
 
   const handleRecordAnother = useCallback((draft = null) => {
     setSelectedSession(null)
@@ -434,6 +443,7 @@ function AppContent() {
         {view === 'upload' && (
           <SessionUpload
             token={token}
+            practiceThreadOptions={practiceThreadOptions}
             onComplete={handleUploadComplete}
             onCancel={({ bypassUploadGuard = false } = {}) => navigate(
               pendingPracticeSeries
@@ -457,6 +467,7 @@ function AppContent() {
           <SessionDetail
             session={selectedSession}
             token={token}
+            practiceThreadOptions={practiceThreadOptions}
             onBack={goBack}
             initialReviewRequestDraft={pendingFollowUpRequestDraft}
             onReviewRequestDraftCleared={() => setPendingFollowUpRequestDraft(null)}

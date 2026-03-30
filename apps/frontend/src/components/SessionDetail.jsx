@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { feedbackCategoryLabel, feedbackCategoryTone, fmtTimer, sessionVideoSources, videoUrl } from '../utils'
 import { useConfirm } from './ConfirmDialog'
 import { useToast } from './Toast'
+import PracticeThreadField from './PracticeThreadField'
 
 const requestStatusTone = {
   requested: 'bg-amber-100 text-amber-800',
@@ -83,7 +84,7 @@ const writeLastTeacher = (teacher) => {
   } catch {}
 }
 
-function SessionDetail({ session: initialSession, token, onBack, onOpenReviewRequest, initialReviewRequestDraft = null, onReviewRequestDraftCleared, onSessionUpdate, onSessionDelete, justUploaded = false, onRecordAnother, onOpenSeries }) {
+function SessionDetail({ session: initialSession, token, onBack, onOpenReviewRequest, initialReviewRequestDraft = null, onReviewRequestDraftCleared, onSessionUpdate, onSessionDelete, justUploaded = false, onRecordAnother, onOpenSeries, practiceThreadOptions = [] }) {
   const toast = useToast()
   const confirm = useConfirm()
   const videoRef = useRef(null)
@@ -115,12 +116,9 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const [showRequestHistory, setShowRequestHistory] = useState(false)
   const [showLegacyLinkTools, setShowLegacyLinkTools] = useState(false)
   const [requestInstrument, setRequestInstrument] = useState('drums')
-  const [requestStudentLevel, setRequestStudentLevel] = useState('')
   const [requestGoal, setRequestGoal] = useState('')
   const [requestExerciseOrSong, setRequestExerciseOrSong] = useState('')
   const [requestNotes, setRequestNotes] = useState('')
-  const [requestTurnaroundHours, setRequestTurnaroundHours] = useState('24')
-  const [requestDeadline, setRequestDeadline] = useState('')
 
   const authHeaders = useMemo(() => (token ? { Authorization: `Token ${token}` } : {}), [token])
   const canEdit = Boolean(session?.can_edit)
@@ -170,12 +168,9 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     setShowRequestHistory(false)
     setShowLegacyLinkTools(false)
     setRequestInstrument('drums')
-    setRequestStudentLevel('')
     setRequestGoal('')
     setRequestExerciseOrSong('')
     setRequestNotes('')
-    setRequestTurnaroundHours('24')
-    setRequestDeadline('')
   }, [initialSession?.id])
 
   useEffect(() => {
@@ -194,11 +189,9 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     setSelectedTeacher(initialReviewRequestDraft.teacher || null)
     setShowRequestDetails(true)
     setRequestInstrument(initialReviewRequestDraft.instrument || 'drums')
-    setRequestStudentLevel(initialReviewRequestDraft.student_level || '')
     setRequestGoal(initialReviewRequestDraft.goal || '')
     setRequestExerciseOrSong(initialReviewRequestDraft.exercise_or_song || '')
     setRequestNotes(initialReviewRequestDraft.notes || '')
-    setRequestTurnaroundHours(initialReviewRequestDraft.requested_turnaround_hours ? String(initialReviewRequestDraft.requested_turnaround_hours) : '24')
   }, [initialReviewRequestDraft, canEdit])
 
   useEffect(() => {
@@ -453,12 +446,9 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
         teacher_id: selectedTeacher.id,
         parent_request_id: initialReviewRequestDraft?.parent_request_id || null,
         instrument: requestInstrument.trim() || 'drums',
-        student_level: requestStudentLevel.trim(),
         goal: requestGoal.trim(),
         exercise_or_song: requestExerciseOrSong.trim(),
         notes: requestNotes.trim(),
-        requested_turnaround_hours: requestTurnaroundHours ? Number(requestTurnaroundHours) : null,
-        deadline: requestDeadline ? new Date(requestDeadline).toISOString() : null,
       }
       const res = await fetch('/api/review-requests/', {
         method: 'POST',
@@ -478,8 +468,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       setRequestGoal('')
       setRequestExerciseOrSong('')
       setRequestNotes('')
-      setRequestStudentLevel('')
-      setRequestDeadline('')
       onReviewRequestDraftCleared?.()
       writeLastTeacher(selectedTeacher)
       toast.success(`Request sent to ${selectedTeacher.display_name || selectedTeacher.username}`)
@@ -641,11 +629,9 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       parent_request_id: requestItem.id,
       teacher: requestItem.teacher,
       instrument: requestItem.instrument,
-      student_level: requestItem.student_level,
       goal: requestItem.goal,
       exercise_or_song: requestItem.exercise_or_song,
       notes: requestItem.notes,
-      requested_turnaround_hours: requestItem.requested_turnaround_hours,
       practiceSeries: session?.practice_series || '',
     })
   }
@@ -678,12 +664,11 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 onChange={(event) => setEditTitle(event.target.value)}
                 className="w-full text-lg font-semibold text-gray-900 border-b border-gray-200 focus:border-gray-400 focus:outline-none pb-1"
               />
-              <input
-                type="text"
+              <PracticeThreadField
                 value={editPracticeSeries}
-                onChange={(event) => setEditPracticeSeries(event.target.value)}
-                placeholder="Practice thread"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                onChange={setEditPracticeSeries}
+                options={practiceThreadOptions}
+                placeholder="Choose a thread or create a new one"
               />
               <textarea
                 value={editDescription}
@@ -969,25 +954,9 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
 
                         {showRequestDetails ? (
                           <div className="space-y-3">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Level</label>
-                                <input type="text" value={requestStudentLevel} onChange={(event) => setRequestStudentLevel(event.target.value)} placeholder="Beginner, intermediate, advanced" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Turnaround hours</label>
-                                <input type="number" min="1" step="1" value={requestTurnaroundHours} onChange={(event) => setRequestTurnaroundHours(event.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
-                              </div>
-                            </div>
-
                             <div>
                               <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Exercise or song</label>
                               <input type="text" value={requestExerciseOrSong} onChange={(event) => setRequestExerciseOrSong(event.target.value)} placeholder="Optional focus area" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
-                            </div>
-
-                            <div>
-                              <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Deadline</label>
-                              <input type="datetime-local" value={requestDeadline} onChange={(event) => setRequestDeadline(event.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
                             </div>
 
                             <div>
@@ -1033,10 +1002,10 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                   {requestStatusLabel(requestItem.status)}
                                 </span>
                               </div>
-                              <p className="text-xs text-gray-500 mt-1">{requestItem.instrument}{requestItem.student_level ? ` • ${requestItem.student_level}` : ''}</p>
+                              <p className="text-xs text-gray-500 mt-1">{requestItem.instrument}</p>
                             </div>
                             <div className="text-right">
-                              <p className="text-xs text-gray-500">{requestItem.deadline ? `Due ${new Date(requestItem.deadline).toLocaleString()}` : `Requested ${new Date(requestItem.created_at).toLocaleString()}`}</p>
+                              <p className="text-xs text-gray-500">Requested {new Date(requestItem.created_at).toLocaleString()}</p>
                               <p className="text-xs text-gray-400 mt-1">Responses: {requestItem.response_count || 0}</p>
                             </div>
                           </div>

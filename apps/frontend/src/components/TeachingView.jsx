@@ -180,10 +180,10 @@ function TeachingView({ token, onOpenReviewRequest }) {
                     {nextRequest.parent_request ? <span className="text-[11px] uppercase tracking-wide bg-violet-100 text-violet-800 px-2 py-1 rounded-full">Follow-up</span> : null}
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    {nextRequest.owner?.display_name || nextRequest.student?.display_name || nextRequest.owner?.username || nextRequest.student?.username || 'Member'} • {nextRequest.instrument}{nextRequest.student_level ? ` • ${nextRequest.student_level}` : ''}
+                    {nextRequest.owner?.display_name || nextRequest.student?.display_name || nextRequest.owner?.username || nextRequest.student?.username || 'Member'} • {nextRequest.instrument}
                   </p>
                   <p className="text-sm text-gray-700 mt-3">{nextRequest.goal}</p>
-                  {nextRequest.deadline ? <p className="text-xs text-gray-500 mt-2">Due {new Date(nextRequest.deadline).toLocaleString()}</p> : <p className="text-xs text-gray-500 mt-2">Requested {fmtDate(nextRequest.created_at)}</p>}
+                  <p className="text-xs text-gray-500 mt-2">Requested {fmtDate(nextRequest.created_at)}</p>
                 </div>
                 <div className="shrink-0 flex items-center gap-2">
                   <button
@@ -266,7 +266,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
                         {item.parent_request ? <span className="text-[11px] uppercase tracking-wide bg-violet-100 text-violet-800 px-2 py-1 rounded-full">Follow-up</span> : null}
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
-                        {item.owner?.display_name || item.student?.display_name || item.owner?.username || item.student?.username || 'Member'} • {item.instrument}{item.student_level ? ` • ${item.student_level}` : ''}
+                        {item.owner?.display_name || item.student?.display_name || item.owner?.username || item.student?.username || 'Member'} • {item.instrument}
                       </p>
                       <p className="text-sm text-gray-700 mt-3">{item.goal}</p>
                       {item.exercise_or_song ? <p className="text-xs text-gray-500 mt-2">Focus: {item.exercise_or_song}</p> : null}
@@ -279,7 +279,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
                           ))}
                         </div>
                       ) : null}
-                      {item.deadline ? <p className="text-xs text-gray-500 mt-1">Due {new Date(item.deadline).toLocaleString()}</p> : <p className="text-xs text-gray-500 mt-1">Requested {fmtDate(item.created_at)}</p>}
+                      <p className="text-xs text-gray-500 mt-1">Requested {fmtDate(item.created_at)}</p>
                     </div>
                     <div className="shrink-0 flex items-center gap-2">
                       <button
