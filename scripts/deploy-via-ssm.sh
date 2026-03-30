@@ -2,6 +2,9 @@
 set -euo pipefail
 
 ENV_B64=$(printf '%s' "${ENV_PRODUCTION:-}" | base64 | tr -d '\n')
+BACKEND_IMAGE_B64=$(printf '%s' "${BACKEND_IMAGE:-}" | base64 | tr -d '\n')
+ECR_REGISTRY_B64=$(printf '%s' "${ECR_REGISTRY:-}" | base64 | tr -d '\n')
+ECR_PASSWORD_B64=$(printf '%s' "${ECR_PASSWORD:-}" | base64 | tr -d '\n')
 
 REMOTE_SCRIPT=$(cat <<'EOS'
 #!/usr/bin/env bash
@@ -60,10 +63,22 @@ export DEPLOYED_GIT_SHA=$(git rev-parse HEAD 2>/dev/null || echo '')
 
 printf '%s' "__ENV_B64__" | base64 -d > .env.production
 set -a; source .env.production; set +a
+BACKEND_IMAGE=$(printf '%s' "__BACKEND_IMAGE_B64__" | base64 -d)
+ECR_REGISTRY=$(printf '%s' "__ECR_REGISTRY_B64__" | base64 -d)
+ECR_PASSWORD=$(printf '%s' "__ECR_PASSWORD_B64__" | base64 -d)
 : "${POSTGRES_DB:=practica_prod}"
 : "${POSTGRES_USER:=practica}"
 : "${POSTGRES_PASSWORD:=${DB_PASSWORD:-}}"
-export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD
+export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD BACKEND_IMAGE ECR_REGISTRY ECR_PASSWORD
+
+if [ -n "${BACKEND_IMAGE:-}" ]; then
+  if [ -n "${ECR_PASSWORD:-}" ] && [ -n "${ECR_REGISTRY:-}" ]; then
+    printf '%s' "$ECR_PASSWORD" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+  else
+    AWS_REGION_VALUE="${AWS_REGION:-${AWS_S3_REGION_NAME:-us-east-1}}"
+    aws ecr get-login-password --region "$AWS_REGION_VALUE" | docker login --username AWS --password-stdin "${BACKEND_IMAGE%%/*}"
+  fi
+fi
 
 # Remove stale unix socket from previous runs before building context.
 rm -f apps/backend/gunicorn.ctl
@@ -99,8 +114,12 @@ fi
 # Keep supporting services up while preparing the next backend image.
 compose -f docker-compose.prod.yml up -d db redis
 
-# Build next backend image and run prep work before cutting over traffic.
-compose -f docker-compose.prod.yml build backend
+# Build or pull next backend image, then run prep work before cutting over traffic.
+if [ -n "${BACKEND_IMAGE:-}" ]; then
+  docker pull "$BACKEND_IMAGE"
+else
+  compose -f docker-compose.prod.yml build backend
+fi
 compose -f docker-compose.prod.yml run --rm backend python /app/apps/backend/manage.py migrate
 compose -f docker-compose.prod.yml run --rm backend python /app/apps/backend/manage.py collectstatic --noinput
 
@@ -190,9 +209,12 @@ EOS
 )
 
 REMOTE_SCRIPT="${REMOTE_SCRIPT//__ENV_B64__/$ENV_B64}"
+REMOTE_SCRIPT="${REMOTE_SCRIPT//__BACKEND_IMAGE_B64__/$BACKEND_IMAGE_B64}"
+REMOTE_SCRIPT="${REMOTE_SCRIPT//__ECR_REGISTRY_B64__/$ECR_REGISTRY_B64}"
+REMOTE_SCRIPT="${REMOTE_SCRIPT//__ECR_PASSWORD_B64__/$ECR_PASSWORD_B64}"
 REMOTE_SCRIPT="${REMOTE_SCRIPT//__GIT_REF__/${GIT_REF:-main}}"
 REMOTE_B64=$(printf '%s' "$REMOTE_SCRIPT" | base64 | tr -d '\n')
-COMMAND="mkdir -p /opt/practica && rm -f /opt/practica/.deploy-success /opt/practica/.deploy-failed && : > /opt/practica/deploy.log && echo '$REMOTE_B64' | base64 -d > /tmp/practica-deploy.sh && chmod +x /tmp/practica-deploy.sh && nohup /bin/bash /tmp/practica-deploy.sh >> /opt/practica/deploy.log 2>&1 </dev/null >/dev/null 2>&1 & echo launched"
+COMMAND="mkdir -p /opt/practica && rm -f /opt/practica/.deploy-success /opt/practica/.deploy-failed && : > /opt/practica/deploy.log && echo '$REMOTE_B64' | base64 -d > /tmp/practica-deploy.sh && chmod +x /tmp/practica-deploy.sh && nohup /bin/bash /tmp/practica-deploy.sh >> /opt/practica/deploy.log 2>&1 </dev/null & echo launched"
 COMMAND_ESCAPED=$(printf '%s' "$COMMAND" | sed 's/\\/\\\\/g; s/"/\\"/g')
 PARAMS_JSON="{\"commands\":[\"$COMMAND_ESCAPED\"]}"
 

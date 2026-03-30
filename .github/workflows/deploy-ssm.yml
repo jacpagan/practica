@@ -52,12 +52,53 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Ensure ECR repository exists
+        env:
+          ECR_REPOSITORY: practica-backend
+        run: |
+          aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" >/dev/null 2>&1 || \
+            aws ecr create-repository --repository-name "$ECR_REPOSITORY" --image-scanning-configuration scanOnPush=true >/dev/null
+
+      - name: Login to Amazon ECR
+        id: login_ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Resolve ECR deploy auth
+        id: ecr_deploy_auth
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          REGISTRY: ${{ steps.login_ecr.outputs.registry }}
+        run: |
+          PASSWORD=$(aws ecr get-login-password --region "$AWS_REGION")
+          echo "::add-mask::$PASSWORD"
+          echo "registry=$REGISTRY" >> "$GITHUB_OUTPUT"
+          {
+            echo 'password<<EOF'
+            echo "$PASSWORD"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push backend image
+        id: backend_image
+        env:
+          REGISTRY: ${{ steps.login_ecr.outputs.registry }}
+          ECR_REPOSITORY: practica-backend
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          IMAGE_URI="$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          docker build -f apps/backend/Dockerfile -t "$IMAGE_URI" .
+          docker push "$IMAGE_URI"
+          echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
+
       - name: Send SSM deploy command
         id: send_ssm
         env:
           INSTANCE_ID: ${{ secrets.INSTANCE_ID }}
           ENV_PRODUCTION: ${{ secrets.ENV_PRODUCTION }}
           GIT_REF: ${{ steps.ref.outputs.ref }}
+          BACKEND_IMAGE: ${{ steps.backend_image.outputs.image_uri }}
+          ECR_REGISTRY: ${{ steps.ecr_deploy_auth.outputs.registry }}
+          ECR_PASSWORD: ${{ steps.ecr_deploy_auth.outputs.password }}
         run: bash scripts/deploy-via-ssm.sh
 
       - name: Deployment summary
@@ -73,6 +114,7 @@ jobs:
           echo "Deploy summary:"
           echo "commit_sha=$COMMIT_SHA"
           echo "deployed_ref=$DEPLOYED_REF"
+          echo "backend_image=${{ steps.backend_image.outputs.image_uri }}"
           echo "ssm_command_id=$SSM_COMMAND_ID"
           echo "ssm_status=$SSM_STATUS"
           echo "health_gate=backend+public required"
@@ -81,6 +123,7 @@ jobs:
             echo "### Production Deploy Summary"
             echo "- Commit SHA: \`$COMMIT_SHA\`"
             echo "- Deployed ref: \`$DEPLOYED_REF\`"
+            echo "- Backend image: \`${{ steps.backend_image.outputs.image_uri }}\`"
             echo "- SSM command id: \`$SSM_COMMAND_ID\`"
             echo "- SSM status: \`$SSM_STATUS\`"
             echo "- Health gate: \`backend + public health required\`"
