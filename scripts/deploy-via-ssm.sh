@@ -26,10 +26,8 @@ if ! command -v nginx >/dev/null 2>&1; then echo 'nginx not found. Please instal
 compose() {
   if docker compose version >/dev/null 2>&1; then
     docker compose "$@"
-  elif command -v docker-compose >/dev/null 2>&1; then
-    docker-compose "$@"
   else
-    echo 'Neither docker compose nor docker-compose is available.' >&2
+    echo 'docker compose plugin is required on production host.' >&2
     exit 1
   fi
 }
@@ -66,12 +64,38 @@ export DEPLOYED_GIT_SHA=$(git rev-parse HEAD 2>/dev/null || echo '')
 printf '%s' "__ENV_B64__" | base64 -d > .env.production
 MEDIA_CONVERT_ROLE_ARN=$(printf '%s' "__MEDIA_CONVERT_ROLE_ARN_B64__" | base64 -d)
 MEDIA_CONVERT_ENDPOINT_URL=$(printf '%s' "__MEDIA_CONVERT_ENDPOINT_URL_B64__" | base64 -d)
-if [ -n "${MEDIA_CONVERT_ROLE_ARN:-}" ]; then
-  echo "AWS_MEDIA_CONVERT_ROLE_ARN=$MEDIA_CONVERT_ROLE_ARN" >> .env.production
-fi
-if [ -n "${MEDIA_CONVERT_ENDPOINT_URL:-}" ]; then
-  echo "AWS_MEDIA_CONVERT_ENDPOINT_URL=$MEDIA_CONVERT_ENDPOINT_URL" >> .env.production
-fi
+python3 - <<'PY'
+from pathlib import Path
+import os
+
+p = Path('.env.production')
+lines = p.read_text().splitlines()
+updates = {}
+role_arn = os.environ.get('MEDIA_CONVERT_ROLE_ARN', '').strip()
+endpoint_url = os.environ.get('MEDIA_CONVERT_ENDPOINT_URL', '').strip()
+if role_arn:
+    updates['AWS_MEDIA_CONVERT_ROLE_ARN'] = role_arn
+if endpoint_url:
+    updates['AWS_MEDIA_CONVERT_ENDPOINT_URL'] = endpoint_url
+
+if updates:
+    out = []
+    seen = set()
+    for line in lines:
+        if '=' in line:
+            key = line.split('=', 1)[0].strip()
+            if key in updates:
+                if key in seen:
+                    continue
+                out.append(f'{key}={updates[key]}')
+                seen.add(key)
+                continue
+        out.append(line)
+    for key, value in updates.items():
+        if key not in seen:
+            out.append(f'{key}={value}')
+    p.write_text('\n'.join(out) + '\n')
+PY
 set -a; source .env.production; set +a
 BACKEND_IMAGE=$(printf '%s' "__BACKEND_IMAGE_B64__" | base64 -d)
 ECR_REGISTRY=$(printf '%s' "__ECR_REGISTRY_B64__" | base64 -d)
@@ -184,7 +208,7 @@ if [ "$backend_ok" != "1" ]; then
 fi
 
 cat > /etc/cron.d/practica-mediaconvert-sync <<'CRON'
-* * * * * root /usr/bin/flock -n /tmp/practica-mediaconvert-sync.lock /bin/bash -lc 'cd /opt/practica && if docker compose version >/dev/null 2>&1; then docker compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py sync_mediaconvert_jobs; else docker-compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py sync_mediaconvert_jobs; fi' >> /opt/practica/mediaconvert-sync.log 2>&1
+* * * * * root /usr/bin/flock -n /tmp/practica-mediaconvert-sync.lock /bin/bash -lc 'cd /opt/practica && docker compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py sync_mediaconvert_jobs' >> /opt/practica/mediaconvert-sync.log 2>&1
 CRON
 chmod 644 /etc/cron.d/practica-mediaconvert-sync
 systemctl restart cron || service cron restart || true

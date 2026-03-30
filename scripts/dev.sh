@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DC=${DC:-docker-compose}
+DC=${DC:-docker compose}
 
 usage() {
   cat <<EOF
@@ -33,4 +33,3 @@ case "$cmd" in
   nuke)               $DC down -v ;;
   *) usage; exit 1 ;;
 esac
-
