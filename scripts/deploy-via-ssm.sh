@@ -78,7 +78,11 @@ ECR_REGISTRY=$(printf '%s' "__ECR_REGISTRY_B64__" | base64 -d)
 ECR_PASSWORD=$(printf '%s' "__ECR_PASSWORD_B64__" | base64 -d)
 : "${POSTGRES_DB:=practica_prod}"
 : "${POSTGRES_USER:=practica}"
-: "${POSTGRES_PASSWORD:=${DB_PASSWORD:-}}"
+if [ -n "${DB_PASSWORD:-}" ]; then
+  POSTGRES_PASSWORD="${DB_PASSWORD}"
+elif [ -z "${POSTGRES_PASSWORD:-}" ]; then
+  POSTGRES_PASSWORD=""
+fi
 export POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD BACKEND_IMAGE ECR_REGISTRY ECR_PASSWORD
 
 if [ -n "${BACKEND_IMAGE:-}" ]; then
