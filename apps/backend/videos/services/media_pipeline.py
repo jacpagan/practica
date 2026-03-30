@@ -83,11 +83,28 @@ def _mediaconvert_client():
     return boto3.client('mediaconvert', **kwargs)
 
 
+def _s3_client():
+    kwargs = {
+        'region_name': getattr(settings, 'AWS_S3_REGION_NAME', None),
+    }
+    role_credentials = _instance_role_credentials()
+    if role_credentials:
+        kwargs.update(role_credentials)
+    return boto3.client('s3', **kwargs)
+
+
 def _s3_uri_to_key(uri):
     parsed = urlparse(str(uri or '').strip())
     if parsed.scheme == 's3':
         return parsed.path.lstrip('/')
     return str(uri or '').strip().lstrip('/')
+
+
+def _s3_uri_parts(uri):
+    parsed = urlparse(str(uri or '').strip())
+    if parsed.scheme != 's3':
+        return '', ''
+    return parsed.netloc, parsed.path.lstrip('/')
 
 
 def _session_input_uri(session):
@@ -294,6 +311,61 @@ def _derive_assets_from_job(session, job):
     return deduped
 
 
+def _discover_assets_from_job_outputs(job):
+    output_groups = job.get('Settings', {}).get('OutputGroups', []) or []
+    discovered = []
+
+    for group in output_groups:
+        settings_payload = group.get('OutputGroupSettings', {}) or {}
+        destination = ''
+        if settings_payload.get('Type') == 'FILE_GROUP_SETTINGS':
+            destination = (settings_payload.get('FileGroupSettings') or {}).get('Destination', '')
+        elif settings_payload.get('Type') == 'HLS_GROUP_SETTINGS':
+            destination = (settings_payload.get('HlsGroupSettings') or {}).get('Destination', '')
+        bucket, prefix = _s3_uri_parts(destination)
+        if not bucket or not prefix:
+            continue
+
+        response = _s3_client().list_objects_v2(Bucket=bucket, Prefix=prefix)
+        contents = response.get('Contents', []) or []
+        keys = [str(item.get('Key', '')).strip() for item in contents if str(item.get('Key', '')).strip()]
+        if not keys:
+            continue
+
+        name = str(group.get('Name', '') or '').strip().lower()
+        if name == 'proxy-mp4':
+            proxy_key = next((key for key in keys if key.lower().endswith('.mp4')), '')
+            if proxy_key:
+                discovered.append({
+                    'asset_type': SessionAsset.TYPE_PROXY_MP4,
+                    'object_key': proxy_key,
+                    'content_type': 'video/mp4',
+                    'metadata_json': {'source': 'mediaconvert'},
+                })
+        elif name == 'hls-cmaf':
+            manifest_key = next((key for key in keys if key.lower().endswith('.m3u8') and '_hls' not in key.lower()), '')
+            if not manifest_key:
+                manifest_key = next((key for key in keys if key.lower().endswith('.m3u8')), '')
+            if manifest_key:
+                discovered.append({
+                    'asset_type': SessionAsset.TYPE_HLS_MASTER,
+                    'object_key': manifest_key,
+                    'content_type': 'application/vnd.apple.mpegurl',
+                    'metadata_json': {'source': 'mediaconvert'},
+                })
+        elif name == 'thumb-capture':
+            thumb_key = next((key for key in keys if key.lower().endswith('.jpg') or key.lower().endswith('.jpeg')), '')
+            if thumb_key:
+                discovered.append({
+                    'asset_type': SessionAsset.TYPE_THUMB_SPRITE,
+                    'object_key': thumb_key,
+                    'content_type': 'image/jpeg',
+                    'metadata_json': {'source': 'mediaconvert'},
+                })
+
+    return discovered
+
+
 @transaction.atomic
 def sync_mediaconvert_session(session):
     job_id = str(getattr(session, 'processing_job_id', '') or '').strip()
@@ -313,6 +385,9 @@ def sync_mediaconvert_session(session):
 
     if status == 'COMPLETE':
         assets = _derive_assets_from_job(session, job)
+        asset_types = {asset['asset_type'] for asset in assets}
+        if SessionAsset.TYPE_PROXY_MP4 not in asset_types:
+            assets.extend(_discover_assets_from_job_outputs(job))
         apply_processing_update(session, Session.STATUS_READY, assets=assets)
         session.processing_job_id = ''
         session.save(update_fields=['processing_job_id', 'updated_at'])

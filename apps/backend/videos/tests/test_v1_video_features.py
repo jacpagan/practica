@@ -367,6 +367,51 @@ class V1VideoFeaturesTests(APITestCase):
         self.assertEqual(session.processing_job_id, '')
         self.assertTrue(session.assets.filter(asset_type=SessionAsset.TYPE_PROXY_MP4).exists())
 
+    @override_settings(
+        AWS_STORAGE_BUCKET_NAME='test-bucket',
+        AWS_MEDIA_CONVERT_ROLE_ARN='arn:aws:iam::123456789012:role/practica-mediaconvert',
+        AWS_MEDIA_CONVERT_ENDPOINT_URL='https://mediaconvert.us-east-1.amazonaws.com',
+    )
+    @patch('videos.services.media_pipeline._s3_client')
+    @patch('videos.services.media_pipeline._mediaconvert_client')
+    def test_sync_mediaconvert_session_discovers_proxy_asset_from_s3_prefix(self, mediaconvert_client, s3_client):
+        session = self._create_session(user=self.owner)
+        session.processing_status = Session.STATUS_PROCESSING
+        session.processing_job_id = 'mc-job-456'
+        session.video_file = 'sessions/uploaded.mp4'
+        session.save(update_fields=['processing_status', 'processing_job_id', 'video_file'])
+
+        mediaconvert_client.return_value.get_job.return_value = {
+            'Job': {
+                'Status': 'COMPLETE',
+                'Settings': {
+                    'OutputGroups': [
+                        {
+                            'Name': 'proxy-mp4',
+                            'OutputGroupSettings': {
+                                'Type': 'FILE_GROUP_SETTINGS',
+                                'FileGroupSettings': {'Destination': 's3://test-bucket/processed/sessions/1/proxy/'},
+                            },
+                        },
+                    ],
+                },
+                'OutputGroupDetails': [
+                    {'OutputDetails': [{'DurationInMs': 2000}]},
+                ],
+            },
+        }
+        s3_client.return_value.list_objects_v2.return_value = {
+            'Contents': [
+                {'Key': 'processed/sessions/1/proxy/uploaded_proxy.mp4'},
+            ],
+        }
+
+        sync_mediaconvert_session(session)
+
+        session.refresh_from_db()
+        self.assertEqual(session.processing_status, Session.STATUS_READY)
+        self.assertTrue(session.assets.filter(asset_type=SessionAsset.TYPE_PROXY_MP4, object_key='processed/sessions/1/proxy/uploaded_proxy.mp4').exists())
+
     @override_settings(AWS_STORAGE_BUCKET_NAME='test-bucket')
     def test_mediaconvert_job_settings_include_h264_max_bitrate(self):
         session = self._create_session(user=self.owner)
