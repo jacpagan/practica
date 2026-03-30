@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from videos.models import Profile, Session, SessionAsset, VideoFeedback
-from videos.services.media_pipeline import sync_mediaconvert_session
+from videos.services.media_pipeline import _create_job_settings, sync_mediaconvert_session
 
 
 @override_settings(AWS_STORAGE_BUCKET_NAME='')
@@ -366,3 +366,15 @@ class V1VideoFeaturesTests(APITestCase):
         self.assertEqual(session.processing_status, Session.STATUS_READY)
         self.assertEqual(session.processing_job_id, '')
         self.assertTrue(session.assets.filter(asset_type=SessionAsset.TYPE_PROXY_MP4).exists())
+
+    @override_settings(AWS_STORAGE_BUCKET_NAME='test-bucket')
+    def test_mediaconvert_job_settings_include_h264_max_bitrate(self):
+        session = self._create_session(user=self.owner)
+        session.video_file = 'sessions/uploaded.mp4'
+        settings_payload = _create_job_settings(session)
+
+        proxy_h264 = settings_payload['OutputGroups'][0]['Outputs'][0]['VideoDescription']['CodecSettings']['H264Settings']
+        hls_h264 = settings_payload['OutputGroups'][1]['Outputs'][0]['VideoDescription']['CodecSettings']['H264Settings']
+
+        self.assertEqual(proxy_h264['MaxBitrate'], 3000000)
+        self.assertEqual(hls_h264['MaxBitrate'], 5000000)

@@ -130,6 +130,7 @@ def _create_job_settings(session):
                             'H264Settings': {
                                 'RateControlMode': 'QVBR',
                                 'QvbrSettings': {'QvbrQualityLevel': 7},
+                                'MaxBitrate': 3000000,
                                 'GopSize': 15,
                                 'GopSizeUnits': 'FRAMES',
                             },
@@ -165,6 +166,7 @@ def _create_job_settings(session):
                             'H264Settings': {
                                 'RateControlMode': 'QVBR',
                                 'QvbrSettings': {'QvbrQualityLevel': 7},
+                                'MaxBitrate': 5000000,
                                 'GopSize': 30,
                                 'GopSizeUnits': 'FRAMES',
                             },
