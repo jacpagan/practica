@@ -3,6 +3,10 @@ import os
 import shutil
 import subprocess
 import sys
+import json
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
+from urllib.error import URLError, HTTPError
 from typing import Iterable
 
 import boto3
@@ -27,12 +31,63 @@ def media_pipeline_enabled():
     )
 
 
+def _instance_role_credentials():
+    try:
+        token_request = Request(
+            'http://169.254.169.254/latest/api/token',
+            method='PUT',
+            headers={'X-aws-ec2-metadata-token-ttl-seconds': '21600'},
+        )
+        with urlopen(token_request, timeout=1) as token_response:
+            token = token_response.read().decode('utf-8').strip()
+        common_headers = {'X-aws-ec2-metadata-token': token}
+
+        role_request = Request(
+            'http://169.254.169.254/latest/meta-data/iam/security-credentials/',
+            headers=common_headers,
+        )
+        with urlopen(role_request, timeout=1) as role_response:
+            role_name = role_response.read().decode('utf-8').strip()
+        if not role_name:
+            return None
+
+        creds_request = Request(
+            f'http://169.254.169.254/latest/meta-data/iam/security-credentials/{role_name}',
+            headers=common_headers,
+        )
+        with urlopen(creds_request, timeout=1) as creds_response:
+            payload = json.loads(creds_response.read().decode('utf-8'))
+
+        access_key = str(payload.get('AccessKeyId', '')).strip()
+        secret_key = str(payload.get('SecretAccessKey', '')).strip()
+        token_value = str(payload.get('Token', '')).strip()
+        if not access_key or not secret_key or not token_value:
+            return None
+        return {
+            'aws_access_key_id': access_key,
+            'aws_secret_access_key': secret_key,
+            'aws_session_token': token_value,
+        }
+    except (URLError, HTTPError, TimeoutError, ValueError, OSError, json.JSONDecodeError):
+        return None
+
+
 def _mediaconvert_client():
-    return boto3.client(
-        'mediaconvert',
-        region_name=getattr(settings, 'AWS_S3_REGION_NAME', None),
-        endpoint_url=getattr(settings, 'AWS_MEDIA_CONVERT_ENDPOINT_URL', None),
-    )
+    kwargs = {
+        'region_name': getattr(settings, 'AWS_S3_REGION_NAME', None),
+        'endpoint_url': getattr(settings, 'AWS_MEDIA_CONVERT_ENDPOINT_URL', None),
+    }
+    role_credentials = _instance_role_credentials()
+    if role_credentials:
+        kwargs.update(role_credentials)
+    return boto3.client('mediaconvert', **kwargs)
+
+
+def _s3_uri_to_key(uri):
+    parsed = urlparse(str(uri or '').strip())
+    if parsed.scheme == 's3':
+        return parsed.path.lstrip('/')
+    return str(uri or '').strip().lstrip('/')
 
 
 def _session_input_uri(session):
@@ -181,6 +236,94 @@ def enqueue_session_processing(session):
 
     job_id = str(resp.get('Job', {}).get('Id', '')).strip()
     return True, '', job_id
+
+
+def _derive_assets_from_job(session, job):
+    assets = []
+    output_groups = job.get('OutputGroupDetails', []) or []
+
+    for group in output_groups:
+        playlist_paths = group.get('PlaylistFilePaths', []) or []
+        for path in playlist_paths:
+            key = _s3_uri_to_key(path)
+            if key.endswith('.m3u8'):
+                assets.append({
+                    'asset_type': SessionAsset.TYPE_HLS_MASTER,
+                    'object_key': key,
+                    'content_type': 'application/vnd.apple.mpegurl',
+                    'metadata_json': {'source': 'mediaconvert'},
+                })
+
+        output_details = group.get('OutputDetails', []) or []
+        for detail in output_details:
+            output_paths = detail.get('OutputFilePaths', []) or []
+            for path in output_paths:
+                key = _s3_uri_to_key(path)
+                lower_key = key.lower()
+                if lower_key.endswith('.mp4') and '/proxy/' in lower_key:
+                    assets.append({
+                        'asset_type': SessionAsset.TYPE_PROXY_MP4,
+                        'object_key': key,
+                        'content_type': 'video/mp4',
+                        'metadata_json': {'source': 'mediaconvert'},
+                    })
+                elif lower_key.endswith('.vtt'):
+                    assets.append({
+                        'asset_type': SessionAsset.TYPE_THUMB_VTT,
+                        'object_key': key,
+                        'content_type': 'text/vtt',
+                        'metadata_json': {'source': 'mediaconvert'},
+                    })
+                elif lower_key.endswith('.jpg') or lower_key.endswith('.jpeg'):
+                    assets.append({
+                        'asset_type': SessionAsset.TYPE_THUMB_SPRITE,
+                        'object_key': key,
+                        'content_type': 'image/jpeg',
+                        'metadata_json': {'source': 'mediaconvert'},
+                    })
+
+    deduped = []
+    seen_types = set()
+    for asset in assets:
+        if asset['asset_type'] in seen_types:
+            continue
+        seen_types.add(asset['asset_type'])
+        deduped.append(asset)
+    return deduped
+
+
+@transaction.atomic
+def sync_mediaconvert_session(session):
+    job_id = str(getattr(session, 'processing_job_id', '') or '').strip()
+    if not job_id or not media_pipeline_enabled():
+        return session
+
+    try:
+        response = _mediaconvert_client().get_job(Id=job_id)
+    except (BotoCoreError, ClientError):
+        logger.exception('MediaConvert get_job failed for session_id=%s job_id=%s', session.id, job_id)
+        return session
+
+    job = response.get('Job', {}) or {}
+    status = str(job.get('Status', '') or '').strip().upper()
+    if status in {'SUBMITTED', 'INPUT_INFORMATION', 'PROGRESSING', 'STATUS_UPDATE'}:
+        return session
+
+    if status == 'COMPLETE':
+        assets = _derive_assets_from_job(session, job)
+        apply_processing_update(session, Session.STATUS_READY, assets=assets)
+        session.processing_job_id = ''
+        session.save(update_fields=['processing_job_id', 'updated_at'])
+        return session
+
+    if status in {'ERROR', 'CANCELED'}:
+        error_message = str(job.get('ErrorMessage', '') or job.get('Status', '') or 'MediaConvert job failed').strip()
+        apply_processing_update(session, Session.STATUS_FAILED, error=error_message[:2000])
+        session.processing_job_id = ''
+        session.save(update_fields=['processing_job_id', 'updated_at'])
+        return session
+
+    return session
 
 
 def enqueue_local_session_transcode(session):

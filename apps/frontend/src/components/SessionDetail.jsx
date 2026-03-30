@@ -361,7 +361,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     }
   }
 
-  const refreshSession = async () => {
+  const refreshSession = async ({ silent = false } = {}) => {
     if (!token || !session?.id) return
     setRefreshing(true)
     try {
@@ -374,11 +374,32 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       onSessionUpdate?.(next)
       await loadReviewRequests()
     } catch {
-      toast.error('Could not refresh this video')
+      if (!silent) toast.error('Could not refresh this video')
     } finally {
       setRefreshing(false)
     }
   }
+
+  useEffect(() => {
+    if (!token || !session?.id) return undefined
+    if (session.processing_status !== 'processing') return undefined
+
+    let cancelled = false
+    let timeoutId = null
+
+    const poll = async () => {
+      if (cancelled) return
+      await refreshSession({ silent: true })
+      if (cancelled) return
+      timeoutId = window.setTimeout(poll, 5000)
+    }
+
+    timeoutId = window.setTimeout(poll, 5000)
+    return () => {
+      cancelled = true
+      if (timeoutId) window.clearTimeout(timeoutId)
+    }
+  }, [authHeaders, loadReviewRequests, onSessionUpdate, session?.id, session?.processing_status, token])
 
   const copyReviewRequestLink = async (requestItem) => {
     const url = requestItem?.feedback_link?.url || requestItem?.review_link?.url

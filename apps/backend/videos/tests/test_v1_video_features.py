@@ -7,6 +7,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from videos.models import Profile, Session, SessionAsset, VideoFeedback
+from videos.services.media_pipeline import sync_mediaconvert_session
 
 
 @override_settings(AWS_STORAGE_BUCKET_NAME='')
@@ -303,3 +304,65 @@ class V1VideoFeaturesTests(APITestCase):
         session.refresh_from_db()
         self.assertEqual(session.processing_status, Session.STATUS_READY)
         self.assertEqual(session.assets.count(), 1)
+
+    @override_settings(
+        AWS_STORAGE_BUCKET_NAME='test-bucket',
+        AWS_MEDIA_CONVERT_ROLE_ARN='arn:aws:iam::123456789012:role/practica-mediaconvert',
+        AWS_MEDIA_CONVERT_ENDPOINT_URL='https://mediaconvert.us-east-1.amazonaws.com',
+    )
+    @patch('videos.views.enqueue_session_processing', return_value=(True, '', 'mc-job-123'))
+    def test_session_create_stores_mediaconvert_job_id(self, enqueue_session_processing):
+        self.client.force_authenticate(user=self.owner)
+
+        res = self.client.post(
+            '/api/sessions/',
+            {
+                'title': 'MediaConvert Session',
+                'description': 'queued in managed pipeline',
+                'video_file': self._video_file('uploaded.mp4'),
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        created = Session.objects.get(id=res.data['id'])
+        self.assertEqual(created.processing_status, Session.STATUS_PROCESSING)
+        self.assertEqual(created.processing_job_id, 'mc-job-123')
+        enqueue_session_processing.assert_called_once()
+
+    @override_settings(
+        AWS_STORAGE_BUCKET_NAME='test-bucket',
+        AWS_MEDIA_CONVERT_ROLE_ARN='arn:aws:iam::123456789012:role/practica-mediaconvert',
+        AWS_MEDIA_CONVERT_ENDPOINT_URL='https://mediaconvert.us-east-1.amazonaws.com',
+    )
+    @patch('videos.services.media_pipeline._mediaconvert_client')
+    def test_sync_mediaconvert_session_marks_session_ready_from_job_outputs(self, mediaconvert_client):
+        session = self._create_session(user=self.owner)
+        session.processing_status = Session.STATUS_PROCESSING
+        session.processing_job_id = 'mc-job-123'
+        session.video_file = 'sessions/uploaded.mov'
+        session.save(update_fields=['processing_status', 'processing_job_id', 'video_file'])
+
+        mediaconvert_client.return_value.get_job.return_value = {
+            'Job': {
+                'Status': 'COMPLETE',
+                'OutputGroupDetails': [
+                    {
+                        'OutputDetails': [
+                            {
+                                'OutputFilePaths': [
+                                    's3://test-bucket/processed/sessions/1/proxy/uploaded_proxy.mp4',
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            },
+        }
+
+        sync_mediaconvert_session(session)
+
+        session.refresh_from_db()
+        self.assertEqual(session.processing_status, Session.STATUS_READY)
+        self.assertEqual(session.processing_job_id, '')
+        self.assertTrue(session.assets.filter(asset_type=SessionAsset.TYPE_PROXY_MP4).exists())

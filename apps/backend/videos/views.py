@@ -45,6 +45,7 @@ from .services.media_pipeline import (
     enqueue_session_processing,
     local_transcode_enabled,
     media_pipeline_enabled,
+    sync_mediaconvert_session,
 )
 from .services.feedback_video_processing import prepare_feedback_video_upload
 from .video_uploads import is_allowed_video_upload
@@ -267,11 +268,14 @@ def _can_modify_session(user, session):
 
 def _start_processing_pipeline(session):
     session.processing_status = Session.STATUS_PROCESSING
+    session.processing_job_id = ''
     session.processing_error = ''
-    session.save(update_fields=['processing_status', 'processing_error', 'updated_at'])
+    session.save(update_fields=['processing_status', 'processing_job_id', 'processing_error', 'updated_at'])
 
-    queued, error, _job_id = enqueue_session_processing(session)
+    queued, error, job_id = enqueue_session_processing(session)
     if queued:
+        session.processing_job_id = job_id
+        session.save(update_fields=['processing_job_id', 'updated_at'])
         return
 
     # Fallback when managed transcoding is unavailable.
@@ -288,7 +292,18 @@ def _start_processing_pipeline(session):
     else:
         session.processing_status = Session.STATUS_FAILED
         session.processing_error = (error or 'Failed to enqueue media processing')[:2000]
-    session.save(update_fields=['processing_status', 'processing_error', 'updated_at'])
+    session.processing_job_id = ''
+    session.save(update_fields=['processing_status', 'processing_job_id', 'processing_error', 'updated_at'])
+
+
+def _maybe_refresh_session_processing(session):
+    if not session:
+        return session
+    if session.processing_status != Session.STATUS_PROCESSING:
+        return session
+    if not getattr(session, 'processing_job_id', ''):
+        return session
+    return sync_mediaconvert_session(session)
 
 
 def _processing_callback_authorized(request):
@@ -831,6 +846,20 @@ class SessionViewSet(viewsets.ModelViewSet):
             return SessionListSerializer
         return SessionSerializer
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        processing_sessions = list(queryset.filter(processing_status=Session.STATUS_PROCESSING).exclude(processing_job_id='')[:5])
+        for session in processing_sessions:
+            _maybe_refresh_session_processing(session)
+        return super().list(request, *args, **kwargs)
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        _maybe_refresh_session_processing(instance)
+        instance.refresh_from_db()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
     def perform_create(self, serializer):
         session = serializer.save(user=self.request.user)
         _attach_tags_to_session(session, self.request.data.get('tags', ''))
@@ -849,6 +878,8 @@ class SessionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post', 'delete'], url_path='share')
     def create_share_link(self, request, pk=None):
         session = self.get_object()
+        _maybe_refresh_session_processing(session)
+        session.refresh_from_db()
         if request.method == 'DELETE':
             if not can_edit_session(request.user, session):
                 raise PermissionDenied("You can only revoke your own sessions' links.")
@@ -1175,6 +1206,9 @@ class SessionViewSet(viewsets.ModelViewSet):
                 error=processing_error,
                 assets=assets,
             )
+            if next_status in {Session.STATUS_READY, Session.STATUS_FAILED}:
+                session.processing_job_id = ''
+                session.save(update_fields=['processing_job_id', 'updated_at'])
         except ValueError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception:

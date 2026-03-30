@@ -99,6 +99,8 @@ jobs:
           BACKEND_IMAGE: ${{ steps.backend_image.outputs.image_uri }}
           ECR_REGISTRY: ${{ steps.ecr_deploy_auth.outputs.registry }}
           ECR_PASSWORD: ${{ steps.ecr_deploy_auth.outputs.password }}
+          AWS_MEDIA_CONVERT_ROLE_ARN: ${{ secrets.AWS_MEDIA_CONVERT_ROLE_ARN }}
+          AWS_MEDIA_CONVERT_ENDPOINT_URL: ${{ secrets.AWS_MEDIA_CONVERT_ENDPOINT_URL }}
         run: bash scripts/deploy-via-ssm.sh
 
       - name: Deployment summary

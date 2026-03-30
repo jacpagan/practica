@@ -86,6 +86,7 @@ class Session(models.Model):
     reference_url = models.URLField(blank=True)
     video_file = models.FileField(upload_to='sessions/')
     processing_status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_UPLOADED)
+    processing_job_id = models.CharField(max_length=64, blank=True, db_index=True)
     processing_error = models.TextField(blank=True)
     tags = models.ManyToManyField(Tag, blank=True, related_name='sessions')
     duration_seconds = models.IntegerField(null=True, blank=True)

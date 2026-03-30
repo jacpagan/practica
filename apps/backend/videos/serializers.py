@@ -204,6 +204,7 @@ class SessionSerializer(serializers.ModelSerializer):
     can_edit = serializers.SerializerMethodField()
     video_file = SafeFileField()
     processing_status = serializers.CharField(read_only=True)
+    processing_job_id = serializers.CharField(read_only=True)
     processing_error = serializers.CharField(read_only=True)
     assets = SessionAssetSerializer(many=True, read_only=True)
 
@@ -212,7 +213,7 @@ class SessionSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'practice_series', 'description', 'video_file',
                   'reference_title', 'reference_url',
                   'duration_seconds', 'recorded_at', 'created_at', 'updated_at',
-                  'processing_status', 'processing_error',
+                  'processing_status', 'processing_job_id', 'processing_error',
                   'tag_names', 'assets',
                   'chapters', 'video_feedback', 'active_review_link', 'chapter_count', 'video_feedback_count', 'owner',
                   'can_edit']
@@ -265,6 +266,7 @@ class SessionListSerializer(serializers.ModelSerializer):
     can_edit = serializers.SerializerMethodField()
     video_file = SafeFileField()
     processing_status = serializers.CharField(read_only=True)
+    processing_job_id = serializers.CharField(read_only=True)
     processing_error = serializers.CharField(read_only=True)
     assets = SessionAssetSerializer(many=True, read_only=True)
 
@@ -272,7 +274,7 @@ class SessionListSerializer(serializers.ModelSerializer):
         model = Session
         fields = ['id', 'title', 'practice_series', 'description', 'video_file',
                   'duration_seconds', 'recorded_at', 'created_at',
-                  'processing_status', 'processing_error',
+                  'processing_status', 'processing_job_id', 'processing_error',
                   'assets', 'video_feedback_count',
                   'can_edit']
         read_only_fields = ['id', 'recorded_at', 'created_at']
@@ -300,7 +302,7 @@ class PublicSessionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Session
-        fields = ['id', 'title', 'practice_series', 'description', 'video_file', 'duration_seconds', 'recorded_at', 'assets', 'processing_status', 'processing_error']
+        fields = ['id', 'title', 'practice_series', 'description', 'video_file', 'duration_seconds', 'recorded_at', 'assets', 'processing_status', 'processing_job_id', 'processing_error']
         read_only_fields = fields
 
 
