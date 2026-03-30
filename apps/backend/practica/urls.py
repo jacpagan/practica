@@ -14,6 +14,7 @@ from videos.views import (
     review_link_info, review_link_feedback,
     feedback_inbox, member_connections, feedback_insights, feedback_templates, feedback_template_detail,
     teacher_inbox, teacher_roster, teacher_insights, teacher_templates, teacher_template_detail,
+    reviewer_inbox, reviewer_connections, reviewer_insights, reviewer_templates, reviewer_template_detail,
     favicon,
 )
 
@@ -51,6 +52,11 @@ urlpatterns = [
     path('api/teacher/insights/', teacher_insights, name='teacher_insights'),
     path('api/teacher/templates/', teacher_templates, name='teacher_templates'),
     path('api/teacher/templates/<int:template_id>/', teacher_template_detail, name='teacher_template_detail'),
+    path('api/reviewer/inbox/', reviewer_inbox, name='reviewer_inbox'),
+    path('api/reviewer/connections/', reviewer_connections, name='reviewer_connections'),
+    path('api/reviewer/insights/', reviewer_insights, name='reviewer_insights'),
+    path('api/reviewer/templates/', reviewer_templates, name='reviewer_templates'),
+    path('api/reviewer/templates/<int:template_id>/', reviewer_template_detail, name='reviewer_template_detail'),
     path('health/', health_check, name='health_check'),
     path('ready/', ready_check, name='ready_check'),
     path('favicon.ico', favicon, name='favicon'),

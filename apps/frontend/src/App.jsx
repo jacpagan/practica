@@ -159,10 +159,10 @@ function AppContent() {
     if (!token) return
     setStudentReviewRequestsLoading(true)
     try {
-      const res = await fetch('/api/review-requests/?role=student', {
+      const res = await fetch('/api/review-requests/?role=owner', {
         headers: { Authorization: `Token ${token}` },
       })
-      if (!res.ok) throw new Error('student-review-requests')
+      if (!res.ok) throw new Error('owner-review-requests')
       const data = await res.json()
       setStudentReviewRequests(Array.isArray(data) ? data : data.results || [])
     } catch {
@@ -175,10 +175,10 @@ function AppContent() {
   const loadTeacherWorkspaceAvailability = useCallback(async () => {
     if (!token) return
     try {
-      const res = await fetch('/api/review-requests/?role=teacher', {
+      const res = await fetch('/api/review-requests/?role=reviewer', {
         headers: { Authorization: `Token ${token}` },
       })
-      if (!res.ok) throw new Error('teacher-review-requests')
+      if (!res.ok) throw new Error('reviewer-review-requests')
       const data = await res.json()
       const requests = Array.isArray(data) ? data : data.results || []
       setHasTeacherWorkspace(requests.length > 0)

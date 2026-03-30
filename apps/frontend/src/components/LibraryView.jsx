@@ -286,7 +286,7 @@ function LibraryView({
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-medium text-gray-900">Waiting on {activeRequest.teacher?.display_name || activeRequest.teacher?.username || 'teacher'}</p>
+                        <p className="text-sm font-medium text-gray-900">Waiting on {activeRequest.reviewer?.display_name || activeRequest.teacher?.display_name || activeRequest.reviewer?.username || activeRequest.teacher?.username || 'reviewer'}</p>
                         <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${requestStatusTone[activeRequestStatus] || 'bg-gray-100 text-gray-700'}`}>
                           {requestStatusLabel(activeRequest.status)}
                         </span>
@@ -316,7 +316,7 @@ function LibraryView({
                           {requestStatusLabel(activeRequest.status)}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">{activeRequest.goal || 'Ready for another take'} • {activeRequest.teacher?.display_name || activeRequest.teacher?.username || 'Teacher'}</p>
+                      <p className="text-xs text-gray-500 mt-1">{activeRequest.goal || 'Ready for another take'} • {activeRequest.reviewer?.display_name || activeRequest.teacher?.display_name || activeRequest.reviewer?.username || activeRequest.teacher?.username || 'Reviewer'}</p>
                     </div>
                     <div className="text-xs text-gray-500">Session: {activeRequest.session?.title || 'Video'}</div>
                   </div>

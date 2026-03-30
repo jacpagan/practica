@@ -378,6 +378,13 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
     teacher = UserSummarySerializer(read_only=True)
     owner = UserSummarySerializer(source='student', read_only=True)
     reviewer = UserSummarySerializer(source='teacher', read_only=True)
+    owner_id = serializers.IntegerField(source='student_id', read_only=True)
+    reviewer_id = serializers.PrimaryKeyRelatedField(
+        source='teacher',
+        queryset=User.objects.all(),
+        write_only=True,
+        required=False,
+    )
     session = SessionListSerializer(read_only=True)
     session_id = serializers.PrimaryKeyRelatedField(
         source='session',
@@ -389,7 +396,7 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
         source='teacher',
         queryset=User.objects.all(),
         write_only=True,
-        required=True,
+        required=False,
     )
     review_link = ReviewLinkSerializer(read_only=True)
     feedback_link = ReviewLinkSerializer(source='review_link', read_only=True)
@@ -417,7 +424,7 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
             'session', 'session_id',
             'student',
             'teacher', 'teacher_id',
-            'owner', 'reviewer',
+            'owner', 'owner_id', 'reviewer', 'reviewer_id',
             'review_link', 'feedback_link',
             'parent_request', 'parent_request_id',
             'parent_feedback_request',
@@ -503,13 +510,15 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'session_id': 'You can only request review on your own sessions.'})
         if session and session.processing_status != Session.STATUS_READY:
             raise serializers.ValidationError({'session_id': 'This session must be playback ready before requesting review.'})
+        if not teacher:
+            raise serializers.ValidationError({'reviewer_id': 'Choose a reviewer.'})
         if teacher and teacher.id == user.id:
-            raise serializers.ValidationError({'teacher_id': 'Choose a teacher other than yourself.'})
+            raise serializers.ValidationError({'reviewer_id': 'Choose a reviewer other than yourself.'})
         if parent_request:
             if parent_request.student_id != user.id and not user.is_staff:
                 raise serializers.ValidationError({'parent_request_id': 'You can only follow up on your own review requests.'})
             if teacher and parent_request.teacher_id != teacher.id:
-                raise serializers.ValidationError({'teacher_id': 'Follow-up requests must use the same teacher as the parent request.'})
+                raise serializers.ValidationError({'reviewer_id': 'Follow-up requests must use the same reviewer as the parent request.'})
             if session and parent_request.session_id == session.id:
                 raise serializers.ValidationError({'session_id': 'Choose a new session for this follow-up request.'})
         return attrs

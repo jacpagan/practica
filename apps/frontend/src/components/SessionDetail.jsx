@@ -464,7 +464,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     try {
       const payload = {
         session_id: session.id,
-        teacher_id: selectedTeacher.id,
+        reviewer_id: selectedTeacher.id,
         parent_request_id: initialReviewRequestDraft?.parent_request_id || null,
         instrument: requestInstrument.trim() || 'drums',
         goal: requestGoal.trim(),
@@ -870,7 +870,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           disabled={!canCreateShareLink}
                           className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors"
                         >
-                          {selectedTeacherName ? `Request from ${selectedTeacherName}` : 'Request feedback'}
+                          {selectedTeacherName ? `Request from ${selectedTeacherName}` : 'Request review'}
                         </button>
                       ) : null}
                       {!justUploadedWithoutRequest ? (
@@ -893,7 +893,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       {selectedTeacherName ? (
                         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3">
                           <p className="text-xs font-medium uppercase tracking-wide text-emerald-800">Ready</p>
-                          <p className="text-sm text-emerald-900 mt-1">This feedback request will go to {selectedTeacherName}.</p>
+                          <p className="text-sm text-emerald-900 mt-1">This review request will go to {selectedTeacherName}.</p>
                         </div>
                       ) : null}
 
@@ -909,7 +909,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           </div>
                         ) : (
                           <div className="space-y-2">
-                            {recentTeachersLoading ? <p className="text-xs text-gray-500">Loading recent teachers…</p> : null}
+                            {recentTeachersLoading ? <p className="text-xs text-gray-500">Loading recent reviewers…</p> : null}
                             {recentTeachers.length > 0 ? (
                               <div className="flex flex-wrap gap-2">
                                 {recentTeachers.map((teacher) => (
@@ -982,7 +982,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
 
                             <div>
                               <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Notes</label>
-                              <textarea value={requestNotes} onChange={(event) => setRequestNotes(event.target.value)} rows={3} placeholder="Anything the teacher should watch for?" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none" />
+                              <textarea value={requestNotes} onChange={(event) => setRequestNotes(event.target.value)} rows={3} placeholder="Anything the reviewer should watch for?" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none" />
                             </div>
                           </div>
                         ) : null}
@@ -1052,7 +1052,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                   <div className="flex items-start justify-between gap-3">
                                     <div>
                                       <div className="flex items-center gap-2 flex-wrap">
-                                        <p className="text-sm font-medium text-gray-900">{feedbackItem.author_display_name || 'Teacher'}</p>
+                                        <p className="text-sm font-medium text-gray-900">{feedbackItem.author_display_name || 'Reviewer'}</p>
                                         {feedbackItem.feedback_category ? (
                                           <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${feedbackCategoryTone(feedbackItem.feedback_category)}`}>
                                             {feedbackCategoryLabel(feedbackItem.feedback_category)}

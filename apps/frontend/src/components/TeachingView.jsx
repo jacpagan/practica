@@ -384,7 +384,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
               <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading…</div>
             ) : uniqueSessions.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
-                <p className="text-sm text-gray-700">No student videos yet.</p>
+                <p className="text-sm text-gray-700">No member videos yet.</p>
                 <p className="text-xs text-gray-500 mt-1">Assigned sessions appear here.</p>
               </div>
             ) : (

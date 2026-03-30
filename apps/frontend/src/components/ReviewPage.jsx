@@ -32,7 +32,7 @@ const reviewLinkLoadErrorState = ({ status, data }) => {
 const reviewLinkSubmitErrorMessage = ({ status, data }) => {
   const code = data?.code || ''
   if (code === 'review_link_feedback_disabled') return 'Video feedback is turned off for this link.'
-  if (code === 'review_request_forbidden') return data?.error || 'Only the assigned teacher can respond to this review request.'
+  if (code === 'review_request_forbidden') return data?.error || 'Only the assigned reviewer can respond to this review request.'
   if (code === 'review_link_expired' || status === 410) return 'This private feedback link expired. Ask for a new link.'
   if (code === 'review_link_revoked' || status === 403) return 'This private feedback link has been turned off.'
   if (code === 'review_link_invalid' || status === 404) return 'This private feedback link is no longer available.'
@@ -574,8 +574,8 @@ function ReviewPage({ reviewToken = '' }) {
           </div>
         ) : link?.allow_video_feedback ? (
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 space-y-2">
-            <p className="text-sm font-semibold text-blue-900">Review replies are teacher-only</p>
-            <p className="text-sm text-blue-800">This page is for {reviewRequest?.teacher?.display_name || reviewRequest?.teacher?.username || 'the assigned teacher'} to leave video feedback. To follow up, add a new session from your private library and send a new review request.</p>
+            <p className="text-sm font-semibold text-blue-900">Review replies are reviewer-only</p>
+            <p className="text-sm text-blue-800">This page is for {reviewRequest?.reviewer?.display_name || reviewRequest?.teacher?.display_name || reviewRequest?.reviewer?.username || reviewRequest?.teacher?.username || 'the assigned reviewer'} to leave video feedback. To follow up, add a new session from your private library and send a new review request.</p>
           </div>
         ) : (
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 space-y-2">

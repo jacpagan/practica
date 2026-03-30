@@ -448,7 +448,7 @@ def review_link_info(request, token):
     review_request = getattr(link, 'review_request', None)
     if review_request and not _review_request_visible_to_user(review_request, request.user):
         return _review_request_forbidden_response(
-            'This review request is only available to the assigned teacher and student.'
+            'This review request is only available to the assigned reviewer and owner.'
         )
     ReviewLink.objects.filter(pk=link.pk).update(last_accessed_at=timezone.now())
     link.refresh_from_db(fields=['last_accessed_at'])
@@ -478,7 +478,7 @@ def review_link_feedback(request, token):
     review_request = getattr(link, 'review_request', None)
     if review_request and not _review_request_visible_to_user(review_request, request.user):
         return _review_request_forbidden_response(
-            'This review request is only available to the assigned teacher and student.'
+            'This review request is only available to the assigned reviewer and owner.'
         )
 
     if request.method == 'GET':
@@ -558,7 +558,7 @@ def review_link_feedback(request, token):
         )
     if review_request and not _review_request_teacher_can_respond(review_request, request.user):
         return _review_request_forbidden_response(
-            'Only the assigned teacher can respond to this review request.'
+            'Only the assigned reviewer can respond to this review request.'
         )
 
     serializer = ReviewVideoFeedbackSerializer(data=request.data, context={'request': request, 'session': link.session})
@@ -708,6 +708,11 @@ teacher_roster = member_connections
 teacher_insights = feedback_insights
 teacher_templates = feedback_templates
 teacher_template_detail = feedback_template_detail
+reviewer_inbox = feedback_inbox
+reviewer_connections = member_connections
+reviewer_insights = feedback_insights
+reviewer_templates = feedback_templates
+reviewer_template_detail = feedback_template_detail
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -730,9 +735,9 @@ class ReviewRequestViewSet(viewsets.ModelViewSet):
         if session_id.isdigit():
             qs = qs.filter(session_id=int(session_id))
         role = str(self.request.query_params.get('role', '')).strip().lower()
-        if role == 'teacher':
+        if role in {'teacher', 'reviewer'}:
             qs = qs.filter(teacher=self.request.user)
-        elif role == 'student':
+        elif role in {'student', 'owner'}:
             qs = qs.filter(student=self.request.user)
         status_filter = str(self.request.query_params.get('status', '')).strip().lower()
         if status_filter:
