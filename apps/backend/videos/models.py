@@ -232,6 +232,7 @@ class VideoFeedback(models.Model):
     timestamp_seconds = models.IntegerField(null=True, blank=True)
     text = models.TextField()
     feedback_video = models.FileField(upload_to='feedback_videos/', null=True, blank=True)
+    client_upload_id = models.CharField(max_length=64, blank=True, db_index=True)
     is_legacy_text_feedback = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 

@@ -282,7 +282,7 @@ const abortableSleep = (ms, signal) =>
     signal?.addEventListener('abort', onAbort, { once: true })
   })
 
-export const uploadFormData = ({ url, formData, token, onProgress, signal }) =>
+export const uploadMultipartRequest = ({ url, method = 'POST', formData, token, onProgress, signal }) =>
   new Promise((resolve, reject) => {
     if (signal?.aborted) {
       reject(createAbortError())
@@ -290,7 +290,7 @@ export const uploadFormData = ({ url, formData, token, onProgress, signal }) =>
     }
 
     const xhr = new XMLHttpRequest()
-    xhr.open('POST', url)
+    xhr.open(method, url)
     if (token) xhr.setRequestHeader('Authorization', `Token ${token}`)
 
     const handleAbort = () => xhr.abort()
@@ -332,6 +332,9 @@ export const uploadFormData = ({ url, formData, token, onProgress, signal }) =>
     }
     xhr.send(formData)
   })
+
+export const uploadFormData = ({ url, formData, token, onProgress, signal }) =>
+  uploadMultipartRequest({ url, method: 'POST', formData, token, onProgress, signal })
 
 const parseJsonResponse = async (res) => {
   const text = await res.text()

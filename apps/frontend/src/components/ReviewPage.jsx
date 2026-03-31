@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { fmtTimer, MAX_RECORDER_DURATION_SECONDS, MAX_VIDEO_UPLOAD_BYTES, sessionVideoSources, videoUrl, isLikelyVideoFile, videoFileAccept } from '../utils'
+import { fmtTimer, MAX_RECORDER_DURATION_SECONDS, MAX_VIDEO_UPLOAD_BYTES, sessionVideoSources, videoUrl, isLikelyVideoFile, videoFileAccept, uploadMultipartRequest } from '../utils'
 import { useAuth } from '../auth'
 import VideoRecorder from './VideoRecorder'
 
@@ -73,10 +73,21 @@ function ReviewPage({ reviewToken = '' }) {
   const [templatesLoading, setTemplatesLoading] = useState(false)
   const ownedPreviewUrlRef = useRef('')
   const editPreviewUrlRef = useRef('')
+  const submitUploadIdRef = useRef('')
+  const editUploadIdRef = useRef('')
   const playbackSources = useMemo(() => sessionVideoSources(session), [session])
   const [playbackSourceIndex, setPlaybackSourceIndex] = useState(0)
   const [playbackFailed, setPlaybackFailed] = useState(false)
   const playableUrl = playbackSources[playbackSourceIndex] || null
+  const [uploadProgressPercent, setUploadProgressPercent] = useState(null)
+  const [uploadProgressLoaded, setUploadProgressLoaded] = useState(0)
+  const [uploadProgressTotal, setUploadProgressTotal] = useState(0)
+  const [editUploadProgressPercent, setEditUploadProgressPercent] = useState(null)
+
+  const createClientUploadId = () => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+    return `upload-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  }
 
   const token = reviewToken || window.location.pathname.replace(/^\/r\//, '')
 
@@ -238,6 +249,10 @@ function ReviewPage({ reviewToken = '' }) {
     const file = event.target.files?.[0]
     if (!file || !isLikelyVideoFile(file)) return
     setResponseFile(file)
+    submitUploadIdRef.current = ''
+    setUploadProgressPercent(null)
+    setUploadProgressLoaded(0)
+    setUploadProgressTotal(file.size || 0)
     replaceOwnedPreviewUrl(URL.createObjectURL(file))
   }
 
@@ -245,6 +260,10 @@ function ReviewPage({ reviewToken = '' }) {
     setShowRecorder(false)
     if (!isLikelyVideoFile(file)) return
     setResponseFile(file)
+    submitUploadIdRef.current = ''
+    setUploadProgressPercent(null)
+    setUploadProgressLoaded(0)
+    setUploadProgressTotal(file.size || 0)
     replaceOwnedPreviewUrl(URL.createObjectURL(file))
   }
 
@@ -262,6 +281,8 @@ function ReviewPage({ reviewToken = '' }) {
     setEditingText('')
     setEditingTimestampSeconds('')
     setEditingVideoFile(null)
+    editUploadIdRef.current = ''
+    setEditUploadProgressPercent(null)
     replaceEditPreviewUrl('')
   }
 
@@ -269,6 +290,8 @@ function ReviewPage({ reviewToken = '' }) {
     const file = event.target.files?.[0]
     if (!file || !isLikelyVideoFile(file)) return
     setEditingVideoFile(file)
+    editUploadIdRef.current = ''
+    setEditUploadProgressPercent(null)
     replaceEditPreviewUrl(URL.createObjectURL(file))
     event.target.value = ''
   }
@@ -276,6 +299,7 @@ function ReviewPage({ reviewToken = '' }) {
   const saveFeedbackEdit = async (feedbackId) => {
     if (!authToken) return
     setSavingFeedbackId(feedbackId)
+    setEditUploadProgressPercent(editingVideoFile ? 0 : null)
     setError('')
     try {
       const payload = new FormData()
@@ -283,14 +307,32 @@ function ReviewPage({ reviewToken = '' }) {
       payload.append('text', editingText)
       payload.append('timestamp_seconds', editingTimestampSeconds)
       if (editingVideoFile) payload.append('feedback_video', editingVideoFile)
-      const res = await fetch(`/api/review/${token}/feedback/`, {
+      if (editingVideoFile) {
+        if (!editUploadIdRef.current) editUploadIdRef.current = createClientUploadId()
+        payload.append('client_upload_id', editUploadIdRef.current)
+      }
+
+      const attemptRequest = () => uploadMultipartRequest({
+        url: `/api/review/${token}/feedback/`,
         method: 'PATCH',
-        headers: {
-          Authorization: `Token ${authToken}`,
-        },
-        body: payload,
+        formData: payload,
+        token: authToken,
+        onProgress: (percent) => setEditUploadProgressPercent(percent ?? null),
       })
-      const data = await res.json().catch(() => ({}))
+
+      let res
+      try {
+        res = await attemptRequest()
+      } catch (networkError) {
+        if (editingVideoFile) {
+          await new Promise((resolve) => window.setTimeout(resolve, 800))
+          res = await attemptRequest()
+        } else {
+          throw networkError
+        }
+      }
+
+      const data = res.data || {}
       if (!res.ok) throw new Error(reviewLinkSubmitErrorMessage({ status: res.status, data }))
       setFeedback((current) => current.map((item) => (item.id === feedbackId ? data : item)))
       cancelEditingFeedback()
@@ -298,6 +340,7 @@ function ReviewPage({ reviewToken = '' }) {
       setError(saveError.message || 'Could not update feedback.')
     } finally {
       setSavingFeedbackId(null)
+      setEditUploadProgressPercent(null)
     }
   }
 
@@ -338,19 +381,39 @@ function ReviewPage({ reviewToken = '' }) {
     }
 
     setSubmitting(true)
+    setUploadProgressPercent(0)
+    setUploadProgressLoaded(0)
+    setUploadProgressTotal(responseFile.size || 0)
     setError('')
     try {
       const formData = new FormData()
       formData.append('feedback_video', responseFile)
       if (responseNotes.trim()) formData.append('text', responseNotes.trim())
       if (typeof selectedTimestampSeconds === 'number') formData.append('timestamp_seconds', selectedTimestampSeconds)
+      if (!submitUploadIdRef.current) submitUploadIdRef.current = createClientUploadId()
+      formData.append('client_upload_id', submitUploadIdRef.current)
 
-      const res = await fetch(`/api/review/${token}/feedback/`, {
+      const attemptRequest = () => uploadMultipartRequest({
+        url: `/api/review/${token}/feedback/`,
         method: 'POST',
-        headers: { Authorization: `Token ${authToken}` },
-        body: formData,
+        formData,
+        token: authToken,
+        onProgress: (percent, loaded, total) => {
+          setUploadProgressPercent(percent ?? null)
+          setUploadProgressLoaded(loaded || 0)
+          setUploadProgressTotal(total || responseFile.size || 0)
+        },
       })
-      const data = await res.json().catch(() => ({}))
+
+      let res
+      try {
+        res = await attemptRequest()
+      } catch (networkError) {
+        await new Promise((resolve) => window.setTimeout(resolve, 800))
+        res = await attemptRequest()
+      }
+
+      const data = res.data || {}
       if (!res.ok) throw new Error(reviewLinkSubmitErrorMessage({ status: res.status, data }))
       setFeedback((current) => [...current, data].sort((left, right) => {
         const leftTs = typeof left.timestamp_seconds === 'number' ? left.timestamp_seconds : Number.MAX_SAFE_INTEGER
@@ -359,6 +422,9 @@ function ReviewPage({ reviewToken = '' }) {
         return new Date(left.created_at) - new Date(right.created_at)
       }))
       setResponseFile(null)
+      submitUploadIdRef.current = ''
+      setUploadProgressLoaded(0)
+      setUploadProgressTotal(0)
       replaceOwnedPreviewUrl('')
       setResponseNotes('')
       setSelectedTimestampSeconds(null)
@@ -366,6 +432,7 @@ function ReviewPage({ reviewToken = '' }) {
       setError(submitError.message || 'Could not send feedback.')
     } finally {
       setSubmitting(false)
+      setUploadProgressPercent(null)
     }
   }
 
@@ -499,7 +566,14 @@ function ReviewPage({ reviewToken = '' }) {
               <div className="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-medium text-gray-900">Video preview</p>
-                  <button type="button" onClick={() => { setResponseFile(null); replaceOwnedPreviewUrl('') }} className="text-xs text-red-600 hover:text-red-700 transition-colors">
+                  <button type="button" onClick={() => {
+                    setResponseFile(null)
+                    submitUploadIdRef.current = ''
+                    setUploadProgressPercent(null)
+                    setUploadProgressLoaded(0)
+                    setUploadProgressTotal(0)
+                    replaceOwnedPreviewUrl('')
+                  }} className="text-xs text-red-600 hover:text-red-700 transition-colors">
                     Remove
                   </button>
                 </div>
@@ -562,6 +636,26 @@ function ReviewPage({ reviewToken = '' }) {
                   />
                 </div>
               </details>
+
+              {submitting && responseFile ? (
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 space-y-2">
+                  <div className="flex items-center justify-between gap-3 text-xs text-gray-600">
+                    <span>Uploading feedback video…</span>
+                    <span>{uploadProgressPercent !== null ? `${uploadProgressPercent}%` : 'Working…'}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
+                    <div
+                      className="h-full bg-gray-900 transition-all"
+                      style={{ width: `${Math.max(5, uploadProgressPercent || 0)}%` }}
+                    />
+                  </div>
+                  {uploadProgressTotal > 0 ? (
+                    <p className="text-[11px] text-gray-500">
+                      {`${Math.round(uploadProgressLoaded / (1024 * 1024))} MB of ${Math.round(uploadProgressTotal / (1024 * 1024))} MB`}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
 
               {error ? <p className="text-xs text-red-500">{error}</p> : null}
 
@@ -656,6 +750,20 @@ function ReviewPage({ reviewToken = '' }) {
                         ) : (
                           <p className="text-xs text-gray-500">Add a replacement video before saving.</p>
                         )}
+                        {savingFeedbackId === item.id && editingVideoFile ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between gap-3 text-xs text-gray-600">
+                              <span>Uploading replacement video…</span>
+                              <span>{editUploadProgressPercent !== null ? `${editUploadProgressPercent}%` : 'Working…'}</span>
+                            </div>
+                            <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
+                              <div
+                                className="h-full bg-gray-900 transition-all"
+                                style={{ width: `${Math.max(5, editUploadProgressPercent || 0)}%` }}
+                              />
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                       <div className="flex justify-end gap-2">
                         <button type="button" onClick={cancelEditingFeedback} className="text-sm text-gray-600 border border-gray-200 rounded-lg px-4 py-2 hover:bg-gray-50 transition-colors">

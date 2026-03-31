@@ -314,6 +314,11 @@ def _processing_callback_authorized(request):
     return bool(request.user.is_authenticated and request.user.is_staff)
 
 
+def _normalized_client_upload_id(raw_value):
+    value = str(raw_value or '').strip()
+    return value[:64]
+
+
 # ── Auth views ──────────────────────────────────────────────────────
 
 @csrf_exempt
@@ -565,6 +570,7 @@ def review_link_feedback(request, token):
     serializer.is_valid(raise_exception=True)
     video_file = request.FILES.get('feedback_video')
     text = str(serializer.validated_data.get('text', '') or '').strip()
+    client_upload_id = _normalized_client_upload_id(request.data.get('client_upload_id'))
     if not video_file:
         return Response({'error': 'Feedback video is required'}, status=status.HTTP_400_BAD_REQUEST)
     if video_file and not is_allowed_video_upload(video_file.content_type, video_file.name):
@@ -574,6 +580,19 @@ def review_link_feedback(request, token):
     except ValueError as exc:
         return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
+    if client_upload_id:
+        existing = VideoFeedback.objects.filter(
+            session=link.session,
+            review_request=review_request,
+            user=request.user,
+            client_upload_id=client_upload_id,
+        ).first()
+        if existing:
+            return Response(
+                ReviewVideoFeedbackSerializer(existing, context={'request': request, 'session': link.session}).data,
+                status=status.HTTP_200_OK,
+            )
+
     item = VideoFeedback.objects.create(
         session=link.session,
         review_request=review_request,
@@ -582,6 +601,7 @@ def review_link_feedback(request, token):
         timestamp_seconds=serializer.validated_data.get('timestamp_seconds'),
         text=text,
         feedback_video=video_file,
+        client_upload_id=client_upload_id,
         is_legacy_text_feedback=False,
     )
     if review_request:
@@ -1338,13 +1358,24 @@ class SessionViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Feedback video is required'}, status=status.HTTP_400_BAD_REQUEST)
         if video_file and not is_allowed_video_upload(video_file.content_type, video_file.name):
             return Response({'error': 'Only video files allowed'}, status=status.HTTP_400_BAD_REQUEST)
+        client_upload_id = _normalized_client_upload_id(request.data.get('client_upload_id'))
         try:
             video_file = prepare_feedback_video_upload(video_file)
         except ValueError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        if client_upload_id:
+            existing = VideoFeedback.objects.filter(
+                session=session,
+                user=request.user,
+                review_request__isnull=True,
+                client_upload_id=client_upload_id,
+            ).first()
+            if existing:
+                session.refresh_from_db()
+                return Response(SessionSerializer(session).data, status=status.HTTP_200_OK)
         VideoFeedback.objects.create(
             session=session, user=request.user,
-            timestamp_seconds=timestamp, text=text, feedback_video=video_file, is_legacy_text_feedback=False,
+            timestamp_seconds=timestamp, text=text, feedback_video=video_file, client_upload_id=client_upload_id, is_legacy_text_feedback=False,
         )
         session.refresh_from_db()
         return Response(SessionSerializer(session).data, status=status.HTTP_201_CREATED)

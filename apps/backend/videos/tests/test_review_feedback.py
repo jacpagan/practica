@@ -151,6 +151,30 @@ class ReviewFeedbackApiTests(APITestCase):
         self.assertEqual(feedback.timestamp_seconds, 25)
         self.assertFalse(feedback.is_legacy_text_feedback)
 
+    def test_feedback_post_is_idempotent_for_client_upload_id(self):
+        self._auth(self.reviewer)
+        payload = {
+            'text': 'Retry-safe upload',
+            'timestamp_seconds': 12,
+            'client_upload_id': 'retry-123',
+            'feedback_video': self._video_file('retry.mp4'),
+        }
+
+        first = self.client.post(
+            f'/api/review/{self.link.token}/feedback/',
+            payload,
+            format='multipart',
+        )
+        second = self.client.post(
+            f'/api/review/{self.link.token}/feedback/',
+            payload,
+            format='multipart',
+        )
+
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
+        self.assertEqual(VideoFeedback.objects.filter(session=self.session, user=self.reviewer, client_upload_id='retry-123').count(), 1)
+
     def test_authenticated_reviewer_can_post_android_video_feedback(self):
         self._auth(self.reviewer)
         response = self.client.post(
