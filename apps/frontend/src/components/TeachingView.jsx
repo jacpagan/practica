@@ -182,7 +182,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
                   <p className="text-xs text-gray-500 mt-1">
                     {nextRequest.owner?.display_name || nextRequest.student?.display_name || nextRequest.owner?.username || nextRequest.student?.username || 'Member'} • {nextRequest.instrument}
                   </p>
-                  <p className="text-sm text-gray-700 mt-3">{nextRequest.goal}</p>
+                  {/* Thread title is enough; remove extra goal text */}
                   <p className="text-xs text-gray-500 mt-2">Requested {fmtDate(nextRequest.created_at)}</p>
                 </div>
                 <div className="shrink-0 flex items-center gap-2">
@@ -268,8 +268,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
                       <p className="text-xs text-gray-500 mt-1">
                         {item.owner?.display_name || item.student?.display_name || item.owner?.username || item.student?.username || 'Member'} • {item.instrument}
                       </p>
-                      <p className="text-sm text-gray-700 mt-3">{item.goal}</p>
-                      {item.exercise_or_song ? <p className="text-xs text-gray-500 mt-2">Focus: {item.exercise_or_song}</p> : null}
+                      {/* Thread title is enough; remove extra goal/focus lines */}
                       {item.feedback_category_counts && Object.keys(item.feedback_category_counts).length > 0 ? (
                         <div className="flex flex-wrap gap-2 mt-3">
                           {Object.entries(item.feedback_category_counts).map(([category, count]) => (

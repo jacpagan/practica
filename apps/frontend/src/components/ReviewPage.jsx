@@ -462,20 +462,7 @@ function ReviewPage({ reviewToken = '' }) {
           {link?.expires_at ? <p className="text-xs text-gray-500 mt-1">Private link • authenticated access only • expires {new Date(link.expires_at).toLocaleString()}</p> : null}
         </div>
 
-        {reviewRequest ? (
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-2">
-            <p className="text-sm font-semibold text-gray-900">{reviewRequest.goal}</p>
-            {(reviewRequest.exercise_or_song || reviewRequest.notes) ? (
-              <details className="text-xs text-gray-500">
-                <summary className="cursor-pointer list-none hover:text-gray-900 transition-colors">Details</summary>
-                <div className="space-y-1 pt-2">
-                  <p>{reviewRequest.instrument}</p>
-                  {reviewRequest.exercise_or_song ? <p>Focus: {reviewRequest.exercise_or_song}</p> : null}
-                </div>
-              </details>
-            ) : null}
-          </div>
-        ) : null}
+        {/* Thread title is enough; omit extra request metadata here */}
 
         <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
           <div className="aspect-video bg-black">

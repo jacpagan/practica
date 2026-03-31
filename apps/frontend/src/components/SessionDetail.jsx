@@ -455,10 +455,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       toast.error('Choose a reviewer first')
       return
     }
-    if (!requestGoal.trim()) {
-      toast.error('Add a goal for this feedback request')
-      return
-    }
 
     setCreatingRequest(true)
     try {
@@ -466,9 +462,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
         session_id: session.id,
         reviewer_id: selectedTeacher.id,
         parent_request_id: initialReviewRequestDraft?.parent_request_id || null,
-        instrument: requestInstrument.trim() || 'drums',
-        goal: requestGoal.trim(),
-        exercise_or_song: requestExerciseOrSong.trim(),
       }
       const res = await fetch('/api/review-requests/', {
         method: 'POST',
@@ -487,7 +480,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       setShowRequestDetails(false)
       setRequestGoal('')
       setRequestExerciseOrSong('')
-      setRequestNotes('')
       onReviewRequestDraftCleared?.()
       writeLastTeacher(selectedTeacher)
       toast.success(`Request sent to ${selectedTeacher.display_name || selectedTeacher.username}`)
@@ -951,39 +943,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                         )}
                       </div>
 
-                      <div>
-                        <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Goal</label>
-                        <input type="text" value={requestGoal} onChange={(event) => setRequestGoal(event.target.value)} placeholder="What do you want help with today?" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {LESSON_GOAL_PRESETS.map((preset) => (
-                            <button
-                              key={preset}
-                              type="button"
-                              onClick={() => setRequestGoal(preset)}
-                              className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
-                            >
-                              {preset}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="rounded-lg border border-gray-200 bg-white px-3 py-3 space-y-3">
-                        <button type="button" onClick={() => setShowRequestDetails((current) => !current)} className="text-xs text-gray-600 hover:text-gray-900 transition-colors">
-                          {showRequestDetails ? 'Hide details' : 'Add details (optional)'}
-                        </button>
-
-                        {showRequestDetails ? (
-                          <div className="space-y-3">
-                            <div>
-                              <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Exercise or song</label>
-                              <input type="text" value={requestExerciseOrSong} onChange={(event) => setRequestExerciseOrSong(event.target.value)} placeholder="Optional focus area" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
-                            </div>
-
-                            {/* Notes removed for a tighter, video-first loop */}
-                          </div>
-                        ) : null}
-                      </div>
+                      {/* Title of the practice thread is sufficient context; no extra request fields */}
 
                       <div className="flex justify-end">
                         <button type="button" disabled={creatingRequest || !canCreateShareLink} onClick={createReviewRequest} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
