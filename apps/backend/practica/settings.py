@@ -3,6 +3,7 @@ Django settings for practica project.
 """
 
 import os
+import sys
 from pathlib import Path
 import dj_database_url
 
@@ -11,6 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-insecure-change-in-production')
 
 DEBUG = os.environ.get('DEBUG', 'True').lower() in ['true', '1', 'yes']
+RUNNING_TESTS = any(arg == 'test' for arg in sys.argv[1:])
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0').split(',')
 
@@ -31,7 +33,6 @@ MIDDLEWARE = [
     'practica.request_logging.RequestIdLoggingMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'practica.csrf_middleware.CustomCsrfMiddleware',
@@ -39,6 +40,9 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+if not DEBUG:
+    MIDDLEWARE.insert(3, 'whitenoise.middleware.WhiteNoiseMiddleware')
 
 ROOT_URLCONF = 'practica.urls'
 
@@ -108,7 +112,7 @@ if FRONTEND_DIR.exists():
     STATICFILES_DIRS.append(str(FRONTEND_DIR))
 
 # Storage backends
-AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME', '')
+AWS_STORAGE_BUCKET_NAME = '' if RUNNING_TESTS else os.environ.get('AWS_STORAGE_BUCKET_NAME', '')
 AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'us-east-1')
 AWS_S3_FILE_OVERWRITE = False
 AWS_DEFAULT_ACL = None
