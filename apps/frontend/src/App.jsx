@@ -60,6 +60,35 @@ function AppContent() {
   const currentPathRef = useRef(routePath(initialRoute))
   const autoQuickRecordCheckedRef = useRef(false)
 
+  const fetchPaginated = useCallback(async (path) => {
+    if (!token) return []
+    let nextUrl = path
+    let items = []
+
+    while (nextUrl) {
+      const res = await fetch(nextUrl, {
+        headers: { Authorization: `Token ${token}` },
+      })
+      if (!res.ok) throw new Error('paginated-fetch')
+      const data = await res.json()
+      if (Array.isArray(data)) {
+        items = items.concat(data)
+        break
+      }
+      items = items.concat(Array.isArray(data?.results) ? data.results : [])
+      const rawNext = String(data?.next || '').trim()
+      if (!rawNext) break
+      try {
+        const parsed = new URL(rawNext, window.location.origin)
+        nextUrl = `${parsed.pathname}${parsed.search}`
+      } catch {
+        nextUrl = rawNext
+      }
+    }
+
+    return items
+  }, [token])
+
   const applyRoute = useCallback((nextRoute, { replace = false } = {}) => {
     setView(nextRoute.view)
     setRouteSessionId(nextRoute.sessionId ?? null)
@@ -141,51 +170,38 @@ function AppContent() {
     if (!token) return
     setSessionsLoading(true)
     try {
-      const res = await fetch('/api/sessions/', {
-        headers: { Authorization: `Token ${token}` },
-      })
-      if (!res.ok) throw new Error('sessions')
-      const data = await res.json()
-      setSessions(Array.isArray(data) ? data : data.results || [])
+      const items = await fetchPaginated('/api/sessions/')
+      setSessions(items)
     } catch {
       setSessions([])
       toast.error('Could not load your library')
     } finally {
       setSessionsLoading(false)
     }
-  }, [token, toast])
+  }, [fetchPaginated, token, toast])
 
   const loadStudentReviewRequests = useCallback(async () => {
     if (!token) return
     setStudentReviewRequestsLoading(true)
     try {
-      const res = await fetch('/api/review-requests/?role=owner', {
-        headers: { Authorization: `Token ${token}` },
-      })
-      if (!res.ok) throw new Error('owner-review-requests')
-      const data = await res.json()
-      setStudentReviewRequests(Array.isArray(data) ? data : data.results || [])
+      const items = await fetchPaginated('/api/review-requests/?role=owner')
+      setStudentReviewRequests(items)
     } catch {
       setStudentReviewRequests([])
     } finally {
       setStudentReviewRequestsLoading(false)
     }
-  }, [token])
+  }, [fetchPaginated, token])
 
   const loadTeacherWorkspaceAvailability = useCallback(async () => {
     if (!token) return
     try {
-      const res = await fetch('/api/review-requests/?role=reviewer', {
-        headers: { Authorization: `Token ${token}` },
-      })
-      if (!res.ok) throw new Error('reviewer-review-requests')
-      const data = await res.json()
-      const requests = Array.isArray(data) ? data : data.results || []
+      const requests = await fetchPaginated('/api/review-requests/?role=reviewer')
       setHasTeacherWorkspace(requests.length > 0)
     } catch {
       setHasTeacherWorkspace(false)
     }
-  }, [token])
+  }, [fetchPaginated, token])
 
   const openSessionById = useCallback(async (sessionId, { updateUrl = true } = {}) => {
     if (!token) return
