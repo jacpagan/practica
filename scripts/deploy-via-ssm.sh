@@ -334,10 +334,17 @@ if [ "$FINAL_STATUS" != "Success" ]; then
 fi
 
 EXPECTED_SHA=$(git rev-parse HEAD 2>/dev/null || echo '')
-PUBLIC_VERIFY_MAX_POLLS="${PUBLIC_VERIFY_MAX_POLLS:-720}"
+PUBLIC_VERIFY_INTERVAL_SECONDS="${PUBLIC_VERIFY_INTERVAL_SECONDS:-5}"
+PUBLIC_VERIFY_TIMEOUT_SECONDS="${PUBLIC_VERIFY_TIMEOUT_SECONDS:-900}"
+if [ "$PUBLIC_VERIFY_INTERVAL_SECONDS" -le 0 ]; then
+  echo "PUBLIC_VERIFY_INTERVAL_SECONDS must be greater than 0" >&2
+  exit 1
+fi
+PUBLIC_VERIFY_MAX_POLLS=$(( (PUBLIC_VERIFY_TIMEOUT_SECONDS + PUBLIC_VERIFY_INTERVAL_SECONDS - 1) / PUBLIC_VERIFY_INTERVAL_SECONDS ))
 PUBLIC_STABLE_SUCCESSES="${PUBLIC_STABLE_SUCCESSES:-3}"
 PUBLIC_FINAL=0
 PUBLIC_STREAK=0
+echo "Public verify window: timeout=${PUBLIC_VERIFY_TIMEOUT_SECONDS}s interval=${PUBLIC_VERIFY_INTERVAL_SECONDS}s stable_successes=${PUBLIC_STABLE_SUCCESSES}"
 for i in $(seq 1 "$PUBLIC_VERIFY_MAX_POLLS"); do
   HEALTH_JSON=$(curl -fsS --max-time 10 https://practica.jpagan.com/health/ 2>/dev/null || true)
   if [ -n "$HEALTH_JSON" ] && python3 -c '
@@ -385,14 +392,19 @@ PY
     if [ "$PUBLIC_STREAK" -gt 0 ]; then
       echo "Public deploy lost health during verification; retrying"
     else
-      echo "Waiting for public deploy: expected sha ${EXPECTED_SHA:-unknown}"
+      elapsed_seconds=$(( (i - 1) * PUBLIC_VERIFY_INTERVAL_SECONDS ))
+      remaining_seconds=$(( PUBLIC_VERIFY_TIMEOUT_SECONDS - elapsed_seconds ))
+      if [ "$remaining_seconds" -lt 0 ]; then
+        remaining_seconds=0
+      fi
+      echo "Waiting for public deploy: expected sha ${EXPECTED_SHA:-unknown} elapsed=${elapsed_seconds}s remaining=${remaining_seconds}s"
     fi
     PUBLIC_STREAK=0
   fi
-  sleep 5
+  sleep "$PUBLIC_VERIFY_INTERVAL_SECONDS"
 done
 if [ "$PUBLIC_FINAL" != "1" ]; then
-  echo "Public deploy verification timed out" >&2
+  echo "Public deploy verification timed out after ${PUBLIC_VERIFY_TIMEOUT_SECONDS}s" >&2
   STATUS_CMD_ID=$(send_short_ssm "if [ -f /opt/practica/.deploy-success ]; then echo success; elif [ -f /opt/practica/.deploy-failed ]; then echo failed; else echo pending; fi" "Practica deploy status")
   DEPLOY_STATUS=$(wait_for_ssm_output "$STATUS_CMD_ID" | tr -d '\r' | tail -n 1)
   echo "Remote deploy status: ${DEPLOY_STATUS:-pending}"
