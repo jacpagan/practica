@@ -174,10 +174,10 @@ export const reportClientError = ({ message = '', stack = '', source = 'ui', ext
       }
     } catch {}
     const payload = {
-      message: trimLogValue(message, 1000),
-      stack: trimLogValue(stack, 6000),
+      message: trimLogValue(message, 300),
+      stack: stack ? 'present' : '',
       source: trimLogValue(source, 64),
-      path: trimLogValue(`${window.location.pathname}${window.location.search}`, 512),
+      path: trimLogValue(window.location.pathname, 512),
       extra: extra && typeof extra === 'object' ? { ...extra, client_trace_id: traceId } : { client_trace_id: traceId },
     }
     const body = JSON.stringify(payload)

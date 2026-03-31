@@ -184,8 +184,7 @@ def _run_browser_transcode(source_path, output_path):
 
 def _transcode_uploaded_feedback_video(uploaded_file):
     source_name = Path(str(getattr(uploaded_file, 'name', '') or 'feedback-video')).name
-    safe_stem = Path(source_name).stem.strip() or 'feedback-video'
-    target_name = f'{safe_stem[:80]}-{uuid.uuid4().hex[:12]}-browser.mp4'
+    target_name = f'feedback-{uuid.uuid4().hex[:12]}-browser.mp4'
 
     with tempfile.TemporaryDirectory(prefix='practica-feedback-video-') as tmpdir:
         tmp_path = Path(tmpdir)
@@ -203,9 +202,7 @@ def _transcode_uploaded_feedback_video(uploaded_file):
 
 
 def _feedback_proxy_key(feedback):
-    source_name = Path(str(getattr(feedback.feedback_video, 'name', '') or f'feedback-{feedback.id}')).name
-    safe_stem = Path(source_name).stem.strip() or f'feedback-{feedback.id}'
-    return f'feedback_videos/browser/{feedback.id}/{safe_stem[:80]}-browser.mp4'
+    return f'feedback_videos/browser/{feedback.id}/{feedback.id}-browser.mp4'
 
 
 def ensure_feedback_video_playback_key(feedback):

@@ -824,6 +824,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       <div className="rounded-lg border border-gray-200 bg-white px-3 py-3">
                         <p className="text-xs text-gray-500">Share this link</p>
                         <p className="text-sm text-gray-900 break-all mt-1">{activeReviewLink.url}</p>
+                        <p className="text-xs text-gray-500 mt-2">Authenticated access only • expires {new Date(activeReviewLink.expires_at).toLocaleString()} • can be turned off any time</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <button type="button" onClick={copyShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">

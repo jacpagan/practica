@@ -10,11 +10,13 @@ import SessionDetail from './components/SessionDetail'
 import LibraryView from './components/LibraryView'
 import SeriesView from './components/SeriesView'
 import RequestsView from './components/TeachingView'
+import PrivacyPage from './components/PrivacyPage'
 
 const parseRoute = (pathname) => {
   if (pathname === '/') {
     return { view: 'library', sessionId: null }
   }
+  if (pathname === '/privacy') return { view: 'privacy', sessionId: null }
   if (pathname === '/archive') return { view: 'archive', sessionId: null }
   if (pathname === '/library') return { view: 'library', sessionId: null }
   if (pathname === '/upload') return { view: 'upload', sessionId: null }
@@ -30,6 +32,7 @@ const parseRoute = (pathname) => {
 
 const routePath = ({ view, sessionId, token, seriesName }) => {
   if (view === 'library') return '/library'
+  if (view === 'privacy') return '/privacy'
   if (view === 'archive') return '/archive'
   if (view === 'upload') return '/upload'
   if (view === 'requests') return '/requests'
@@ -342,6 +345,9 @@ function AppContent() {
   }
 
   if (!user) {
+    if (view === 'privacy') {
+      return <PrivacyPage signedIn={false} />
+    }
     return <AuthForm />
   }
 
@@ -391,6 +397,9 @@ function AppContent() {
               Record
             </button>
             <div className="flex items-center gap-2 sm:border-l sm:border-gray-100 sm:pl-3">
+              <button onClick={() => navigate({ view: 'privacy', sessionId: null })} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+                Privacy
+              </button>
               <span className="hidden sm:inline text-xs text-gray-400">{user.display_name}</span>
               <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
                 Log out
@@ -473,6 +482,10 @@ function AppContent() {
             }}
             onRecordFollowUp={(draft) => handleRecordAnother(draft)}
           />
+        )}
+
+        {view === 'privacy' && (
+          <PrivacyPage signedIn onBack={() => navigate({ view: 'library', sessionId: null })} />
         )}
 
         {view === 'series' && (

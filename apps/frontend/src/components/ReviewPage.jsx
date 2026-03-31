@@ -462,6 +462,7 @@ function ReviewPage({ reviewToken = '' }) {
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Leave video feedback</h1>
           <p className="text-xs text-gray-500 mt-2">Signed in as {user.display_name || user.username}.</p>
+          {link?.expires_at ? <p className="text-xs text-gray-500 mt-1">Private link • authenticated access only • expires {new Date(link.expires_at).toLocaleString()}</p> : null}
         </div>
 
         {reviewRequest ? (

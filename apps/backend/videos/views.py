@@ -108,6 +108,20 @@ def _review_link_error_response(reason):
     )
 
 
+def _sanitized_client_path(path):
+    raw = str(path or '').strip()
+    if not raw:
+        return '/'
+    base = raw.split('?', 1)[0]
+    if base.startswith('/r/'):
+        return '/r/:token'
+    if base.startswith('/api/review/') and base.endswith('/feedback/'):
+        return '/api/review/:token/feedback/'
+    if base.startswith('/api/review/'):
+        return '/api/review/:token/'
+    return base
+
+
 def _feedback_request_forbidden_response(message='You do not have access to this feedback request.'):
     return Response(
         {
@@ -212,6 +226,14 @@ def _recommended_part_size(size_bytes):
 def _sanitize_filename(name):
     safe = (name or 'session-video.mp4').strip().replace('\\', '/').split('/')[-1]
     return safe or 'session-video.mp4'
+
+
+def _opaque_video_storage_key(*, user_id, filename, prefix='sessions'):
+    safe_name = _sanitize_filename(filename)
+    extension = ''
+    if '.' in safe_name:
+        extension = f".{safe_name.rsplit('.', 1)[-1].lower()}"
+    return f"{prefix}/{user_id}/{uuid.uuid4().hex}{extension}"
 
 
 def _list_uploaded_parts(upload, client=None):
@@ -417,25 +439,23 @@ def invite_code_detail(request, invite_id):
 @permission_classes([AllowAny])
 def client_error_view(request):
     payload = request.data if isinstance(request.data, dict) else {}
-    message = str(payload.get('message', '')).strip()[:1000]
-    stack = str(payload.get('stack', '')).strip()[:6000]
     source = str(payload.get('source', '')).strip()[:64]
-    path = str(payload.get('path', '')).strip()[:512]
+    path = _sanitized_client_path(payload.get('path', ''))[:512]
     extra = payload.get('extra') if isinstance(payload.get('extra'), dict) else {}
-    user_id = request.user.id if getattr(request.user, 'is_authenticated', False) else None
-    user_agent = request.META.get('HTTP_USER_AGENT', '')[:512]
+    client_trace_id = str(extra.get('client_trace_id', '')).strip()[:128]
+    message = str(payload.get('message', '')).strip()
+    stack = str(payload.get('stack', '')).strip()
 
     request_id = request.META.get('HTTP_X_REQUEST_ID', '')
     logger.warning(
-        'ClientError source=%s path=%s user_id=%s request_id=%s message=%s ua=%s extra=%s stack=%s',
+        'ClientError source=%s path=%s is_authenticated=%s request_id=%s client_trace_id=%s message_len=%s stack_present=%s',
         source or 'unknown',
         path or 'unknown',
-        user_id,
+        bool(getattr(request.user, 'is_authenticated', False)),
         request_id,
-        message or 'n/a',
-        user_agent or 'n/a',
-        extra,
-        stack or 'n/a',
+        client_trace_id or 'n/a',
+        len(message),
+        bool(stack),
     )
     return Response({'ok': True}, status=status.HTTP_202_ACCEPTED)
 
@@ -978,7 +998,7 @@ class SessionViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Only video files allowed'}, status=status.HTTP_400_BAD_REQUEST)
 
         filename = _sanitize_filename(request.data.get('filename'))
-        key = f"sessions/{request.user.id}/{uuid.uuid4().hex}-{filename}"
+        key = _opaque_video_storage_key(user_id=request.user.id, filename=filename)
         part_size = _recommended_part_size(size_bytes)
         total_parts = math.ceil(size_bytes / part_size)
 
