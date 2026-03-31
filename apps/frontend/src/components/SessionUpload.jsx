@@ -377,10 +377,17 @@ function SessionUpload({
                 <input ref={captureInputRef} type="file" accept={videoFileAccept()} capture="environment" className="hidden" onChange={handleFilePick} />
               </div>
               <div className="flex flex-col">
-                <button type="button" onClick={startRecording} disabled={isUploading} className="flex-1 rounded-2xl bg-gray-900 text-white px-4 py-3 text-sm font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                  Record
-                </button>
-                <p className="hidden sm:block text-[11px] text-gray-500 mt-2 text-center">Press R to record</p>
+                {(() => {
+                  const recorderSupported = typeof window !== 'undefined' && typeof window.MediaRecorder !== 'undefined' && !!(navigator.mediaDevices?.getUserMedia)
+                  return (
+                    <>
+                      <button type="button" onClick={startRecording} disabled={isUploading} className="flex-1 rounded-2xl bg-gray-900 text-white px-4 py-3 text-sm font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors">
+                        {recorderSupported ? 'Record' : 'Use camera'}
+                      </button>
+                      {recorderSupported ? <p className="hidden sm:block text-[11px] text-gray-500 mt-2 text-center">Press R to record</p> : null}
+                    </>
+                  )
+                })()}
               </div>
             </div>
             <div className="mt-3 space-y-1">
