@@ -8,6 +8,9 @@ on:
         required: true
         default: "hostname && pwd && ls -la /opt/practica | tail -n 20"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   debug:
     runs-on: ubuntu-latest
