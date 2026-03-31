@@ -167,14 +167,21 @@ function LibraryView({
   onCreateVideo,
   onOpenReviewRequest,
   onRecordFollowUp,
+  onOpenRequests,
+  hasReviewerWorkspace = false,
   token = '',
 }) {
+  const toast = useToast()
+  const [archiveView, setArchiveView] = useState('all')
+  const [expandedSeriesNames, setExpandedSeriesNames] = useState({})
+
   const ownSessions = useMemo(
     () => sessions
       .filter((session) => session.can_edit)
       .sort((left, right) => new Date(right.recorded_at || right.created_at) - new Date(left.recorded_at || left.created_at)),
     [sessions],
   )
+
   const seriesGroups = useMemo(() => {
     const groups = new Map()
     ownSessions.forEach((session) => {
@@ -187,17 +194,20 @@ function LibraryView({
       .map(([seriesName, items]) => ({ seriesName, items }))
       .sort((left, right) => new Date(right.items[0].recorded_at || right.items[0].created_at) - new Date(left.items[0].recorded_at || left.items[0].created_at))
   }, [ownSessions])
+
   const standaloneSessions = useMemo(
     () => ownSessions.filter((session) => !String(session.practice_series || '').trim()),
     [ownSessions],
   )
-  const studentRequests = useMemo(
+
+  const ownerRequests = useMemo(
     () => [...reviewRequests].sort((left, right) => new Date(right.created_at) - new Date(left.created_at)),
     [reviewRequests],
   )
+
   const activeRequestBySessionId = useMemo(() => {
     const bySessionId = new Map()
-    studentRequests.forEach((item) => {
+    ownerRequests.forEach((item) => {
       const status = String(item?.status || '').trim().toLowerCase()
       if (['closed', 'revoked'].includes(status)) return
       const sessionId = Number(item?.session?.id || item?.session_id || 0)
@@ -205,16 +215,16 @@ function LibraryView({
       bySessionId.set(sessionId, item)
     })
     return bySessionId
-  }, [studentRequests])
+  }, [ownerRequests])
+
   const activeRequest = useMemo(
-    () => studentRequests.find((item) => !['closed', 'revoked'].includes(String(item.status || '').trim().toLowerCase())) || null,
-    [studentRequests],
+    () => ownerRequests.find((item) => !['closed', 'revoked'].includes(String(item.status || '').trim().toLowerCase())) || null,
+    [ownerRequests],
   )
+
   const activeRequestStatus = String(activeRequest?.status || '').trim().toLowerCase()
   const latestSeries = seriesGroups[0] || null
   const latestSessionNeedingRequest = ownSessions.find((session) => session.processing_status === 'ready') || ownSessions[0] || null
-
-  const toast = useToast()
 
   const moveToThread = async (session) => {
     if (!token || !session?.id) return
@@ -233,11 +243,62 @@ function LibraryView({
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || 'Could not move video')
       toast.success(next ? 'Moved to thread' : 'Removed from thread')
-      // Soft refresh hint: user can open thread via button labels below.
     } catch (error) {
       toast.error(error?.message || 'Could not move video')
     }
   }
+
+  const toggleSeriesExpanded = (seriesName) => {
+    setExpandedSeriesNames((current) => ({
+      ...current,
+      [seriesName]: !current[seriesName],
+    }))
+  }
+
+  const renderSessionRows = (items, returnRoute = { view: 'library', sessionId: null, seriesName: '' }) => items.map((session) => {
+    const activeSessionRequest = activeRequestBySessionId.get(Number(session.id))
+    const activeSessionRequestStatus = String(activeSessionRequest?.status || '').trim().toLowerCase()
+    const threadName = String(session.practice_series || '').trim()
+
+    return (
+      <button
+        key={session.id}
+        type="button"
+        onClick={() => onOpenSession?.(session, returnRoute)}
+        className="w-full text-left rounded-2xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <VideoThumbnail session={session} className="relative w-24 h-16 rounded-xl shrink-0" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-sm font-medium text-gray-900 line-clamp-1">{session.title}</p>
+                {threadName ? <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">{threadName}</span> : null}
+                {activeSessionRequest ? <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${requestStatusTone[activeSessionRequestStatus] || 'bg-gray-100 text-gray-700'}`}>{requestStatusLabel(activeSessionRequest.status)}</span> : null}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">{fmtDate(session.recorded_at || session.created_at)}</p>
+              {session.description ? <p className="text-xs text-gray-500 mt-2 line-clamp-2">{session.description}</p> : null}
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); moveToThread(session) }} className="text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-white transition-colors">
+                  {threadName ? 'Change thread' : 'Add to thread'}
+                </button>
+                {threadName ? (
+                  <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); onOpenSeries?.(threadName) }} className="text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-white transition-colors">
+                    Open thread
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            <p className="text-xs text-gray-500">{session.video_feedback_count || 0} replies</p>
+            <p className="text-xs text-gray-400 mt-2">{activeSessionRequest ? 'Open loop' : 'Open'}</p>
+          </div>
+        </div>
+      </button>
+    )
+  })
+
   return (
     <div className="px-4 sm:px-6 py-6">
       <div className="max-w-4xl mx-auto space-y-4">
@@ -247,6 +308,16 @@ function LibraryView({
               <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Home</h2>
               <p className="text-sm text-gray-500 mt-1">Your next step.</p>
             </div>
+            {hasReviewerWorkspace ? (
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="rounded-full bg-gray-900 text-white px-3 py-1.5 text-xs font-medium">
+                  Videos I own
+                </button>
+                <button type="button" onClick={onOpenRequests} className="rounded-full border border-gray-200 bg-white text-gray-700 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 transition-colors">
+                  Requests I’m reviewing
+                </button>
+              </div>
+            ) : null}
           </div>
           <button
             type="button"
@@ -274,10 +345,10 @@ function LibraryView({
         ) : (
           <div className="space-y-4">
             <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 space-y-3">
-            <div>
-              <p className="text-sm font-semibold text-gray-900">Up next</p>
-              <p className="text-xs text-gray-500 mt-1">Submit, get feedback, retry.</p>
-            </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Up next</p>
+                <p className="text-xs text-gray-500 mt-1">Submit, get feedback, retry.</p>
+              </div>
 
               {reviewRequestsLoading ? (
                 <div className="rounded-xl bg-gray-50 px-4 py-4 text-sm text-gray-500">Loading…</div>
@@ -296,9 +367,9 @@ function LibraryView({
                     <div className="text-xs text-gray-500">Session: {activeRequest.session?.title || 'Video'}</div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={() => onOpenReviewRequest?.(activeRequest)} className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors">
+                    <button type="button" onClick={() => onOpenReviewRequest?.(activeRequest)} className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors">
                       Open
-                        </button>
+                    </button>
                     {activeRequest.session?.id ? (
                       <button type="button" onClick={() => onOpenSession?.(activeRequest.session, { view: 'library', sessionId: null, seriesName: '' })} className="rounded-full border border-gray-200 bg-white text-gray-900 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors">
                         Open video
@@ -326,20 +397,18 @@ function LibraryView({
                       onClick={() => onRecordFollowUp?.({
                         parent_request_id: activeRequest.id,
                         teacher: activeRequest.teacher,
-                        instrument: activeRequest.instrument,
                         student_level: activeRequest.student_level,
                         goal: activeRequest.goal,
                         exercise_or_song: activeRequest.exercise_or_song,
                         notes: activeRequest.notes,
-                        requested_turnaround_hours: activeRequest.requested_turnaround_hours,
                         practiceSeries: activeRequest.session?.practice_series || '',
                       })}
                       className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
                     >
-                      Record next
+                      Record follow-up
                     </button>
                     <button type="button" onClick={() => onOpenReviewRequest?.(activeRequest)} className="rounded-full border border-gray-200 bg-white text-gray-900 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors">
-                      Open
+                      Open feedback
                     </button>
                   </div>
                 </div>
@@ -347,18 +416,21 @@ function LibraryView({
                 <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 space-y-3">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
-                      <p className="text-sm font-medium text-gray-900">Pick up your latest take</p>
-                      <p className="text-xs text-gray-500 mt-1">Open your latest video{latestSessionNeedingRequest.processing_status !== 'ready' ? ' (processing)' : ''}.</p>
+                      <p className="text-sm font-medium text-gray-900">Ready to send</p>
+                      <p className="text-xs text-gray-500 mt-1">Latest ready video: {latestSessionNeedingRequest.title}</p>
                     </div>
                     <div className="text-xs text-gray-500">{fmtDate(latestSessionNeedingRequest.recorded_at || latestSessionNeedingRequest.created_at)}</div>
                   </div>
-                  <button type="button" onClick={() => onOpenSession?.(latestSessionNeedingRequest, { view: 'library', sessionId: null, seriesName: '' })} className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors">
-                    Open
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={() => onOpenSession?.(latestSessionNeedingRequest, { view: 'library', sessionId: null, seriesName: '' })} className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors">
+                      Open
+                    </button>
+                    <button type="button" onClick={onCreateVideo} className="rounded-full border border-gray-200 bg-white text-gray-900 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors">
+                      Record
+                    </button>
+                  </div>
                 </div>
-              ) : null}
-
-              {latestSeries ? (
+              ) : latestSeries ? (
                 <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 space-y-3">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
@@ -379,97 +451,101 @@ function LibraryView({
               ) : null}
             </div>
 
-            <details className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
-              <summary className="cursor-pointer list-none flex items-center justify-between gap-3">
+            <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 space-y-4">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">Browse archive</p>
-                  <p className="text-xs text-gray-500 mt-1">Older takes.</p>
+                  <p className="text-xs text-gray-500 mt-1">All your owned videos.</p>
                 </div>
-                <span className="text-xs text-gray-500">Show</span>
-              </summary>
-              <div className="space-y-4 pt-3">
-                {seriesGroups.length > 0 ? (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Practice threads</p>
-                {seriesGroups.map(({ seriesName, items }) => {
-                  const latest = items[0]
-                  const latestRequest = activeRequestBySessionId.get(Number(latest.id))
-                  const latestRequestStatus = String(latestRequest?.status || '').trim().toLowerCase()
-                  return (
-                    <button
-                      key={seriesName}
-                          type="button"
-                          onClick={() => onOpenSeries?.(seriesName)}
-                          className="w-full text-left rounded-2xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-start gap-3 min-w-0">
-                              <VideoThumbnail session={latest} className="relative w-24 h-16 rounded-xl shrink-0" />
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <p className="text-sm font-medium text-gray-900 line-clamp-1">{seriesName}</p>
-                                  <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">{items.length} takes</span>
-                                  {latestRequest ? <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${requestStatusTone[latestRequestStatus] || 'bg-gray-100 text-gray-700'}`}>{requestStatusLabel(latestRequest.status)}</span> : null}
+                <div className="flex flex-wrap gap-2 rounded-full border border-gray-200 p-1">
+                  <button type="button" onClick={() => setArchiveView('all')} className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${archiveView === 'all' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
+                    All my videos
+                  </button>
+                  <button type="button" onClick={() => setArchiveView('threads')} className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${archiveView === 'threads' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
+                    Threads
+                  </button>
+                  <button type="button" onClick={() => setArchiveView('standalone')} className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${archiveView === 'standalone' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
+                    Standalone
+                  </button>
+                </div>
+              </div>
+
+              {archiveView === 'all' ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">All videos • {ownSessions.length}</p>
+                  {renderSessionRows(ownSessions)}
+                </div>
+              ) : null}
+
+              {archiveView === 'threads' ? (
+                seriesGroups.length > 0 ? (
+                  <div className="space-y-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Practice threads • {seriesGroups.length}</p>
+                    {seriesGroups.map(({ seriesName, items }) => {
+                      const latest = items[0]
+                      const latestRequest = activeRequestBySessionId.get(Number(latest.id))
+                      const latestRequestStatus = String(latestRequest?.status || '').trim().toLowerCase()
+                      const isExpanded = Boolean(expandedSeriesNames[seriesName])
+                      return (
+                        <div key={seriesName} className="rounded-2xl border border-gray-200 overflow-hidden">
+                          <div className="px-4 py-3 bg-white">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-3 min-w-0">
+                                <VideoThumbnail session={latest} className="relative w-24 h-16 rounded-xl shrink-0" />
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <p className="text-sm font-medium text-gray-900 line-clamp-1">{seriesName}</p>
+                                    <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">{items.length} takes</span>
+                                    {latestRequest ? <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${requestStatusTone[latestRequestStatus] || 'bg-gray-100 text-gray-700'}`}>{requestStatusLabel(latestRequest.status)}</span> : null}
+                                  </div>
+                                  <p className="text-xs text-gray-500 mt-1">Latest {fmtDate(latest.recorded_at || latest.created_at)}</p>
+                                  <p className="text-xs text-gray-500 mt-2 line-clamp-2">Newest take: {latest.title}</p>
                                 </div>
-                                <p className="text-xs text-gray-500 mt-1">Latest {fmtDate(latest.recorded_at || latest.created_at)}</p>
-                                <p className="text-xs text-gray-500 mt-2 line-clamp-2">Newest take: {latest.title}</p>
+                              </div>
+                              <div className="text-right shrink-0 space-y-2">
+                                <p className="text-xs text-gray-500">{items.reduce((sum, item) => sum + (item.video_feedback_count || 0), 0)} replies</p>
+                                <div className="flex flex-wrap justify-end gap-2">
+                                  <button type="button" onClick={() => toggleSeriesExpanded(seriesName)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors">
+                                    {isExpanded ? 'Hide takes' : 'Show takes'}
+                                  </button>
+                                  <button type="button" onClick={() => onOpenSeries?.(seriesName)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors">
+                                    Open thread
+                                  </button>
+                                </div>
                               </div>
                             </div>
-                            <div className="text-right shrink-0">
-                              <p className="text-xs text-gray-500">{items.reduce((sum, item) => sum + (item.video_feedback_count || 0), 0)} replies</p>
-                              <p className="text-xs text-gray-400 mt-2">{latestRequest ? 'Open loop' : 'Open thread'}</p>
-                            </div>
                           </div>
-                        </button>
+                          {isExpanded ? (
+                            <div className="border-t border-gray-200 bg-gray-50 px-3 py-3 space-y-2">
+                              {renderSessionRows(items, { view: 'series', sessionId: null, seriesName })}
+                            </div>
+                          ) : null}
+                        </div>
                       )
                     })}
                   </div>
-                ) : null}
-
-                {standaloneSessions.length > 0 ? (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Standalone videos</p>
-                    {standaloneSessions.map((session) => (
-                      (() => {
-                        const activeSessionRequest = activeRequestBySessionId.get(Number(session.id))
-                        const activeSessionRequestStatus = String(activeSessionRequest?.status || '').trim().toLowerCase()
-                        return (
-                      <button
-                        key={session.id}
-                        type="button"
-                        onClick={() => onOpenSession?.(session, { view: 'library', sessionId: null, seriesName: '' })}
-                        className="w-full text-left rounded-2xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-start gap-3 min-w-0">
-                            <VideoThumbnail session={session} className="relative w-24 h-16 rounded-xl shrink-0" />
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <p className="text-sm font-medium text-gray-900 line-clamp-1">{session.title}</p>
-                                {activeSessionRequest ? <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${requestStatusTone[activeSessionRequestStatus] || 'bg-gray-100 text-gray-700'}`}>{requestStatusLabel(activeSessionRequest.status)}</span> : null}
-                              </div>
-                              <p className="text-xs text-gray-500 mt-1">{fmtDate(session.recorded_at || session.created_at)}</p>
-                              {session.description ? <p className="text-xs text-gray-500 mt-2 line-clamp-2">{session.description}</p> : null}
-                              <div className="mt-2">
-                                <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); moveToThread(session) }} className="text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-white transition-colors">
-                                  Add to thread
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-xs text-gray-500">{session.video_feedback_count || 0} replies</p>
-                            <p className="text-xs text-gray-400 mt-2">{activeSessionRequest ? 'Open loop' : 'Open'}</p>
-                          </div>
-                        </div>
-                      </button>
-                        )
-                      })()
-                    ))}
+                ) : (
+                  <div className="rounded-xl border border-dashed border-gray-200 px-4 py-4 text-center">
+                    <p className="text-sm text-gray-600">No practice threads yet.</p>
+                    <p className="text-xs text-gray-400 mt-1">Add a thread name when saving a video to group repeated takes.</p>
                   </div>
-                ) : null}
-              </div>
-            </details>
+                )
+              ) : null}
+
+              {archiveView === 'standalone' ? (
+                standaloneSessions.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Standalone videos • {standaloneSessions.length}</p>
+                    {renderSessionRows(standaloneSessions)}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-gray-200 px-4 py-4 text-center">
+                    <p className="text-sm text-gray-600">No standalone videos.</p>
+                    <p className="text-xs text-gray-400 mt-1">Every owned video is currently grouped into a thread.</p>
+                  </div>
+                )
+              ) : null}
+            </div>
 
             <details className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
               <summary className="cursor-pointer list-none flex items-center justify-between gap-3">

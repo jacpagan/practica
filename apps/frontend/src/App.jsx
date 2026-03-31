@@ -406,10 +406,12 @@ function AppContent() {
             sessionsLoading={sessionsLoading}
             reviewRequests={studentReviewRequests}
             reviewRequestsLoading={studentReviewRequestsLoading}
+            hasReviewerWorkspace={hasTeacherWorkspace}
             token={token}
             onOpenSession={openHomeWorkItem}
             onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
             onCreateVideo={startQuickRecord}
+            onOpenRequests={() => navigate({ view: 'requests', sessionId: null })}
             onOpenReviewRequest={(requestItem) => {
               const requestLink = requestItem?.feedback_link || requestItem?.review_link
               if (!requestLink?.token) return
