@@ -469,7 +469,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
         instrument: requestInstrument.trim() || 'drums',
         goal: requestGoal.trim(),
         exercise_or_song: requestExerciseOrSong.trim(),
-        notes: requestNotes.trim(),
       }
       const res = await fetch('/api/review-requests/', {
         method: 'POST',
@@ -981,10 +980,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                               <input type="text" value={requestExerciseOrSong} onChange={(event) => setRequestExerciseOrSong(event.target.value)} placeholder="Optional focus area" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
                             </div>
 
-                            <div>
-                              <label className="block text-xs font-medium uppercase tracking-wide text-gray-500 mb-1.5">Notes</label>
-                              <textarea value={requestNotes} onChange={(event) => setRequestNotes(event.target.value)} rows={3} placeholder="Anything the reviewer should watch for?" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none" />
-                            </div>
+                            {/* Notes removed for a tighter, video-first loop */}
                           </div>
                         ) : null}
                       </div>
@@ -1034,7 +1030,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           <div>
                             <p className="text-sm text-gray-800">{requestItem.goal}</p>
                             {requestItem.exercise_or_song ? <p className="text-xs text-gray-500 mt-1">Focus: {requestItem.exercise_or_song}</p> : null}
-                            {requestItem.notes ? <p className="text-xs text-gray-500 mt-2 whitespace-pre-wrap">{requestItem.notes}</p> : null}
+                            {/* Notes removed from display */}
                             {requestItem.feedback_category_counts && Object.keys(requestItem.feedback_category_counts).length > 0 ? (
                               <div className="flex flex-wrap gap-2 mt-3">
                                 {Object.entries(requestItem.feedback_category_counts).map(([category, count]) => (

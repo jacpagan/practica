@@ -471,7 +471,6 @@ function ReviewPage({ reviewToken = '' }) {
                 <div className="space-y-1 pt-2">
                   <p>{reviewRequest.instrument}</p>
                   {reviewRequest.exercise_or_song ? <p>Focus: {reviewRequest.exercise_or_song}</p> : null}
-                  {reviewRequest.notes ? <p className="whitespace-pre-wrap">{reviewRequest.notes}</p> : null}
                 </div>
               </details>
             ) : null}

@@ -59,6 +59,7 @@ function AppContent() {
   const [studentReviewRequestsLoading, setStudentReviewRequestsLoading] = useState(false)
   const [hasTeacherWorkspace, setHasTeacherWorkspace] = useState(false)
   const [teacherPendingCount, setTeacherPendingCount] = useState(0)
+  const teacherPollRef = useRef(null)
   const [detailReturnRoute, setDetailReturnRoute] = useState({ view: 'library', sessionId: null, seriesName: '' })
   const [openRecorderOnUpload, setOpenRecorderOnUpload] = useState(false)
   const [justUploadedSessionId, setJustUploadedSessionId] = useState(null)
@@ -213,6 +214,33 @@ function AppContent() {
       setTeacherPendingCount(0)
     }
   }, [fetchPaginated, token])
+
+  // Poll the teacher pending count periodically; pause when tab is hidden
+  useEffect(() => {
+    if (!token) return () => {}
+    const start = () => {
+      if (teacherPollRef.current) { try { clearInterval(teacherPollRef.current) } catch {} }
+      loadTeacherWorkspaceAvailability()
+      teacherPollRef.current = setInterval(() => {
+        if (typeof document !== 'undefined' && document.hidden) return
+        loadTeacherWorkspaceAvailability()
+      }, 45000)
+    }
+    const stop = () => {
+      if (teacherPollRef.current) { try { clearInterval(teacherPollRef.current) } catch {}; teacherPollRef.current = null }
+    }
+    const onVisibility = () => {
+      if (typeof document !== 'undefined' && document.hidden) stop()
+      else start()
+    }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibility)
+      onVisibility()
+      return () => { document.removeEventListener('visibilitychange', onVisibility); stop() }
+    }
+    start()
+    return () => stop()
+  }, [loadTeacherWorkspaceAvailability, token])
 
   const openSessionById = useCallback(async (sessionId, { updateUrl = true } = {}) => {
     if (!token) return
