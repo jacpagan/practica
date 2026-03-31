@@ -131,9 +131,13 @@ function SessionUpload({
       event.preventDefault()
       el.classList.remove('ring-2', 'ring-gray-300')
       if (isUploading) return
-      const file = event.dataTransfer?.files?.[0]
-      if (!file) return
-      if (!isLikelyVideoFile(file)) {
+      const files = Array.from(event.dataTransfer?.files || [])
+      if (files.length === 0) return
+      if (files.length > 1) {
+        try { toast('Only one video at a time') } catch {}
+      }
+      const file = files.find((f) => isLikelyVideoFile(f)) || files[0]
+      if (!file || !isLikelyVideoFile(file)) {
         toast.error('Please choose a video file like .mov, .mp4, or .webm')
         return
       }
@@ -157,8 +161,12 @@ function SessionUpload({
       event.target.value = ''
       return
     }
-    const file = event.target.files?.[0]
-    if (!file) return
+    const fileList = Array.from(event.target.files || [])
+    if (fileList.length === 0) return
+    if (fileList.length > 1) {
+      try { toast('Only one video at a time') } catch {}
+    }
+    const file = fileList[0]
     if (!isLikelyVideoFile(file)) {
       toast.error('Please choose a video file like .mov, .mp4, or .webm')
       event.target.value = ''
@@ -172,20 +180,7 @@ function SessionUpload({
     replaceOwnedPreviewUrl(URL.createObjectURL(file))
   }
 
-  // Accept a video file from clipboard or other sources
-  const acceptVideoFile = useCallback((file) => {
-    if (!file || !isLikelyVideoFile(file)) {
-      toast.error('Please choose a video file like .mov, .mp4, or .webm')
-      return
-    }
-    if (isUploading) return
-    setVideoFile(file)
-    if (!titleManuallyEdited) {
-      const hasThread = String(practiceSeries || '').trim().length > 0
-      setTitle(hasThread ? seriesBasedTitle(practiceSeries) : defaultPracticeTitle())
-    }
-    replaceOwnedPreviewUrl(URL.createObjectURL(file))
-  }, [defaultPracticeTitle, isUploading, practiceSeries, replaceOwnedPreviewUrl, seriesBasedTitle, titleManuallyEdited, toast])
+  
 
   const handleRecorded = (file) => {
     if (isUploading) return
@@ -198,6 +193,24 @@ function SessionUpload({
     if (!titleManuallyEdited) setTitle(seriesBasedTitle(practiceSeries))
     replaceOwnedPreviewUrl(URL.createObjectURL(file))
   }
+
+  // Accept a video via helper (used by paste handler)
+  const acceptVideoFile = useCallback((file, { source = '' } = {}) => {
+    if (!file || !isLikelyVideoFile(file)) {
+      toast.error('Please choose a video file like .mov, .mp4, or .webm')
+      return
+    }
+    if (isUploading) return
+    setVideoFile(file)
+    if (!titleManuallyEdited) {
+      const hasThread = String(practiceSeries || '').trim().length > 0
+      setTitle(hasThread ? seriesBasedTitle(practiceSeries) : defaultPracticeTitle())
+    }
+    replaceOwnedPreviewUrl(URL.createObjectURL(file))
+    if (source === 'paste') {
+      try { toast.success('Video added from clipboard') } catch {}
+    }
+  }, [defaultPracticeTitle, isUploading, practiceSeries, replaceOwnedPreviewUrl, seriesBasedTitle, titleManuallyEdited, toast])
 
   const clearSelectedVideo = () => {
     if (isUploading) return
@@ -282,7 +295,7 @@ function SessionUpload({
     openCamera()
   }
 
-  // Global keyboard/paste accessibility
+  // Global keyboard shortcut (R) and paste-to-upload
   useEffect(() => {
     const onKeyDown = (event) => {
       const tag = String(event.target?.tagName || '').toLowerCase()
@@ -294,26 +307,13 @@ function SessionUpload({
     const onPaste = (event) => {
       if (isUploading) return
       try {
-        const files = event.clipboardData?.files
-        if (files && files.length) {
-          const file = Array.from(files).find((f) => isLikelyVideoFile(f))
-          if (file) {
-            acceptVideoFile(file)
+        const files = Array.from(event.clipboardData?.files || [])
+        if (files.length) {
+          const file = files.find((f) => isLikelyVideoFile(f)) || files[0]
+          if (file && isLikelyVideoFile(file)) {
+            acceptVideoFile(file, { source: 'paste' })
             event.preventDefault()
             return
-          }
-        }
-        const items = event.clipboardData?.items
-        if (items && items.length) {
-          for (const item of items) {
-            if (item.kind === 'file') {
-              const file = item.getAsFile()
-              if (file && isLikelyVideoFile(file)) {
-                acceptVideoFile(file)
-                event.preventDefault()
-                return
-              }
-            }
           }
         }
       } catch {}
@@ -324,7 +324,9 @@ function SessionUpload({
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('paste', onPaste)
     }
-  }, [acceptVideoFile, isUploading])
+  }, [acceptVideoFile, isUploading, startRecording])
+
+  // (removed duplicate global keyboard/paste handler)
 
   return (
     <div className="px-4 sm:px-6 py-6">
@@ -346,7 +348,7 @@ function SessionUpload({
                 onPaste={(e) => {
                   try {
                     const file = e.clipboardData?.files?.[0]
-                    if (file && isLikelyVideoFile(file)) { acceptVideoFile(file); e.preventDefault() }
+                    if (file && isLikelyVideoFile(file)) { acceptVideoFile(file, { source: 'paste' }); e.preventDefault() }
                   } catch {}
                 }}
                 aria-label={videoFile ? 'Replace or remove selected video' : 'Drop a video or browse files'}
@@ -378,6 +380,7 @@ function SessionUpload({
                 <button type="button" onClick={startRecording} disabled={isUploading} className="flex-1 rounded-2xl bg-gray-900 text-white px-4 py-3 text-sm font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors">
                   Record
                 </button>
+                <p className="hidden sm:block text-[11px] text-gray-500 mt-2 text-center">Press R to record</p>
               </div>
             </div>
             <div className="mt-3 space-y-1">
