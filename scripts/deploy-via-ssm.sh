@@ -12,12 +12,16 @@ REMOTE_SCRIPT=$(cat <<'EOS'
 #!/usr/bin/env bash
 set -euo pipefail
 
+RUNTIME_DIR="/opt/practica-runtime"
+BACKUP_DIR="/opt/practica-backups"
+
 mkdir -p /opt/practica
+mkdir -p "$RUNTIME_DIR" "$BACKUP_DIR"
 cd /opt/practica
 export HOME=/root
 git config --global --add safe.directory /opt/practica
-rm -f /opt/practica/.deploy-success /opt/practica/.deploy-failed
-trap 'touch /opt/practica/.deploy-failed' ERR
+rm -f "$RUNTIME_DIR/.deploy-success" "$RUNTIME_DIR/.deploy-failed"
+trap 'touch "$RUNTIME_DIR/.deploy-failed"' ERR
 
 if ! command -v git >/dev/null 2>&1; then apt-get update && apt-get install -y git; fi
 if ! command -v docker >/dev/null 2>&1; then echo 'Docker not found. Please install Docker.' && exit 1; fi
@@ -134,13 +138,13 @@ PRE_SESSIONS=$(extract_metric sessions "$PRE_COUNTS")
 echo "Pre-deploy counts: ${PRE_COUNTS:-unavailable}"
 
 # Best-effort DB snapshot before recycling containers.
-mkdir -p /opt/practica/backups
+mkdir -p "$BACKUP_DIR"
 TS=$(date -u +%Y%m%dT%H%M%SZ)
-BACKUP_FILE="/opt/practica/backups/practica_prod_${TS}.sql.gz"
+BACKUP_FILE="$BACKUP_DIR/practica_prod_${TS}.sql.gz"
 if PGPASSWORD="${POSTGRES_PASSWORD:-}" compose -f docker-compose.prod.yml exec -T db \
   pg_dump -U "${POSTGRES_USER:-practica}" "${POSTGRES_DB:-practica_prod}" | gzip -1 > "$BACKUP_FILE"; then
   echo "Wrote DB snapshot: $BACKUP_FILE"
-  ls -1dt /opt/practica/backups/practica_prod_*.sql.gz 2>/dev/null | tail -n +11 | xargs -r rm -f
+  ls -1dt "$BACKUP_DIR"/practica_prod_*.sql.gz 2>/dev/null | tail -n +11 | xargs -r rm -f
   if command -v aws >/dev/null 2>&1 && [ -n "${AWS_STORAGE_BUCKET_NAME:-}" ]; then
     aws s3 cp "$BACKUP_FILE" "s3://${AWS_STORAGE_BUCKET_NAME}/db-backups/$(basename "$BACKUP_FILE")" >/dev/null 2>&1 || true
   fi
@@ -208,7 +212,7 @@ if [ "$backend_ok" != "1" ]; then
 fi
 
 cat > /etc/cron.d/practica-mediaconvert-sync <<'CRON'
-* * * * * root /usr/bin/flock -n /tmp/practica-mediaconvert-sync.lock /bin/bash -lc 'cd /opt/practica && docker compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py sync_mediaconvert_jobs' >> /opt/practica/mediaconvert-sync.log 2>&1
+* * * * * root /usr/bin/flock -n /tmp/practica-mediaconvert-sync.lock /bin/bash -lc 'cd /opt/practica && docker compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py sync_mediaconvert_jobs' >> /opt/practica-runtime/mediaconvert-sync.log 2>&1
 CRON
 chmod 644 /etc/cron.d/practica-mediaconvert-sync
 systemctl restart cron || service cron restart || true
@@ -247,7 +251,7 @@ if [ "$public_ok" != "1" ]; then
 fi
 
 DEPLOYED_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
-touch /opt/practica/.deploy-success
+touch "$RUNTIME_DIR/.deploy-success"
 echo "DEPLOY_SUMMARY ref=$REF sha=$DEPLOYED_SHA backend_health=pass public_health=pass"
 EOS
 )
@@ -260,7 +264,7 @@ REMOTE_SCRIPT="${REMOTE_SCRIPT//__MEDIA_CONVERT_ROLE_ARN_B64__/$MEDIA_CONVERT_RO
 REMOTE_SCRIPT="${REMOTE_SCRIPT//__MEDIA_CONVERT_ENDPOINT_URL_B64__/$MEDIA_CONVERT_ENDPOINT_URL_B64}"
 REMOTE_SCRIPT="${REMOTE_SCRIPT//__GIT_REF__/${GIT_REF:-main}}"
 REMOTE_B64=$(printf '%s' "$REMOTE_SCRIPT" | base64 | tr -d '\n')
-COMMAND="mkdir -p /opt/practica && rm -f /opt/practica/.deploy-success /opt/practica/.deploy-failed && : > /opt/practica/deploy.log && echo '$REMOTE_B64' | base64 -d > /tmp/practica-deploy.sh && chmod +x /tmp/practica-deploy.sh && nohup /bin/bash /tmp/practica-deploy.sh >> /opt/practica/deploy.log 2>&1 </dev/null & echo launched"
+COMMAND="mkdir -p /opt/practica /opt/practica-runtime /opt/practica-backups && rm -f /opt/practica-runtime/.deploy-success /opt/practica-runtime/.deploy-failed && : > /opt/practica-runtime/deploy.log && echo '$REMOTE_B64' | base64 -d > /tmp/practica-deploy.sh && chmod +x /tmp/practica-deploy.sh && nohup /bin/bash /tmp/practica-deploy.sh >> /opt/practica-runtime/deploy.log 2>&1 </dev/null & echo launched"
 COMMAND_ESCAPED=$(printf '%s' "$COMMAND" | sed 's/\\/\\\\/g; s/"/\\"/g')
 PARAMS_JSON="{\"commands\":[\"$COMMAND_ESCAPED\"]}"
 
@@ -405,10 +409,10 @@ PY
 done
 if [ "$PUBLIC_FINAL" != "1" ]; then
   echo "Public deploy verification timed out after ${PUBLIC_VERIFY_TIMEOUT_SECONDS}s" >&2
-  STATUS_CMD_ID=$(send_short_ssm "if [ -f /opt/practica/.deploy-success ]; then echo success; elif [ -f /opt/practica/.deploy-failed ]; then echo failed; else echo pending; fi" "Practica deploy status")
+  STATUS_CMD_ID=$(send_short_ssm "if [ -f /opt/practica-runtime/.deploy-success ]; then echo success; elif [ -f /opt/practica-runtime/.deploy-failed ]; then echo failed; else echo pending; fi" "Practica deploy status")
   DEPLOY_STATUS=$(wait_for_ssm_output "$STATUS_CMD_ID" | tr -d '\r' | tail -n 1)
   echo "Remote deploy status: ${DEPLOY_STATUS:-pending}"
-  LOG_CMD_ID=$(send_short_ssm "tail -n 200 /opt/practica/deploy.log 2>/dev/null || true" "Practica deploy log tail")
+  LOG_CMD_ID=$(send_short_ssm "tail -n 200 /opt/practica-runtime/deploy.log 2>/dev/null || true" "Practica deploy log tail")
   wait_for_ssm_output "$LOG_CMD_ID" || true
   exit 1
 fi

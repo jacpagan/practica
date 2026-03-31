@@ -1,0 +1,106 @@
+name: Prod Health Monitor
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/10 * * * *'
+
+concurrency:
+  group: production-health-monitor
+  cancel-in-progress: true
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check production health
+        id: check
+        continue-on-error: true
+        run: |
+          set +e
+          python3 - <<'PY' | tee /tmp/prod-health-monitor.out
+          import json
+          import sys
+          import urllib.error
+          import urllib.request
+
+          endpoints = {
+              'health': 'https://practica.jpagan.com/health/',
+              'ready': 'https://practica.jpagan.com/ready/',
+          }
+          results = {}
+
+          for name, url in endpoints.items():
+              request = urllib.request.Request(url, headers={'User-Agent': 'practica-prod-health-monitor'})
+              try:
+                  with urllib.request.urlopen(request, timeout=15) as response:
+                      payload = json.loads(response.read().decode('utf-8'))
+                      results[name] = {
+                          'http_status': response.status,
+                          'payload': payload,
+                      }
+              except urllib.error.HTTPError as exc:
+                  body = exc.read().decode('utf-8', errors='replace')
+                  print(f'health_summary={name} http_error={exc.code}', flush=True)
+                  print(f'{name}_body<<EOF')
+                  print(body)
+                  print('EOF')
+                  sys.exit(1)
+              except Exception as exc:
+                  print(f'health_summary={name} error={exc}', flush=True)
+                  sys.exit(1)
+
+          health_payload = results['health']['payload']
+          ready_payload = results['ready']['payload']
+          deployed_sha = str(health_payload.get('deployed_sha') or ready_payload.get('deployed_sha') or '').strip()
+
+          if results['health']['http_status'] != 200 or health_payload.get('status') != 'healthy':
+              print(f'health_summary=health status={health_payload.get("status")} http={results["health"]["http_status"]}')
+              sys.exit(1)
+          if results['ready']['http_status'] != 200 or ready_payload.get('status') != 'ready':
+              print(f'health_summary=ready status={ready_payload.get("status")} http={results["ready"]["http_status"]}')
+              sys.exit(1)
+
+          print('monitor_status=healthy')
+          print(f'deployed_sha={deployed_sha}')
+          print(f'health_status={health_payload.get("status")}')
+          print(f'ready_status={ready_payload.get("status")}')
+          print(f'health_summary=healthy deployed_sha={deployed_sha}')
+          PY
+          STATUS=${PIPESTATUS[0]}
+          set -e
+          cat /tmp/prod-health-monitor.out >> "$GITHUB_OUTPUT"
+          exit "$STATUS"
+
+      - name: Monitor summary
+        if: ${{ always() }}
+        run: |
+          {
+            echo "### Prod Health Monitor"
+            echo "- Status: \`${{ steps.check.outputs.monitor_status || 'failed' }}\`"
+            echo "- Deployed SHA: \`${{ steps.check.outputs.deployed_sha || 'unknown' }}\`"
+            echo "- Summary: \`${{ steps.check.outputs.health_summary || 'no summary' }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Notify Slack on health check failure
+        if: ${{ steps.check.outcome == 'failure' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SUMMARY: ${{ steps.check.outputs.health_summary }}
+          DEPLOYED_SHA: ${{ steps.check.outputs.deployed_sha }}
+        run: |
+          if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
+            echo "::warning::SLACK_WEBHOOK_URL not configured; skipping Slack health alert."
+            exit 0
+          fi
+          MSG=":rotating_light: Practica prod health monitor failed\nSummary: ${SUMMARY:-unknown}\nDeployed SHA: ${DEPLOYED_SHA:-unknown}\nRun: ${RUN_URL}"
+          ESCAPED_MSG=$(printf '%s' "$MSG" | sed 's/\\/\\\\/g; s/"/\\"/g; s/$/\\n/' | tr -d '\n')
+          PAYLOAD="{\"text\":\"${ESCAPED_MSG}\"}"
+          curl -fsS -X POST -H 'Content-type: application/json' --data "$PAYLOAD" "$SLACK_WEBHOOK_URL" || \
+            echo "::warning::Slack health alert failed."
+
+      - name: Fail workflow on unhealthy production
+        if: ${{ steps.check.outcome == 'failure' }}
+        run: exit 1
