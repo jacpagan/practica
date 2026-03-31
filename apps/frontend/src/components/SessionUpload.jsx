@@ -84,11 +84,18 @@ function SessionUpload({
     return `Video ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
   }
 
+  const pad2 = (n) => String(n).padStart(2, '0')
   const seriesBasedTitle = (seriesName = '') => {
     const normalizedSeries = String(seriesName || '').trim()
     if (!normalizedSeries) return defaultPracticeTitle()
     const now = new Date()
-    return `${normalizedSeries} ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+    const yyyy = now.getFullYear()
+    const mm = pad2(now.getMonth() + 1)
+    const dd = pad2(now.getDate())
+    const hh = pad2(now.getHours())
+    const mi = pad2(now.getMinutes())
+    const ss = pad2(now.getSeconds())
+    return `${normalizedSeries.toLowerCase()} - ${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
   }
 
   useEffect(() => {
@@ -151,7 +158,10 @@ function SessionUpload({
       return
     }
     setVideoFile(file)
-    if (!titleManuallyEdited) setTitle(file.name.replace(/\.[^.]+$/, '') || defaultPracticeTitle())
+    if (!titleManuallyEdited) {
+      const hasThread = String(practiceSeries || '').trim().length > 0
+      setTitle(hasThread ? seriesBasedTitle(practiceSeries) : (file.name.replace(/\.[^.]+$/, '') || defaultPracticeTitle()))
+    }
     replaceOwnedPreviewUrl(URL.createObjectURL(file))
   }
 
