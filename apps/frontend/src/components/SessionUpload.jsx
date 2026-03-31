@@ -272,6 +272,7 @@ function SessionUpload({
               <p className="text-xs text-gray-500">Supports `.mov`, `.mp4`, `.m4v`, `.webm`, `.avi`, `.mkv`, `.3gp`, and `.3gpp`.</p>
               <p className="text-xs text-gray-500">Built-in recording is limited to {Math.round(MAX_RECORDER_DURATION_SECONDS / 60)} minutes. File uploads are limited to {Math.round(MAX_VIDEO_UPLOAD_BYTES / (1024 * 1024 * 1024))}GB.</p>
               <p className="text-xs text-gray-500">Playback may take a moment to prepare.</p>
+              <p className="text-xs text-gray-500">Camera and mic access are used only while the recorder is open.</p>
             </div>
           </div>
         </div>
@@ -281,7 +282,7 @@ function SessionUpload({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-semibold text-gray-900">Recorder</h3>
-                <p className="text-xs text-gray-500 mt-1">Record, then save.</p>
+                <p className="text-xs text-gray-500 mt-1">Record, then save. Camera/mic are active only while this recorder is open.</p>
               </div>
               <button type="button" onClick={() => setShowRecorder(false)} disabled={isUploading} className="text-xs text-gray-500 hover:text-gray-900 disabled:opacity-50 transition-colors">
                 Close

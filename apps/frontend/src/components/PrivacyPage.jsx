@@ -16,7 +16,28 @@ function PrivacyPage({ onBack = null, signedIn = false }) {
           <p className="text-sm text-gray-600">Practica is designed for private video improvement inside trusted relationships. It is not a public network, public marketplace, or discovery surface.</p>
         </div>
 
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <p className="text-sm text-emerald-900"><span className="font-medium">No third‑party trackers.</span> We only store what you submit.</p>
+        </div>
+
         <div className="grid grid-cols-1 gap-4">
+          <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-2">
+            <p className="text-sm font-semibold text-gray-900">No practice tracking</p>
+            <ul className="text-sm text-gray-600 space-y-1">
+              <li>Practica does not track your practice or gameplay in the background.</li>
+              <li>No device telemetry or auto-logging of sessions.</li>
+              <li>Only what you record or upload—and the feedback you exchange—is stored.</li>
+            </ul>
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-2">
+            <p className="text-sm font-semibold text-gray-900">Device access</p>
+            <ul className="text-sm text-gray-600 space-y-1">
+              <li>Camera and microphone access is used only while the recorder is open.</li>
+              <li>You control when recording starts and stops.</li>
+              <li>Screen recordings are manual uploads—no background monitoring.</li>
+            </ul>
+          </div>
           <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-2">
             <p className="text-sm font-semibold text-gray-900">What stays private</p>
             <ul className="text-sm text-gray-600 space-y-1">

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { reportClientError } from './utils'
 import { AuthProvider, useAuth } from './auth'
 import { ToastProvider, useToast } from './components/Toast'
+import NotificationsBell from './components/NotificationsBell'
 import { ConfirmProvider, useConfirm } from './components/ConfirmDialog'
 import AuthForm from './components/AuthForm'
 import ReviewPage from './components/ReviewPage'
@@ -397,6 +398,14 @@ function AppContent() {
               Record
             </button>
             <div className="flex items-center gap-2 sm:border-l sm:border-gray-100 sm:pl-3">
+              <NotificationsBell
+                token={token}
+                onOpenReviewRequest={(requestItem) => {
+                  const requestLink = requestItem?.feedback_link || requestItem?.review_link
+                  if (!requestLink?.token) return
+                  navigate({ view: 'review', token: requestLink.token, sessionId: null })
+                }}
+              />
               <button onClick={() => navigate({ view: 'privacy', sessionId: null })} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
                 Privacy
               </button>

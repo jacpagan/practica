@@ -349,8 +349,8 @@ function LibraryView({
           <div className="space-y-4">
             <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 space-y-3">
               <div>
-                <p className="text-sm font-semibold text-gray-900">{isHomeMode ? 'Up next' : 'Archive overview'}</p>
-                <p className="text-xs text-gray-500 mt-1">{isHomeMode ? 'Submit, get feedback, retry.' : 'Everything you own, organized clearly.'}</p>
+                <p className="text-sm font-semibold text-gray-900">{isHomeMode ? 'Recent' : 'Archive overview'}</p>
+                <p className="text-xs text-gray-500 mt-1">{isHomeMode ? 'Your latest items.' : 'Everything you own, organized clearly.'}</p>
               </div>
 
               {isHomeMode && reviewRequestsLoading ? (

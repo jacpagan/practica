@@ -817,14 +817,14 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                   <div className="space-y-3 pt-4">
                   <div>
                     <p className="text-sm font-semibold text-gray-900">Feedback link</p>
-                    <p className="text-xs text-gray-500 mt-1">Anyone with this link can log in and leave feedback.</p>
+                    <p className="text-xs text-gray-500 mt-1">Who can see this: You and people who open the link and sign in. You can turn it off anytime.</p>
                   </div>
                   {activeReviewLink?.url ? (
                     <div className="space-y-3">
                       <div className="rounded-lg border border-gray-200 bg-white px-3 py-3">
                         <p className="text-xs text-gray-500">Share this link</p>
                         <p className="text-sm text-gray-900 break-all mt-1">{activeReviewLink.url}</p>
-                        <p className="text-xs text-gray-500 mt-2">Authenticated access only • expires {new Date(activeReviewLink.expires_at).toLocaleString()} • can be turned off any time</p>
+                        <p className="text-xs text-gray-500 mt-2">Who can see this: You and people who open this link and sign in. Expires {new Date(activeReviewLink.expires_at).toLocaleString()} • can be turned off any time.</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <button type="button" onClick={copyShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
@@ -894,7 +894,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       {selectedTeacherName ? (
                         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3">
                           <p className="text-xs font-medium uppercase tracking-wide text-emerald-800">Ready</p>
-                          <p className="text-sm text-emerald-900 mt-1">This review request will go to {selectedTeacherName}.</p>
+                          <p className="text-sm text-emerald-900 mt-1">This review request will go to {selectedTeacherName}. Who can see this: You and {selectedTeacherName}.</p>
                         </div>
                       ) : null}
 
@@ -1153,7 +1153,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               <div className="rounded-xl border border-gray-200 bg-white px-4 py-4 space-y-3">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">Feedback</p>
-                  <p className="text-xs text-gray-500 mt-1">Anyone who logs in with your feedback link can leave a video response.</p>
+                  <p className="text-xs text-gray-500 mt-1">Who can see this: You and people who open your link and sign in.</p>
                 </div>
 
                 {videoFeedback.length === 0 ? (

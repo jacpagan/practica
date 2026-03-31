@@ -166,8 +166,8 @@ function TeachingView({ token, onOpenReviewRequest }) {
         ) : nextRequest ? (
           <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 space-y-3">
             <div>
-              <p className="text-sm font-semibold text-gray-900">Up next</p>
-              <p className="text-xs text-gray-500 mt-1">Your next review.</p>
+              <p className="text-sm font-semibold text-gray-900">Recent</p>
+              <p className="text-xs text-gray-500 mt-1">Your latest review.</p>
             </div>
             <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3">
               <div className="flex items-start justify-between gap-4 flex-wrap">
