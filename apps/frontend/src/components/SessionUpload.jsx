@@ -172,6 +172,21 @@ function SessionUpload({
     replaceOwnedPreviewUrl(URL.createObjectURL(file))
   }
 
+  // Accept a video file from clipboard or other sources
+  const acceptVideoFile = useCallback((file) => {
+    if (!file || !isLikelyVideoFile(file)) {
+      toast.error('Please choose a video file like .mov, .mp4, or .webm')
+      return
+    }
+    if (isUploading) return
+    setVideoFile(file)
+    if (!titleManuallyEdited) {
+      const hasThread = String(practiceSeries || '').trim().length > 0
+      setTitle(hasThread ? seriesBasedTitle(practiceSeries) : defaultPracticeTitle())
+    }
+    replaceOwnedPreviewUrl(URL.createObjectURL(file))
+  }, [defaultPracticeTitle, isUploading, practiceSeries, replaceOwnedPreviewUrl, seriesBasedTitle, titleManuallyEdited, toast])
+
   const handleRecorded = (file) => {
     if (isUploading) return
     setShowRecorder(false)
@@ -267,6 +282,50 @@ function SessionUpload({
     openCamera()
   }
 
+  // Global keyboard/paste accessibility
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      const tag = String(event.target?.tagName || '').toLowerCase()
+      const isTyping = tag === 'input' || tag === 'textarea'
+      if (!isTyping && (event.key === 'r' || event.key === 'R')) {
+        if (!isUploading) startRecording()
+      }
+    }
+    const onPaste = (event) => {
+      if (isUploading) return
+      try {
+        const files = event.clipboardData?.files
+        if (files && files.length) {
+          const file = Array.from(files).find((f) => isLikelyVideoFile(f))
+          if (file) {
+            acceptVideoFile(file)
+            event.preventDefault()
+            return
+          }
+        }
+        const items = event.clipboardData?.items
+        if (items && items.length) {
+          for (const item of items) {
+            if (item.kind === 'file') {
+              const file = item.getAsFile()
+              if (file && isLikelyVideoFile(file)) {
+                acceptVideoFile(file)
+                event.preventDefault()
+                return
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('paste', onPaste)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('paste', onPaste)
+    }
+  }, [acceptVideoFile, isUploading])
+
   return (
     <div className="px-4 sm:px-6 py-6">
       <div className="max-w-lg mx-auto">
@@ -281,7 +340,17 @@ function SessionUpload({
               <div
                 ref={dropRef}
                 onClick={() => { if (!videoFile) openFiles() }}
-                className={`sm:col-span-2 rounded-2xl border ${videoFile ? 'border-gray-200 bg-white' : 'border-dashed border-gray-300 bg-white cursor-pointer hover:bg-gray-50'} p-6 transition-colors`}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (!videoFile && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openFiles() } }}
+                onPaste={(e) => {
+                  try {
+                    const file = e.clipboardData?.files?.[0]
+                    if (file && isLikelyVideoFile(file)) { acceptVideoFile(file); e.preventDefault() }
+                  } catch {}
+                }}
+                aria-label={videoFile ? 'Replace or remove selected video' : 'Drop a video or browse files'}
+                className={`sm:col-span-2 rounded-2xl border ${videoFile ? 'border-gray-200 bg-white' : 'border-dashed border-gray-300 bg-white cursor-pointer hover:bg-gray-50'} p-6 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300`}
               >
                 {videoFile ? (
                   <div className="rounded-xl bg-white px-1 text-left">
