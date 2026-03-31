@@ -531,6 +531,8 @@ def review_link_feedback(request, token):
             return Response({'ok': True})
 
         payload = request.data.copy()
+        # Enforce video-only feedback (no text field)
+        payload.pop('text', None)
         if str(payload.get('timestamp_seconds', '')).strip() == '':
             payload['timestamp_seconds'] = None
 
@@ -542,7 +544,6 @@ def review_link_feedback(request, token):
         )
         serializer.is_valid(raise_exception=True)
 
-        next_text = str(serializer.validated_data.get('text', feedback.text) or '').strip()
         next_timestamp = serializer.validated_data.get('timestamp_seconds', feedback.timestamp_seconds)
 
         if 'timestamp_seconds' in request.data and str(request.data.get('timestamp_seconds', '')).strip() == '':
@@ -561,7 +562,7 @@ def review_link_feedback(request, token):
         if not next_video:
             return Response({'error': 'Feedback video is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        feedback.text = next_text
+        # Text comments are not stored; keep category empty for now
         feedback.feedback_category = ''
         feedback.timestamp_seconds = next_timestamp
         if 'feedback_video' in request.FILES:
@@ -589,7 +590,7 @@ def review_link_feedback(request, token):
     serializer = ReviewVideoFeedbackSerializer(data=request.data, context={'request': request, 'session': link.session})
     serializer.is_valid(raise_exception=True)
     video_file = request.FILES.get('feedback_video')
-    text = str(serializer.validated_data.get('text', '') or '').strip()
+    # Video-only feedback: no text accepted/stored
     client_upload_id = _normalized_client_upload_id(request.data.get('client_upload_id'))
     if not video_file:
         return Response({'error': 'Feedback video is required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -619,7 +620,7 @@ def review_link_feedback(request, token):
         user=request.user,
         feedback_category='',
         timestamp_seconds=serializer.validated_data.get('timestamp_seconds'),
-        text=text,
+        text='',
         feedback_video=video_file,
         client_upload_id=client_upload_id,
         is_legacy_text_feedback=False,

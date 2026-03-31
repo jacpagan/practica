@@ -278,7 +278,7 @@ function ReviewPage({ reviewToken = '' }) {
 
   const cancelEditingFeedback = () => {
     setEditingFeedbackId(null)
-    setEditingText('')
+    // Video-only feedback: no text editing state
     setEditingTimestampSeconds('')
     setEditingVideoFile(null)
     editUploadIdRef.current = ''
@@ -304,7 +304,6 @@ function ReviewPage({ reviewToken = '' }) {
     try {
       const payload = new FormData()
       payload.append('feedback_id', String(feedbackId))
-      payload.append('text', editingText)
       payload.append('timestamp_seconds', editingTimestampSeconds)
       if (editingVideoFile) payload.append('feedback_video', editingVideoFile)
       if (editingVideoFile) {
@@ -388,7 +387,6 @@ function ReviewPage({ reviewToken = '' }) {
     try {
       const formData = new FormData()
       formData.append('feedback_video', responseFile)
-      if (responseNotes.trim()) formData.append('text', responseNotes.trim())
       if (typeof selectedTimestampSeconds === 'number') formData.append('timestamp_seconds', selectedTimestampSeconds)
       if (!submitUploadIdRef.current) submitUploadIdRef.current = createClientUploadId()
       formData.append('client_upload_id', submitUploadIdRef.current)
@@ -426,7 +424,6 @@ function ReviewPage({ reviewToken = '' }) {
       setUploadProgressLoaded(0)
       setUploadProgressTotal(0)
       replaceOwnedPreviewUrl('')
-      setResponseNotes('')
       setSelectedTimestampSeconds(null)
     } catch (submitError) {
       setError(submitError.message || 'Could not send feedback.')
@@ -628,13 +625,7 @@ function ReviewPage({ reviewToken = '' }) {
                     </div>
                   ) : null}
 
-                  <textarea
-                    value={responseNotes}
-                    onChange={(event) => setResponseNotes(event.target.value)}
-                    rows={3}
-                    placeholder="Optional caption"
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
-                  />
+                  {/* Video-only feedback: no caption/note field */}
                 </div>
               </details>
 
@@ -711,16 +702,10 @@ function ReviewPage({ reviewToken = '' }) {
                       <video src={videoUrl(item.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
                     </div>
                   ) : null}
-                  {item.text ? <p className="text-sm text-gray-700 whitespace-pre-wrap">{item.text}</p> : null}
+                  {/* Video-only feedback: no text display */}
                   {editingFeedbackId === item.id ? (
                     <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-3">
-                      <textarea
-                        value={editingText}
-                        onChange={(event) => setEditingText(event.target.value)}
-                        rows={3}
-                        placeholder="Optional caption"
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
-                      />
+                      {/* Video-only feedback: no text editing */}
                       <input
                         type="number"
                         min="0"

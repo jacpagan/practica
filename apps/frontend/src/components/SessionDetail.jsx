@@ -1071,7 +1071,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                   <div className="rounded-xl overflow-hidden bg-black">
                                     <video src={videoUrl(feedbackItem.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
                                   </div>
-                                  {feedbackItem.text ? <p className="text-sm text-gray-600 whitespace-pre-wrap">{feedbackItem.text}</p> : null}
+                                  {/* Video-only feedback: no text rendering */}
                                 </div>
                               ))}
                             </div>
@@ -1183,7 +1183,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                             <video src={videoUrl(item.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
                           </div>
                         ) : null}
-                        {item.text ? <p className="text-sm text-gray-600 whitespace-pre-wrap">{item.text}</p> : null}
+                        {/* Video-only feedback: no text rendering */}
                       </div>
                     ))}
                   </div>

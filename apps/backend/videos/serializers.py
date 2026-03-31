@@ -326,7 +326,6 @@ class ReviewLinkSerializer(serializers.ModelSerializer):
 class ReviewVideoFeedbackSerializer(serializers.ModelSerializer):
     author_display_name = serializers.SerializerMethodField()
     authored_by_current_user = serializers.SerializerMethodField()
-    text = serializers.CharField(required=False, allow_blank=True, default='')
     review_request_id = serializers.IntegerField(read_only=True)
     feedback_category = serializers.ChoiceField(choices=VideoFeedback.CATEGORY_CHOICES, required=False, allow_blank=True, default='')
     feedback_video = serializers.SerializerMethodField()
@@ -335,7 +334,7 @@ class ReviewVideoFeedbackSerializer(serializers.ModelSerializer):
         model = VideoFeedback
         fields = [
             'id', 'author_display_name', 'authored_by_current_user',
-            'feedback_category', 'timestamp_seconds', 'text', 'feedback_video', 'review_request_id', 'created_at',
+            'feedback_category', 'timestamp_seconds', 'feedback_video', 'review_request_id', 'created_at',
         ]
         read_only_fields = ['id', 'author_display_name', 'authored_by_current_user', 'created_at']
 
