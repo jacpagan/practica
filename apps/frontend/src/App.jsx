@@ -12,9 +12,11 @@ import SeriesView from './components/SeriesView'
 import RequestsView from './components/TeachingView'
 
 const parseRoute = (pathname) => {
-  if (pathname === '/' || pathname === '/library') {
+  if (pathname === '/') {
     return { view: 'library', sessionId: null }
   }
+  if (pathname === '/archive') return { view: 'archive', sessionId: null }
+  if (pathname === '/library') return { view: 'library', sessionId: null }
   if (pathname === '/upload') return { view: 'upload', sessionId: null }
   if (pathname === '/requests') return { view: 'requests', sessionId: null }
   const reviewMatch = pathname.match(/^\/r\/(.+)$/)
@@ -28,6 +30,7 @@ const parseRoute = (pathname) => {
 
 const routePath = ({ view, sessionId, token, seriesName }) => {
   if (view === 'library') return '/library'
+  if (view === 'archive') return '/archive'
   if (view === 'upload') return '/upload'
   if (view === 'requests') return '/requests'
   if (view === 'series' && seriesName) return `/series/${encodeURIComponent(seriesName)}`
@@ -305,8 +308,8 @@ function AppContent() {
 
   useEffect(() => {
     if (!user) return
-    if (view === 'library' || view === 'series') loadSessions()
-    if (view === 'library') loadStudentReviewRequests()
+    if (view === 'library' || view === 'archive' || view === 'series') loadSessions()
+    if (view === 'library' || view === 'archive') loadStudentReviewRequests()
     loadTeacherWorkspaceAvailability()
   }, [user, view, loadSessions, loadStudentReviewRequests, loadTeacherWorkspaceAvailability])
 
@@ -366,6 +369,12 @@ function AppContent() {
                   Home
                 </button>
                 <button
+                  onClick={() => navigate({ view: 'archive', sessionId: null })}
+                  className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'archive' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
+                >
+                  Archive
+                </button>
+                <button
                   onClick={() => navigate({ view: 'requests', sessionId: null })}
                   className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
                 >
@@ -399,6 +408,12 @@ function AppContent() {
                 Home
               </button>
               <button
+                onClick={() => navigate({ view: 'archive', sessionId: null })}
+                className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'archive' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+              >
+                Archive
+              </button>
+              <button
                 onClick={() => navigate({ view: 'requests', sessionId: null })}
                 className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
               >
@@ -423,8 +438,31 @@ function AppContent() {
             reviewRequests={studentReviewRequests}
             reviewRequestsLoading={studentReviewRequestsLoading}
             hasReviewerWorkspace={hasTeacherWorkspace}
+            mode="home"
             token={token}
             onOpenSession={openHomeWorkItem}
+            onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
+            onCreateVideo={startQuickRecord}
+            onOpenRequests={() => navigate({ view: 'requests', sessionId: null })}
+            onOpenReviewRequest={(requestItem) => {
+              const requestLink = requestItem?.feedback_link || requestItem?.review_link
+              if (!requestLink?.token) return
+              navigate({ view: 'review', token: requestLink.token, sessionId: null })
+            }}
+            onRecordFollowUp={(draft) => handleRecordAnother(draft)}
+          />
+        )}
+
+        {view === 'archive' && (
+          <LibraryView
+            sessions={sessions}
+            sessionsLoading={sessionsLoading}
+            reviewRequests={studentReviewRequests}
+            reviewRequestsLoading={studentReviewRequestsLoading}
+            hasReviewerWorkspace={hasTeacherWorkspace}
+            mode="archive"
+            token={token}
+            onOpenSession={openSession}
             onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
             onCreateVideo={startQuickRecord}
             onOpenRequests={() => navigate({ view: 'requests', sessionId: null })}

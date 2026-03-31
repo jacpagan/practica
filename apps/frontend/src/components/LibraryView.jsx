@@ -169,6 +169,7 @@ function LibraryView({
   onRecordFollowUp,
   onOpenRequests,
   hasReviewerWorkspace = false,
+  mode = 'home',
   token = '',
 }) {
   const toast = useToast()
@@ -225,6 +226,8 @@ function LibraryView({
   const activeRequestStatus = String(activeRequest?.status || '').trim().toLowerCase()
   const latestSeries = seriesGroups[0] || null
   const latestSessionNeedingRequest = ownSessions.find((session) => session.processing_status === 'ready') || ownSessions[0] || null
+  const isHomeMode = mode === 'home'
+  const isArchiveMode = mode === 'archive'
 
   const moveToThread = async (session) => {
     if (!token || !session?.id) return
@@ -346,13 +349,13 @@ function LibraryView({
           <div className="space-y-4">
             <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 space-y-3">
               <div>
-                <p className="text-sm font-semibold text-gray-900">Up next</p>
-                <p className="text-xs text-gray-500 mt-1">Submit, get feedback, retry.</p>
+                <p className="text-sm font-semibold text-gray-900">{isHomeMode ? 'Up next' : 'Archive overview'}</p>
+                <p className="text-xs text-gray-500 mt-1">{isHomeMode ? 'Submit, get feedback, retry.' : 'Everything you own, organized clearly.'}</p>
               </div>
 
-              {reviewRequestsLoading ? (
+              {isHomeMode && reviewRequestsLoading ? (
                 <div className="rounded-xl bg-gray-50 px-4 py-4 text-sm text-gray-500">Loading…</div>
-              ) : activeRequest && ['requested', 'opened'].includes(activeRequestStatus) ? (
+              ) : isHomeMode && activeRequest && ['requested', 'opened'].includes(activeRequestStatus) ? (
                 <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 space-y-3">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
@@ -377,7 +380,7 @@ function LibraryView({
                     ) : null}
                   </div>
                 </div>
-              ) : activeRequest && ['responded', 'viewed', 'resubmitted'].includes(activeRequestStatus) ? (
+              ) : isHomeMode && activeRequest && ['responded', 'viewed', 'resubmitted'].includes(activeRequestStatus) ? (
                 <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 space-y-3">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
@@ -412,7 +415,7 @@ function LibraryView({
                     </button>
                   </div>
                 </div>
-              ) : latestSessionNeedingRequest ? (
+              ) : isHomeMode && latestSessionNeedingRequest ? (
                 <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 space-y-3">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
@@ -430,7 +433,7 @@ function LibraryView({
                     </button>
                   </div>
                 </div>
-              ) : latestSeries ? (
+              ) : isHomeMode && latestSeries ? (
                 <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 space-y-3">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
@@ -448,14 +451,29 @@ function LibraryView({
                     </button>
                   </div>
                 </div>
-              ) : null}
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="rounded-xl bg-gray-50 px-4 py-3">
+                    <p className="text-[11px] uppercase tracking-wide text-gray-500">Owned videos</p>
+                    <p className="text-lg font-semibold text-gray-900 mt-1">{ownSessions.length}</p>
+                  </div>
+                  <div className="rounded-xl bg-gray-50 px-4 py-3">
+                    <p className="text-[11px] uppercase tracking-wide text-gray-500">Threads</p>
+                    <p className="text-lg font-semibold text-gray-900 mt-1">{seriesGroups.length}</p>
+                  </div>
+                  <div className="rounded-xl bg-gray-50 px-4 py-3">
+                    <p className="text-[11px] uppercase tracking-wide text-gray-500">Standalone</p>
+                    <p className="text-lg font-semibold text-gray-900 mt-1">{standaloneSessions.length}</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 space-y-4">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">Browse archive</p>
-                  <p className="text-xs text-gray-500 mt-1">All your owned videos.</p>
+                  <p className="text-sm font-semibold text-gray-900">{isArchiveMode ? 'Archive' : 'Browse archive'}</p>
+                  <p className="text-xs text-gray-500 mt-1">{isArchiveMode ? 'Every owned video, thread, and standalone take.' : 'All your owned videos.'}</p>
                 </div>
                 <div className="flex flex-wrap gap-2 rounded-full border border-gray-200 p-1">
                   <button type="button" onClick={() => setArchiveView('all')} className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${archiveView === 'all' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
@@ -547,6 +565,7 @@ function LibraryView({
               ) : null}
             </div>
 
+            {isHomeMode ? (
             <details className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
               <summary className="cursor-pointer list-none flex items-center justify-between gap-3">
                 <div>
@@ -559,6 +578,7 @@ function LibraryView({
                 <InviteCodesPanel token={token} />
               </div>
             </details>
+            ) : null}
           </div>
         )}
       </div>
