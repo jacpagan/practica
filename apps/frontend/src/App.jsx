@@ -58,6 +58,7 @@ function AppContent() {
   const [studentReviewRequests, setStudentReviewRequests] = useState([])
   const [studentReviewRequestsLoading, setStudentReviewRequestsLoading] = useState(false)
   const [hasTeacherWorkspace, setHasTeacherWorkspace] = useState(false)
+  const [teacherPendingCount, setTeacherPendingCount] = useState(0)
   const [detailReturnRoute, setDetailReturnRoute] = useState({ view: 'library', sessionId: null, seriesName: '' })
   const [openRecorderOnUpload, setOpenRecorderOnUpload] = useState(false)
   const [justUploadedSessionId, setJustUploadedSessionId] = useState(null)
@@ -205,8 +206,11 @@ function AppContent() {
     try {
       const requests = await fetchPaginated('/api/review-requests/?role=reviewer')
       setHasTeacherWorkspace(requests.length > 0)
+      const pending = requests.filter((r) => ['requested', 'opened'].includes(String(r?.status || '').trim().toLowerCase())).length
+      setTeacherPendingCount(pending)
     } catch {
       setHasTeacherWorkspace(false)
+      setTeacherPendingCount(0)
     }
   }, [fetchPaginated, token])
 
@@ -385,7 +389,7 @@ function AppContent() {
                   onClick={() => navigate({ view: 'requests', sessionId: null })}
                   className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
                 >
-                  Requests
+                  Requests{teacherPendingCount > 0 ? ` (${teacherPendingCount})` : ''}
                 </button>
               </nav>
             ) : null}
@@ -400,6 +404,7 @@ function AppContent() {
             <div className="flex items-center gap-2 sm:border-l sm:border-gray-100 sm:pl-3">
               <NotificationsBell
                 token={token}
+                onOpenPrivacy={() => navigate({ view: 'privacy', sessionId: null })}
                 onOpenReviewRequest={(requestItem) => {
                   const requestLink = requestItem?.feedback_link || requestItem?.review_link
                   if (!requestLink?.token) return
@@ -435,7 +440,7 @@ function AppContent() {
                 onClick={() => navigate({ view: 'requests', sessionId: null })}
                 className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
               >
-                Requests
+                Requests{teacherPendingCount > 0 ? ` (${teacherPendingCount})` : ''}
               </button>
             </nav>
           ) : null}

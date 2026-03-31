@@ -16,7 +16,7 @@ function BellIcon({ className = '' }) {
   )
 }
 
-export default function NotificationsBell({ token, onOpenReviewRequest }) {
+export default function NotificationsBell({ token, onOpenReviewRequest, onOpenPrivacy }) {
   const toast = useToast()
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState([])
@@ -156,7 +156,16 @@ export default function NotificationsBell({ token, onOpenReviewRequest }) {
       {open && (
         <div className="absolute right-0 mt-2 w-80 rounded-xl border border-gray-200 bg-white shadow-lg z-20">
           <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
-            <p className="text-xs font-semibold text-gray-900">Feedback</p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-semibold text-gray-900">Feedback</p>
+              <button
+                type="button"
+                onClick={() => { onOpenPrivacy?.(); setOpen(false) }}
+                className="text-[11px] text-gray-600 border border-gray-200 rounded-md px-2 py-1 hover:bg-gray-50"
+              >
+                Notifications settings
+              </button>
+            </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
