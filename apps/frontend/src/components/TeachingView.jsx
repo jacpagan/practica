@@ -309,7 +309,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
                   <p className="text-sm font-semibold text-gray-900">{item.member?.display_name || item.student?.display_name || item.member?.username || item.student?.username}</p>
                   <p className="text-xs text-gray-500">Pending reviews: {item.pending_review_count}</p>
                   <p className="text-xs text-gray-500">Total requests: {item.total_review_count}</p>
-                  <p className="text-xs text-gray-500">Last request: {item.last_request_at ? new Date(item.last_request_at).toLocaleString() : '—'}</p>
+                  <p className="text-xs text-gray-500">Last request: {item.last_request_at ? new Date(item.last_request_at).toLocaleString(undefined, { hour12: undefined }) : '—'}</p>
                 </div>
               ))}
             </div>
@@ -361,7 +361,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-sm font-semibold text-gray-900">{template.title}</p>
-                        <p className="text-xs text-gray-400 mt-1">Updated {new Date(template.updated_at).toLocaleString()}</p>
+                        <p className="text-xs text-gray-400 mt-1">Updated {new Date(template.updated_at).toLocaleString(undefined, { hour12: undefined })}</p>
                       </div>
                       <button
                         type="button"

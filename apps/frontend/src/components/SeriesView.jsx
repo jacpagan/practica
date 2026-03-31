@@ -66,7 +66,7 @@ function SeriesView({ seriesName = '', sessions = [], reviewRequests = [], onBac
             <div>
               <p className="text-xs uppercase tracking-wide text-gray-500">Practice thread</p>
               <h2 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">{seriesName}</h2>
-              <p className="text-sm text-gray-500 mt-2">{seriesSessions.length} takes{latestSession ? ` • latest ${new Date(latestSession.recorded_at || latestSession.created_at).toLocaleString()}` : ''}</p>
+              <p className="text-sm text-gray-500 mt-2">{seriesSessions.length} takes{latestSession ? ` • latest ${new Date(latestSession.recorded_at || latestSession.created_at).toLocaleString(undefined, { hour12: undefined })}` : ''}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {latestSession ? (
@@ -101,7 +101,7 @@ function SeriesView({ seriesName = '', sessions = [], reviewRequests = [], onBac
                 <div>
                   <p className="text-xs uppercase tracking-wide text-gray-500">Latest take</p>
                   <h3 className="text-lg font-semibold text-gray-900 mt-1">{latestSession?.title}</h3>
-                  <p className="text-sm text-gray-500 mt-1">{latestSession ? new Date(latestSession.recorded_at || latestSession.created_at).toLocaleString() : ''}</p>
+                  <p className="text-sm text-gray-500 mt-1">{latestSession ? new Date(latestSession.recorded_at || latestSession.created_at).toLocaleString(undefined, { hour12: undefined }) : ''}</p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">Take {latestSession?.takeNumber}</span>
@@ -214,7 +214,7 @@ function SeriesView({ seriesName = '', sessions = [], reviewRequests = [], onBac
                               {session.activeRequest ? <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${requestStatusTone[requestStatus] || 'bg-gray-100 text-gray-700'}`}>{requestStatusLabel(session.activeRequest.status)}</span> : null}
                             </div>
                             <p className="text-sm font-medium text-gray-900 mt-3 line-clamp-1">{session.title}</p>
-                            <p className="text-xs text-gray-500 mt-1">{new Date(session.recorded_at || session.created_at).toLocaleString()}</p>
+                            <p className="text-xs text-gray-500 mt-1">{new Date(session.recorded_at || session.created_at).toLocaleString(undefined, { hour12: undefined })}</p>
                             {session.description ? <p className="text-xs text-gray-500 mt-2 line-clamp-2">{session.description}</p> : null}
                           </div>
                         </div>

@@ -459,7 +459,7 @@ function ReviewPage({ reviewToken = '' }) {
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Leave video feedback</h1>
           <p className="text-xs text-gray-500 mt-2">Signed in as {user.display_name || user.username}.</p>
-          {link?.expires_at ? <p className="text-xs text-gray-500 mt-1">Private link • authenticated access only • expires {new Date(link.expires_at).toLocaleString()}</p> : null}
+          {link?.expires_at ? <p className="text-xs text-gray-500 mt-1">Private link • authenticated access only • expires {new Date(link.expires_at).toLocaleString(undefined, { hour12: undefined })}</p> : null}
         </div>
 
         {/* Thread title is enough; omit extra request metadata here */}
@@ -669,7 +669,7 @@ function ReviewPage({ reviewToken = '' }) {
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="text-sm font-medium text-gray-900">{item.author_display_name || 'Member'}</p>
                           </div>
-                          <p className="text-xs text-gray-400 mt-1">{new Date(item.created_at).toLocaleString()}</p>
+                          <p className="text-xs text-gray-400 mt-1">{new Date(item.created_at).toLocaleString(undefined, { hour12: undefined })}</p>
                         </div>
                     {typeof item.timestamp_seconds === 'number' ? <span className="text-xs text-gray-500">@{fmtTimer(item.timestamp_seconds)}</span> : null}
                   </div>

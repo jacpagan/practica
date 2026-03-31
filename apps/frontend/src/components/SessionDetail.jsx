@@ -727,7 +727,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 <details className="text-xs text-gray-500">
                   <summary className="cursor-pointer list-none hover:text-gray-900 transition-colors">Video details</summary>
                   <div className="flex flex-wrap gap-2 pt-2">
-                    {session.recorded_at ? <span className="rounded-full bg-gray-100 px-3 py-1">{new Date(session.recorded_at).toLocaleString()}</span> : null}
+                    {session.recorded_at ? <span className="rounded-full bg-gray-100 px-3 py-1">{new Date(session.recorded_at).toLocaleString(undefined, { hour12: undefined })}</span> : null}
                     {session.duration_seconds ? <span className="rounded-full bg-gray-100 px-3 py-1">{fmtTimer(session.duration_seconds)}</span> : null}
                   </div>
                 </details>
@@ -815,7 +815,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       <div className="rounded-lg border border-gray-200 bg-white px-3 py-3">
                         <p className="text-xs text-gray-500">Share this link</p>
                         <p className="text-sm text-gray-900 break-all mt-1">{activeReviewLink.url}</p>
-                        <p className="text-xs text-gray-500 mt-2">Who can see this: You and people who open this link and sign in. Expires {new Date(activeReviewLink.expires_at).toLocaleString()} • can be turned off any time.</p>
+                        <p className="text-xs text-gray-500 mt-2">Who can see this: You and people who open this link and sign in. Expires {new Date(activeReviewLink.expires_at).toLocaleString(undefined, { hour12: undefined })} • can be turned off any time.</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <button type="button" onClick={copyShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
@@ -983,7 +983,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                               <p className="text-xs text-gray-500 mt-1">{requestItem.instrument}</p>
                             </div>
                             <div className="text-right">
-                              <p className="text-xs text-gray-500">Requested {new Date(requestItem.created_at).toLocaleString()}</p>
+                              <p className="text-xs text-gray-500">Requested {new Date(requestItem.created_at).toLocaleString(undefined, { hour12: undefined })}</p>
                               <p className="text-xs text-gray-400 mt-1">Responses: {requestItem.response_count || 0}</p>
                             </div>
                           </div>
@@ -1016,7 +1016,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                           </span>
                                         ) : null}
                                       </div>
-                                      <p className="text-xs text-gray-400 mt-1">{new Date(feedbackItem.created_at).toLocaleString()}</p>
+                                      <p className="text-xs text-gray-400 mt-1">{new Date(feedbackItem.created_at).toLocaleString(undefined, { hour12: undefined })}</p>
                                     </div>
                                     {typeof feedbackItem.timestamp_seconds === 'number' ? (
                                       <button type="button" onClick={() => jumpToTimestamp(feedbackItem.timestamp_seconds)} className="text-xs text-blue-700 hover:text-blue-900 transition-colors">
@@ -1126,7 +1126,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="text-sm font-medium text-gray-900">{item.display_name || item.username || 'Viewer'}</p>
                             </div>
-                            <p className="text-xs text-gray-400 mt-1">{new Date(item.created_at).toLocaleString()}</p>
+                              <p className="text-xs text-gray-400 mt-1">{new Date(item.created_at).toLocaleString(undefined, { hour12: undefined })}</p>
                           </div>
                           {typeof item.timestamp_seconds === 'number' ? (
                             <button type="button" onClick={() => jumpToTimestamp(item.timestamp_seconds)} className="text-xs text-blue-700 hover:text-blue-900 transition-colors">
