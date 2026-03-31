@@ -113,7 +113,8 @@ export const fmtDate = (d) => {
   if (days === 0) return 'Today'
   if (days === 1) return 'Yesterday'
   if (days < 7) return `${days}d ago`
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  // Use viewer's locale (undefined) for month/day
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
 export const feedbackCategoryOptions = () => ([

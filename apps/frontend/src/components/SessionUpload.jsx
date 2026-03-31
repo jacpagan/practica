@@ -102,7 +102,7 @@ function SessionUpload({
     const hh = pad2(now.getHours())
     const mi = pad2(now.getMinutes())
     const ss = pad2(now.getSeconds())
-    return `${normalizedSeries.toLowerCase()} - ${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
+    return `${normalizedSeries} - ${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
   }
 
   useEffect(() => {
