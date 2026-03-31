@@ -717,7 +717,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               {justUploaded ? (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
                   <p className="text-sm font-medium text-emerald-900">Saved to your private library.</p>
-                  <p className="text-xs text-emerald-800 mt-1">Next step below.</p>
                 </div>
               ) : null}
 
@@ -759,16 +758,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
 
               {canEdit ? (
                 <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 space-y-3">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">Next step</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {waitingOnTeacher
-                        ? 'Waiting on feedback.'
-                        : readyForFollowUp
-                          ? 'Feedback is back. Record the next take.'
-                          : 'Send this take for feedback.'}
-                    </p>
-                  </div>
                   <div className="flex flex-wrap gap-2">
                     {waitingOnTeacher && currentLoopRequest ? (
                       <>
@@ -789,7 +778,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                     ) : null}
                     {!waitingOnTeacher && !readyForFollowUp ? (
                       <button type="button" onClick={openRequestComposer} disabled={!canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                        {selectedTeacherName ? `Request from ${selectedTeacherName}` : 'Request feedback'}
+                        {selectedTeacherName ? `Send to ${selectedTeacherName}` : 'Request feedback'}
                       </button>
                     ) : null}
                   </div>
