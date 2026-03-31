@@ -110,6 +110,49 @@ class V1VideoFeaturesTests(APITestCase):
         self.assertEqual(detail.status_code, status.HTTP_200_OK)
         self.assertTrue(any(item['id'] == legacy.id for item in detail.data['video_feedback']))
 
+    def test_feedback_author_can_update_own_session_feedback(self):
+        session = self._create_session(user=self.owner)
+        feedback = VideoFeedback.objects.create(
+            session=session,
+            user=self.owner,
+            text='Original note',
+            timestamp_seconds=12,
+            feedback_video=self._video_file('original.mp4'),
+            is_legacy_text_feedback=False,
+        )
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.patch(
+            f'/api/sessions/{session.id}/video-feedback/{feedback.id}/',
+            {
+                'timestamp_seconds': 30,
+                'feedback_video': self._video_file('updated.mp4'),
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        feedback.refresh_from_db()
+        self.assertEqual(feedback.timestamp_seconds, 30)
+        self.assertTrue(bool(feedback.feedback_video))
+        self.assertNotEqual(feedback.feedback_video.name, 'original.mp4')
+
+    def test_feedback_author_can_delete_own_session_feedback(self):
+        session = self._create_session(user=self.owner)
+        feedback = VideoFeedback.objects.create(
+            session=session,
+            user=self.owner,
+            text='',
+            feedback_video=self._video_file('original.mp4'),
+            is_legacy_text_feedback=False,
+        )
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.delete(f'/api/sessions/{session.id}/video-feedback/{feedback.id}/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(VideoFeedback.objects.filter(pk=feedback.id).exists())
+
     @override_settings(
         AWS_STORAGE_BUCKET_NAME='',
         AWS_MEDIA_CONVERT_ROLE_ARN='',

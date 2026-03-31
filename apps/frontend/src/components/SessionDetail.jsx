@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { feedbackCategoryLabel, feedbackCategoryTone, fmtTimer, sessionVideoSources, videoUrl } from '../utils'
+import { feedbackCategoryLabel, feedbackCategoryTone, fmtTimer, isLikelyVideoFile, sessionVideoSources, uploadMultipartRequest, videoFileAccept, videoUrl } from '../utils'
 import { useConfirm } from './ConfirmDialog'
 import { useToast } from './Toast'
 import PracticeThreadField from './PracticeThreadField'
@@ -89,6 +89,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const confirm = useConfirm()
   const videoRef = useRef(null)
   const loopDetailsRef = useRef(null)
+  const editFeedbackInputRef = useRef(null)
+  const editFeedbackUploadIdRef = useRef('')
   const [session, setSession] = useState(initialSession)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -119,6 +121,13 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const [requestGoal, setRequestGoal] = useState('')
   const [requestExerciseOrSong, setRequestExerciseOrSong] = useState('')
   const [requestNotes, setRequestNotes] = useState('')
+  const [editingFeedbackId, setEditingFeedbackId] = useState(null)
+  const [editingFeedbackTimestampSeconds, setEditingFeedbackTimestampSeconds] = useState('')
+  const [editingFeedbackVideoFile, setEditingFeedbackVideoFile] = useState(null)
+  const [editingFeedbackPreviewUrl, setEditingFeedbackPreviewUrl] = useState('')
+  const [savingFeedbackId, setSavingFeedbackId] = useState(null)
+  const [deletingFeedbackId, setDeletingFeedbackId] = useState(null)
+  const [editFeedbackUploadProgressPercent, setEditFeedbackUploadProgressPercent] = useState(null)
 
   const authHeaders = useMemo(() => (token ? { Authorization: `Token ${token}` } : {}), [token])
   const canEdit = Boolean(session?.can_edit)
@@ -171,7 +180,17 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     setRequestGoal('')
     setRequestExerciseOrSong('')
     setRequestNotes('')
+    setEditingFeedbackId(null)
+    setEditingFeedbackTimestampSeconds('')
+    setEditingFeedbackVideoFile(null)
+    setEditingFeedbackPreviewUrl('')
   }, [initialSession?.id])
+
+  useEffect(() => () => {
+    if (editingFeedbackPreviewUrl && editingFeedbackPreviewUrl.startsWith('blob:')) {
+      try { window.URL.revokeObjectURL(editingFeedbackPreviewUrl) } catch {}
+    }
+  }, [editingFeedbackPreviewUrl])
 
   useEffect(() => {
     if (!justUploaded) return
@@ -618,6 +637,104 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     setPlaybackFailed(true)
   }
 
+  const createClientUploadId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+
+  const replaceEditingFeedbackPreviewUrl = (nextUrl) => {
+    setEditingFeedbackPreviewUrl((current) => {
+      if (current && current.startsWith('blob:')) {
+        try { window.URL.revokeObjectURL(current) } catch {}
+      }
+      return nextUrl || ''
+    })
+  }
+
+  const startEditingFeedback = (item) => {
+    setEditingFeedbackId(item.id)
+    setEditingFeedbackTimestampSeconds(typeof item.timestamp_seconds === 'number' ? String(item.timestamp_seconds) : '')
+    setEditingFeedbackVideoFile(null)
+    editFeedbackUploadIdRef.current = ''
+    setEditFeedbackUploadProgressPercent(null)
+    replaceEditingFeedbackPreviewUrl('')
+  }
+
+  const cancelEditingFeedback = () => {
+    setEditingFeedbackId(null)
+    setEditingFeedbackTimestampSeconds('')
+    setEditingFeedbackVideoFile(null)
+    editFeedbackUploadIdRef.current = ''
+    setEditFeedbackUploadProgressPercent(null)
+    replaceEditingFeedbackPreviewUrl('')
+  }
+
+  const pickEditFeedbackFile = (event) => {
+    const file = event.target.files?.[0]
+    if (!file || !isLikelyVideoFile(file)) return
+    setEditingFeedbackVideoFile(file)
+    editFeedbackUploadIdRef.current = ''
+    setEditFeedbackUploadProgressPercent(null)
+    replaceEditingFeedbackPreviewUrl(URL.createObjectURL(file))
+    if (event.target) event.target.value = ''
+  }
+
+  const saveFeedbackEdit = async (feedbackId) => {
+    if (!token || !session?.id) return
+    setSavingFeedbackId(feedbackId)
+    try {
+      const payload = new FormData()
+      payload.append('timestamp_seconds', editingFeedbackTimestampSeconds)
+      if (editingFeedbackVideoFile) {
+        payload.append('feedback_video', editingFeedbackVideoFile)
+        if (!editFeedbackUploadIdRef.current) editFeedbackUploadIdRef.current = createClientUploadId()
+        payload.append('client_upload_id', editFeedbackUploadIdRef.current)
+      }
+
+      const res = await uploadMultipartRequest({
+        url: `/api/sessions/${session.id}/video-feedback/${feedbackId}/`,
+        method: 'PATCH',
+        formData: payload,
+        token,
+        onProgress: (percent) => setEditFeedbackUploadProgressPercent(percent ?? null),
+      })
+      if (!res.ok) throw new Error(res.data?.error || 'Could not update feedback video')
+      await refreshSession({ silent: true })
+      cancelEditingFeedback()
+      toast.success('Feedback video updated')
+    } catch (error) {
+      toast.error(error.message || 'Could not update feedback video')
+    } finally {
+      setSavingFeedbackId(null)
+      setEditFeedbackUploadProgressPercent(null)
+    }
+  }
+
+  const deleteFeedback = async (feedbackId) => {
+    if (!token || !session?.id) return
+    const accepted = await confirm({
+      title: 'Delete feedback video?',
+      message: 'This removes your feedback video from the thread.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Keep',
+      tone: 'danger',
+    })
+    if (!accepted) return
+    setDeletingFeedbackId(feedbackId)
+    try {
+      const res = await fetch(`/api/sessions/${session.id}/video-feedback/${feedbackId}/`, {
+        method: 'DELETE',
+        headers: authHeaders,
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Could not delete feedback video')
+      await refreshSession({ silent: true })
+      if (editingFeedbackId === feedbackId) cancelEditingFeedback()
+      toast.success('Feedback video deleted')
+    } catch (error) {
+      toast.error(error.message || 'Could not delete feedback video')
+    } finally {
+      setDeletingFeedbackId(null)
+    }
+  }
+
   const openRequestComposer = () => {
     if (!canCreateShareLink) return
     setShowLoopDetails(true)
@@ -1013,9 +1130,69 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                       </button>
                                     ) : null}
                                   </div>
+                                  {feedbackItem.authored_by_current_user ? (
+                                    <div className="flex items-center justify-end gap-2">
+                                      <button type="button" onClick={() => startEditingFeedback(feedbackItem)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-white transition-colors">
+                                        Edit
+                                      </button>
+                                      <button type="button" onClick={() => deleteFeedback(feedbackItem.id)} disabled={deletingFeedbackId === feedbackItem.id} className="text-xs text-red-600 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50 disabled:opacity-50 transition-colors">
+                                        {deletingFeedbackId === feedbackItem.id ? 'Deleting…' : 'Delete'}
+                                      </button>
+                                    </div>
+                                  ) : null}
                                   <div className="rounded-xl overflow-hidden bg-black">
                                     <video src={videoUrl(feedbackItem.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
                                   </div>
+                                  {editingFeedbackId === feedbackItem.id ? (
+                                    <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-3">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        value={editingFeedbackTimestampSeconds}
+                                        onChange={(event) => setEditingFeedbackTimestampSeconds(event.target.value)}
+                                        placeholder="Timestamp seconds"
+                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                                      />
+                                      <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                                        <div className="flex items-center justify-between gap-3">
+                                          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Video</p>
+                                          <button type="button" onClick={() => editFeedbackInputRef.current?.click()} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-white transition-colors">
+                                            {feedbackItem.feedback_video || editingFeedbackVideoFile ? 'Replace video' : 'Add video'}
+                                          </button>
+                                        </div>
+                                        <input ref={editFeedbackInputRef} type="file" accept={videoFileAccept()} className="hidden" onChange={pickEditFeedbackFile} />
+                                        {editingFeedbackPreviewUrl ? (
+                                          <div className="rounded-xl overflow-hidden bg-black">
+                                            <video src={editingFeedbackPreviewUrl} controls playsInline className="w-full aspect-video bg-black" />
+                                          </div>
+                                        ) : feedbackItem.feedback_video ? (
+                                          <div className="rounded-xl overflow-hidden bg-black">
+                                            <video src={videoUrl(feedbackItem.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
+                                          </div>
+                                        ) : null}
+                                        {savingFeedbackId === feedbackItem.id && editingFeedbackVideoFile ? (
+                                          <div className="space-y-2">
+                                            <div className="flex items-center justify-between gap-3 text-xs text-gray-600">
+                                              <span>Uploading replacement video…</span>
+                                              <span>{editFeedbackUploadProgressPercent !== null ? `${editFeedbackUploadProgressPercent}%` : 'Working…'}</span>
+                                            </div>
+                                            <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
+                                              <div className="h-full bg-gray-900 transition-all" style={{ width: `${Math.max(5, editFeedbackUploadProgressPercent || 0)}%` }} />
+                                            </div>
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                      <div className="flex justify-end gap-2">
+                                        <button type="button" onClick={cancelEditingFeedback} className="text-sm text-gray-600 border border-gray-200 rounded-lg px-4 py-2 hover:bg-gray-50 transition-colors">
+                                          Cancel
+                                        </button>
+                                        <button type="button" onClick={() => saveFeedbackEdit(feedbackItem.id)} disabled={savingFeedbackId === feedbackItem.id} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2 hover:bg-gray-800 disabled:opacity-50 transition-colors">
+                                          {savingFeedbackId === feedbackItem.id ? 'Saving…' : 'Save'}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : null}
                                   {/* Video-only feedback: no text rendering */}
                                 </div>
                               ))}
@@ -1123,9 +1300,69 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                             </button>
                           ) : null}
                         </div>
+                        {!item.review_request_id && item.authored_by_current_user ? (
+                          <div className="flex items-center justify-end gap-2">
+                            <button type="button" onClick={() => startEditingFeedback(item)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-white transition-colors">
+                              Edit
+                            </button>
+                            <button type="button" onClick={() => deleteFeedback(item.id)} disabled={deletingFeedbackId === item.id} className="text-xs text-red-600 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50 disabled:opacity-50 transition-colors">
+                              {deletingFeedbackId === item.id ? 'Deleting…' : 'Delete'}
+                            </button>
+                          </div>
+                        ) : null}
                         {item.feedback_video ? (
                           <div className="rounded-xl overflow-hidden bg-black">
                             <video src={videoUrl(item.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
+                          </div>
+                        ) : null}
+                        {!item.review_request_id && editingFeedbackId === item.id ? (
+                          <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-3">
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={editingFeedbackTimestampSeconds}
+                              onChange={(event) => setEditingFeedbackTimestampSeconds(event.target.value)}
+                              placeholder="Timestamp seconds"
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                            />
+                            <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Video</p>
+                                <button type="button" onClick={() => editFeedbackInputRef.current?.click()} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-white transition-colors">
+                                  {item.feedback_video || editingFeedbackVideoFile ? 'Replace video' : 'Add video'}
+                                </button>
+                              </div>
+                              <input ref={editFeedbackInputRef} type="file" accept={videoFileAccept()} className="hidden" onChange={pickEditFeedbackFile} />
+                              {editingFeedbackPreviewUrl ? (
+                                <div className="rounded-xl overflow-hidden bg-black">
+                                  <video src={editingFeedbackPreviewUrl} controls playsInline className="w-full aspect-video bg-black" />
+                                </div>
+                              ) : item.feedback_video ? (
+                                <div className="rounded-xl overflow-hidden bg-black">
+                                  <video src={videoUrl(item.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
+                                </div>
+                              ) : null}
+                              {savingFeedbackId === item.id && editingFeedbackVideoFile ? (
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between gap-3 text-xs text-gray-600">
+                                    <span>Uploading replacement video…</span>
+                                    <span>{editFeedbackUploadProgressPercent !== null ? `${editFeedbackUploadProgressPercent}%` : 'Working…'}</span>
+                                  </div>
+                                  <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
+                                    <div className="h-full bg-gray-900 transition-all" style={{ width: `${Math.max(5, editFeedbackUploadProgressPercent || 0)}%` }} />
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                            <div className="flex justify-end gap-2">
+                              <button type="button" onClick={cancelEditingFeedback} className="text-sm text-gray-600 border border-gray-200 rounded-lg px-4 py-2 hover:bg-gray-50 transition-colors">
+                                Cancel
+                              </button>
+                              <button type="button" onClick={() => saveFeedbackEdit(item.id)} disabled={savingFeedbackId === item.id} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2 hover:bg-gray-800 disabled:opacity-50 transition-colors">
+                                {savingFeedbackId === item.id ? 'Saving…' : 'Save'}
+                              </button>
+                            </div>
                           </div>
                         ) : null}
                         {/* Video-only feedback: no text rendering */}

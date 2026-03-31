@@ -163,19 +163,25 @@ class SessionAssetSerializer(serializers.ModelSerializer):
 class VideoFeedbackSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     display_name = serializers.SerializerMethodField()
+    authored_by_current_user = serializers.SerializerMethodField()
     review_request_id = serializers.IntegerField(read_only=True)
     feedback_video = serializers.SerializerMethodField()
 
     class Meta:
         model = VideoFeedback
         fields = ['id', 'session', 'user', 'username', 'display_name',
-                  'feedback_category', 'timestamp_seconds', 'text', 'feedback_video', 'review_request_id', 'created_at']
+                  'authored_by_current_user', 'feedback_category', 'timestamp_seconds', 'text', 'feedback_video', 'review_request_id', 'created_at']
         read_only_fields = ['id', 'user', 'username', 'display_name', 'created_at']
 
     def get_display_name(self, obj):
         if hasattr(obj.user, 'profile') and obj.user.profile.display_name:
             return obj.user.profile.display_name
         return obj.user.username
+
+    def get_authored_by_current_user(self, obj):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
+        return bool(user and user.is_authenticated and obj.user_id == user.id)
 
     def get_feedback_video(self, obj):
         return feedback_video_playback_url(obj)

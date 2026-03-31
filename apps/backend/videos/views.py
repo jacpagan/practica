@@ -1409,17 +1409,60 @@ class SessionViewSet(viewsets.ModelViewSet):
         )
         return Response({'status': 'ok'})
 
-    @action(detail=True, methods=['delete'], url_path='video-feedback/(?P<feedback_id>[0-9]+)')
-    def remove_video_feedback(self, request, pk=None, feedback_id=None):
+    @action(detail=True, methods=['patch', 'delete'], url_path='video-feedback/(?P<feedback_id>[0-9]+)')
+    def manage_video_feedback(self, request, pk=None, feedback_id=None):
         session = self.get_object()
         if not _can_view_session(request.user, session):
             return Response({'error': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
         feedback = get_object_or_404(VideoFeedback, pk=feedback_id, session=session)
         if request.user != feedback.user and not request.user.is_staff:
             return Response({'error': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
+        if request.method == 'PATCH':
+            payload = request.data.copy()
+            if str(payload.get('timestamp_seconds', '')).strip() == '':
+                payload['timestamp_seconds'] = None
+
+            serializer = ReviewVideoFeedbackSerializer(
+                feedback,
+                data=payload,
+                partial=True,
+                context={'request': request, 'session': session},
+            )
+            serializer.is_valid(raise_exception=True)
+
+            next_timestamp = serializer.validated_data.get('timestamp_seconds', feedback.timestamp_seconds)
+            if 'timestamp_seconds' in request.data and str(request.data.get('timestamp_seconds', '')).strip() == '':
+                next_timestamp = None
+
+            next_video = feedback.feedback_video
+            if 'feedback_video' in request.FILES:
+                uploaded_video = request.FILES.get('feedback_video')
+                if uploaded_video and not is_allowed_video_upload(uploaded_video.content_type, uploaded_video.name):
+                    return Response({'error': 'Only video files allowed'}, status=status.HTTP_400_BAD_REQUEST)
+                try:
+                    next_video = prepare_feedback_video_upload(uploaded_video)
+                except ValueError as exc:
+                    return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+            if not next_video and not feedback.is_legacy_text_feedback:
+                return Response({'error': 'Feedback video is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            if 'text' in request.data:
+                feedback.text = str(request.data.get('text', '') or '').strip()
+            feedback.feedback_category = serializer.validated_data.get('feedback_category', feedback.feedback_category)
+            feedback.timestamp_seconds = next_timestamp
+            if 'feedback_video' in request.FILES:
+                if feedback.feedback_video:
+                    feedback.feedback_video.delete(save=False)
+                feedback.feedback_video = next_video
+            feedback.is_legacy_text_feedback = False if feedback.feedback_video else feedback.is_legacy_text_feedback
+            feedback.save()
+            session.refresh_from_db()
+            return Response(SessionSerializer(session, context={'request': request}).data)
+
         feedback.delete()
         session.refresh_from_db()
-        return Response(SessionSerializer(session).data)
+        return Response(SessionSerializer(session, context={'request': request}).data)
 # ── Health check ────────────────────────────────────────────────────
 
 def health_check(request):
