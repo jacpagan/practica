@@ -441,6 +441,7 @@ function AppContent() {
           <SeriesView
             seriesName={routeSeriesName}
             sessions={sessions}
+            reviewRequests={studentReviewRequests}
             onBack={() => navigate({ view: 'library', sessionId: null })}
             onOpenSession={openSession}
             onCreateVideo={() => {
