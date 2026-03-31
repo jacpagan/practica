@@ -34,7 +34,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Validate release strategy guardrails
         run: bash scripts/check-release-strategy.sh
@@ -50,7 +50,7 @@ jobs:
           echo "ref=$REF" >> $GITHUB_OUTPUT
 
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
@@ -64,7 +64,7 @@ jobs:
 
       - name: Login to Amazon ECR
         id: login_ecr
-        uses: aws-actions/amazon-ecr-login@v2
+        uses: aws-actions/amazon-ecr-login@4282e2b4f4018fbb1d76a177de8ce052de19b55e # v2.1.1
 
       - name: Resolve ECR deploy auth
         id: ecr_deploy_auth
