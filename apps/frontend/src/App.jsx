@@ -12,6 +12,7 @@ import LibraryView from './components/LibraryView'
 import SeriesView from './components/SeriesView'
 import RequestsView from './components/TeachingView'
 import PrivacyPage from './components/PrivacyPage'
+import CalendarView from './components/CalendarView'
 
 const parseRoute = (pathname) => {
   if (pathname === '/') {
@@ -19,6 +20,7 @@ const parseRoute = (pathname) => {
   }
   if (pathname === '/privacy') return { view: 'privacy', sessionId: null }
   if (pathname === '/archive') return { view: 'archive', sessionId: null }
+  if (pathname === '/calendar') return { view: 'calendar', sessionId: null }
   if (pathname === '/library') return { view: 'library', sessionId: null }
   if (pathname === '/upload') return { view: 'upload', sessionId: null }
   if (pathname === '/requests') return { view: 'requests', sessionId: null }
@@ -35,6 +37,7 @@ const routePath = ({ view, sessionId, token, seriesName }) => {
   if (view === 'library') return '/library'
   if (view === 'privacy') return '/privacy'
   if (view === 'archive') return '/archive'
+  if (view === 'calendar') return '/calendar'
   if (view === 'upload') return '/upload'
   if (view === 'requests') return '/requests'
   if (view === 'series' && seriesName) return `/series/${encodeURIComponent(seriesName)}`
@@ -417,6 +420,12 @@ function AppContent() {
                   Archive
                 </button>
                 <button
+                  onClick={() => navigate({ view: 'calendar', sessionId: null })}
+                  className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'calendar' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
+                >
+                  Calendar
+                </button>
+                <button
                   onClick={() => navigate({ view: 'requests', sessionId: null })}
                   className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
                 >
@@ -454,7 +463,7 @@ function AppContent() {
         </div>
         <div className="max-w-4xl mx-auto mt-3 space-y-2 sm:hidden">
           {hasTeacherWorkspace ? (
-            <nav className="grid grid-cols-2 gap-2">
+            <nav className="grid grid-cols-3 gap-2">
               <button
                 onClick={() => navigate({ view: 'library', sessionId: null })}
                 className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'library' || view === 'detail' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
@@ -466,6 +475,12 @@ function AppContent() {
                 className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'archive' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
               >
                 Archive
+              </button>
+              <button
+                onClick={() => navigate({ view: 'calendar', sessionId: null })}
+                className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'calendar' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+              >
+                Calendar
               </button>
               <button
                 onClick={() => navigate({ view: 'requests', sessionId: null })}
@@ -526,6 +541,14 @@ function AppContent() {
               navigate({ view: 'review', token: requestLink.token, sessionId: null })
             }}
             onRecordFollowUp={(draft) => handleRecordAnother(draft)}
+          />
+        )}
+
+        {view === 'calendar' && (
+          <CalendarView
+            sessions={sessions}
+            sessionsLoading={sessionsLoading}
+            onOpenSession={(session) => navigate({ view: 'detail', sessionId: session.id })}
           />
         )}
 
