@@ -422,6 +422,11 @@ function AppContent() {
     if (autoQuickRecordCheckedRef.current) return
     if (!user || view !== 'library') return
     if (sessionsLoading || studentReviewRequestsLoading) return
+    // If calendar deep-linked with a date, do not auto-redirect to record
+    try {
+      const params = new URLSearchParams(window.location.search)
+      if ((params.get('date') || '').trim()) return
+    } catch {}
 
     autoQuickRecordCheckedRef.current = true
     if (!hasActiveStudentLoop && ownReadySessionCount === 0) {
