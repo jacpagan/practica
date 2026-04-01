@@ -1,15 +1,18 @@
 import React from 'react'
 import VideoThumbnail from './VideoThumbnail'
 import StatusChip from './StatusChip'
+import usePrefetchSession from '../hooks/usePrefetchSession'
 
-export default function SessionListItem({ session, onOpen, status = '', showSeries = false, highlight = false, onRecordFollowUp = null }) {
+export default function SessionListItem({ session, onOpen, status = '', showSeries = false, highlight = false, onRecordFollowUp = null, prefetch = true }) {
   if (!session) return null
   const recordedAt = new Date(session.recorded_at || session.created_at)
   const replies = Number(session.video_feedback_count || 0)
+  const prefetchSession = usePrefetchSession()
   return (
     <button
       type="button"
       onClick={onOpen}
+      onMouseEnter={() => { if (prefetch) prefetchSession(session.id) }}
       className={`w-full text-left rounded-2xl border border-gray-200 px-4 py-4 hover:bg-gray-50 transition-colors ${highlight ? 'ring-1 ring-gray-300' : ''}`}
     >
       <div className="flex items-start justify-between gap-4">

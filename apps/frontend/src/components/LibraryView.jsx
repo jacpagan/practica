@@ -168,6 +168,7 @@ function LibraryView({
   onOpenReviewRequest,
   onRecordFollowUp,
   onOpenRequests,
+  onOpenCalendar,
   hasReviewerWorkspace = false,
   mode = 'home',
   token = '',
@@ -364,6 +365,20 @@ function LibraryView({
                 <p className="text-sm font-semibold text-gray-900">{isHomeMode ? 'Recent' : 'Archive overview'}</p>
                 <p className="text-xs text-gray-500 mt-1">{isHomeMode ? 'Your latest items.' : 'Everything you own, organized clearly.'}</p>
               </div>
+              {(dateFilter || withFeedbackOnly) ? (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {dateFilter ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">Date: {dateFilter}</span>
+                      <button type="button" onClick={() => setDateFilter('')} className="text-[11px] px-2 py-1 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50">Clear date</button>
+                      <button type="button" onClick={() => { try { window.localStorage.setItem(DATE_FILTER_KEY, dateFilter) } catch {} ; onOpenCalendar?.() }} className="text-[11px] px-2 py-1 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50">Back to calendar</button>
+                    </div>
+                  ) : null}
+                  {withFeedbackOnly ? (
+                    <button type="button" onClick={() => setWithFeedbackOnly(false)} className="text-[11px] px-2 py-1 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50">With feedback</button>
+                  ) : null}
+                </div>
+              ) : null}
 
               {isHomeMode && reviewRequestsLoading ? (
                 <div className="rounded-xl bg-gray-50 px-4 py-4 text-sm text-gray-500">Loading…</div>

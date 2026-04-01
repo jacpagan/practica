@@ -568,6 +568,7 @@ function AppContent() {
             onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
             onCreateVideo={startQuickRecord}
             onOpenRequests={() => navigate({ view: 'requests', sessionId: null })}
+            onOpenCalendar={() => navigate({ view: 'calendar', sessionId: null })}
             onOpenReviewRequest={(requestItem) => {
               const requestLink = requestItem?.feedback_link || requestItem?.review_link
               if (!requestLink?.token) return
@@ -590,6 +591,7 @@ function AppContent() {
             onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
             onCreateVideo={startQuickRecord}
             onOpenRequests={() => navigate({ view: 'requests', sessionId: null })}
+            onOpenCalendar={() => navigate({ view: 'calendar', sessionId: null })}
             onOpenReviewRequest={(requestItem) => {
               const requestLink = requestItem?.feedback_link || requestItem?.review_link
               if (!requestLink?.token) return
