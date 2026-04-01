@@ -200,6 +200,7 @@ function LibraryView({
   }, [])
   const [archiveView, setArchiveView] = useState('all')
   const [expandedSeriesNames, setExpandedSeriesNames] = useState({})
+  const [withFeedbackOnly, setWithFeedbackOnly] = useState(false)
 
   const byDateKey = (d) => {
     const x = new Date(d)
