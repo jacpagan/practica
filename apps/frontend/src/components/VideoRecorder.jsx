@@ -20,7 +20,7 @@ const readSyncOffsetMs = () => {
   return 0
 }
 
-function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop = true, minAutoUseSeconds = 2 }) {
+function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop = true, minAutoUseSeconds = 2, autoOpenOnMount = false }) {
   const [state, setState] = useState(STATES.IDLE)
   const [mode, setMode] = useState('camera') // 'camera' | 'screen_cam'
   const [elapsed, setElapsed] = useState(0)
@@ -136,6 +136,16 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   }, [cancelCountIn, closeAudioContext, stopMetronome, stopTimer, stopStream])
 
   useEffect(() => cleanup, [cleanup])
+
+  // Auto-open camera on mount if requested
+  useEffect(() => {
+    if (!autoOpenOnMount) return
+    if (state === STATES.IDLE) {
+      // Best effort; ignore errors here and let the UI show any message
+      openCamera()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     try {

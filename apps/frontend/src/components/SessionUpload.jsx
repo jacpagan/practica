@@ -433,6 +433,7 @@ function SessionUpload({
               maxDuration={MAX_RECORDER_DURATION_SECONDS}
               autoUseOnStop={true}
               minAutoUseSeconds={2}
+              autoOpenOnMount={true}
             />
           </div>
         ) : null}
