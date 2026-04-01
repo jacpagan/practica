@@ -263,6 +263,9 @@ function LibraryView({
   const latestSessionNeedingRequest = ownSessions.find((session) => session.processing_status === 'ready') || ownSessions[0] || null
   const isHomeMode = mode === 'home'
   const isArchiveMode = mode === 'archive'
+  const [editingThreadSession, setEditingThreadSession] = useState(null)
+  const [savingThread, setSavingThread] = useState(false)
+  const threadOptions = useMemo(() => Array.from(new Set(sessions.map(s => String(s.practice_series || '').trim()).filter(Boolean))).sort(), [sessions])
 
   const moveToThread = async (session) => {
     if (!token || !session?.id) return
@@ -296,6 +299,7 @@ function LibraryView({
   const renderSessionRows = (items, returnRoute = { view: 'library', sessionId: null, seriesName: '' }) => items.map((session) => {
     const ar = activeRequestBySessionId.get(Number(session.id)) || null
     const onFollowUp = ar ? () => onRecordFollowUp?.({ parent_request_id: ar.id, practiceSeries: session.practice_series || '' }) : null
+    const openThreadPicker = () => setEditingThreadSession(session)
     return (
       <SessionListItem
         key={session.id}
@@ -303,11 +307,34 @@ function LibraryView({
         status={ar?.status}
         showSeries={Boolean(String(session.practice_series || '').trim())}
         onOpen={() => onOpenSession?.(session, returnRoute)}
-        onChangeThread={() => moveToThread(session)}
+        onChangeThread={openThreadPicker}
         onRecordFollowUp={onFollowUp}
       />
     )
   })
+
+  const saveThreadForEditing = async (nextValue = '') => {
+    const s = editingThreadSession
+    if (!token || !s?.id) { setEditingThreadSession(null); return }
+    const value = String(nextValue || '').trim()
+    setSavingThread(true)
+    try {
+      const res = await fetch(`/api/sessions/${s.id}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Token ${token}` },
+        body: JSON.stringify({ practice_series: value }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Could not update thread')
+      toast.success(value ? 'Moved to thread' : 'Removed from thread')
+      try { window.dispatchEvent(new CustomEvent('practica:session-updated', { detail: { id: s.id } })) } catch {}
+    } catch (e) {
+      toast.error(e?.message || 'Could not update thread')
+    } finally {
+      setSavingThread(false)
+      setEditingThreadSession(null)
+    }
+  }
 
   return (
     <div className="px-4 sm:px-6 py-6">
@@ -619,6 +646,15 @@ function LibraryView({
             ) : null}
           </div>
         )}
+        <ThreadPickerModal
+          open={Boolean(editingThreadSession)}
+          title={`${editingThreadSession?.practice_series ? 'Change' : 'Add to'} thread`}
+          initialValue={editingThreadSession?.practice_series || ''}
+          options={threadOptions}
+          saving={savingThread}
+          onSave={saveThreadForEditing}
+          onClose={() => setEditingThreadSession(null)}
+        />
       </div>
     </div>
   )

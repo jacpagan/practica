@@ -219,6 +219,23 @@ function AppContent() {
     }
   }, [fetchPaginated, token])
 
+  // Listen for lightweight session updates from children (e.g., thread changes)
+  useEffect(() => {
+    const handler = async (e) => {
+      const id = Number(e?.detail?.id || 0)
+      if (!id || !token) return
+      try {
+        const res = await fetch(`/api/sessions/${id}/`, { headers: { Authorization: `Token ${token}` } })
+        if (!res.ok) return
+        const data = await res.json()
+        setSessions((current) => current.map((item) => (item.id === id ? { ...item, ...data } : item)))
+        setSelectedSession((prev) => (prev && prev.id === id ? { ...prev, ...data } : prev))
+      } catch {}
+    }
+    window.addEventListener('practica:session-updated', handler)
+    return () => window.removeEventListener('practica:session-updated', handler)
+  }, [token])
+
   const loadTeacherWorkspaceAvailability = useCallback(async () => {
     if (!token) return
     try {

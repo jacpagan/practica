@@ -3,6 +3,7 @@ import VideoThumbnail from './VideoThumbnail'
 import SessionListItem from './SessionListItem'
 import ThreadPickerModal from './ThreadPickerModal'
 import { useAuth } from '../auth'
+import { useToast } from './Toast'
 
 const monthLabel = (date) => date.toLocaleString(undefined, { month: 'long', year: 'numeric' })
 
@@ -32,6 +33,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
   const [saving, setSaving] = useState(false)
   const threadOptions = useMemo(() => Array.from(new Set(sessions.map(s => String(s.practice_series || '').trim()).filter(Boolean))).sort(), [sessions])
   const { token } = useAuth()
+  const toast = useToast()
   const SORT_KEY = 'practica.sort.newestFirst.v1'
   const readSort = () => {
     try { return (window.localStorage.getItem(SORT_KEY) || 'true') === 'true' } catch { return true }
@@ -251,8 +253,11 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
                 headers: { 'Content-Type': 'application/json', Authorization: `Token ${token}` },
                 body: JSON.stringify({ practice_series: val }),
               })
-              await res.json().catch(() => ({}))
-            } catch {}
+              const data = await res.json().catch(() => ({}))
+              if (!res.ok) throw new Error(data?.error || 'Could not update')
+              try { window.dispatchEvent(new CustomEvent('practica:session-updated', { detail: { id: editing.id } })) } catch {}
+              toast.success(val ? 'Moved to thread' : 'Removed from thread')
+            } catch (e) { toast.error(e?.message || 'Could not update thread') }
             setSaving(false)
             setEditing(null)
           }}

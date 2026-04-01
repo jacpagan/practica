@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { useToast } from './Toast'
 import { fmtDate } from '../utils'
 import VideoThumbnail from './VideoThumbnail'
 import SessionListItem from './SessionListItem'
@@ -23,6 +24,7 @@ const requestStatusLabel = (value = '') => {
 function SeriesView({ seriesName = '', sessions = [], reviewRequests = [], onBack, onOpenSession, onCreateVideo }) {
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
+  const toast = useToast()
   const threadOptions = useMemo(() => Array.from(new Set(sessions.map(s => String(s.practice_series || '').trim()).filter(Boolean))).sort(), [sessions])
   const seriesSessions = useMemo(() => {
     const filtered = sessions
@@ -211,8 +213,11 @@ function SeriesView({ seriesName = '', sessions = [], reviewRequests = [], onBac
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ practice_series: val }),
                     })
-                    await res.json().catch(() => ({}))
-                  } catch {}
+                    const data = await res.json().catch(() => ({}))
+                    if (!res.ok) throw new Error(data?.error || 'Could not update')
+                    try { window.dispatchEvent(new CustomEvent('practica:session-updated', { detail: { id: editing.id } })) } catch {}
+                    toast.success(val ? 'Moved to thread' : 'Removed from thread')
+                  } catch (e) { toast.error(e?.message || 'Could not update thread') }
                   setSaving(false)
                   setEditing(null)
                 }}
