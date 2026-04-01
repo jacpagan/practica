@@ -7,6 +7,8 @@ import { ConfirmProvider, useConfirm } from './components/ConfirmDialog'
 import AuthForm from './components/AuthForm'
 import ReviewPage from './components/ReviewPage'
 import SessionUpload from './components/SessionUpload'
+import { isLikelyVideoFile, videoFileAccept } from './utils'
+import HeaderCreateButtons from './components/HeaderCreateButtons'
 import SessionDetail from './components/SessionDetail'
 import LibraryView from './components/LibraryView'
 import SeriesView from './components/SeriesView'
@@ -322,6 +324,21 @@ function AppContent() {
     [sessions],
   )
 
+  // Header Upload button (desktop + mobile)
+  const uploadInputRef = React.useRef(null)
+  const [prefillUploadFile, setPrefillUploadFile] = React.useState(null)
+  React.useEffect(() => {
+    const handler = (e) => {
+      const file = e.detail?.file
+      if (!file || !isLikelyVideoFile(file)) return
+      setPrefillUploadFile(file)
+      setOpenRecorderOnUpload(false)
+      navigate({ view: 'upload', sessionId: null })
+    }
+    window.addEventListener('practica:header-upload', handler)
+    return () => window.removeEventListener('practica:header-upload', handler)
+  }, [navigate])
+
   const [showRecordMenu, setShowRecordMenu] = React.useState(false)
   React.useEffect(() => {
     if (!showRecordMenu) return
@@ -351,15 +368,6 @@ function AppContent() {
     setPendingFollowUpRequestDraft(null)
     setPendingPracticeSeries('')
     setOpenRecorderOnUpload(true)
-    navigate({ view: 'upload', sessionId: null })
-  }, [navigate])
-
-  const startQuickUpload = useCallback(() => {
-    setSelectedSession(null)
-    setJustUploadedSessionId(null)
-    setPendingFollowUpRequestDraft(null)
-    setPendingPracticeSeries('')
-    setOpenRecorderOnUpload(false)
     navigate({ view: 'upload', sessionId: null })
   }, [navigate])
 
@@ -461,32 +469,7 @@ function AppContent() {
             ) : null}
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="relative hidden sm:block">
-              <button
-                onClick={() => setShowRecordMenu((v) => !v)}
-                className="rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
-              >
-                Record
-              </button>
-              {showRecordMenu ? (
-                <div className="absolute right-0 mt-2 w-40 rounded-xl border border-gray-200 bg-white shadow-lg py-1 z-20">
-                  <button
-                    type="button"
-                    onClick={() => { setShowRecordMenu(false); startQuickRecord() }}
-                    className="block w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-gray-50"
-                  >
-                    Record new
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowRecordMenu(false); startQuickUpload() }}
-                    className="block w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-gray-50"
-                  >
-                    Upload video
-                  </button>
-                </div>
-              ) : null}
-            </div>
+            <HeaderCreateButtons onRecord={startQuickRecord} />
             <div className="flex items-center gap-2 sm:border-l sm:border-gray-100 sm:pl-3">
               <NotificationsBell
                 token={token}
@@ -530,12 +513,24 @@ function AppContent() {
               </button>
             </nav>
           ) : null}
-          <button
-            onClick={startQuickRecord}
-            className="w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
-          >
-            Record
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={startQuickRecord}
+              className="w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
+            >
+              Record
+            </button>
+            <button
+              onClick={() => uploadInputRef.current?.click()}
+              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors"
+            >
+              Upload
+            </button>
+            <input ref={uploadInputRef} type="file" accept={videoFileAccept()} className="hidden" onChange={(e) => {
+              const f = e.target?.files?.[0]; e.target.value = '';
+              if (!f || !isLikelyVideoFile(f)) return; setPrefillUploadFile(f); setOpenRecorderOnUpload(false); navigate({ view: 'upload', sessionId: null })
+            }} />
+          </div>
         </div>
       </header>
 
@@ -654,6 +649,8 @@ function AppContent() {
             onPracticeSeriesHandled={() => setPendingPracticeSeries('')}
             onRecorderOpenHandled={() => setOpenRecorderOnUpload(false)}
             onUploadGuardChange={setUploadNavigationGuard}
+            prefillFile={prefillUploadFile}
+            onPrefillUsed={() => setPrefillUploadFile(null)}
           />
         )}
 

@@ -17,6 +17,8 @@ function SessionUpload({
   onPracticeSeriesHandled,
   onRecorderOpenHandled,
   onUploadGuardChange,
+  prefillFile = null,
+  onPrefillUsed,
 }) {
   const toast = useToast()
   const confirm = useConfirm()
@@ -62,6 +64,20 @@ function SessionUpload({
     setShowVideoDetails(true)
     onPracticeSeriesHandled?.()
   }, [initialPracticeSeries, onPracticeSeriesHandled])
+
+  // Accept prefilled file from header Upload
+  useEffect(() => {
+    if (!prefillFile || videoFile || isUploading) return
+    if (!isLikelyVideoFile(prefillFile)) return
+    setVideoFile(prefillFile)
+    if (!titleManuallyEdited) {
+      const hasThread = String(practiceSeries || '').trim().length > 0
+      setTitle(hasThread ? seriesBasedTitle(practiceSeries) : defaultPracticeTitle())
+    }
+    replaceOwnedPreviewUrl(URL.createObjectURL(prefillFile))
+    setShowVideoDetails(true)
+    onPrefillUsed?.()
+  }, [isUploading, practiceSeries, prefillFile, seriesBasedTitle, titleManuallyEdited, videoFile, onPrefillUsed])
 
   const requestUploadAbort = useCallback(() => {
     abortRequestedRef.current = true
