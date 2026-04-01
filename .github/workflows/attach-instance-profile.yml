@@ -1,0 +1,40 @@
+name: Attach Backend Instance Profile
+
+on:
+  workflow_dispatch:
+    inputs:
+      instance_profile_name:
+        description: "IAM Instance Profile Name to attach"
+        required: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Attach instance profile to EC2
+        env:
+          INSTANCE_ID: ${{ secrets.INSTANCE_ID }}
+          PROFILE: ${{ github.event.inputs.instance_profile_name }}
+        run: |
+          set -euo pipefail
+          if [ -z "${INSTANCE_ID:-}" ] || [ -z "${PROFILE:-}" ]; then
+            echo "Missing INSTANCE_ID secret or profile input" >&2
+            exit 1
+          fi
+          echo "Associating profile $PROFILE to $INSTANCE_ID"
+          aws ec2 associate-iam-instance-profile --instance-id "$INSTANCE_ID" --iam-instance-profile Name="$PROFILE"
+          echo "Done"
