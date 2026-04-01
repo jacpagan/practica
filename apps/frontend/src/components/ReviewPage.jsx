@@ -3,6 +3,8 @@ import { fmtTimer, MAX_RECORDER_DURATION_SECONDS, MAX_VIDEO_UPLOAD_BYTES, sessio
 import { useAuth } from '../auth'
 import AuthForm from './AuthForm'
 import VideoRecorder from './VideoRecorder'
+import StatusChip from './StatusChip'
+import ClosureBar from './ClosureBar'
 
 const reviewLinkLoadErrorState = ({ status, data }) => {
   const code = data?.code || ''
@@ -84,6 +86,7 @@ function ReviewPage({ reviewToken = '' }) {
   const [uploadProgressLoaded, setUploadProgressLoaded] = useState(0)
   const [uploadProgressTotal, setUploadProgressTotal] = useState(0)
   const [editUploadProgressPercent, setEditUploadProgressPercent] = useState(null)
+  const [closing, setClosing] = useState(false)
 
   const createClientUploadId = () => {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
@@ -196,6 +199,37 @@ function ReviewPage({ reviewToken = '' }) {
   const canRespondToRequest = !reviewRequest || memberRole === 'reviewer'
   const reviewerShouldRespond = memberRole === 'reviewer' && ['requested', 'opened', 'resubmitted'].includes(String(reviewRequest?.status || '').trim().toLowerCase())
   const hasCurrentUserFeedback = feedback.some((item) => item.authored_by_current_user)
+
+  const canStudentClose = memberRole === 'student' || memberRole === 'owner'
+  const statusKey = String(reviewRequest?.status || '').trim().toLowerCase()
+  const canShowClosure = Boolean(reviewRequest && canStudentClose && ['responded', 'viewed', 'resubmitted'].includes(statusKey))
+  const canShowRetry = Boolean(reviewRequest && canStudentClose && ['responded', 'viewed'].includes(statusKey))
+
+  const patchReviewRequestStatus = async (nextStatus) => {
+    if (!authToken || !reviewRequest?.id) return
+    const res = await fetch(`/api/review-requests/${reviewRequest.id}/`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Token ${authToken}` },
+      body: JSON.stringify({ status: nextStatus }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data?.error || 'Could not update request')
+    setReviewRequest((current) => ({ ...(current || {}), ...data }))
+  }
+
+  const handleCloseRequest = async () => {
+    if (!canShowClosure || closing) return
+    setClosing(true)
+    try { await patchReviewRequestStatus('closed') } catch {}
+    setClosing(false)
+  }
+
+  const handleRetryRequest = async () => {
+    if (!canShowRetry || closing) return
+    setClosing(true)
+    try { await patchReviewRequestStatus('resubmitted') } catch {}
+    setClosing(false)
+  }
 
   useEffect(() => {
     if (autoOpenRecorderRef.current) return
@@ -531,7 +565,10 @@ function ReviewPage({ reviewToken = '' }) {
     <div className="min-h-screen bg-white px-4 py-6 sm:px-6">
       <main className="max-w-3xl mx-auto space-y-4">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Leave video feedback</h1>
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Leave video feedback</h1>
+            {reviewRequest ? <StatusChip status={reviewRequest.status} /> : null}
+          </div>
           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Private review</p>
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-2">Respond with video</h1>
           <p className="text-xs text-gray-500 mt-2">Signed in as {user.display_name || user.username}.</p>
@@ -827,6 +864,15 @@ function ReviewPage({ reviewToken = '' }) {
           )}
         </div>
       </main>
+      {canShowClosure ? (
+        <ClosureBar
+          canClose
+          canRetry={canShowRetry}
+          onClose={handleCloseRequest}
+          onRetry={handleRetryRequest}
+          subtleText={statusKey === 'responded' ? 'Feedback delivered • Finish the loop when ready' : 'Ready to close this thread'}
+        />
+      ) : null}
     </div>
   )
 }
