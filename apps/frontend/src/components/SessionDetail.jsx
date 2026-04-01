@@ -950,29 +950,22 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               ) : null}
 
               {canEdit ? (
-                <details className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3" open={showLegacyLinkTools}>
+                <details className="rounded-xl border border-gray-200 bg-white px-4 py-3" open={showLegacyLinkTools}>
                   <summary onClick={() => setShowLegacyLinkTools((current) => !current)} className="cursor-pointer list-none flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">Private link options</p>
-                      <p className="text-xs text-gray-500 mt-1">Secondary.</p>
+                      <p className="text-sm font-semibold text-gray-900">Need a simple private link instead?</p>
+                      <p className="text-xs text-gray-500 mt-1">Use this when you do not want to assign one specific reviewer.</p>
                     </div>
                     <span className="text-xs text-gray-500">{showLegacyLinkTools ? 'Hide' : 'Show'}</span>
                   </summary>
                   <div className="space-y-3 pt-4">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">Feedback link</p>
-                    <p className="text-xs text-gray-500 mt-1">Who can see this: You and people who open the link and sign in. You can turn it off anytime.</p>
-                  </div>
                   {activeReviewLink?.url ? (
-                    <div className="space-y-3">
-                      <div className="rounded-lg border border-gray-200 bg-white px-3 py-3">
-                        <p className="text-xs text-gray-500">Share this link</p>
-                        <p className="text-sm text-gray-900 break-all mt-1">{activeReviewLink.url}</p>
-                        <p className="text-xs text-gray-500 mt-2">Who can see this: You and people who open this link and sign in. Expires {new Date(activeReviewLink.expires_at).toLocaleString(undefined, { hour12: undefined })} • can be turned off any time.</p>
-                      </div>
+                    <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
+                      <p className="text-sm text-gray-800">Private link active.</p>
+                      <p className="text-xs text-gray-500">Signed-in access only • expires {new Date(activeReviewLink.expires_at).toLocaleString(undefined, { hour12: undefined })}</p>
                       <div className="flex flex-wrap gap-2">
                         <button type="button" onClick={copyShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
-                          Copy link
+                          Copy private link
                         </button>
                         <button type="button" onClick={revokeShareLink} disabled={revokingShare} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white disabled:opacity-50 transition-colors">
                           {revokingShare ? 'Turning off…' : 'Turn off link'}
@@ -980,7 +973,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
                       {!canCreateShareLink ? (
                         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
                           <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Not shareable yet</p>
@@ -991,9 +984,12 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           </p>
                         </div>
                       ) : null}
-                      <button type="button" onClick={createShare} disabled={sharing || !canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                        {sharing ? 'Creating…' : 'Create feedback link'}
-                      </button>
+                      {!canCreateShareLink ? null : <p className="text-sm text-gray-800">Create one signed-in private link that you can copy anywhere.</p>}
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={createShare} disabled={sharing || !canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
+                          {sharing ? 'Creating…' : 'Create private link'}
+                        </button>
+                      </div>
                     </div>
                   )}
                   </div>
