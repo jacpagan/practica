@@ -517,8 +517,10 @@ function ReviewPage({ reviewToken = '' }) {
       <main className="max-w-3xl mx-auto space-y-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Leave video feedback</h1>
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Private review</p>
+          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-2">Respond with video</h1>
           <p className="text-xs text-gray-500 mt-2">Signed in as {user.display_name || user.username}.</p>
-          {link?.expires_at ? <p className="text-xs text-gray-500 mt-1">Private link • authenticated access only • expires {new Date(link.expires_at).toLocaleString(undefined, { hour12: undefined })}</p> : null}
+          {link?.expires_at ? <p className="text-xs text-gray-500 mt-1">Private access • sign-in required • expires {new Date(link.expires_at).toLocaleString(undefined, { hour12: undefined })}</p> : null}
         </div>
 
         {/* Thread title is enough; omit extra request metadata here */}
@@ -558,8 +560,8 @@ function ReviewPage({ reviewToken = '' }) {
         {link?.allow_video_feedback && canRespondToRequest ? (
           <div ref={responseComposerRef} className="rounded-xl border border-gray-200 p-3 space-y-4">
             <div>
-              <p className="text-sm font-semibold text-gray-900">{reviewerShouldRespond && !hasCurrentUserFeedback ? 'Respond now' : 'Add your video'}</p>
-              <p className="text-xs text-gray-500 mt-1">{reviewerShouldRespond && !hasCurrentUserFeedback ? 'Record now.' : 'Record or upload.'}</p>
+              <p className="text-sm font-semibold text-gray-900">{reviewerShouldRespond && !hasCurrentUserFeedback ? 'Add your response' : 'Add another response'}</p>
+              <p className="text-xs text-gray-500 mt-1">Record here or upload a video you already have.</p>
             </div>
 
             {false ? (
@@ -591,10 +593,10 @@ function ReviewPage({ reviewToken = '' }) {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button type="button" onClick={() => setShowRecorder(true)} className="rounded-2xl bg-gray-900 text-white px-4 py-3 text-sm font-medium hover:bg-gray-800 transition-colors">
-                {responseFile ? 'Record again' : 'Record now'}
+                {responseFile ? 'Record again' : 'Record response'}
               </button>
               <button type="button" onClick={() => inputRef.current?.click()} className="rounded-2xl border border-gray-200 bg-white text-gray-900 px-4 py-3 text-sm font-medium hover:bg-gray-50 transition-colors">
-                Upload video
+                Upload response
               </button>
               <input ref={inputRef} type="file" accept={videoFileAccept()} className="hidden" onChange={pickFile} />
             </div>
@@ -698,27 +700,27 @@ function ReviewPage({ reviewToken = '' }) {
 
               <div className="flex justify-end">
                 <button type="submit" disabled={submitting} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50">
-                  {submitting ? 'Sending…' : 'Send feedback'}
+                  {submitting ? 'Sending…' : 'Send response'}
                 </button>
               </div>
             </form>
           </div>
         ) : link?.allow_video_feedback ? (
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 space-y-2">
-            <p className="text-sm font-semibold text-blue-900">Review replies are reviewer-only</p>
-            <p className="text-sm text-blue-800">This page is for {reviewRequest?.reviewer?.display_name || reviewRequest?.teacher?.display_name || reviewRequest?.reviewer?.username || reviewRequest?.teacher?.username || 'the assigned reviewer'} to leave video feedback. To follow up, add a new session from your private library and send a new review request.</p>
+            <p className="text-sm font-semibold text-blue-900">This thread is ready for your reviewer</p>
+            <p className="text-sm text-blue-800">{reviewRequest?.reviewer?.display_name || reviewRequest?.teacher?.display_name || reviewRequest?.reviewer?.username || reviewRequest?.teacher?.username || 'Your reviewer'} can respond here privately. When you are ready to continue, record a new take from your library and send the next request.</p>
           </div>
         ) : (
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 space-y-2">
-            <p className="text-sm font-semibold text-blue-900">Feedback is turned off</p>
-            <p className="text-sm text-blue-800">The owner left this page open for viewing, but new feedback is currently disabled.</p>
+            <p className="text-sm font-semibold text-blue-900">This review is view-only right now</p>
+            <p className="text-sm text-blue-800">You can still watch the take here, but new video responses are currently turned off.</p>
           </div>
         )}
 
         <div className="space-y-2">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Feedback</p>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Responses</p>
               {feedback.length === 0 ? (
-                <p className="text-sm text-gray-500">No feedback yet.</p>
+                <p className="text-sm text-gray-500">No responses yet.</p>
               ) : (
                 <div className="space-y-3">
                   {feedback.map((item) => (
