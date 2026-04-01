@@ -16,7 +16,7 @@ const formatKey = (d) => {
   return `${yyyy}-${mm}-${dd}`
 }
 
-function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, onOpenSeries }) {
+function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, onOpenSeries, onMonthChange }) {
   const today = startOfDay(new Date())
   const [activeMonth, setActiveMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
   const [selectedDateKey, setSelectedDateKey] = useState(formatKey(today))
@@ -81,6 +81,12 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
   }, [])
 
   const weekLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+  // Notify parent when month changes so it can load month-bounded data
+  React.useEffect(() => {
+    try { onMonthChange?.(new Date(activeMonth)) } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMonth])
 
   return (
     <div className="px-4 sm:px-6 py-6">

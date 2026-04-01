@@ -898,6 +898,18 @@ class SessionViewSet(viewsets.ModelViewSet):
         if tag:
             qs = qs.filter(tags__name__iexact=tag)
 
+        # Optional date range filter for calendar views: inclusive by day
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        if start_date or end_date:
+            # recorded_at is always set; default to created_at only if needed in future
+            if start_date and end_date:
+                qs = qs.filter(recorded_at__date__range=(start_date, end_date))
+            elif start_date:
+                qs = qs.filter(recorded_at__date__gte=start_date)
+            elif end_date:
+                qs = qs.filter(recorded_at__date__lte=end_date)
+
         return qs.distinct()
 
     def get_serializer_context(self):

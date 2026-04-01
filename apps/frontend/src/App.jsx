@@ -538,6 +538,25 @@ function AppContent() {
             sessionsLoading={sessionsLoading}
             onOpenSession={(session) => navigate({ view: 'detail', sessionId: session.id })}
             onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
+            onMonthChange={(monthDate) => {
+              // Compute month bounds and load only that range
+              const y = monthDate.getFullYear()
+              const m = monthDate.getMonth()
+              const start = new Date(y, m, 1)
+              const end = new Date(y, m + 1, 0)
+              const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+              ;(async () => {
+                try {
+                  setSessionsLoading(true)
+                  const items = await fetchPaginated(`/api/sessions/?start_date=${toISO(start)}&end_date=${toISO(end)}`)
+                  setSessions(items)
+                } catch {
+                  setSessions([])
+                } finally {
+                  setSessionsLoading(false)
+                }
+              })()
+            }}
           />
         )}
 

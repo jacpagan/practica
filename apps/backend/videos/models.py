@@ -96,6 +96,9 @@ class Session(models.Model):
 
     class Meta:
         ordering = ['-recorded_at']
+        indexes = [
+            models.Index(fields=['user', 'recorded_at']),
+        ]
 
     def __str__(self):
         return self.title
