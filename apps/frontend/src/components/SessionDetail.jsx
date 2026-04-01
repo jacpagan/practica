@@ -872,7 +872,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
 
               {justUploaded ? (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-                  <p className="text-sm font-medium text-emerald-900">Saved to your private library.</p>
+                  <p className="text-sm font-medium text-emerald-900">This take is now in your private library.</p>
                 </div>
               ) : null}
 
@@ -890,11 +890,11 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
 
               {session.processing_status === 'failed' ? (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-                  <p className="text-sm font-medium text-amber-900">Playback needs processing help.</p>
-                  <p className="text-sm text-amber-800 mt-1">{session.processing_error || 'This video is not ready for browser playback yet.'}</p>
+                  <p className="text-sm font-medium text-amber-900">Playback needs another pass.</p>
+                  <p className="text-sm text-amber-800 mt-1">{session.processing_error || 'This take is not ready for browser playback yet.'}</p>
                   {canEdit ? (
                     <button type="button" onClick={retryProcessing} disabled={retryingProcessing} className="mt-3 text-sm font-medium text-amber-900 border border-amber-300 rounded-lg px-4 py-2.5 hover:bg-amber-100 disabled:opacity-50 transition-colors">
-                      {retryingProcessing ? 'Retrying…' : 'Retry playback processing'}
+                      {retryingProcessing ? 'Retrying…' : 'Retry playback'}
                     </button>
                   ) : null}
                 </div>
@@ -902,11 +902,11 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
 
               {playbackFailed && session.processing_status === 'ready' ? (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-                  <p className="text-sm font-medium text-amber-900">Playback failed on this device.</p>
-                  <p className="text-sm text-amber-800 mt-1">Retry processing to generate a more compatible playback version for Mac and phone browsers.</p>
+                  <p className="text-sm font-medium text-amber-900">Playback is not available on this device yet.</p>
+                  <p className="text-sm text-amber-800 mt-1">Retry playback to generate a more compatible version for Mac and phone browsers.</p>
                   {canEdit ? (
                     <button type="button" onClick={retryProcessing} disabled={retryingProcessing} className="mt-3 text-sm font-medium text-amber-900 border border-amber-300 rounded-lg px-4 py-2.5 hover:bg-amber-100 disabled:opacity-50 transition-colors">
-                      {retryingProcessing ? 'Retrying…' : 'Retry playback processing'}
+                      {retryingProcessing ? 'Retrying…' : 'Retry playback'}
                     </button>
                   ) : null}
                 </div>
@@ -918,17 +918,17 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                     {waitingOnTeacher && currentLoopRequest ? (
                       <>
                         <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
-                          Open request thread
+                          Open private thread
                         </button>
                       </>
                     ) : null}
                     {readyForFollowUp && currentLoopRequest ? (
                       <>
                         <button type="button" onClick={() => startFollowUp(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
-                          Record follow-up
+                          Record next take
                         </button>
                         <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
-                          Open request thread
+                          Open private thread
                         </button>
                       </>
                     ) : null}
@@ -954,14 +954,14 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                   <summary onClick={() => setShowLegacyLinkTools((current) => !current)} className="cursor-pointer list-none flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-gray-900">Need a simple private link instead?</p>
-                      <p className="text-xs text-gray-500 mt-1">Use this when you do not want to assign one specific reviewer.</p>
+                      <p className="text-xs text-gray-500 mt-1">Use this when you want a lighter private share instead of a named review thread.</p>
                     </div>
                     <span className="text-xs text-gray-500">{showLegacyLinkTools ? 'Hide' : 'Show'}</span>
                   </summary>
                   <div className="space-y-3 pt-4">
                   {activeReviewLink?.url ? (
                     <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
-                      <p className="text-sm text-gray-800">Private link active.</p>
+                      <p className="text-sm text-gray-800">Private link ready.</p>
                       <p className="text-xs text-gray-500">Signed-in access only • expires {new Date(activeReviewLink.expires_at).toLocaleString(undefined, { hour12: undefined })}</p>
                       <div className="flex flex-wrap gap-2">
                         <button type="button" onClick={copyShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
@@ -984,7 +984,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           </p>
                         </div>
                       ) : null}
-                      {!canCreateShareLink ? null : <p className="text-sm text-gray-800">Create one signed-in private link that you can copy anywhere.</p>}
+                      {!canCreateShareLink ? null : <p className="text-sm text-gray-800">Create one signed-in private link you can send anywhere.</p>}
                       <div className="flex flex-wrap gap-2">
                         <button type="button" onClick={createShare} disabled={sharing || !canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
                           {sharing ? 'Creating…' : 'Create private link'}
@@ -1000,8 +1000,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 <div ref={loopDetailsRef} className="rounded-xl border border-gray-200 bg-white px-4 py-3 space-y-4">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">{reviewRequests.length > 0 ? 'Review requests' : 'Request feedback'}</p>
-                      <p className="text-xs text-gray-500 mt-1">{reviewRequests.length > 0 ? `${reviewRequests.length} request${reviewRequests.length === 1 ? '' : 's'} on this video.` : 'Privately send this take to a trusted person.'}</p>
+                      <p className="text-sm font-semibold text-gray-900">{reviewRequests.length > 0 ? 'Private review' : 'Request feedback'}</p>
+                      <p className="text-xs text-gray-500 mt-1">{reviewRequests.length > 0 ? `${reviewRequests.length} review request${reviewRequests.length === 1 ? '' : 's'} on this take.` : 'Privately send this take to a trusted person.'}</p>
                     </div>
                     <div className="flex items-center gap-2" />
                   </div>
@@ -1018,7 +1018,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       {selectedTeacherName ? (
                         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3">
                           <p className="text-xs font-medium uppercase tracking-wide text-emerald-800">Ready</p>
-                          <p className="text-sm text-emerald-900 mt-1">This review request will go to {selectedTeacherName}. Who can see this: You and {selectedTeacherName}.</p>
+                          <p className="text-sm text-emerald-900 mt-1">This will open a private thread with {selectedTeacherName}. Only the two of you can see it.</p>
                         </div>
                       ) : null}
 
@@ -1107,7 +1107,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                   ) : reviewRequests.length > 0 ? (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-xs text-gray-500">Recent requests on this video</p>
+                        <p className="text-xs text-gray-500">Thread history</p>
                         <button type="button" onClick={() => setShowRequestHistory((current) => !current)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
                           {showRequestHistory ? 'Hide request history' : 'Show request history'}
                         </button>
@@ -1303,13 +1303,13 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               <div className="rounded-xl border border-gray-200 bg-white px-4 py-4 space-y-3">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">Feedback</p>
-                  <p className="text-xs text-gray-500 mt-1">Who can see this: You and people who open your link and sign in.</p>
+                  <p className="text-xs text-gray-500 mt-1">Responses stay private to you and the people included in this review.</p>
                 </div>
 
                 {videoFeedback.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-gray-200 px-4 py-4 text-center">
-                    <p className="text-sm text-gray-600">No feedback yet.</p>
-                    <p className="text-xs text-gray-400 mt-1">Share your feedback link when you want video responses.</p>
+                    <p className="text-sm text-gray-600">No responses yet.</p>
+                    <p className="text-xs text-gray-400 mt-1">Use a private review or a private link when you want a response.</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
