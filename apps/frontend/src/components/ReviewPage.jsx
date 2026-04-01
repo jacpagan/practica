@@ -464,36 +464,37 @@ function ReviewPage({ reviewToken = '' }) {
   if (!user) {
     const reviewerName = reviewRequest?.reviewer?.display_name || reviewRequest?.reviewer?.username || reviewRequest?.teacher?.display_name || reviewRequest?.teacher?.username || ''
     const ownerName = reviewRequest?.owner?.display_name || reviewRequest?.owner?.username || reviewRequest?.student?.display_name || reviewRequest?.student?.username || ''
-    const authTitle = claimCode ? 'Join Practica to review this video' : 'Log in to open this private review'
+    const authTitle = claimCode ? 'Continue this private review' : 'Sign in to continue'
     const authSubtitle = claimCode
-      ? 'Create your account once, then continue straight into the review page.'
-      : 'Private links stay inside trusted networks and require sign-in.'
+      ? 'Create your account once to watch the take, leave your response, and keep everything in one private thread.'
+      : 'This private review stays inside a trusted thread and opens right where you left off.'
 
     return (
       <div className="min-h-screen bg-white px-4 py-6 sm:px-6">
         <main className="max-w-3xl mx-auto grid gap-6 lg:grid-cols-[1.1fr_0.9fr] items-start">
           <div className="space-y-4">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Private review invite</p>
-              <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-2">{session?.title || 'Review this private video'}</h1>
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Private review</p>
+              <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-2">{session?.title || 'Review this take'}</h1>
               <p className="text-sm text-gray-600 mt-2">
                 {reviewerName
-                  ? `${reviewerName} has been asked to review this privately in Practica.`
-                  : 'You have been invited to review this privately in Practica.'}
+                  ? `${reviewerName} has been invited into a private feedback thread in Practica.`
+                  : 'You have been invited into a private feedback thread in Practica.'}
               </p>
-              {ownerName ? <p className="text-xs text-gray-500 mt-2">Shared by {ownerName}.</p> : null}
-              {link?.expires_at ? <p className="text-xs text-gray-500 mt-1">Signed-in access only • expires {new Date(link.expires_at).toLocaleString(undefined, { hour12: undefined })}</p> : null}
+              {ownerName ? <p className="text-xs text-gray-500 mt-2">Shared privately by {ownerName}.</p> : null}
+              {reviewRequest?.goal ? <p className="text-xs text-gray-500 mt-1">Focus: {reviewRequest.goal}</p> : null}
+              {link?.expires_at ? <p className="text-xs text-gray-500 mt-1">Private access • sign-in required • expires {new Date(link.expires_at).toLocaleString(undefined, { hour12: undefined })}</p> : null}
             </div>
 
             <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
               <div className="aspect-video bg-black">
                 <div className="w-full h-full flex items-center justify-center px-6 text-center text-sm text-white/70">
-                  Sign in to watch and respond.
+                  Sign in to watch the take and leave your response.
                 </div>
               </div>
               <div className="p-4 space-y-2">
                 {session?.description ? <p className="text-sm text-gray-600">{session.description}</p> : null}
-                {reviewRequest?.goal ? <p className="text-sm text-gray-800">Goal: {reviewRequest.goal}</p> : null}
+                <p className="text-sm text-gray-800">Everything here stays private to the people included in this review.</p>
               </div>
             </div>
           </div>
