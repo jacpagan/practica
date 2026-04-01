@@ -311,21 +311,7 @@ function ReviewPage({ reviewToken = '' }) {
     setUploadProgressLoaded(0)
     setUploadProgressTotal(file.size || 0)
     replaceOwnedPreviewUrl(URL.createObjectURL(file))
-    // Offer Undo: clear response and reopen recorder
-    try {
-      toast.successAction('Recording selected', {
-        label: 'Undo',
-        onClick: () => {
-          setResponseFile(null)
-          submitUploadIdRef.current = ''
-          setUploadProgressPercent(null)
-          setUploadProgressLoaded(0)
-          setUploadProgressTotal(0)
-          replaceOwnedPreviewUrl('')
-          setShowRecorder(true)
-        },
-      })
-    } catch {}
+    // Keep UX minimal; avoid undo toast here
   }
 
   const beginEditingFeedback = (item) => {

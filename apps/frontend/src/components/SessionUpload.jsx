@@ -208,16 +208,7 @@ function SessionUpload({
     setVideoFile(file)
     if (!titleManuallyEdited) setTitle(seriesBasedTitle(practiceSeries))
     replaceOwnedPreviewUrl(URL.createObjectURL(file))
-    // Offer Undo: clear selection and reopen recorder
-    try {
-      toast.successAction('Recording selected', {
-        label: 'Undo',
-        onClick: () => {
-          clearSelectedVideo()
-          setShowRecorder(true)
-        },
-      })
-    } catch {}
+    // Keep UX minimal; avoid action toasts here to reduce complexity
   }
 
   // Accept a video via helper (used by paste handler)
