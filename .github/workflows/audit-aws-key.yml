@@ -1,0 +1,59 @@
+name: Audit AWS Access Key
+
+on:
+  workflow_dispatch:
+    inputs:
+      access_key_id:
+        description: "AWS Access Key ID (AKIA...)"
+        required: true
+      days:
+        description: "Look back window in days"
+        default: "14"
+        required: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  audit:
+    name: Audit Key Usage
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Run audit
+        id: audit
+        env:
+          KEY_ID: ${{ github.event.inputs.access_key_id }}
+          DAYS: ${{ github.event.inputs.days || '14' }}
+        run: |
+          bash scripts/audit-aws-key.sh "$KEY_ID" --days "$DAYS" | tee audit.out
+          echo "audit_log<<EOF" >> $GITHUB_OUTPUT
+          sed -n '1,200p' audit.out >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Summary
+        run: |
+          {
+            echo "### AWS Access Key Audit"
+            echo "- Access Key: \
+\`${{ github.event.inputs.access_key_id }}\`"
+            echo "- Window: ${{ github.event.inputs.days || '14' }} days"
+            echo
+            echo '```'
+            sed -n '1,200p' audit.out
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
+
