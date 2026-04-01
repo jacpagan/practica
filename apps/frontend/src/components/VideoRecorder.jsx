@@ -22,6 +22,7 @@ const readSyncOffsetMs = () => {
 
 function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop = true, minAutoUseSeconds = 2 }) {
   const [state, setState] = useState(STATES.IDLE)
+  const [mode, setMode] = useState('camera') // 'camera' | 'screen_cam'
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState(null)
   const [bpm, setBpm] = useState(80)
@@ -30,12 +31,20 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   const [beatsPerBar, setBeatsPerBar] = useState(4)
   const [syncOffsetMs, setSyncOffsetMs] = useState(readSyncOffsetMs)
   const [showTimingTools, setShowTimingTools] = useState(false)
+  const [showPipControls, setShowPipControls] = useState(false)
+  const [musicMode, setMusicMode] = useState(true)
+  const [micGain, setMicGain] = useState(1)
+  const [micLevel, setMicLevel] = useState(0)
   const [countInRemaining, setCountInRemaining] = useState(null)
 
   const liveRef = useRef(null)
   const playbackRef = useRef(null)
   const streamRef = useRef(null)
   const mixedStreamRef = useRef(null)
+  const camStreamRef = useRef(null)
+  const displayStreamRef = useRef(null)
+  const compositeCanvasRef = useRef(null)
+  const compositeRafRef = useRef(null)
   const recorderRef = useRef(null)
   const chunksRef = useRef([])
   const timerRef = useRef(null)
@@ -45,8 +54,17 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   const blobUrlRef = useRef(null)
   const audioContextRef = useRef(null)
   const audioDestinationRef = useRef(null)
+  const micGainNodeRef = useRef(null)
+  const analyserRef = useRef(null)
+  const meterRafRef = useRef(null)
   const beatRef = useRef(0)
   const [recordedFile, setRecordedFile] = useState(null)
+  // PiP controls (for screen+cam)
+  const pipStateRef = useRef({ xFrac: 0.76, yFrac: 0.72, wFrac: 0.22, radiusFrac: 0.06, mirror: true })
+  const canvasSizeRef = useRef({ width: 1280, height: 720 })
+  const camAspectRef = useRef(9 / 16)
+  const videoContainerRef = useRef(null)
+  const draggingRef = useRef(null) // {type: 'move'|'resize', startX, startY, start}
   const isCaptureMode = state === STATES.PREVIEWING || state === STATES.RECORDING || state === STATES.RECORDED
 
   const metronomeRecordDelaySeconds = useCallback(() => {
@@ -62,9 +80,16 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   // ── Cleanup ──
 
   const stopStream = useCallback(() => {
+    if (compositeRafRef.current) { cancelAnimationFrame(compositeRafRef.current); compositeRafRef.current = null }
     streamRef.current?.getTracks().forEach(t => t.stop())
+    mixedStreamRef.current?.getTracks().forEach(t => t.stop())
+    camStreamRef.current?.getTracks().forEach(t => t.stop())
+    displayStreamRef.current?.getTracks().forEach(t => t.stop())
     streamRef.current = null
     mixedStreamRef.current = null
+    camStreamRef.current = null
+    displayStreamRef.current = null
+    compositeCanvasRef.current = null
   }, [])
 
   const stopTimer = useCallback(() => {
@@ -95,6 +120,8 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     const ctx = audioContextRef.current
     audioContextRef.current = null
     audioDestinationRef.current = null
+    micGainNodeRef.current = null
+    if (meterRafRef.current) { cancelAnimationFrame(meterRafRef.current); meterRafRef.current = null }
     if (!ctx) return
     try { ctx.close() } catch {}
   }, [])
@@ -150,10 +177,31 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       if (audioTracks.length) {
         const micStream = new MediaStream(audioTracks)
         const micSource = audioContext.createMediaStreamSource(micStream)
-        const micGain = audioContext.createGain()
-        micGain.gain.value = 1
-        micSource.connect(micGain)
-        micGain.connect(destination)
+        const micGainNode = audioContext.createGain()
+        micGainNode.gain.value = micGain
+        micGainNodeRef.current = micGainNode
+        const analyser = audioContext.createAnalyser()
+        analyser.fftSize = 2048
+        analyserRef.current = analyser
+        micSource.connect(micGainNode)
+        micGainNode.connect(analyser)
+        analyser.connect(destination)
+        if (!meterRafRef.current) {
+          const data = new Float32Array(analyser.frequencyBinCount)
+          const tick = () => {
+            try {
+              analyser.getFloatTimeDomainData(data)
+              let peak = 0
+              for (let i = 0; i < data.length; i++) {
+                const v = Math.abs(data[i])
+                if (v > peak) peak = v
+              }
+              setMicLevel(peak)
+            } catch {}
+            meterRafRef.current = requestAnimationFrame(tick)
+          }
+          meterRafRef.current = requestAnimationFrame(tick)
+        }
       }
     }
 
@@ -166,6 +214,70 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     if (mixedAudioTrack) tracks.push(mixedAudioTrack)
     mixedStreamRef.current = new MediaStream(tracks)
     return mixedStreamRef.current
+  }, [])
+
+  // Mix audio from multiple input streams (e.g., mic + system audio)
+  const ensureAudioMixForStreams = useCallback(async (streams) => {
+    if (typeof window === 'undefined') return null
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext
+    if (!AudioContextClass) return null
+
+    let audioContext = audioContextRef.current
+    let destination = audioDestinationRef.current
+    if (!audioContext || !destination) {
+      audioContext = new AudioContextClass()
+      destination = audioContext.createMediaStreamDestination()
+      audioContextRef.current = audioContext
+      audioDestinationRef.current = destination
+    }
+
+    if (audioContext.state === 'suspended') {
+      try { await audioContext.resume() } catch {}
+    }
+
+    streams.forEach((s, idx) => {
+      const audioTracks = s?.getAudioTracks?.() || []
+      if (audioTracks.length) {
+        const input = new MediaStream(audioTracks)
+        try {
+          const source = audioContext.createMediaStreamSource(input)
+          const gain = audioContext.createGain()
+          if (idx === 0) {
+            gain.gain.value = micGain
+            micGainNodeRef.current = gain
+            const analyser = audioContext.createAnalyser()
+            analyser.fftSize = 2048
+            analyserRef.current = analyser
+            source.connect(gain)
+            gain.connect(analyser)
+            analyser.connect(destination)
+            if (!meterRafRef.current) {
+              const data = new Float32Array(analyser.frequencyBinCount)
+              const tick = () => {
+                try {
+                  analyser.getFloatTimeDomainData(data)
+                  let peak = 0
+                  for (let i = 0; i < data.length; i++) {
+                    const v = Math.abs(data[i])
+                    if (v > peak) peak = v
+                  }
+                  setMicLevel(peak)
+                } catch {}
+                meterRafRef.current = requestAnimationFrame(tick)
+              }
+              meterRafRef.current = requestAnimationFrame(tick)
+            }
+          } else {
+            // Slightly lower system audio
+            gain.gain.value = 0.8
+            source.connect(gain)
+            gain.connect(destination)
+          }
+        } catch {}
+      }
+    })
+
+    return destination.stream
   }, [])
 
   const playTick = useCallback(async () => {
@@ -234,10 +346,12 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera not supported')
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
-        audio: true,
+        audio: musicMode ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false } : true,
       })
+      camStreamRef.current = stream
       streamRef.current = stream
       await ensureAudioMix(stream)
+      setMode('camera')
       setState(STATES.PREVIEWING)
       // Attach after state change triggers re-render with video element
       requestAnimationFrame(() => attachStream())
@@ -245,6 +359,123 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       setError(e.name === 'NotAllowedError'
         ? 'Camera permission denied. Please allow access in your browser settings.'
         : 'Could not access camera. Please check your device.')
+      setState(STATES.IDLE)
+    }
+  }
+
+  // Screen + Camera (PiP)
+  const openScreenCam = async () => {
+    setState(STATES.REQUESTING)
+    setError(null)
+    try {
+      if (!navigator.mediaDevices?.getDisplayMedia) throw new Error('Screen capture not supported in this browser')
+      const display = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: 30 } },
+        audio: true,
+      })
+      displayStreamRef.current = display
+
+      const cam = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 360 }, facingMode: 'user' },
+        audio: musicMode ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false } : true,
+      })
+      camStreamRef.current = cam
+
+      const screenVideo = document.createElement('video')
+      screenVideo.muted = true
+      screenVideo.playsInline = true
+      screenVideo.srcObject = display
+      await screenVideo.play().catch(() => {})
+
+      const camVideo = document.createElement('video')
+      camVideo.muted = true
+      camVideo.playsInline = true
+      camVideo.srcObject = cam
+      await camVideo.play().catch(() => {})
+
+      const canvas = document.createElement('canvas')
+      const screenTrack = display.getVideoTracks()[0]
+      const screenSettings = screenTrack?.getSettings?.() || {}
+      const width = Number(screenSettings.width || 1280)
+      const height = Number(screenSettings.height || 720)
+      canvas.width = width
+      canvas.height = height
+      canvasSizeRef.current = { width, height }
+      compositeCanvasRef.current = canvas
+      const ctx = canvas.getContext('2d')
+
+      const updateCamAspect = () => {
+        const vw = camVideo.videoWidth || 16
+        const vh = camVideo.videoHeight || 9
+        if (vw && vh) camAspectRef.current = vh / vw
+      }
+      camVideo.addEventListener('loadedmetadata', updateCamAspect, { once: true })
+      updateCamAspect()
+
+      const draw = () => {
+        try {
+          ctx.clearRect(0, 0, width, height)
+          ctx.drawImage(screenVideo, 0, 0, width, height)
+          const { xFrac, yFrac, wFrac, radiusFrac, mirror } = pipStateRef.current
+          const pipW = Math.max(40, Math.round(width * Math.min(0.8, Math.max(0.08, wFrac))))
+          const pipH = Math.max(30, Math.round(pipW * (camAspectRef.current || 9 / 16)))
+          const maxX = width - pipW
+          const maxY = height - pipH
+          const x = Math.min(maxX, Math.max(0, Math.round(xFrac * width)))
+          const y = Math.min(maxY, Math.max(0, Math.round(yFrac * height)))
+          ctx.save()
+          const r = Math.max(8, Math.round(pipW * Math.min(0.25, Math.max(0, radiusFrac))))
+          ctx.beginPath()
+          ctx.moveTo(x + r, y)
+          ctx.arcTo(x + pipW, y, x + pipW, y + pipH, r)
+          ctx.arcTo(x + pipW, y + pipH, x, y + pipH, r)
+          ctx.arcTo(x, y + pipH, x, y, r)
+          ctx.arcTo(x, y, x + pipW, y, r)
+          ctx.closePath()
+          ctx.clip()
+          if (mirror) {
+            ctx.save()
+            ctx.translate(x + pipW, y)
+            ctx.scale(-1, 1)
+            ctx.drawImage(camVideo, 0, 0, pipW, pipH)
+            ctx.restore()
+          } else {
+            ctx.drawImage(camVideo, x, y, pipW, pipH)
+          }
+          ctx.restore()
+        } catch {}
+        compositeRafRef.current = requestAnimationFrame(draw)
+      }
+      draw()
+
+      const compositeVideoStream = canvas.captureStream(30)
+      const audioMix = await ensureAudioMixForStreams([cam, display])
+
+      const finalTracks = []
+      const cvt = compositeVideoStream.getVideoTracks()[0]
+      if (cvt) finalTracks.push(cvt)
+      const at = audioMix?.getAudioTracks?.()[0]
+      if (at) finalTracks.push(at)
+      const finalStream = new MediaStream(finalTracks)
+
+      mixedStreamRef.current = finalStream
+      streamRef.current = finalStream
+      setMode('screen_cam')
+      setState(STATES.PREVIEWING)
+      requestAnimationFrame(() => attachStream())
+
+      // If share is stopped via browser UI
+      display.getVideoTracks().forEach((t) => {
+        t.onended = () => {
+          stopRecording()
+          cleanup()
+          setMode('camera')
+          setState(STATES.IDLE)
+        }
+      })
+    } catch (e) {
+      const message = e?.name === 'NotAllowedError' ? 'Screen capture permission denied.' : (e?.message || 'Could not start screen capture.')
+      setError(message)
       setState(STATES.IDLE)
     }
   }
@@ -334,6 +565,30 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     if (recorderRef.current?.state === 'recording') recorderRef.current.stop()
   }
 
+  // ── Music mode & mic controls ──
+  useEffect(() => {
+    if (micGainNodeRef.current) {
+      try { micGainNodeRef.current.gain.value = micGain } catch {}
+    }
+  }, [micGain])
+
+  const applyMicProcessing = useCallback(async (enabled) => {
+    // Try to flip browser DSP on the mic track without restarting streams
+    const track = camStreamRef.current?.getAudioTracks?.()[0]
+    if (!track || !track.applyConstraints) return
+    try {
+      await track.applyConstraints({
+        echoCancellation: !enabled,
+        noiseSuppression: !enabled,
+        autoGainControl: !enabled,
+      })
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    applyMicProcessing(Boolean(musicMode))
+  }, [applyMicProcessing, musicMode])
+
   // ── Actions ──
 
   const handleUse = () => {
@@ -345,7 +600,11 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     if (blobUrlRef.current) { URL.revokeObjectURL(blobUrlRef.current); blobUrlRef.current = null }
     setElapsed(0)
     cancelCountIn()
-    openCamera()
+    if (mode === 'screen_cam') {
+      openScreenCam()
+    } else {
+      openCamera()
+    }
   }
 
   const handleCancel = () => {
@@ -387,15 +646,28 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
             </>
           ) : (
             <>
-              <button
-                onClick={openCamera}
-                className="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
-              >
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
-                </svg>
-              </button>
-              <p className="text-xs text-white/40">Tap to open camera</p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={openCamera}
+                  className="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
+                >
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={openScreenCam}
+                  className="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
+                  title="Record screen + camera"
+                >
+                  <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <rect x="3" y="5" width="14" height="10" rx="2" ry="2" strokeWidth="1.5"/>
+                    <path d="M21 7l-4 3 4 3V7z" strokeWidth="1.5"/>
+                    <circle cx="9" cy="15.5" r="2.5" fill="currentColor" />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-xs text-white/40">Tap to open camera or screen + cam</p>
             </>
           )}
         </div>
@@ -411,15 +683,25 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
 
       {/* ── LIVE PREVIEW / RECORDING ── */}
       {(state === STATES.PREVIEWING || state === STATES.RECORDING) && (
-        <div className="bg-gray-950">
+        <div className="bg-gray-950 relative" ref={videoContainerRef}>
           <video
             ref={setLiveRef}
             autoPlay
             muted
             playsInline
             className="w-full aspect-video object-cover"
-            style={{ transform: 'scaleX(-1)' }}
+            style={{ transform: mode === 'camera' ? 'scaleX(-1)' : 'none' }}
           />
+
+          {mode === 'screen_cam' && (
+            <PiPOverlay
+              videoContainerRef={videoContainerRef}
+              pipStateRef={pipStateRef}
+              canvasSizeRef={canvasSizeRef}
+              camAspectRef={camAspectRef}
+              draggingRef={draggingRef}
+            />
+          )}
 
           <div className="p-4 bg-gray-950 space-y-4">
             <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -427,6 +709,28 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                   {countInRemaining ? `Starting in ${countInRemaining}` : state === STATES.RECORDING ? 'Recording' : 'Camera ready'}
               </div>
               <div className="flex items-center gap-2">
+                {/* Minimal audio controls */}
+                <button
+                  type="button"
+                  onClick={() => setMusicMode(m => !m)}
+                  title="Music mode (disables noise suppression/AGC/echo cancel)"
+                  className={`rounded-full px-2.5 py-1 text-[11px] transition-colors ${musicMode ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
+                >
+                  Music
+                </button>
+                <div title="Mic level" className="w-16 h-1 rounded bg-white/10 overflow-hidden">
+                  <div className="h-full bg-white/80" style={{ width: `${Math.min(100, Math.round((micLevel*3)*100))}%` }} />
+                </div>
+                <input
+                  title="Mic gain"
+                  type="range"
+                  min="0.5"
+                  max="2"
+                  step="0.01"
+                  value={micGain}
+                  onChange={(e) => setMicGain(Number(e.target.value))}
+                  className="w-20 accent-white/90"
+                />
                 <button
                   type="button"
                   onClick={() => setShowTimingTools((current) => !current)}
@@ -434,6 +738,15 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                 >
                   Timing tools
                 </button>
+                {mode === 'screen_cam' && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPipControls((c) => !c)}
+                    className="rounded-full px-3 py-1.5 text-xs transition-colors bg-white/10 text-white/80 hover:bg-white/20"
+                  >
+                    PiP controls
+                  </button>
+                )}
                 <div className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/70">
                   {state === STATES.RECORDING ? fmtTimer(elapsed) : `Max ${fmtTimer(maxDuration)}`}
                 </div>
@@ -508,6 +821,90 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                 </div>
 
                 <p className="text-[11px] text-white/55">Timing tools are optional. When the metronome is on, recording starts after a one-bar count-in. Headphones give the cleanest result.</p>
+              </div>
+            ) : null}
+
+            {mode === 'screen_cam' && showPipControls ? (
+              <div className="space-y-3">
+                <div className="rounded-2xl bg-white/5 px-3 py-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-white/60">PiP position</p>
+                    <p className="text-sm font-medium text-white">Drag overlay or quick-snap</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {['tl','tr','bl','br','center'].map((pos) => (
+                      <button
+                        key={pos}
+                        onClick={() => {
+                          const { width, height } = canvasSizeRef.current
+                          const { wFrac } = pipStateRef.current
+                          const pipW = width * wFrac
+                          const pipH = pipW * (camAspectRef.current || 9/16)
+                          const xFrac = pos === 'tr' || pos === 'br' ? (width - pipW) / width : pos === 'center' ? (width - pipW) / (2*width) : 0
+                          const yFrac = pos === 'bl' || pos === 'br' ? (height - pipH) / height : pos === 'center' ? (height - pipH) / (2*height) : 0
+                          pipStateRef.current = { ...pipStateRef.current, xFrac, yFrac }
+                        }}
+                        className="rounded-lg px-2 py-1 text-xs bg-white/10 text-white/80 hover:bg-white/20"
+                      >
+                        {pos.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl bg-white/5 px-3 py-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-white/60">PiP size</p>
+                    <p className="text-sm font-medium text-white">Small / Medium / Large</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {[
+                      {k:'S', v:0.16},
+                      {k:'M', v:0.22},
+                      {k:'L', v:0.3},
+                    ].map(({k,v}) => (
+                      <button key={k}
+                        onClick={() => {
+                          const { width, height } = canvasSizeRef.current
+                          const wFrac = v
+                          // Clamp position so PiP stays on-screen
+                          const pipW = width * wFrac
+                          const pipH = pipW * (camAspectRef.current || 9/16)
+                          let { xFrac, yFrac } = pipStateRef.current
+                          xFrac = Math.min(1 - pipW/width, Math.max(0, xFrac))
+                          yFrac = Math.min(1 - pipH/height, Math.max(0, yFrac))
+                          pipStateRef.current = { ...pipStateRef.current, wFrac, xFrac, yFrac }
+                        }}
+                        className="rounded-lg px-2 py-1 text-xs bg-white/10 text-white/80 hover:bg-white/20"
+                      >{k}</button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl bg-white/5 px-3 py-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-white/60">Roundness</p>
+                    <p className="text-sm font-medium text-white">{Math.round((pipStateRef.current.radiusFrac || 0)*100)}%</p>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="0.25"
+                    step="0.01"
+                    defaultValue={pipStateRef.current.radiusFrac}
+                    onChange={(e) => {
+                      pipStateRef.current = { ...pipStateRef.current, radiusFrac: Number(e.target.value) }
+                    }}
+                    className="w-40"
+                  />
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-1 text-xs text-white/80">
+                      <input type="checkbox" defaultChecked={pipStateRef.current.mirror}
+                        onChange={(e) => { pipStateRef.current = { ...pipStateRef.current, mirror: e.target.checked } }} />
+                      Mirror
+                    </label>
+                  </div>
+                </div>
               </div>
             ) : null}
 
@@ -588,3 +985,116 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
 }
 
 export default VideoRecorder
+
+// Overlay component to drag/resize PiP when in screen+cam mode
+function PiPOverlay({ videoContainerRef, pipStateRef, canvasSizeRef, camAspectRef, draggingRef }) {
+  const [, force] = React.useReducer((x) => x + 1, 0)
+
+  useEffect(() => {
+    const onUp = () => { draggingRef.current = null }
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+    return () => {
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+    }
+  }, [draggingRef])
+
+  const getCanvasPoint = (clientX, clientY) => {
+    const el = videoContainerRef.current
+    if (!el) return { x: 0, y: 0 }
+    const rect = el.getBoundingClientRect()
+    const { width: cw, height: ch } = canvasSizeRef.current
+    const x = ((clientX - rect.left) / rect.width) * cw
+    const y = ((clientY - rect.top) / rect.height) * ch
+    return { x, y }
+  }
+
+  const onMove = (e) => {
+    if (!draggingRef.current) return
+    const { type, startX, startY, start } = draggingRef.current
+    const { x, y } = getCanvasPoint(e.clientX, e.clientY)
+    const { width, height } = canvasSizeRef.current
+    const aspect = camAspectRef.current || 9/16
+    const dx = x - startX
+    const dy = y - startY
+    if (type === 'move') {
+      let xFrac = (start.xPx + dx) / width
+      let yFrac = (start.yPx + dy) / height
+      const pipW = width * start.wFrac
+      const pipH = pipW * aspect
+      xFrac = Math.min(1 - pipW / width, Math.max(0, xFrac))
+      yFrac = Math.min(1 - pipH / height, Math.max(0, yFrac))
+      pipStateRef.current = { ...pipStateRef.current, xFrac, yFrac }
+      force()
+    } else if (type === 'resize') {
+      let wFrac = Math.max(0.08, Math.min(0.8, start.wFrac + dx / width))
+      // Clamp position if new size would overflow
+      const pipW = width * wFrac
+      const pipH = pipW * aspect
+      let xFrac = Math.min(1 - pipW / width, Math.max(0, start.xFrac))
+      let yFrac = Math.min(1 - pipH / height, Math.max(0, start.yFrac))
+      pipStateRef.current = { ...pipStateRef.current, wFrac, xFrac, yFrac }
+      force()
+    }
+  }
+
+  const startMove = (e) => {
+    const { x, y } = getCanvasPoint(e.clientX, e.clientY)
+    const { width, height } = canvasSizeRef.current
+    const { xFrac, yFrac, wFrac } = pipStateRef.current
+    draggingRef.current = {
+      type: 'move',
+      startX: x,
+      startY: y,
+      start: { xPx: xFrac * width, yPx: yFrac * height, wFrac },
+    }
+    window.addEventListener('pointermove', onMove)
+  }
+
+  const startResize = (e) => {
+    const { x, y } = getCanvasPoint(e.clientX, e.clientY)
+    const { xFrac, yFrac, wFrac } = pipStateRef.current
+    draggingRef.current = { type: 'resize', startX: x, startY: y, start: { xFrac, yFrac, wFrac } }
+    window.addEventListener('pointermove', onMove)
+  }
+
+  useEffect(() => {
+    return () => { window.removeEventListener('pointermove', onMove) }
+  }, [])
+
+  // Render overlay box sized to PiP
+  const el = videoContainerRef.current
+  const rect = el?.getBoundingClientRect()
+  const widthPx = rect?.width || 0
+  const heightPx = rect?.height || 0
+  const { xFrac, yFrac, wFrac } = pipStateRef.current
+  const pipWidthPx = widthPx * wFrac
+  const pipHeightPx = pipWidthPx * (camAspectRef.current || 9 / 16)
+  const left = widthPx * xFrac
+  const top = heightPx * yFrac
+
+  return (
+    <div className="absolute inset-0 pointer-events-none">
+      <div
+        className="absolute ring-1 ring-white/30 rounded-xl bg-black/10 pointer-events-auto"
+        style={{ left, top, width: pipWidthPx, height: pipHeightPx, backdropFilter: 'saturate(120%)' }}
+        onPointerDown={startMove}
+      >
+        {/* Resize handle (bottom-right) */}
+        <button
+          type="button"
+          onPointerDown={(e) => { e.stopPropagation(); startResize(e) }}
+          className="absolute -bottom-3 -right-3 w-7 h-7 rounded-full bg-white/80 text-gray-900 flex items-center justify-center shadow"
+          title="Resize"
+        >
+          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M4 20L20 4M10 20h10V10" />
+          </svg>
+        </button>
+        {/* Drag affordance */}
+        <div className="absolute left-1 top-1 px-2 py-0.5 text-[10px] rounded bg-white/80 text-gray-900">Drag</div>
+      </div>
+    </div>
+  )
+}
