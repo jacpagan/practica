@@ -543,23 +543,34 @@ function LibraryView({
                   <p className="text-sm font-semibold text-gray-900">{isArchiveMode ? 'Archive' : 'Browse archive'}</p>
                   <p className="text-xs text-gray-500 mt-1">{isArchiveMode ? 'Every owned video, thread, and standalone take.' : 'All your owned videos.'}</p>
                 </div>
-                <div className="flex flex-wrap gap-2 rounded-full border border-gray-200 p-1">
-                  <button type="button" onClick={() => setArchiveView('all')} className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${archiveView === 'all' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
-                    All my videos
-                  </button>
-                  <button type="button" onClick={() => setArchiveView('threads')} className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${archiveView === 'threads' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
-                    Threads
-                  </button>
-                  <button type="button" onClick={() => setArchiveView('standalone')} className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${archiveView === 'standalone' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
-                    Standalone
-                  </button>
+                <div className="flex flex-col items-end gap-2">
+                  {Boolean(dateFilter || withFeedbackOnly) ? (
+                    <div className="text-xs text-gray-600">
+                      Showing <span className="font-medium text-gray-900">{baseSessions.length}</span> of <span className="font-medium text-gray-900">{sessions.filter(s => s.can_edit).length}</span>
+                      <button type="button" onClick={() => { setDateFilter(''); setWithFeedbackOnly(false); try { window.history.replaceState(null, '', '/library') } catch {} }} className="ml-2 text-gray-700 border border-gray-200 rounded-lg px-2 py-1 hover:bg-gray-50">Clear filters</button>
+                    </div>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2 rounded-full border border-gray-200 p-1">
+                    <button type="button" onClick={() => setArchiveView('all')} className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${archiveView === 'all' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
+                      All my videos
+                    </button>
+                    <button type="button" onClick={() => setArchiveView('threads')} className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${archiveView === 'threads' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
+                      Threads
+                    </button>
+                    <button type="button" onClick={() => setArchiveView('standalone')} className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${archiveView === 'standalone' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
+                      Standalone
+                    </button>
+                    <button type="button" onClick={() => setWithFeedbackOnly(v => !v)} className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${withFeedbackOnly ? 'bg-gray-900 text-white' : 'text-gray-600 hover:text-gray-900'}`}>
+                      {withFeedbackOnly ? 'With feedback' : 'All videos'}
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {archiveView === 'all' ? (
                 <div className="space-y-2">
-                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">All videos • {ownSessions.length}</p>
-                  {renderSessionRows(ownSessions)}
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">All videos • {baseSessions.length}</p>
+                  {renderSessionRows(baseSessions)}
                 </div>
               ) : null}
 
