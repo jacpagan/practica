@@ -3,7 +3,7 @@ import VideoThumbnail from './VideoThumbnail'
 import StatusChip from './StatusChip'
 import usePrefetchSession from '../hooks/usePrefetchSession'
 
-export default function SessionListItem({ session, onOpen, status = '', showSeries = false, highlight = false, onRecordFollowUp = null, prefetch = true }) {
+export default function SessionListItem({ session, onOpen, status = '', showSeries = false, highlight = false, onRecordFollowUp = null, onChangeThread = null, prefetch = true }) {
   if (!session) return null
   const recordedAt = new Date(session.recorded_at || session.created_at)
   const replies = Number(session.video_feedback_count || 0)
@@ -36,6 +36,15 @@ export default function SessionListItem({ session, onOpen, status = '', showSeri
         </div>
         <div className="text-right shrink-0 space-y-2">
           <p className="text-xs text-gray-500">{replies} {replies === 1 ? 'reply' : 'replies'}</p>
+          {onChangeThread ? (
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChangeThread?.() }}
+              className="text-[11px] px-2.5 py-1.5 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50"
+            >
+              {session.practice_series ? 'Change thread' : 'Add to thread'}
+            </button>
+          ) : null}
           {onRecordFollowUp ? (
             <button
               type="button"

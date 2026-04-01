@@ -301,6 +301,7 @@ function LibraryView({
         status={ar?.status}
         showSeries={Boolean(String(session.practice_series || '').trim())}
         onOpen={() => onOpenSession?.(session, returnRoute)}
+        onChangeThread={() => moveToThread(session)}
         onRecordFollowUp={onFollowUp}
       />
     )
