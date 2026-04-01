@@ -348,7 +348,7 @@ function SessionUpload({
           </div>
 
           <div className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-stretch">
+            <div className="grid grid-cols-1 gap-3 items-stretch">
               <div
                 ref={dropRef}
                 onClick={() => { if (!videoFile) openFiles() }}
@@ -385,19 +385,6 @@ function SessionUpload({
                 )}
                 <input ref={inputRef} type="file" accept={videoFileAccept()} className="hidden" onChange={handleFilePick} />
                 <input ref={captureInputRef} type="file" accept={videoFileAccept()} capture="environment" className="hidden" onChange={handleFilePick} />
-              </div>
-              <div className="flex flex-col">
-                {(() => {
-                  const recorderSupported = typeof window !== 'undefined' && typeof window.MediaRecorder !== 'undefined' && !!(navigator.mediaDevices?.getUserMedia)
-                  return (
-                    <>
-                      <button type="button" onClick={startRecording} disabled={isUploading} className="flex-1 rounded-2xl bg-gray-900 text-white px-4 py-3 text-sm font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                        {recorderSupported ? 'Record' : 'Use camera'}
-                      </button>
-                      {recorderSupported ? <p className="hidden sm:block text-[11px] text-gray-500 mt-2 text-center">Press R to record</p> : null}
-                    </>
-                  )
-                })()}
               </div>
             </div>
             <div className="mt-3 space-y-1">

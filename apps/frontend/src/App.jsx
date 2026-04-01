@@ -322,6 +322,20 @@ function AppContent() {
     [sessions],
   )
 
+  const [showRecordMenu, setShowRecordMenu] = React.useState(false)
+  React.useEffect(() => {
+    if (!showRecordMenu) return
+    const onClick = (e) => {
+      // Close when clicking outside the menu or button
+      const target = e.target
+      // Best effort: if click happens within a button or menu (role), skip
+      if (target.closest && target.closest('.record-menu-keep')) return
+      setShowRecordMenu(false)
+    }
+    document.addEventListener('click', onClick)
+    return () => document.removeEventListener('click', onClick)
+  }, [showRecordMenu])
+
   const handleRecordAnother = useCallback((draft = null) => {
     setSelectedSession(null)
     setJustUploadedSessionId(null)
@@ -337,6 +351,15 @@ function AppContent() {
     setPendingFollowUpRequestDraft(null)
     setPendingPracticeSeries('')
     setOpenRecorderOnUpload(true)
+    navigate({ view: 'upload', sessionId: null })
+  }, [navigate])
+
+  const startQuickUpload = useCallback(() => {
+    setSelectedSession(null)
+    setJustUploadedSessionId(null)
+    setPendingFollowUpRequestDraft(null)
+    setPendingPracticeSeries('')
+    setOpenRecorderOnUpload(false)
     navigate({ view: 'upload', sessionId: null })
   }, [navigate])
 
@@ -438,12 +461,32 @@ function AppContent() {
             ) : null}
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              onClick={startQuickRecord}
-              className="hidden sm:inline-flex rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
-            >
-              Record
-            </button>
+            <div className="relative hidden sm:block">
+              <button
+                onClick={() => setShowRecordMenu((v) => !v)}
+                className="rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
+              >
+                Record
+              </button>
+              {showRecordMenu ? (
+                <div className="absolute right-0 mt-2 w-40 rounded-xl border border-gray-200 bg-white shadow-lg py-1 z-20">
+                  <button
+                    type="button"
+                    onClick={() => { setShowRecordMenu(false); startQuickRecord() }}
+                    className="block w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-gray-50"
+                  >
+                    Record new
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowRecordMenu(false); startQuickUpload() }}
+                    className="block w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-gray-50"
+                  >
+                    Upload video
+                  </button>
+                </div>
+              ) : null}
+            </div>
             <div className="flex items-center gap-2 sm:border-l sm:border-gray-100 sm:pl-3">
               <NotificationsBell
                 token={token}
