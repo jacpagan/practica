@@ -112,23 +112,7 @@ function SeriesView({ seriesName = '', sessions = [], reviewRequests = [], onBac
               </div>
               <div className="p-4 space-y-4">
                 <VideoThumbnail session={latestSession} className="relative w-full max-w-xl aspect-video rounded-2xl overflow-hidden bg-black" />
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="rounded-xl bg-gray-50 px-4 py-3">
-                    <p className="text-[11px] uppercase tracking-wide text-gray-500">Thread size</p>
-                    <p className="text-lg font-semibold text-gray-900 mt-1">{seriesSessions.length}</p>
-                    <p className="text-xs text-gray-500 mt-1">takes recorded</p>
-                  </div>
-                  <div className="rounded-xl bg-gray-50 px-4 py-3">
-                    <p className="text-[11px] uppercase tracking-wide text-gray-500">Reviewed takes</p>
-                    <p className="text-lg font-semibold text-gray-900 mt-1">{reviewedSessions.length}</p>
-                    <p className="text-xs text-gray-500 mt-1">with feedback attached</p>
-                  </div>
-                  <div className="rounded-xl bg-gray-50 px-4 py-3">
-                    <p className="text-[11px] uppercase tracking-wide text-gray-500">Replies</p>
-                    <p className="text-lg font-semibold text-gray-900 mt-1">{totalReplies}</p>
-                    <p className="text-xs text-gray-500 mt-1">across this thread</p>
-                  </div>
-                </div>
+                {/* Removed thread stats summary for leaner UI */}
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
