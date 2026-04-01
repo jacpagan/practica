@@ -40,19 +40,17 @@ const parseRoute = (pathname, search = '') => {
 }
 
 const routePath = ({ view, sessionId, token, seriesName, date }) => {
-  if (view === 'library') return '/library'
   if (view === 'privacy') return '/privacy'
   if (view === 'archive') return '/archive'
-  if (view === 'calendar') return '/'
   if (view === 'upload') return '/upload'
   if (view === 'record') return '/record'
   if (view === 'requests') return '/requests'
   if (view === 'series' && seriesName) return `/series/${encodeURIComponent(seriesName)}`
   if (view === 'review' && token) return `/r/${token}`
   if (view === 'detail' && sessionId) return `/sessions/${sessionId}`
-  const base = '/'
-  if (date && (view === 'calendar' || view === 'library')) return `${view === 'calendar' ? '/' : '/library'}?date=${encodeURIComponent(date)}`
-  return base
+  if (view === 'library') return date ? `/library?date=${encodeURIComponent(date)}` : '/library'
+  if (view === 'calendar') return date ? `/?date=${encodeURIComponent(date)}` : '/'
+  return '/'
 }
 
 function AppContent() {
