@@ -369,13 +369,21 @@ function LibraryView({
                     </div>
                     <div className="text-xs text-gray-500">Session: {activeRequest.session?.title || 'Video'}</div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={() => onOpenReviewRequest?.(activeRequest)} className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors">
-                      Open
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => onOpenReviewRequest?.(activeRequest)}
+                      className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
+                    >
+                      Open request
                     </button>
                     {activeRequest.session?.id ? (
-                      <button type="button" onClick={() => onOpenSession?.(activeRequest.session, { view: 'library', sessionId: null, seriesName: '' })} className="rounded-full border border-gray-200 bg-white text-gray-900 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors">
-                        Open video
+                      <button
+                        type="button"
+                        onClick={() => onOpenSession?.(activeRequest.session, { view: 'library', sessionId: null, seriesName: '' })}
+                        className="text-xs text-gray-600 hover:text-gray-900 transition-colors"
+                      >
+                        View video
                       </button>
                     ) : null}
                   </div>
