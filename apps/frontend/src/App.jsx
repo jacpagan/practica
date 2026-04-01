@@ -347,7 +347,7 @@ function AppContent() {
 
   useEffect(() => {
     if (!user) return
-    if (view === 'library' || view === 'archive' || view === 'series') loadSessions()
+    if (view === 'library' || view === 'archive' || view === 'series' || view === 'calendar') loadSessions()
     if (view === 'library' || view === 'archive') loadStudentReviewRequests()
     loadTeacherWorkspaceAvailability()
   }, [user, view, loadSessions, loadStudentReviewRequests, loadTeacherWorkspaceAvailability])
