@@ -1,3 +1,4 @@
+import os
 from django.contrib import admin
 from django.urls import path, include, re_path
 from django.conf import settings
@@ -24,11 +25,21 @@ router.register(r'review-requests', ReviewRequestViewSet, basename='review-reque
 
 
 def spa_index(request):
-    response = render(request, 'index.html')
-    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response['Pragma'] = 'no-cache'
-    response['Expires'] = '0'
-    return response
+    resp = render(request, 'index.html')
+    try:
+        body = resp.content.decode('utf-8')
+        sha = os.getenv('DEPLOYED_GIT_SHA', '')
+        if sha:
+            # Append a cache-busting query param to built asset URLs
+            body = body.replace('.js"', f'.js?v={sha[:8]}"')
+            body = body.replace('.css"', f'.css?v={sha[:8]}"')
+        resp.content = body.encode('utf-8')
+    except Exception:
+        pass
+    resp['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp['Pragma'] = 'no-cache'
+    resp['Expires'] = '0'
+    return resp
 
 urlpatterns = [
     path(settings.ADMIN_URL, admin.site.urls),
