@@ -16,7 +16,7 @@ import CalendarView from './components/CalendarView'
 
 const parseRoute = (pathname) => {
   if (pathname === '/') {
-    return { view: 'library', sessionId: null }
+    return { view: 'calendar', sessionId: null }
   }
   if (pathname === '/privacy') return { view: 'privacy', sessionId: null }
   if (pathname === '/archive') return { view: 'archive', sessionId: null }
@@ -43,7 +43,7 @@ const routePath = ({ view, sessionId, token, seriesName }) => {
   if (view === 'series' && seriesName) return `/series/${encodeURIComponent(seriesName)}`
   if (view === 'review' && token) return `/r/${token}`
   if (view === 'detail' && sessionId) return `/sessions/${sessionId}`
-  return '/library'
+  return '/calendar'
 }
 
 function AppContent() {
@@ -257,7 +257,7 @@ function AppContent() {
       if (updateUrl) navigate({ view: 'detail', sessionId: data.id })
     } catch {
       toast.error('Could not load video')
-      navigate({ view: 'library', sessionId: null }, { replace: true })
+      navigate({ view: 'calendar', sessionId: null }, { replace: true })
     }
   }, [navigate, token, toast])
 
@@ -365,7 +365,7 @@ function AppContent() {
 
   useEffect(() => {
     if (view === 'requests' && !hasTeacherWorkspace) {
-      navigate({ view: 'library', sessionId: null }, { replace: true })
+      navigate({ view: 'calendar', sessionId: null }, { replace: true })
     }
   }, [hasTeacherWorkspace, navigate, view])
 
@@ -402,14 +402,14 @@ function AppContent() {
       <header className="border-b border-gray-100 bg-white px-4 py-4 sm:px-6">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-4 min-w-0">
-            <button onClick={() => navigate({ view: 'library', sessionId: null })} className="text-lg font-semibold text-gray-900 tracking-tight">
+            <button onClick={() => navigate({ view: 'calendar', sessionId: null })} className="text-lg font-semibold text-gray-900 tracking-tight">
               Practica
             </button>
             {hasTeacherWorkspace ? (
               <nav className="hidden sm:flex items-center gap-2 rounded-full border border-gray-200 p-1">
                 <button
-                  onClick={() => navigate({ view: 'library', sessionId: null })}
-                  className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'library' || view === 'detail' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
+                  onClick={() => navigate({ view: 'calendar', sessionId: null })}
+                  className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'calendar' || view === 'detail' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
                 >
                   Home
                 </button>
@@ -418,12 +418,6 @@ function AppContent() {
                   className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'archive' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
                 >
                   Archive
-                </button>
-                <button
-                  onClick={() => navigate({ view: 'calendar', sessionId: null })}
-                  className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'calendar' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
-                >
-                  Calendar
                 </button>
                 <button
                   onClick={() => navigate({ view: 'requests', sessionId: null })}
@@ -463,10 +457,10 @@ function AppContent() {
         </div>
         <div className="max-w-4xl mx-auto mt-3 space-y-2 sm:hidden">
           {hasTeacherWorkspace ? (
-            <nav className="grid grid-cols-3 gap-2">
+            <nav className="grid grid-cols-2 gap-2">
               <button
-                onClick={() => navigate({ view: 'library', sessionId: null })}
-                className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'library' || view === 'detail' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+                onClick={() => navigate({ view: 'calendar', sessionId: null })}
+                className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'calendar' || view === 'detail' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
               >
                 Home
               </button>
@@ -475,12 +469,6 @@ function AppContent() {
                 className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'archive' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
               >
                 Archive
-              </button>
-              <button
-                onClick={() => navigate({ view: 'calendar', sessionId: null })}
-                className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'calendar' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
-              >
-                Calendar
               </button>
               <button
                 onClick={() => navigate({ view: 'requests', sessionId: null })}
@@ -553,7 +541,7 @@ function AppContent() {
         )}
 
         {view === 'privacy' && (
-          <PrivacyPage signedIn onBack={() => navigate({ view: 'library', sessionId: null })} />
+          <PrivacyPage signedIn onBack={() => navigate({ view: 'calendar', sessionId: null })} />
         )}
 
         {view === 'series' && (
@@ -561,7 +549,7 @@ function AppContent() {
             seriesName={routeSeriesName}
             sessions={sessions}
             reviewRequests={studentReviewRequests}
-            onBack={() => navigate({ view: 'library', sessionId: null })}
+            onBack={() => navigate({ view: 'calendar', sessionId: null })}
             onOpenSession={openSession}
             onCreateVideo={() => {
               setPendingPracticeSeries(routeSeriesName)
@@ -625,7 +613,7 @@ function AppContent() {
             onSessionDelete={(sessionId) => {
               setSessions((current) => current.filter((item) => item.id !== sessionId))
               setSelectedSession(null)
-              navigate({ view: 'library', sessionId: null }, { replace: true })
+              navigate({ view: 'calendar', sessionId: null }, { replace: true })
             }}
           />
         )}
