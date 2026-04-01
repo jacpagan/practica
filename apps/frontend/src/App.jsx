@@ -16,6 +16,7 @@ import RequestsView from './components/TeachingView'
 import PrivacyPage from './components/PrivacyPage'
 import CalendarView from './components/CalendarView'
 import RecorderModal from './components/RecorderModal'
+import RecorderPage from './components/RecorderPage'
 
 const parseRoute = (pathname) => {
   if (pathname === '/') {
@@ -26,6 +27,7 @@ const parseRoute = (pathname) => {
   if (pathname === '/calendar') return { view: 'calendar', sessionId: null }
   if (pathname === '/library') return { view: 'library', sessionId: null }
   if (pathname === '/upload') return { view: 'upload', sessionId: null }
+  if (pathname === '/record' || pathname === '/recording') return { view: 'record', sessionId: null }
   if (pathname === '/requests') return { view: 'requests', sessionId: null }
   const reviewMatch = pathname.match(/^\/r\/(.+)$/)
   if (reviewMatch) return { view: 'review', token: reviewMatch[1], sessionId: null }
@@ -42,6 +44,7 @@ const routePath = ({ view, sessionId, token, seriesName }) => {
   if (view === 'archive') return '/archive'
   if (view === 'calendar') return '/'
   if (view === 'upload') return '/upload'
+  if (view === 'record') return '/record'
   if (view === 'requests') return '/requests'
   if (view === 'series' && seriesName) return `/series/${encodeURIComponent(seriesName)}`
   if (view === 'review' && token) return `/r/${token}`
@@ -345,12 +348,13 @@ function AppContent() {
   const openGlobalRecorder = useCallback(() => {
     const supported = typeof window !== 'undefined' && typeof window.MediaRecorder !== 'undefined' && !!(navigator.mediaDevices?.getUserMedia)
     if (supported) {
-      setShowRecorderModal(true)
-      return
+      // Navigate to dedicated recording page for a simpler, stable flow
+      navigate({ view: 'record', sessionId: null })
+    } else {
+      // Fallback: go to upload and use native capture
+      setOpenRecorderOnUpload(true)
+      navigate({ view: 'upload', sessionId: null })
     }
-    // Fallback: go to upload and use native capture
-    setOpenRecorderOnUpload(true)
-    navigate({ view: 'upload', sessionId: null })
   }, [navigate])
 
   // no dropdown menu state
@@ -668,6 +672,17 @@ function AppContent() {
             onUploadGuardChange={setUploadNavigationGuard}
             prefillFile={prefillUploadFile}
             onPrefillUsed={() => setPrefillUploadFile(null)}
+          />
+        )}
+
+        {view === 'record' && (
+          <RecorderPage
+            onCancel={() => navigate({ view: 'calendar', sessionId: null })}
+            onRecorded={(file) => {
+              setPrefillUploadFile(file)
+              setOpenRecorderOnUpload(false)
+              navigate({ view: 'upload', sessionId: null })
+            }}
           />
         )}
 
