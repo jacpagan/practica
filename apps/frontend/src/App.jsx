@@ -605,6 +605,10 @@ function AppContent() {
             sessionsLoading={sessionsLoading}
             onOpenSession={(session) => navigate({ view: 'detail', sessionId: session.id })}
             onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
+            onOpenListDate={(dateKey) => {
+              try { window.localStorage.setItem('practica.filter.date.v1', String(dateKey || '')) } catch {}
+              navigate({ view: 'library', sessionId: null })
+            }}
             onMonthChange={(monthDate) => {
               // Compute month bounds and load only that range
               const y = monthDate.getFullYear()

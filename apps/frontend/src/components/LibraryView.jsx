@@ -173,15 +173,47 @@ function LibraryView({
   token = '',
 }) {
   const toast = useToast()
+  const SORT_KEY = 'practica.sort.newestFirst.v1'
+  const DATE_FILTER_KEY = 'practica.filter.date.v1'
+  const [newestFirst, setNewestFirst] = useState(() => {
+    try { return (window.localStorage.getItem(SORT_KEY) || 'true') === 'true' } catch { return true }
+  })
+  useEffect(() => { try { window.localStorage.setItem(SORT_KEY, String(Boolean(newestFirst))) } catch {} }, [newestFirst])
+  const [dateFilter, setDateFilter] = useState('')
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(DATE_FILTER_KEY)
+      if (raw) {
+        setDateFilter(raw)
+        window.localStorage.removeItem(DATE_FILTER_KEY)
+        setTimeout(() => {
+          const anchor = document.getElementById(`date-${raw}`)
+          if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }, 100)
+      }
+    } catch {}
+  }, [])
   const [archiveView, setArchiveView] = useState('all')
   const [expandedSeriesNames, setExpandedSeriesNames] = useState({})
 
-  const ownSessions = useMemo(
-    () => sessions
+  const byDateKey = (d) => {
+    const x = new Date(d)
+    const yyyy = x.getFullYear()
+    const mm = String(x.getMonth() + 1).padStart(2, '0')
+    const dd = String(x.getDate()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}`
+  }
+  const ownSessions = useMemo(() => {
+    const filtered = sessions
       .filter((session) => session.can_edit)
-      .sort((left, right) => new Date(right.recorded_at || right.created_at) - new Date(left.recorded_at || left.created_at)),
-    [sessions],
-  )
+      .filter((s) => !dateFilter || byDateKey(s.recorded_at || s.created_at) === dateFilter)
+    const cmp = (a, b) => {
+      const ta = new Date(a.recorded_at || a.created_at)
+      const tb = new Date(b.recorded_at || b.created_at)
+      return newestFirst ? (tb - ta) : (ta - tb)
+    }
+    return filtered.sort(cmp)
+  }, [dateFilter, newestFirst, sessions])
 
   const seriesGroups = useMemo(() => {
     const groups = new Map()
@@ -322,13 +354,22 @@ function LibraryView({
               </div>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={onCreateVideo}
-            className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
-          >
-            New video
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onCreateVideo}
+              className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
+            >
+              New video
+            </button>
+            <button
+              type="button"
+              onClick={() => setNewestFirst((v) => !v)}
+              className={`rounded-full px-3 py-2 text-xs border ${newestFirst ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
+            >
+              {newestFirst ? 'Newest first' : 'Oldest first'}
+            </button>
+          </div>
         </div>
 
         {sessionsLoading ? (
@@ -347,7 +388,7 @@ function LibraryView({
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 space-y-3">
+            <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 space-y-3" id={dateFilter ? `date-${dateFilter}` : undefined}>
               <div>
                 <p className="text-sm font-semibold text-gray-900">{isHomeMode ? 'Recent' : 'Archive overview'}</p>
                 <p className="text-xs text-gray-500 mt-1">{isHomeMode ? 'Your latest items.' : 'Everything you own, organized clearly.'}</p>

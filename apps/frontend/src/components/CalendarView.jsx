@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react'
 import VideoThumbnail from './VideoThumbnail'
+import SessionListItem from './SessionListItem'
 
 const monthLabel = (date) => date.toLocaleString(undefined, { month: 'long', year: 'numeric' })
 
@@ -16,12 +17,19 @@ const formatKey = (d) => {
   return `${yyyy}-${mm}-${dd}`
 }
 
-function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, onOpenSeries, onMonthChange }) {
+function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, onOpenSeries, onMonthChange, onOpenListDate }) {
   const today = startOfDay(new Date())
   const [activeMonth, setActiveMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
   const [selectedDateKey, setSelectedDateKey] = useState(formatKey(today))
   const [showDayModal, setShowDayModal] = useState(false)
-  const [newestFirst, setNewestFirst] = useState(true)
+  const SORT_KEY = 'practica.sort.newestFirst.v1'
+  const readSort = () => {
+    try { return (window.localStorage.getItem(SORT_KEY) || 'true') === 'true' } catch { return true }
+  }
+  const [newestFirst, setNewestFirst] = useState(readSort)
+  useEffect(() => {
+    try { window.localStorage.setItem(SORT_KEY, String(Boolean(newestFirst))) } catch {}
+  }, [newestFirst])
 
   const monthBounds = useMemo(() => {
     const firstOfMonth = new Date(activeMonth.getFullYear(), activeMonth.getMonth(), 1)
@@ -173,6 +181,13 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
                   >
                     {newestFirst ? 'Newest first' : 'Oldest first'}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => { try { window.localStorage.setItem('practica.filter.date.v1', selectedDateKey) } catch {} ; onOpenListDate?.(selectedDateKey) }}
+                    className="text-[11px] rounded-full px-2.5 py-1 border bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                  >
+                    Open in list
+                  </button>
                   <button type="button" onClick={() => setShowDayModal(false)} className="text-xs text-gray-500 hover:text-gray-900 rounded-lg border border-gray-200 px-2 py-1">Close</button>
                 </div>
               </div>
@@ -199,23 +214,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
                         </div>
                         <div className="space-y-2">
                           {group.items.map((session) => (
-                            <button
-                              key={session.id}
-                              type="button"
-                              onClick={() => onOpenSession?.(session, { view: 'calendar' })}
-                              className="w-full text-left rounded-xl border border-gray-200 px-3 py-3 hover:bg-gray-50 transition-colors"
-                            >
-                              <div className="flex items-start gap-3">
-                                <VideoThumbnail session={session} className="relative w-24 h-16 rounded-lg shrink-0" />
-                                <div className="min-w-0">
-                                  <p className="text-sm font-medium text-gray-900 line-clamp-1">{session.title || 'Untitled'}</p>
-                                  <p className="text-xs text-gray-500 mt-1">{new Date(session.recorded_at || session.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</p>
-                                  {session.video_feedback_count ? (
-                                    <p className="text-[11px] text-gray-500 mt-1">{session.video_feedback_count} {session.video_feedback_count === 1 ? 'reply' : 'replies'}</p>
-                                  ) : null}
-                                </div>
-                              </div>
-                            </button>
+                            <SessionListItem key={session.id} session={session} onOpen={() => onOpenSession?.(session, { view: 'calendar' })} />
                           ))}
                         </div>
                       </div>
