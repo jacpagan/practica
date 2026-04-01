@@ -651,53 +651,43 @@ function ReviewPage({ reviewToken = '' }) {
               </div>
             ) : null}
 
-            <form onSubmit={submit} className="space-y-3">
-              <details className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-3" open={showResponseDetails}>
-                <summary onClick={() => setShowResponseDetails((current) => !current)} className="cursor-pointer list-none flex items-center justify-between gap-3">
+            <form onSubmit={submit} className="space-y-2">
+              {/* Lean timestamp controls (removed Details wrapper) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Details</p>
-                    <p className="text-sm text-gray-700 mt-1">Optional.</p>
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Timestamp</p>
+                    <p className="text-sm text-gray-700 mt-1">{typeof selectedTimestampSeconds === 'number' ? `Attach at ${fmtTimer(selectedTimestampSeconds)}` : 'No timestamp attached'}</p>
                   </div>
-                  <span className="text-xs text-gray-500">{showResponseDetails ? 'Hide' : 'Show'}</span>
-                </summary>
-                <div className="space-y-3 pt-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Timestamp</p>
-                      <p className="text-sm text-gray-700 mt-1">{typeof selectedTimestampSeconds === 'number' ? `Attach at ${fmtTimer(selectedTimestampSeconds)}` : 'No timestamp attached'}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button type="button" onClick={useCurrentVideoTime} className="text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-white transition-colors">
-                        Use current time
-                      </button>
-                      <button type="button" onClick={clearTimestamp} className="text-xs text-gray-500 hover:text-gray-700 transition-colors">
-                        Clear
-                      </button>
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={useCurrentVideoTime} className="text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-white transition-colors">
+                      Use current time
+                    </button>
+                    <button type="button" onClick={clearTimestamp} className="text-xs text-gray-500 hover:text-gray-700 transition-colors">
+                      Clear
+                    </button>
                   </div>
-
-                  {durationSeconds > 0 ? (
-                    <div>
-                      <input
-                        type="range"
-                        min="0"
-                        max={durationSeconds}
-                        step="1"
-                        value={typeof selectedTimestampSeconds === 'number' ? selectedTimestampSeconds : 0}
-                        onChange={(event) => setSelectedTimestampSeconds(Number(event.target.value))}
-                        className="w-full"
-                      />
-                      <div className="flex items-center justify-between text-[11px] text-gray-400 mt-1">
-                        <span>0:00</span>
-                        <span>Now: {fmtTimer(currentTime)}</span>
-                        <span>{fmtTimer(durationSeconds)}</span>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {/* Video-only feedback: no caption/note field */}
                 </div>
-              </details>
+
+                {durationSeconds > 0 ? (
+                  <div>
+                    <input
+                      type="range"
+                      min="0"
+                      max={durationSeconds}
+                      step="1"
+                      value={typeof selectedTimestampSeconds === 'number' ? selectedTimestampSeconds : 0}
+                      onChange={(event) => setSelectedTimestampSeconds(Number(event.target.value))}
+                      className="w-full"
+                    />
+                    <div className="flex items-center justify-between text-[11px] text-gray-400 mt-1">
+                      <span>0:00</span>
+                      <span>Now: {fmtTimer(currentTime)}</span>
+                      <span>{fmtTimer(durationSeconds)}</span>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
 
               {submitting && responseFile ? (
                 <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 space-y-2">
