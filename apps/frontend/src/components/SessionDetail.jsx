@@ -114,6 +114,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const [selectedTeacher, setSelectedTeacher] = useState(null)
   const [recentTeachers, setRecentTeachers] = useState([])
   const [recentTeachersLoading, setRecentTeachersLoading] = useState(false)
+  const [creatingInvite, setCreatingInvite] = useState(false)
   const [showRequestDetails, setShowRequestDetails] = useState(false)
   const [showRequestHistory, setShowRequestHistory] = useState(false)
   const [showLegacyLinkTools, setShowLegacyLinkTools] = useState(false)
@@ -222,10 +223,12 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   }, [canCreateShareLink, canEdit, initialReviewRequestDraft, justUploaded, requestsLoading, reviewRequests.length, showRequestComposer])
 
   useEffect(() => {
-    if (showRequestComposer || showRequestHistory) {
+    if (showRequestComposer || showRequestHistory || reviewRequests.length > 0) {
       setShowLoopDetails(true)
+    } else {
+      setShowLoopDetails(false)
     }
-  }, [showRequestComposer, showRequestHistory])
+  }, [reviewRequests.length, showRequestComposer, showRequestHistory])
 
   useEffect(() => {
     if (!showRequestComposer) return
@@ -515,23 +518,59 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     }
   }
 
+  const ensurePrivateLink = async () => {
+    if (activeReviewLink?.url) return activeReviewLink
+    const res = await fetch(`/api/sessions/${session.id}/share/`, {
+      method: 'POST',
+      headers: authHeaders,
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data?.error || 'Could not create private feedback link')
+    setActiveReviewLink(data)
+    return data
+  }
+
   const createShare = async () => {
     if (!token || !session?.id) return
     setSharing(true)
     try {
-      const res = await fetch(`/api/sessions/${session.id}/share/`, {
-        method: 'POST',
-        headers: authHeaders,
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data?.error || 'Could not create private feedback link')
-      setActiveReviewLink(data)
+      const data = await ensurePrivateLink()
       await navigator.clipboard.writeText(data.url)
-      toast.success(res.status === 201 ? 'Private feedback link created' : 'Private feedback link copied')
+      toast.success('Private feedback link copied')
     } catch (error) {
       toast.error(error?.message || 'Could not create private feedback link')
     } finally {
       setSharing(false)
+    }
+  }
+
+  const inviteNewReviewer = async () => {
+    if (!token || !session?.id) return
+    setCreatingInvite(true)
+    try {
+      const linkData = await ensurePrivateLink()
+      const inviteRes = await fetch('/api/invite-codes/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
+        body: JSON.stringify({ label: `Review ${session.title}` }),
+      })
+      const inviteData = await inviteRes.json().catch(() => ({}))
+      if (!inviteRes.ok) throw new Error(inviteData?.error || 'Could not create invite code')
+      const message = [
+        'You have been invited to join Practica and review a private video.',
+        '',
+        `Invite code: ${inviteData.code}`,
+        `Private feedback link: ${linkData.url}`,
+      ].join('\n')
+      await navigator.clipboard.writeText(message)
+      toast.success('Invite message copied')
+    } catch (error) {
+      toast.error(error?.message || 'Could not create invite message')
+    } finally {
+      setCreatingInvite(false)
     }
   }
 
@@ -895,7 +934,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                     ) : null}
                     {!waitingOnTeacher && !readyForFollowUp ? (
                       <button type="button" onClick={openRequestComposer} disabled={!canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                        {selectedTeacherName ? `Send to ${selectedTeacherName}` : 'Request feedback'}
+                        Request feedback
                       </button>
                     ) : null}
                   </div>
@@ -965,29 +1004,13 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 <div ref={loopDetailsRef} className="rounded-xl border border-gray-200 bg-white px-4 py-3 space-y-4">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">{justUploadedWithoutRequest ? 'Send this take' : 'Loop details'}</p>
-                      <p className="text-xs text-gray-500 mt-1">{justUploadedWithoutRequest ? 'Send it now.' : 'Optional.'}</p>
+                      <p className="text-sm font-semibold text-gray-900">{reviewRequests.length > 0 ? 'Review requests' : 'Request feedback'}</p>
+                      <p className="text-xs text-gray-500 mt-1">{reviewRequests.length > 0 ? `${reviewRequests.length} request${reviewRequests.length === 1 ? '' : 's'} on this video.` : 'Privately send this take to a trusted person.'}</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {!showLoopDetails && !showRequestComposer ? (
-                        <button
-                          type="button"
-                          onClick={openRequestComposer}
-                          disabled={!canCreateShareLink}
-                          className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors"
-                        >
-                          {selectedTeacherName ? `Request from ${selectedTeacherName}` : 'Request review'}
-                        </button>
-                      ) : null}
-                      {!justUploadedWithoutRequest ? (
-                        <button type="button" onClick={toggleLoopDetails} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors">
-                          {showLoopDetails ? 'Hide details' : 'Show details'}
-                        </button>
-                      ) : null}
-                    </div>
+                    <div className="flex items-center gap-2" />
                   </div>
 
-                  {showLoopDetails && showRequestComposer ? (
+                  {showRequestComposer ? (
                     <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-4">
                       {!canCreateShareLink ? (
                         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
@@ -1057,27 +1080,38 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                         )}
                       </div>
 
+                      <div className="rounded-lg border border-gray-200 bg-white px-3 py-3 space-y-2">
+                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Other ways</p>
+                        <div className="flex flex-wrap gap-2">
+                          <button type="button" onClick={inviteNewReviewer} disabled={creatingInvite || !canCreateShareLink} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2 hover:bg-gray-50 disabled:opacity-50 transition-colors">
+                            {creatingInvite ? 'Creating invite…' : 'Invite someone new'}
+                          </button>
+                          <button type="button" onClick={createShare} disabled={sharing || !canCreateShareLink} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2 hover:bg-gray-50 disabled:opacity-50 transition-colors">
+                            {sharing ? 'Creating link…' : 'Copy private feedback link'}
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-500">Use a member search, invite someone new, or send a private feedback link.</p>
+                      </div>
+
                       {/* Title of the practice thread is sufficient context; no extra request fields */}
 
-                      <div className="flex justify-end">
+                      <div className="flex justify-end gap-2">
+                        <button type="button" onClick={() => setShowRequestComposer(false)} className="text-sm text-gray-600 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
+                          Cancel
+                        </button>
                         <button type="button" disabled={creatingRequest || !canCreateShareLink} onClick={createReviewRequest} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                          {creatingRequest ? (selectedTeacherName ? `Sending to ${selectedTeacherName}…` : 'Sending…') : (selectedTeacherName ? `Send to ${selectedTeacherName}` : 'Send request')}
+                          {creatingRequest ? 'Sending…' : 'Send request'}
                         </button>
                       </div>
                     </div>
                   ) : null}
 
-                  {!showLoopDetails ? null : requestsLoading ? (
+                  {requestsLoading ? (
                     <div className="rounded-xl border border-gray-200 px-4 py-5 text-center text-sm text-gray-500">Loading feedback requests…</div>
-                  ) : reviewRequests.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-gray-200 px-4 py-5 text-center">
-                      <p className="text-sm text-gray-600">No feedback requests for this video yet.</p>
-                      <p className="text-xs text-gray-400 mt-1">Create one when you want a repeatable proof → feedback → retry loop with someone specific.</p>
-                    </div>
-                  ) : (
+                  ) : reviewRequests.length > 0 ? (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-xs text-gray-500">{reviewRequests.length} request{reviewRequests.length === 1 ? '' : 's'} on this video</p>
+                        <p className="text-xs text-gray-500">Recent requests on this video</p>
                         <button type="button" onClick={() => setShowRequestHistory((current) => !current)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
                           {showRequestHistory ? 'Hide request history' : 'Show request history'}
                         </button>
@@ -1252,7 +1286,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                         </div>
                       )}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               ) : null}
 
