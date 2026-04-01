@@ -8,7 +8,7 @@ import AuthForm from './components/AuthForm'
 import ReviewPage from './components/ReviewPage'
 import SessionUpload from './components/SessionUpload'
 import { isLikelyVideoFile, videoFileAccept } from './utils'
-import HeaderCreateButtons from './components/HeaderCreateButtons'
+// Inline header create buttons to avoid any chance of circular init
 import SessionDetail from './components/SessionDetail'
 import LibraryView from './components/LibraryView'
 import SeriesView from './components/SeriesView'
@@ -339,19 +339,7 @@ function AppContent() {
     return () => window.removeEventListener('practica:header-upload', handler)
   }, [navigate])
 
-  const [showRecordMenu, setShowRecordMenu] = React.useState(false)
-  React.useEffect(() => {
-    if (!showRecordMenu) return
-    const onClick = (e) => {
-      // Close when clicking outside the menu or button
-      const target = e.target
-      // Best effort: if click happens within a button or menu (role), skip
-      if (target.closest && target.closest('.record-menu-keep')) return
-      setShowRecordMenu(false)
-    }
-    document.addEventListener('click', onClick)
-    return () => document.removeEventListener('click', onClick)
-  }, [showRecordMenu])
+  // no dropdown menu state
 
   const handleRecordAnother = useCallback((draft = null) => {
     setSelectedSession(null)
@@ -469,7 +457,22 @@ function AppContent() {
             ) : null}
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <HeaderCreateButtons onRecord={startQuickRecord} />
+            <button
+              onClick={startQuickRecord}
+              className="hidden sm:inline-flex rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
+            >
+              Record
+            </button>
+            <button
+              onClick={() => uploadInputRef.current?.click()}
+              className="hidden sm:inline-flex rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors"
+            >
+              Upload
+            </button>
+            <input ref={uploadInputRef} type="file" accept={videoFileAccept()} className="hidden" onChange={(e) => {
+              const f = e.target?.files?.[0]; e.target.value = '';
+              if (!f || !isLikelyVideoFile(f)) return; setPrefillUploadFile(f); setOpenRecorderOnUpload(false); navigate({ view: 'upload', sessionId: null })
+            }} />
             <div className="flex items-center gap-2 sm:border-l sm:border-gray-100 sm:pl-3">
               <NotificationsBell
                 token={token}
