@@ -15,6 +15,7 @@ import SeriesView from './components/SeriesView'
 import RequestsView from './components/TeachingView'
 import PrivacyPage from './components/PrivacyPage'
 import CalendarView from './components/CalendarView'
+import RecorderModal from './components/RecorderModal'
 
 const parseRoute = (pathname) => {
   if (pathname === '/') {
@@ -339,6 +340,19 @@ function AppContent() {
     return () => window.removeEventListener('practica:header-upload', handler)
   }, [navigate])
 
+  // Global modal recorder
+  const [showRecorderModal, setShowRecorderModal] = useState(false)
+  const openGlobalRecorder = useCallback(() => {
+    const supported = typeof window !== 'undefined' && typeof window.MediaRecorder !== 'undefined' && !!(navigator.mediaDevices?.getUserMedia)
+    if (supported) {
+      setShowRecorderModal(true)
+      return
+    }
+    // Fallback: go to upload and use native capture
+    setOpenRecorderOnUpload(true)
+    navigate({ view: 'upload', sessionId: null })
+  }, [navigate])
+
   // no dropdown menu state
 
   const handleRecordAnother = useCallback((draft = null) => {
@@ -458,7 +472,7 @@ function AppContent() {
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <button
-              onClick={startQuickRecord}
+              onClick={openGlobalRecorder}
               className="hidden sm:inline-flex rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
             >
               Record
@@ -518,7 +532,7 @@ function AppContent() {
           ) : null}
           <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={startQuickRecord}
+              onClick={openGlobalRecorder}
               className="w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
             >
               Record
@@ -690,6 +704,16 @@ function AppContent() {
           />
         )}
       </main>
+      {showRecorderModal ? (
+        <RecorderModal
+          onClose={() => setShowRecorderModal(false)}
+          onRecorded={(file) => {
+            setPrefillUploadFile(file)
+            setOpenRecorderOnUpload(false)
+            navigate({ view: 'upload', sessionId: null })
+          }}
+        />
+      ) : null}
     </div>
   )
 }
