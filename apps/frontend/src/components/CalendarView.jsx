@@ -21,6 +21,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
   const [activeMonth, setActiveMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
   const [selectedDateKey, setSelectedDateKey] = useState(formatKey(today))
   const [showDayModal, setShowDayModal] = useState(false)
+  const [newestFirst, setNewestFirst] = useState(true)
 
   const monthBounds = useMemo(() => {
     const firstOfMonth = new Date(activeMonth.getFullYear(), activeMonth.getMonth(), 1)
@@ -67,11 +68,26 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
       if (!groups.has(key)) groups.set(key, [])
       groups.get(key).push(s)
     })
-    return Array.from(groups.entries()).map(([seriesName, items]) => ({
-      seriesName,
-      items: items.slice().sort((a, b) => new Date(a.recorded_at || a.created_at) - new Date(b.recorded_at || b.created_at)),
-    }))
-  }, [selectedSessions])
+    const groupArray = Array.from(groups.entries()).map(([seriesName, items]) => {
+      const sortedItems = items
+        .slice()
+        .sort((a, b) => {
+          const ta = new Date(a.recorded_at || a.created_at)
+          const tb = new Date(b.recorded_at || b.created_at)
+          return newestFirst ? (tb - ta) : (ta - tb)
+        })
+      return { seriesName, items: sortedItems }
+    })
+    // Sort groups by their first item's timestamp
+    groupArray.sort((ga, gb) => {
+      const fa = ga.items[0]
+      const fb = gb.items[0]
+      const ta = fa ? new Date(fa.recorded_at || fa.created_at) : 0
+      const tb = fb ? new Date(fb.recorded_at || fb.created_at) : 0
+      return newestFirst ? (tb - ta) : (ta - tb)
+    })
+    return groupArray
+  }, [newestFirst, selectedSessions])
 
   const gotoPrevMonth = useCallback(() => {
     setActiveMonth((cur) => new Date(cur.getFullYear(), cur.getMonth() - 1, 1))
@@ -148,7 +164,17 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
                   <p className="text-sm font-semibold text-gray-900">{selectedDateKey}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{selectedSessions.length} {selectedSessions.length === 1 ? 'take' : 'takes'}</p>
                 </div>
-                <button type="button" onClick={() => setShowDayModal(false)} className="text-xs text-gray-500 hover:text-gray-900 rounded-lg border border-gray-200 px-2 py-1">Close</button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewestFirst((v) => !v)}
+                    className={`text-[11px] rounded-full px-2.5 py-1 border ${newestFirst ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
+                    title="Toggle sort order"
+                  >
+                    {newestFirst ? 'Newest first' : 'Oldest first'}
+                  </button>
+                  <button type="button" onClick={() => setShowDayModal(false)} className="text-xs text-gray-500 hover:text-gray-900 rounded-lg border border-gray-200 px-2 py-1">Close</button>
+                </div>
               </div>
               <div className="p-4 overflow-y-auto">
                 {sessionsLoading ? (
