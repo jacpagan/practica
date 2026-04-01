@@ -899,6 +899,14 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       </button>
                     ) : null}
                   </div>
+                  <div className="flex flex-wrap gap-2 border-t border-gray-200 pt-3">
+                    <button type="button" onClick={startEditing} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
+                      Edit video
+                    </button>
+                    <button type="button" onClick={deleteSession} disabled={deleting} className="text-sm text-red-600 border border-red-200 rounded-lg px-4 py-2.5 hover:bg-red-50 disabled:opacity-50 transition-colors">
+                      {deleting ? 'Deleting…' : 'Delete video'}
+                    </button>
+                  </div>
                 </div>
               ) : null}
 
@@ -1254,20 +1262,10 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                   <button type="button" onClick={refreshSession} disabled={refreshing} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 disabled:opacity-50 transition-colors">
                     {refreshing ? 'Refreshing…' : 'Refresh'}
                   </button>
-                  {canEdit ? (
-                    <button type="button" onClick={startEditing} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors">
-                      Edit
-                    </button>
-                  ) : null}
                   {canEdit && session.video_file ? (
                     <a href={videoUrl(session.video_file)} download className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors">
                       Download original
                     </a>
-                  ) : null}
-                  {canEdit ? (
-                    <button type="button" onClick={deleteSession} disabled={deleting} className="text-sm text-red-600 border border-red-200 rounded-lg px-4 py-2.5 hover:bg-red-50 disabled:opacity-50 transition-colors">
-                      {deleting ? 'Deleting…' : 'Delete'}
-                    </button>
                   ) : null}
                 </div>
               </details>
