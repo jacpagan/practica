@@ -677,10 +677,10 @@ function AppContent() {
         {view === 'record' && (
           <RecorderPage
             onCancel={() => navigate({ view: 'calendar', sessionId: null })}
-            onRecorded={(file) => {
-              setPrefillUploadFile(file)
-              setOpenRecorderOnUpload(false)
-              navigate({ view: 'upload', sessionId: null })
+            onComplete={(sessionData) => {
+              setSelectedSession(sessionData)
+              setSessions((current) => [{ ...sessionData }, ...current])
+              navigate({ view: 'detail', sessionId: sessionData.id })
             }}
           />
         )}
