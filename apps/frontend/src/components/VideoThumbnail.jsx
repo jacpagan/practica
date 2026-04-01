@@ -3,8 +3,10 @@ import { sessionVideoSources } from '../utils'
 
 function VideoThumbnail({ session, className = '' }) {
   const videoRef = useRef(null)
+  const wrapperRef = useRef(null)
   const [frameReady, setFrameReady] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [visible, setVisible] = useState(false)
   const sources = useMemo(() => sessionVideoSources(session), [session])
   const [sourceIndex, setSourceIndex] = useState(0)
   const source = sources[sourceIndex] || ''
@@ -41,16 +43,29 @@ function VideoThumbnail({ session, className = '' }) {
     setFailed(true)
   }
 
-  if (!source || failed || session?.processing_status !== 'ready') {
+  // Lazy visibility observer to avoid decoding when off-screen
+  useEffect(() => {
+    const el = wrapperRef.current
+    if (!el) return
+    const io = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) { setVisible(true); io.disconnect(); break }
+      }
+    }, { rootMargin: '150px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+
+  if (!source || failed || session?.processing_status !== 'ready' || !visible) {
     return (
-      <div className={`bg-gray-100 flex items-center justify-center text-[11px] uppercase tracking-wide text-gray-400 ${className}`}>
-        No preview
+      <div ref={wrapperRef} className={`bg-gray-100 flex items-center justify-center text-[11px] uppercase tracking-wide text-gray-400 ${className}`}>
+        {visible ? 'No preview' : 'Loading'}
       </div>
     )
   }
 
   return (
-    <div className={`relative bg-black overflow-hidden ${className}`}>
+    <div ref={wrapperRef} className={`relative bg-black overflow-hidden ${className}`}>
       <video
         key={source}
         ref={videoRef}
