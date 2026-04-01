@@ -149,6 +149,15 @@ Deployment strategy:
 - Local development uses SQLite by default.
 - Sensitive values belong in environment variables, not in git.
 
+### Secrets Management
+
+- Do not commit `.env` or `.env.*` files with real values. Use `.env.template` and `env.example` for reference only.
+- Production deploys read environment from the GitHub Actions secret `ENV_PRODUCTION` (written remotely on the host during deploy).
+- The CI pipeline includes a guard (`scripts/guard-no-secrets.sh`) that fails if:
+  - Any tracked `.env`/`.env.*` file (other than `.env.template` or `env.example`) is present, or
+  - Tracked files contain assignments to common secrets like `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, or `DJANGO_SECRET_KEY`.
+- If a secret is ever committed, rotate it immediately and remove the file from git history (e.g., with `git filter-repo`), then force-push and rebase open branches.
+
 ## License
 
 Personal use only unless explicitly relicensed.

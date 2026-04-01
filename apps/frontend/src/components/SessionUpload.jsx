@@ -192,6 +192,16 @@ function SessionUpload({
     setVideoFile(file)
     if (!titleManuallyEdited) setTitle(seriesBasedTitle(practiceSeries))
     replaceOwnedPreviewUrl(URL.createObjectURL(file))
+    // Offer Undo: clear selection and reopen recorder
+    try {
+      toast.successAction('Recording selected', {
+        label: 'Undo',
+        onClick: () => {
+          clearSelectedVideo()
+          setShowRecorder(true)
+        },
+      })
+    } catch {}
   }
 
   // Accept a video via helper (used by paste handler)
@@ -414,7 +424,13 @@ function SessionUpload({
               <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Recorder limits</p>
               <p className="text-sm text-amber-900 mt-1">You can record up to {Math.round(MAX_RECORDER_DURATION_SECONDS / 60)} minutes in Practica’s built-in recorder.</p>
             </div>
-            <VideoRecorder onRecorded={handleRecorded} onCancel={() => setShowRecorder(false)} maxDuration={MAX_RECORDER_DURATION_SECONDS} />
+            <VideoRecorder
+              onRecorded={handleRecorded}
+              onCancel={() => setShowRecorder(false)}
+              maxDuration={MAX_RECORDER_DURATION_SECONDS}
+              autoUseOnStop={true}
+              minAutoUseSeconds={2}
+            />
           </div>
         ) : null}
 

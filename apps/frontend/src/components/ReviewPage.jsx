@@ -277,6 +277,21 @@ function ReviewPage({ reviewToken = '' }) {
     setUploadProgressLoaded(0)
     setUploadProgressTotal(file.size || 0)
     replaceOwnedPreviewUrl(URL.createObjectURL(file))
+    // Offer Undo: clear response and reopen recorder
+    try {
+      toast.successAction('Recording selected', {
+        label: 'Undo',
+        onClick: () => {
+          setResponseFile(null)
+          submitUploadIdRef.current = ''
+          setUploadProgressPercent(null)
+          setUploadProgressLoaded(0)
+          setUploadProgressTotal(0)
+          replaceOwnedPreviewUrl('')
+          setShowRecorder(true)
+        },
+      })
+    } catch {}
   }
 
   const beginEditingFeedback = (item) => {
@@ -605,7 +620,15 @@ function ReviewPage({ reviewToken = '' }) {
               <p className="text-xs text-gray-500">Recorder: {Math.round(MAX_RECORDER_DURATION_SECONDS / 60)} min • Upload: {Math.round(MAX_VIDEO_UPLOAD_BYTES / (1024 * 1024 * 1024))}GB</p>
             </div>
 
-            {showRecorder ? <VideoRecorder onRecorded={handleRecorded} onCancel={() => setShowRecorder(false)} maxDuration={MAX_RECORDER_DURATION_SECONDS} /> : null}
+            {showRecorder ? (
+              <VideoRecorder
+                onRecorded={handleRecorded}
+                onCancel={() => setShowRecorder(false)}
+                maxDuration={MAX_RECORDER_DURATION_SECONDS}
+                autoUseOnStop={true}
+                minAutoUseSeconds={2}
+              />
+            ) : null}
 
             {responsePreviewUrl ? (
               <div className="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-3">

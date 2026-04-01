@@ -20,7 +20,7 @@ const readSyncOffsetMs = () => {
   return 0
 }
 
-function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
+function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop = true, minAutoUseSeconds = 2 }) {
   const [state, setState] = useState(STATES.IDLE)
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState(null)
@@ -282,6 +282,11 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60 }) {
       setRecordedFile(file)
       cancelCountIn()
       stopStream()
+      // Auto-select the recorded video for the parent (optional + guard for accidental short clips)
+      const shouldAutoUse = Boolean(autoUseOnStop) && (Number(minAutoUseSeconds) <= 0 || Number(elapsed) >= Number(minAutoUseSeconds))
+      if (shouldAutoUse) {
+        try { onRecorded?.(file, blobUrlRef.current) } catch {}
+      }
       setState(STATES.RECORDED)
     }
 
