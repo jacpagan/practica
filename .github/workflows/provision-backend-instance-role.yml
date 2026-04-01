@@ -1,0 +1,62 @@
+name: Provision Backend Instance Role
+
+on:
+  workflow_dispatch:
+    inputs:
+      bucket_name:
+        description: "S3 bucket for media (AWS_STORAGE_BUCKET_NAME)"
+        required: true
+      mediaconvert_role_arn:
+        description: "Optional MediaConvert service role ARN"
+        required: false
+        default: ""
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@633666f66e0061ca3b725c73b2ec20cd13a8fdd1 # v3.1.2
+        with:
+          terraform_version: 1.6.6
+
+      - name: Terraform init
+        working-directory: infra/terraform/backend-instance-profile
+        run: terraform init -input=false
+
+      - name: Terraform apply
+        id: apply
+        working-directory: infra/terraform/backend-instance-profile
+        env:
+          TF_VAR_bucket_name: ${{ github.event.inputs.bucket_name }}
+          TF_VAR_mediaconvert_role_arn: ${{ github.event.inputs.mediaconvert_role_arn }}
+        run: |
+          set -euo pipefail
+          terraform apply -auto-approve -input=false
+          echo "role_arn=$(terraform output -raw role_arn)" >> $GITHUB_OUTPUT
+          echo "instance_profile_name=$(terraform output -raw instance_profile_name)" >> $GITHUB_OUTPUT
+
+      - name: Summary
+        run: |
+          {
+            echo "### Backend Instance Role Provisioned"
+            echo "- Role ARN: \`${{ steps.apply.outputs.role_arn }}\`"
+            echo "- Instance Profile: \`${{ steps.apply.outputs.instance_profile_name }}\`"
+            echo
+            echo "Next: Run 'Attach Backend Instance Profile' with the instance profile name."
+          } >> $GITHUB_STEP_SUMMARY
+
