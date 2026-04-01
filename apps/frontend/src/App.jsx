@@ -537,6 +537,7 @@ function AppContent() {
             sessions={sessions}
             sessionsLoading={sessionsLoading}
             onOpenSession={(session) => navigate({ view: 'detail', sessionId: session.id })}
+            onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
           />
         )}
 

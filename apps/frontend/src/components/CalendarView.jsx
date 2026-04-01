@@ -16,10 +16,11 @@ const formatKey = (d) => {
   return `${yyyy}-${mm}-${dd}`
 }
 
-function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession }) {
+function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, onOpenSeries }) {
   const today = startOfDay(new Date())
   const [activeMonth, setActiveMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
   const [selectedDateKey, setSelectedDateKey] = useState(formatKey(today))
+  const [showDayModal, setShowDayModal] = useState(false)
 
   const monthBounds = useMemo(() => {
     const firstOfMonth = new Date(activeMonth.getFullYear(), activeMonth.getMonth(), 1)
@@ -59,6 +60,19 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession })
 
   const selectedSessions = useMemo(() => sessionsByDate.get(selectedDateKey) || [], [sessionsByDate, selectedDateKey])
 
+  const sessionsByThread = useMemo(() => {
+    const groups = new Map()
+    selectedSessions.forEach((s) => {
+      const key = String(s.practice_series || '').trim() || '(no thread)'
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key).push(s)
+    })
+    return Array.from(groups.entries()).map(([seriesName, items]) => ({
+      seriesName,
+      items: items.slice().sort((a, b) => new Date(a.recorded_at || a.created_at) - new Date(b.recorded_at || b.created_at)),
+    }))
+  }, [selectedSessions])
+
   const gotoPrevMonth = useCallback(() => {
     setActiveMonth((cur) => new Date(cur.getFullYear(), cur.getMonth() - 1, 1))
   }, [])
@@ -96,7 +110,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession })
                 <button
                   key={d.key}
                   type="button"
-                  onClick={() => setSelectedDateKey(d.key)}
+                  onClick={() => { setSelectedDateKey(d.key); setShowDayModal(true) }}
                   className={`h-20 rounded-xl border text-left p-2 transition-colors ${
                     isSelected ? 'border-gray-900 bg-gray-900/5' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
                   } ${d.inMonth ? '' : 'opacity-50'}`}
@@ -118,49 +132,71 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession })
           </div>
         </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-3">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <p className="text-sm font-semibold text-gray-900">{selectedDateKey}</p>
-              <p className="text-xs text-gray-500 mt-1">{selectedSessions.length} {selectedSessions.length === 1 ? 'take' : 'takes'}</p>
+        {/* Day modal: groups by practice thread and lists sessions */}
+        {showDayModal ? (
+          <div className="fixed inset-0 z-50">
+            <div className="absolute inset-0 bg-black/30" onClick={() => setShowDayModal(false)} />
+            <div className="absolute inset-x-4 sm:inset-x-auto sm:right-6 sm:w-[520px] top-10 bottom-10 rounded-2xl bg-white shadow-xl border border-gray-200 flex flex-col">
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{selectedDateKey}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{selectedSessions.length} {selectedSessions.length === 1 ? 'take' : 'takes'}</p>
+                </div>
+                <button type="button" onClick={() => setShowDayModal(false)} className="text-xs text-gray-500 hover:text-gray-900 rounded-lg border border-gray-200 px-2 py-1">Close</button>
+              </div>
+              <div className="p-4 overflow-y-auto">
+                {sessionsLoading ? (
+                  <div className="rounded-xl bg-gray-50 px-4 py-4 text-sm text-gray-500">Loading…</div>
+                ) : sessionsByThread.length === 0 ? (
+                  <p className="text-sm text-gray-500">No takes on this day.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {sessionsByThread.map((group) => (
+                      <div key={group.seriesName} className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs uppercase tracking-wide text-gray-500">{group.seriesName}</p>
+                          {group.seriesName !== '(no thread)' && (
+                            <button
+                              type="button"
+                              onClick={() => onOpenSeries?.(group.seriesName)}
+                              className="text-xs text-gray-600 hover:text-gray-900"
+                            >
+                              Open thread
+                            </button>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          {group.items.map((session) => (
+                            <button
+                              key={session.id}
+                              type="button"
+                              onClick={() => onOpenSession?.(session, { view: 'calendar' })}
+                              className="w-full text-left rounded-xl border border-gray-200 px-3 py-3 hover:bg-gray-50 transition-colors"
+                            >
+                              <div className="flex items-start gap-3">
+                                <VideoThumbnail session={session} className="relative w-24 h-16 rounded-lg shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium text-gray-900 line-clamp-1">{session.title || 'Untitled'}</p>
+                                  <p className="text-xs text-gray-500 mt-1">{new Date(session.recorded_at || session.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</p>
+                                  {session.video_feedback_count ? (
+                                    <p className="text-[11px] text-gray-500 mt-1">{session.video_feedback_count} {session.video_feedback_count === 1 ? 'reply' : 'replies'}</p>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-
-          {sessionsLoading ? (
-            <div className="rounded-xl bg-gray-50 px-4 py-4 text-sm text-gray-500">Loading…</div>
-          ) : selectedSessions.length === 0 ? (
-            <p className="text-sm text-gray-500">No takes on this day.</p>
-          ) : (
-            <div className="space-y-3">
-              {selectedSessions
-                .slice()
-                .sort((a, b) => new Date(a.recorded_at || a.created_at) - new Date(b.recorded_at || b.created_at))
-                .map((session) => (
-                <button
-                  key={session.id}
-                  type="button"
-                  onClick={() => onOpenSession?.(session, { view: 'calendar' })}
-                  className="w-full text-left rounded-2xl border border-gray-200 px-4 py-4 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-start gap-3">
-                    <VideoThumbnail session={session} className="relative w-24 h-16 rounded-xl shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 line-clamp-1">{session.title || 'Untitled'}</p>
-                      <p className="text-xs text-gray-500 mt-1">{new Date(session.recorded_at || session.created_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</p>
-                      {session.video_feedback_count ? (
-                        <p className="text-[11px] text-gray-500 mt-1">{session.video_feedback_count} {session.video_feedback_count === 1 ? 'reply' : 'replies'}</p>
-                      ) : null}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        ) : null}
       </div>
     </div>
   )
 }
 
 export default CalendarView
-
