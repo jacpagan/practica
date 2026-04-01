@@ -1,6 +1,8 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react'
 import VideoThumbnail from './VideoThumbnail'
 import SessionListItem from './SessionListItem'
+import ThreadPickerModal from './ThreadPickerModal'
+import { useAuth } from '../auth'
 
 const monthLabel = (date) => date.toLocaleString(undefined, { month: 'long', year: 'numeric' })
 
@@ -26,6 +28,10 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
   })()
   const [selectedDateKey, setSelectedDateKey] = useState(initialSelected)
   const [showDayModal, setShowDayModal] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const threadOptions = useMemo(() => Array.from(new Set(sessions.map(s => String(s.practice_series || '').trim()).filter(Boolean))).sort(), [sessions])
+  const { token } = useAuth()
   const SORT_KEY = 'practica.sort.newestFirst.v1'
   const readSort = () => {
     try { return (window.localStorage.getItem(SORT_KEY) || 'true') === 'true' } catch { return true }
@@ -218,7 +224,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
                         </div>
                         <div className="space-y-2">
                           {group.items.map((session) => (
-                            <SessionListItem key={session.id} session={session} onOpen={() => onOpenSession?.(session, { view: 'calendar' })} />
+                            <SessionListItem key={session.id} session={session} onOpen={() => onOpenSession?.(session, { view: 'calendar' })} onChangeThread={() => setEditing(session)} />
                           ))}
                         </div>
                       </div>
@@ -229,6 +235,28 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
             </div>
           </div>
         ) : null}
+        <ThreadPickerModal
+          open={Boolean(editing)}
+          title={`${editing?.practice_series ? 'Change' : 'Add to'} thread`}
+          initialValue={editing?.practice_series || ''}
+          options={threadOptions}
+          saving={saving}
+          onClose={() => setEditing(null)}
+          onSave={async (val) => {
+            if (!editing?.id || !token) return
+            setSaving(true)
+            try {
+              const res = await fetch(`/api/sessions/${editing.id}/`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', Authorization: `Token ${token}` },
+                body: JSON.stringify({ practice_series: val }),
+              })
+              await res.json().catch(() => ({}))
+            } catch {}
+            setSaving(false)
+            setEditing(null)
+          }}
+        />
       </div>
     </div>
   )

@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { fmtDate } from '../utils'
 import VideoThumbnail from './VideoThumbnail'
 import SessionListItem from './SessionListItem'
+import ThreadPickerModal from './ThreadPickerModal'
 
 const requestStatusTone = {
   requested: 'bg-amber-100 text-amber-800',
@@ -20,6 +21,9 @@ const requestStatusLabel = (value = '') => {
 }
 
 function SeriesView({ seriesName = '', sessions = [], reviewRequests = [], onBack, onOpenSession, onCreateVideo }) {
+  const [editing, setEditing] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const threadOptions = useMemo(() => Array.from(new Set(sessions.map(s => String(s.practice_series || '').trim()).filter(Boolean))).sort(), [sessions])
   const seriesSessions = useMemo(() => {
     const filtered = sessions
       .filter((session) => session.can_edit && String(session.practice_series || '').trim() === String(seriesName || '').trim())
@@ -187,9 +191,32 @@ function SeriesView({ seriesName = '', sessions = [], reviewRequests = [], onBac
                     status={session.activeRequest?.status}
                     onOpen={() => onOpenSession?.(session, { view: 'series', seriesName })}
                     onRecordFollowUp={session.activeRequest ? () => onCreateVideo?.({ parent_request_id: session.activeRequest.id, practiceSeries: seriesName }) : null}
+                    onChangeThread={() => setEditing(session)}
                   />
                 ))}
               </div>
+              <ThreadPickerModal
+                open={Boolean(editing)}
+                title={`${editing?.practice_series ? 'Change' : 'Add to'} thread`}
+                initialValue={editing?.practice_series || ''}
+                options={threadOptions}
+                saving={saving}
+                onClose={() => setEditing(null)}
+                onSave={async (val) => {
+                  if (!editing?.id) return
+                  setSaving(true)
+                  try {
+                    const res = await fetch(`/api/sessions/${editing.id}/`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ practice_series: val }),
+                    })
+                    await res.json().catch(() => ({}))
+                  } catch {}
+                  setSaving(false)
+                  setEditing(null)
+                }}
+              />
             </div>
           </div>
         )}
