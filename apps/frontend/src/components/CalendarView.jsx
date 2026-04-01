@@ -20,7 +20,11 @@ const formatKey = (d) => {
 function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, onOpenSeries, onMonthChange, onOpenListDate }) {
   const today = startOfDay(new Date())
   const [activeMonth, setActiveMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
-  const [selectedDateKey, setSelectedDateKey] = useState(formatKey(today))
+  const DATE_FILTER_KEY = 'practica.filter.date.v1'
+  const initialSelected = (() => {
+    try { return window.localStorage.getItem(DATE_FILTER_KEY) || formatKey(today) } catch { return formatKey(today) }
+  })()
+  const [selectedDateKey, setSelectedDateKey] = useState(initialSelected)
   const [showDayModal, setShowDayModal] = useState(false)
   const SORT_KEY = 'practica.sort.newestFirst.v1'
   const readSort = () => {

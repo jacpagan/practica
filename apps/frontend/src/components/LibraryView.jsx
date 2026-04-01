@@ -291,46 +291,17 @@ function LibraryView({
   }
 
   const renderSessionRows = (items, returnRoute = { view: 'library', sessionId: null, seriesName: '' }) => items.map((session) => {
-    const activeSessionRequest = activeRequestBySessionId.get(Number(session.id))
-    const activeSessionRequestStatus = String(activeSessionRequest?.status || '').trim().toLowerCase()
-    const threadName = String(session.practice_series || '').trim()
-
+    const ar = activeRequestBySessionId.get(Number(session.id)) || null
+    const onFollowUp = ar ? () => onRecordFollowUp?.({ parent_request_id: ar.id, practiceSeries: session.practice_series || '' }) : null
     return (
-      <button
+      <SessionListItem
         key={session.id}
-        type="button"
-        onClick={() => onOpenSession?.(session, returnRoute)}
-        className="w-full text-left rounded-2xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3 min-w-0">
-            <VideoThumbnail session={session} className="relative w-24 h-16 rounded-xl shrink-0" />
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <p className="text-sm font-medium text-gray-900 line-clamp-1">{session.title}</p>
-                {threadName ? <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">{threadName}</span> : null}
-                {activeSessionRequest ? <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${requestStatusTone[activeSessionRequestStatus] || 'bg-gray-100 text-gray-700'}`}>{requestStatusLabel(activeSessionRequest.status)}</span> : null}
-              </div>
-              <p className="text-xs text-gray-500 mt-1">{fmtDate(session.recorded_at || session.created_at)}</p>
-              {session.description ? <p className="text-xs text-gray-500 mt-2 line-clamp-2">{session.description}</p> : null}
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); moveToThread(session) }} className="text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-white transition-colors">
-                  {threadName ? 'Change thread' : 'Add to thread'}
-                </button>
-                {threadName ? (
-                  <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); onOpenSeries?.(threadName) }} className="text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-white transition-colors">
-                    Open thread
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          </div>
-          <div className="text-right shrink-0">
-            <p className="text-xs text-gray-500">{session.video_feedback_count || 0} replies</p>
-            <p className="text-xs text-gray-400 mt-2">{activeSessionRequest ? 'Open loop' : 'Open'}</p>
-          </div>
-        </div>
-      </button>
+        session={session}
+        status={ar?.status}
+        showSeries={Boolean(String(session.practice_series || '').trim())}
+        onOpen={() => onOpenSession?.(session, returnRoute)}
+        onRecordFollowUp={onFollowUp}
+      />
     )
   })
 

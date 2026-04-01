@@ -2,7 +2,7 @@ import React from 'react'
 import VideoThumbnail from './VideoThumbnail'
 import StatusChip from './StatusChip'
 
-export default function SessionListItem({ session, onOpen, status = '', showSeries = false, highlight = false }) {
+export default function SessionListItem({ session, onOpen, status = '', showSeries = false, highlight = false, onRecordFollowUp = null }) {
   if (!session) return null
   const recordedAt = new Date(session.recorded_at || session.created_at)
   const replies = Number(session.video_feedback_count || 0)
@@ -31,12 +31,21 @@ export default function SessionListItem({ session, onOpen, status = '', showSeri
             <p className="text-xs text-gray-500 mt-1">{recordedAt.toLocaleString(undefined, { hour12: undefined })}</p>
           </div>
         </div>
-        <div className="text-right shrink-0">
+        <div className="text-right shrink-0 space-y-2">
           <p className="text-xs text-gray-500">{replies} {replies === 1 ? 'reply' : 'replies'}</p>
-          <p className="text-xs text-gray-400 mt-2">Open</p>
+          {onRecordFollowUp ? (
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRecordFollowUp?.() }}
+              className="text-[11px] px-2.5 py-1.5 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50"
+            >
+              Record follow-up
+            </button>
+          ) : (
+            <p className="text-xs text-gray-400">Open</p>
+          )}
         </div>
       </div>
     </button>
   )
 }
-
