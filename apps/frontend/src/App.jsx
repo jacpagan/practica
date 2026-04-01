@@ -17,14 +17,16 @@ import CalendarView from './components/CalendarView'
 import RecorderModal from './components/RecorderModal'
 import RecorderPage from './components/RecorderPage'
 
-const parseRoute = (pathname) => {
+const parseRoute = (pathname, search = '') => {
+  const params = new URLSearchParams(search || '')
+  const date = (params.get('date') || '').trim()
   if (pathname === '/') {
-    return { view: 'calendar', sessionId: null }
+    return { view: 'calendar', sessionId: null, date }
   }
   if (pathname === '/privacy') return { view: 'privacy', sessionId: null }
   if (pathname === '/archive') return { view: 'archive', sessionId: null }
-  if (pathname === '/calendar') return { view: 'calendar', sessionId: null }
-  if (pathname === '/library') return { view: 'library', sessionId: null }
+  if (pathname === '/calendar') return { view: 'calendar', sessionId: null, date }
+  if (pathname === '/library') return { view: 'library', sessionId: null, date }
   if (pathname === '/upload') return { view: 'upload', sessionId: null }
   if (pathname === '/record' || pathname === '/recording') return { view: 'record', sessionId: null }
   if (pathname === '/requests') return { view: 'requests', sessionId: null }
@@ -37,7 +39,7 @@ const parseRoute = (pathname) => {
   return { view: 'library', sessionId: null }
 }
 
-const routePath = ({ view, sessionId, token, seriesName }) => {
+const routePath = ({ view, sessionId, token, seriesName, date }) => {
   if (view === 'library') return '/library'
   if (view === 'privacy') return '/privacy'
   if (view === 'archive') return '/archive'
@@ -48,14 +50,16 @@ const routePath = ({ view, sessionId, token, seriesName }) => {
   if (view === 'series' && seriesName) return `/series/${encodeURIComponent(seriesName)}`
   if (view === 'review' && token) return `/r/${token}`
   if (view === 'detail' && sessionId) return `/sessions/${sessionId}`
-  return '/'
+  const base = '/'
+  if (date && (view === 'calendar' || view === 'library')) return `${view === 'calendar' ? '/' : '/library'}?date=${encodeURIComponent(date)}`
+  return base
 }
 
 function AppContent() {
   const { user, token, loading, logout } = useAuth()
   const toast = useToast()
   const confirm = useConfirm()
-  const initialRoute = useMemo(() => parseRoute(window.location.pathname), [])
+  const initialRoute = useMemo(() => parseRoute(window.location.pathname, window.location.search), [])
   const [view, setView] = useState(initialRoute.view)
   const [routeSessionId, setRouteSessionId] = useState(initialRoute.sessionId)
   const [routeSeriesName, setRouteSeriesName] = useState(initialRoute.seriesName || '')
@@ -166,7 +170,7 @@ function AppContent() {
 
   useEffect(() => {
     const onPopState = () => {
-      const route = parseRoute(window.location.pathname)
+      const route = parseRoute(window.location.pathname, window.location.search)
       const nextPath = routePath(route)
       if (uploadGuardRef.current.active && nextPath !== currentPathRef.current) {
         window.history.pushState(null, '', currentPathRef.current)
@@ -626,7 +630,7 @@ function AppContent() {
             onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
             onOpenListDate={(dateKey) => {
               try { window.localStorage.setItem('practica.filter.date.v1', String(dateKey || '')) } catch {}
-              navigate({ view: 'library', sessionId: null })
+              navigate({ view: 'library', sessionId: null, date: String(dateKey || '') })
             }}
             onMonthChange={(monthDate) => {
               // Compute month bounds and load only that range

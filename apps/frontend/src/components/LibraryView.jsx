@@ -185,10 +185,12 @@ function LibraryView({
   const [dateFilter, setDateFilter] = useState('')
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(DATE_FILTER_KEY)
+      const urlParams = new URLSearchParams(window.location.search)
+      const fromQuery = (urlParams.get('date') || '').trim()
+      const raw = fromQuery || window.localStorage.getItem(DATE_FILTER_KEY) || ''
       if (raw) {
         setDateFilter(raw)
-        window.localStorage.removeItem(DATE_FILTER_KEY)
+        if (!fromQuery) window.localStorage.removeItem(DATE_FILTER_KEY)
         setTimeout(() => {
           const anchor = document.getElementById(`date-${raw}`)
           if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'start' })
