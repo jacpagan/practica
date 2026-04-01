@@ -381,6 +381,9 @@ function AppContent() {
     if (view === 'privacy') {
       return <PrivacyPage signedIn={false} />
     }
+    if (view === 'review') {
+      return <ReviewPage reviewToken={reviewToken} />
+    }
     return <AuthForm />
   }
 

@@ -559,11 +559,11 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       })
       const inviteData = await inviteRes.json().catch(() => ({}))
       if (!inviteRes.ok) throw new Error(inviteData?.error || 'Could not create invite code')
+      const bundledUrl = `${linkData.url}${linkData.url.includes('?') ? '&' : '?'}claim=${encodeURIComponent(inviteData.code)}`
       const message = [
         'You have been invited to join Practica and review a private video.',
         '',
-        `Invite code: ${inviteData.code}`,
-        `Private feedback link: ${linkData.url}`,
+        `Open this private invite link: ${bundledUrl}`,
       ].join('\n')
       await navigator.clipboard.writeText(message)
       toast.success('Invite message copied')

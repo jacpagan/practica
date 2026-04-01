@@ -1,15 +1,26 @@
 import React, { useState } from 'react'
 import { useAuth } from '../auth'
 
-function AuthForm() {
+function AuthForm({
+  initialMode = 'login',
+  prefilledInviteCode = '',
+  contextTitle = '',
+  contextSubtitle = '',
+  inviteCodeLocked = false,
+  embedded = false,
+}) {
   const { login, register } = useAuth()
-  const [mode, setMode] = useState('login')
+  const normalizedInitialMode = initialMode === 'register' ? 'register' : 'login'
+  const [mode, setMode] = useState(normalizedInitialMode)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
-  const [inviteCode, setInviteCode] = useState('')
+  const [inviteCode, setInviteCode] = useState(prefilledInviteCode)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const title = contextTitle || 'Practica'
+  const subtitle = contextSubtitle || 'Private video reviews for music lessons.'
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -33,11 +44,11 @@ function AuthForm() {
   }
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center px-4">
-      <div className="w-full max-w-sm">
-        <h1 className="text-2xl font-semibold text-gray-900 text-center mb-1">Practica</h1>
+    <div className={embedded ? 'w-full' : 'min-h-screen bg-white flex items-center justify-center px-4'}>
+      <div className={`w-full max-w-sm ${embedded ? 'rounded-2xl border border-gray-200 bg-white px-6 py-6 shadow-sm' : ''}`}>
+        <h1 className="text-2xl font-semibold text-gray-900 text-center mb-1">{title}</h1>
 
-        <p className="text-sm text-gray-400 text-center mb-8">Private video reviews for music lessons.</p>
+        <p className="text-sm text-gray-400 text-center mb-8">{subtitle}</p>
         <div className="text-center mb-6">
           <a href="/privacy" className="text-xs text-gray-500 hover:text-gray-900 transition-colors">Privacy</a>
         </div>
@@ -81,10 +92,16 @@ function AuthForm() {
           {mode === 'register' && (
             <div>
               <label className="block text-xs text-gray-500 mb-1">Invite code</label>
-              <input type="text" value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
-                placeholder="Enter your invite code"
-                required />
+              {inviteCodeLocked && inviteCode ? (
+                <div className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
+                  {inviteCode}
+                </div>
+              ) : (
+                <input type="text" value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                  placeholder="Enter your invite code"
+                  required />
+              )}
             </div>
           )}
 

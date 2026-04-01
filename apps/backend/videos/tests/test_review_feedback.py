@@ -41,9 +41,12 @@ class ReviewFeedbackApiTests(APITestCase):
     def _video_file(self, name='feedback.mp4', content_type='video/mp4'):
         return SimpleUploadedFile(name, b'video-feedback-data', content_type=content_type)
 
-    def test_review_link_info_requires_login(self):
+    def test_review_link_info_returns_public_preview_without_login(self):
         response = self.client.get(f'/api/review/{self.link.token}/')
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['session']['title'], self.session.title)
+        self.assertEqual(response.data['link']['token'], self.link.token)
+        self.assertTrue(response.data['auth_required'])
 
     def test_private_link_feedback_requires_login(self):
         response = self.client.get(f'/api/review/{self.link.token}/feedback/')

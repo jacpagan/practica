@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { fmtTimer, MAX_RECORDER_DURATION_SECONDS, MAX_VIDEO_UPLOAD_BYTES, sessionVideoSources, videoUrl, isLikelyVideoFile, videoFileAccept, uploadMultipartRequest } from '../utils'
 import { useAuth } from '../auth'
+import AuthForm from './AuthForm'
 import VideoRecorder from './VideoRecorder'
 
 const reviewLinkLoadErrorState = ({ status, data }) => {
@@ -90,6 +91,13 @@ function ReviewPage({ reviewToken = '' }) {
   }
 
   const token = reviewToken || window.location.pathname.replace(/^\/r\//, '')
+  const claimCode = useMemo(() => {
+    try {
+      return (new URLSearchParams(window.location.search).get('claim') || '').trim().toUpperCase()
+    } catch {
+      return ''
+    }
+  }, [token])
 
   const replaceOwnedPreviewUrl = (nextUrl = '') => {
     if (ownedPreviewUrlRef.current) {
@@ -120,7 +128,7 @@ function ReviewPage({ reviewToken = '' }) {
   }, [session?.id, session?.video_file, JSON.stringify(session?.assets || [])])
 
   useEffect(() => {
-    if (!token || !authToken) return
+    if (!token) return
     let cancelled = false
 
     const load = async () => {
@@ -128,22 +136,26 @@ function ReviewPage({ reviewToken = '' }) {
       setError('')
       setLoadError(null)
       try {
-        const infoRes = await fetch(`/api/review/${token}/`, { headers: { Authorization: `Token ${authToken}` } })
+        const infoHeaders = authToken ? { Authorization: `Token ${authToken}` } : {}
+        const infoRes = await fetch(`/api/review/${token}/`, { headers: infoHeaders })
         const infoData = await infoRes.json().catch(() => ({}))
         if (!infoRes.ok) {
           throw { status: infoRes.status, data: infoData }
         }
 
-        const feedbackRes = await fetch(`/api/review/${token}/feedback/`, { headers: { Authorization: `Token ${authToken}` } })
-        const feedbackData = await feedbackRes.json().catch(() => ({}))
-        if (!feedbackRes.ok) {
-          throw { status: feedbackRes.status, data: feedbackData }
+        let feedbackData = []
+        if (authToken) {
+          const feedbackRes = await fetch(`/api/review/${token}/feedback/`, { headers: { Authorization: `Token ${authToken}` } })
+          feedbackData = await feedbackRes.json().catch(() => ({}))
+          if (!feedbackRes.ok) {
+            throw { status: feedbackRes.status, data: feedbackData }
+          }
         }
         if (cancelled) return
         setSession(infoData.session)
         setLink(infoData.link)
         setReviewRequest(infoData.feedback_request || infoData.review_request || null)
-        setFeedback(Array.isArray(feedbackData) ? feedbackData : [])
+        setFeedback(authToken && Array.isArray(feedbackData) ? feedbackData : [])
       } catch (loadFailure) {
         if (!cancelled) setLoadError(reviewLinkLoadErrorState(loadFailure || {}))
       } finally {
@@ -433,10 +445,6 @@ function ReviewPage({ reviewToken = '' }) {
     }
   }
 
-  if (!user) {
-    return null
-  }
-
   if (loading) {
     return <div className="min-h-screen bg-white flex items-center justify-center"><p className="text-sm text-gray-400">Opening private link…</p></div>
   }
@@ -449,6 +457,56 @@ function ReviewPage({ reviewToken = '' }) {
           <h1 className="text-xl font-semibold text-gray-900 mt-2">{loadError.title}</h1>
           <p className="text-sm text-gray-600 mt-3">{loadError.message}</p>
         </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    const reviewerName = reviewRequest?.reviewer?.display_name || reviewRequest?.reviewer?.username || reviewRequest?.teacher?.display_name || reviewRequest?.teacher?.username || ''
+    const ownerName = reviewRequest?.owner?.display_name || reviewRequest?.owner?.username || reviewRequest?.student?.display_name || reviewRequest?.student?.username || ''
+    const authTitle = claimCode ? 'Join Practica to review this video' : 'Log in to open this private review'
+    const authSubtitle = claimCode
+      ? 'Create your account once, then continue straight into the review page.'
+      : 'Private links stay inside trusted networks and require sign-in.'
+
+    return (
+      <div className="min-h-screen bg-white px-4 py-6 sm:px-6">
+        <main className="max-w-3xl mx-auto grid gap-6 lg:grid-cols-[1.1fr_0.9fr] items-start">
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Private review invite</p>
+              <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-2">{session?.title || 'Review this private video'}</h1>
+              <p className="text-sm text-gray-600 mt-2">
+                {reviewerName
+                  ? `${reviewerName} has been asked to review this privately in Practica.`
+                  : 'You have been invited to review this privately in Practica.'}
+              </p>
+              {ownerName ? <p className="text-xs text-gray-500 mt-2">Shared by {ownerName}.</p> : null}
+              {link?.expires_at ? <p className="text-xs text-gray-500 mt-1">Signed-in access only • expires {new Date(link.expires_at).toLocaleString(undefined, { hour12: undefined })}</p> : null}
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+              <div className="aspect-video bg-black">
+                <div className="w-full h-full flex items-center justify-center px-6 text-center text-sm text-white/70">
+                  Sign in to watch and respond.
+                </div>
+              </div>
+              <div className="p-4 space-y-2">
+                {session?.description ? <p className="text-sm text-gray-600">{session.description}</p> : null}
+                {reviewRequest?.goal ? <p className="text-sm text-gray-800">Goal: {reviewRequest.goal}</p> : null}
+              </div>
+            </div>
+          </div>
+
+          <AuthForm
+            initialMode={claimCode ? 'register' : 'login'}
+            prefilledInviteCode={claimCode}
+            inviteCodeLocked={Boolean(claimCode)}
+            contextTitle={authTitle}
+            contextSubtitle={authSubtitle}
+            embedded
+          />
+        </main>
       </div>
     )
   }

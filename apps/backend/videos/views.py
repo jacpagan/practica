@@ -190,6 +190,21 @@ def _mark_feedback_request_viewed(review_request, user):
     )
 
 
+def _public_review_request_preview(review_request):
+    if not review_request:
+        return None
+    return {
+        'id': review_request.id,
+        'status': review_request.status,
+        'instrument': review_request.instrument,
+        'goal': review_request.goal,
+        'owner': UserSummarySerializer(review_request.student).data,
+        'reviewer': UserSummarySerializer(review_request.teacher).data,
+        'owner_id': review_request.student_id,
+        'reviewer_id': review_request.teacher_id,
+    }
+
+
 _review_request_forbidden_response = _feedback_request_forbidden_response
 _review_request_visible_to_user = _feedback_request_visible_to_user
 _review_request_teacher_can_respond = _feedback_request_reviewer_can_respond
@@ -465,29 +480,33 @@ def client_error_view(request):
 
 @csrf_exempt
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def review_link_info(request, token):
     link, error_reason = _resolve_review_link(token)
     if error_reason:
         return _review_link_error_response(error_reason)
     review_request = getattr(link, 'review_request', None)
-    if review_request and not _review_request_visible_to_user(review_request, request.user):
+    if request.user.is_authenticated and review_request and not _review_request_visible_to_user(review_request, request.user):
         return _review_request_forbidden_response(
             'This review request is only available to the assigned reviewer and owner.'
         )
     ReviewLink.objects.filter(pk=link.pk).update(last_accessed_at=timezone.now())
     link.refresh_from_db(fields=['last_accessed_at'])
-    if review_request and review_request.status == ReviewRequest.STATUS_REQUESTED and request.user.id == review_request.teacher_id:
+    if request.user.is_authenticated and review_request and review_request.status == ReviewRequest.STATUS_REQUESTED and request.user.id == review_request.teacher_id:
         review_request.status = ReviewRequest.STATUS_OPENED
         review_request.opened_at = timezone.now()
         review_request.save(update_fields=['status', 'opened_at', 'updated_at'])
-    elif review_request and request.user.id == review_request.student_id:
+    elif request.user.is_authenticated and review_request and request.user.id == review_request.student_id:
         _mark_review_request_viewed(review_request, request.user)
         review_request.refresh_from_db()
-    request_payload = ReviewRequestSerializer(review_request, context={'request': request}).data if review_request else None
+    if request.user.is_authenticated:
+        request_payload = ReviewRequestSerializer(review_request, context={'request': request}).data if review_request else None
+    else:
+        request_payload = _public_review_request_preview(review_request)
     return Response({
         'session': PublicSessionSerializer(link.session, context={'request': request}).data,
         'link': ReviewLinkSerializer(link, context={'request': request}).data,
+        'auth_required': True,
         'review_request': request_payload,
         'feedback_request': request_payload,
     })
