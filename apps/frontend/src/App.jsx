@@ -37,13 +37,13 @@ const routePath = ({ view, sessionId, token, seriesName }) => {
   if (view === 'library') return '/library'
   if (view === 'privacy') return '/privacy'
   if (view === 'archive') return '/archive'
-  if (view === 'calendar') return '/calendar'
+  if (view === 'calendar') return '/'
   if (view === 'upload') return '/upload'
   if (view === 'requests') return '/requests'
   if (view === 'series' && seriesName) return `/series/${encodeURIComponent(seriesName)}`
   if (view === 'review' && token) return `/r/${token}`
   if (view === 'detail' && sessionId) return `/sessions/${sessionId}`
-  return '/calendar'
+  return '/'
 }
 
 function AppContent() {
@@ -111,6 +111,15 @@ function AppContent() {
       if (replace) window.history.replaceState(null, '', path)
       else window.history.pushState(null, '', path)
     }
+  }, [])
+
+  // Normalize URL on initial mount (e.g., convert /calendar to /)
+  useEffect(() => {
+    const desired = routePath({ view, sessionId: routeSessionId, token: reviewToken, seriesName: routeSeriesName })
+    if (desired !== window.location.pathname) {
+      try { window.history.replaceState(null, '', desired) } catch {}
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const requestAbortActiveUpload = useCallback(() => {
