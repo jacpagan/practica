@@ -116,7 +116,8 @@ function AppContent() {
     setReviewToken(nextRoute.token || '')
     setRouteDate(nextRoute.date || '')
     const path = routePath(nextRoute)
-    if (path !== window.location.pathname) {
+    const current = window.location.pathname + (window.location.search || '')
+    if (path !== current) {
       if (replace) window.history.replaceState(null, '', path)
       else window.history.pushState(null, '', path)
     }
