@@ -61,6 +61,7 @@ function AppContent() {
   const [view, setView] = useState(initialRoute.view)
   const [routeSessionId, setRouteSessionId] = useState(initialRoute.sessionId)
   const [routeSeriesName, setRouteSeriesName] = useState(initialRoute.seriesName || '')
+  const [routeDate, setRouteDate] = useState(initialRoute.date || '')
   const [reviewToken, setReviewToken] = useState(initialRoute.token || '')
   const [selectedSession, setSelectedSession] = useState(null)
   const [sessions, setSessions] = useState([])
@@ -113,6 +114,7 @@ function AppContent() {
     setRouteSessionId(nextRoute.sessionId ?? null)
     setRouteSeriesName(nextRoute.seriesName || '')
     setReviewToken(nextRoute.token || '')
+    setRouteDate(nextRoute.date || '')
     const path = routePath(nextRoute)
     if (path !== window.location.pathname) {
       if (replace) window.history.replaceState(null, '', path)
@@ -120,10 +122,11 @@ function AppContent() {
     }
   }, [])
 
-  // Normalize URL on initial mount (e.g., convert /calendar to /)
+  // Normalize URL on initial mount (e.g., convert /calendar to /), preserving query date if present
   useEffect(() => {
-    const desired = routePath({ view, sessionId: routeSessionId, token: reviewToken, seriesName: routeSeriesName })
-    if (desired !== window.location.pathname) {
+    const desired = routePath({ view, sessionId: routeSessionId, token: reviewToken, seriesName: routeSeriesName, date: routeDate })
+    const current = window.location.pathname + (window.location.search || '')
+    if (desired !== current) {
       try { window.history.replaceState(null, '', desired) } catch {}
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -163,8 +166,8 @@ function AppContent() {
   }, [])
 
   useEffect(() => {
-    currentPathRef.current = routePath({ view, sessionId: routeSessionId, token: reviewToken, seriesName: routeSeriesName })
-  }, [reviewToken, routeSessionId, routeSeriesName, view])
+    currentPathRef.current = routePath({ view, sessionId: routeSessionId, token: reviewToken, seriesName: routeSeriesName, date: routeDate })
+  }, [reviewToken, routeDate, routeSessionId, routeSeriesName, view])
 
   useEffect(() => {
     const onPopState = () => {
