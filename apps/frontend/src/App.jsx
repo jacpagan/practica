@@ -171,6 +171,16 @@ function AppContent() {
   }, [reviewToken, routeDate, routeSessionId, routeSeriesName, view])
 
   useEffect(() => {
+    const onAuthExpired = () => {
+      try { toast.error('Session expired. Please sign in again.') } catch {}
+      try { logout() } catch {}
+      try { navigate({ view: 'calendar', sessionId: null }, { replace: true }) } catch {}
+    }
+    window.addEventListener('practica:auth-expired', onAuthExpired, { once: true })
+    return () => window.removeEventListener('practica:auth-expired', onAuthExpired)
+  }, [logout, navigate, toast])
+
+  useEffect(() => {
     const onPopState = () => {
       const route = parseRoute(window.location.pathname, window.location.search)
       const nextPath = routePath(route)

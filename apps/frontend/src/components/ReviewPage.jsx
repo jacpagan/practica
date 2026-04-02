@@ -82,6 +82,7 @@ function ReviewPage({ reviewToken = '' }) {
   const [playbackSourceIndex, setPlaybackSourceIndex] = useState(0)
   const [playbackFailed, setPlaybackFailed] = useState(false)
   const playableUrl = playbackSources[playbackSourceIndex] || null
+  const playbackRefreshTriedRef = useRef(false)
   const [uploadProgressPercent, setUploadProgressPercent] = useState(null)
   const [uploadProgressLoaded, setUploadProgressLoaded] = useState(0)
   const [uploadProgressTotal, setUploadProgressTotal] = useState(0)
@@ -283,10 +284,26 @@ function ReviewPage({ reviewToken = '' }) {
 
   const clearTimestamp = () => setSelectedTimestampSeconds(null)
 
-  const handlePlaybackError = () => {
+  const handlePlaybackError = async () => {
     if (playbackSourceIndex < playbackSources.length - 1) {
       setPlaybackSourceIndex((current) => current + 1)
       return
+    }
+    // Try one refresh of review info to renew any signed URLs, then reattempt first source
+    if (!playbackRefreshTriedRef.current) {
+      playbackRefreshTriedRef.current = true
+      try {
+        const infoHeaders = authToken ? { Authorization: `Token ${authToken}` } : {}
+        const infoRes = await fetch(`/api/review/${token}/`, { headers: infoHeaders })
+        const infoData = await infoRes.json().catch(() => ({}))
+        if (infoRes.ok && infoData?.session) {
+          setSession(infoData.session)
+          setLink(infoData.link)
+          setPlaybackSourceIndex(0)
+          setPlaybackFailed(false)
+          return
+        }
+      } catch {}
     }
     setPlaybackFailed(true)
   }

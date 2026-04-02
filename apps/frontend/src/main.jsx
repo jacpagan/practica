@@ -26,6 +26,19 @@ if (typeof window !== 'undefined' && !window.__practicaErrorHandlersInstalled) {
   })
 }
 
+// Global fetch 401 handler: dispatch an auth-expired event so the app can log out gracefully
+if (typeof window !== 'undefined' && !window.__practicaFetchPatched) {
+  try {
+    const originalFetch = window.fetch.bind(window)
+    window.fetch = async (...args) => {
+      const res = await originalFetch(...args)
+      try { if (res && res.status === 401) window.dispatchEvent(new CustomEvent('practica:auth-expired')) } catch {}
+      return res
+    }
+    window.__practicaFetchPatched = true
+  } catch {}
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />
