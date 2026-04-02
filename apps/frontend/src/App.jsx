@@ -67,9 +67,9 @@ function AppContent() {
   const [sessionsLoading, setSessionsLoading] = useState(false)
   const [studentReviewRequests, setStudentReviewRequests] = useState([])
   const [studentReviewRequestsLoading, setStudentReviewRequestsLoading] = useState(false)
-  const [hasTeacherWorkspace, setHasTeacherWorkspace] = useState(false)
-  const [teacherPendingCount, setTeacherPendingCount] = useState(0)
-  const teacherPollRef = useRef(null)
+  const [hasReviewerWorkspace, setHasReviewerWorkspace] = useState(false)
+  const [reviewerPendingCount, setReviewerPendingCount] = useState(0)
+  const reviewerPollRef = useRef(null)
   const [detailReturnRoute, setDetailReturnRoute] = useState({ view: 'calendar', sessionId: null, seriesName: '' })
   const [openRecorderOnUpload, setOpenRecorderOnUpload] = useState(false)
   const [justUploadedSessionId, setJustUploadedSessionId] = useState(null)
@@ -293,16 +293,16 @@ function AppContent() {
     return () => window.removeEventListener('practica:session-updated', handler)
   }, [token])
 
-  const loadTeacherWorkspaceAvailability = useCallback(async () => {
+  const loadReviewerWorkspaceAvailability = useCallback(async () => {
     if (!token) return
     try {
       const requests = await fetchPaginated('/api/review-requests/?role=reviewer')
-      setHasTeacherWorkspace(requests.length > 0)
+      setHasReviewerWorkspace(requests.length > 0)
       const pending = requests.filter((r) => ['requested', 'opened'].includes(String(r?.status || '').trim().toLowerCase())).length
-      setTeacherPendingCount(pending)
+      setReviewerPendingCount(pending)
     } catch {
-      setHasTeacherWorkspace(false)
-      setTeacherPendingCount(0)
+      setHasReviewerWorkspace(false)
+      setReviewerPendingCount(0)
     }
   }, [fetchPaginated, token])
 
@@ -310,15 +310,15 @@ function AppContent() {
   useEffect(() => {
     if (!token) return () => {}
     const start = () => {
-      if (teacherPollRef.current) { try { clearInterval(teacherPollRef.current) } catch {} }
-      loadTeacherWorkspaceAvailability()
-      teacherPollRef.current = setInterval(() => {
+      if (reviewerPollRef.current) { try { clearInterval(reviewerPollRef.current) } catch {} }
+      loadReviewerWorkspaceAvailability()
+      reviewerPollRef.current = setInterval(() => {
         if (typeof document !== 'undefined' && document.hidden) return
-        loadTeacherWorkspaceAvailability()
+        loadReviewerWorkspaceAvailability()
       }, 45000)
     }
     const stop = () => {
-      if (teacherPollRef.current) { try { clearInterval(teacherPollRef.current) } catch {}; teacherPollRef.current = null }
+      if (reviewerPollRef.current) { try { clearInterval(reviewerPollRef.current) } catch {}; reviewerPollRef.current = null }
     }
     const onVisibility = () => {
       if (typeof document !== 'undefined' && document.hidden) stop()
@@ -331,7 +331,7 @@ function AppContent() {
     }
     start()
     return () => stop()
-  }, [loadTeacherWorkspaceAvailability, token])
+  }, [loadReviewerWorkspaceAvailability, token])
 
   const openSessionById = useCallback(async (sessionId, { updateUrl = true } = {}) => {
     if (!token) return
@@ -477,8 +477,8 @@ function AppContent() {
     if (!user) return
     if (view === 'series' || view === 'calendar') loadSessions()
     if (view === 'calendar') loadStudentReviewRequests()
-    loadTeacherWorkspaceAvailability()
-  }, [user, view, loadSessions, loadStudentReviewRequests, loadTeacherWorkspaceAvailability])
+    loadReviewerWorkspaceAvailability()
+  }, [user, view, loadSessions, loadStudentReviewRequests, loadReviewerWorkspaceAvailability])
 
   useEffect(() => {
     if (autoQuickRecordCheckedRef.current) return
@@ -536,7 +536,7 @@ function AppContent() {
             <button onClick={() => navigate({ view: 'calendar', sessionId: null })} className="text-lg font-semibold text-gray-900 tracking-tight">
               Practica
             </button>
-            {hasTeacherWorkspace ? (
+            {hasReviewerWorkspace ? (
               <nav className="hidden sm:flex items-center gap-2 rounded-full border border-gray-200 p-1">
                 <button
                   onClick={() => navigate({ view: 'calendar', sessionId: null })}
@@ -548,7 +548,7 @@ function AppContent() {
                   onClick={() => navigate({ view: 'requests', sessionId: null })}
                   className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
                 >
-                  Requests{teacherPendingCount > 0 ? ` (${teacherPendingCount})` : ''}
+                  Requests{reviewerPendingCount > 0 ? ` (${reviewerPendingCount})` : ''}
                 </button>
               </nav>
             ) : null}
@@ -591,7 +591,7 @@ function AppContent() {
           </div>
         </div>
         <div className="max-w-4xl mx-auto mt-3 space-y-2 sm:hidden">
-          {hasTeacherWorkspace ? (
+          {hasReviewerWorkspace ? (
             <nav className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => navigate({ view: 'calendar', sessionId: null })}
@@ -603,7 +603,7 @@ function AppContent() {
                 onClick={() => navigate({ view: 'requests', sessionId: null })}
                 className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
               >
-                Requests{teacherPendingCount > 0 ? ` (${teacherPendingCount})` : ''}
+                Requests{reviewerPendingCount > 0 ? ` (${reviewerPendingCount})` : ''}
               </button>
             </nav>
           ) : null}
@@ -687,7 +687,7 @@ function AppContent() {
         )}
 
         {view === 'requests' && (
-          hasTeacherWorkspace ? (
+          hasReviewerWorkspace ? (
             <RequestsView token={token} onOpenReviewRequest={(requestItem) => {
               const requestLink = requestItem?.feedback_link || requestItem?.review_link
               if (!requestLink?.token) return

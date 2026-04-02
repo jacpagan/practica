@@ -20,7 +20,8 @@ const requestStatusLabel = (value = '') => {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1)
 }
 
-const LAST_TEACHER_KEY = 'practica.last_teacher.v1'
+const LAST_REVIEWER_KEY = 'practica.last_reviewer.v1'
+const LEGACY_LAST_REVIEWER_STORAGE_KEY = 'practica.last_teacher.v1'
 const LESSON_GOAL_PRESETS = [
   'Today\'s drum lesson follow-up',
   'Timing and consistency',
@@ -28,17 +29,17 @@ const LESSON_GOAL_PRESETS = [
   'Technique and motion',
 ]
 
-const normalizeTeacherText = (value = '') => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+const normalizeReviewerText = (value = '') => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 
-const findTeacherAutoPick = (query, teachers = []) => {
-  const normalizedQuery = normalizeTeacherText(query)
+const findReviewerAutoPick = (query, reviewers = []) => {
+  const normalizedQuery = normalizeReviewerText(query)
   if (!normalizedQuery) return null
 
   const queryWords = normalizedQuery.split(/\s+/).filter(Boolean)
-  const candidates = teachers
-    .map((teacher) => {
-      const display = normalizeTeacherText(teacher.display_name)
-      const username = normalizeTeacherText(teacher.username)
+  const candidates = reviewers
+    .map((reviewer) => {
+      const display = normalizeReviewerText(reviewer.display_name)
+      const username = normalizeReviewerText(reviewer.username)
       const haystack = `${display} ${username}`.trim()
       let score = 0
 
@@ -49,37 +50,38 @@ const findTeacherAutoPick = (query, teachers = []) => {
       if (normalizedQuery.includes('sage') && haystack.includes('sage')) score += 50
       if (haystack.includes('jimmy sage')) score += 25
 
-      return { teacher, score }
+      return { reviewer, score }
     })
     .filter((item) => item.score > 0)
     .sort((left, right) => right.score - left.score)
 
   if (candidates.length === 0) return null
-  if (candidates.length === 1) return candidates[0].teacher
-  if (candidates[0].score >= 130 && candidates[0].score >= candidates[1].score + 20) return candidates[0].teacher
+  if (candidates.length === 1) return candidates[0].reviewer
+  if (candidates[0].score >= 130 && candidates[0].score >= candidates[1].score + 20) return candidates[0].reviewer
   return null
 }
 
-const readLastTeacher = () => {
+const readLastReviewer = () => {
   if (typeof window === 'undefined') return null
-  try {
-    const raw = window.localStorage.getItem(LAST_TEACHER_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object' || !parsed.id) return null
-    return parsed
-  } catch {
-    return null
+  for (const storageKey of [LAST_REVIEWER_KEY, LEGACY_LAST_REVIEWER_STORAGE_KEY]) {
+    try {
+      const raw = window.localStorage.getItem(storageKey)
+      if (!raw) continue
+      const parsed = JSON.parse(raw)
+      if (!parsed || typeof parsed !== 'object' || !parsed.id) continue
+      return parsed
+    } catch {}
   }
+  return null
 }
 
-const writeLastTeacher = (teacher) => {
-  if (typeof window === 'undefined' || !teacher?.id) return
+const writeLastReviewer = (reviewer) => {
+  if (typeof window === 'undefined' || !reviewer?.id) return
   try {
-    window.localStorage.setItem(LAST_TEACHER_KEY, JSON.stringify({
-      id: teacher.id,
-      username: teacher.username,
-      display_name: teacher.display_name,
+    window.localStorage.setItem(LAST_REVIEWER_KEY, JSON.stringify({
+      id: reviewer.id,
+      username: reviewer.username,
+      display_name: reviewer.display_name,
     }))
   } catch {}
 }
@@ -108,12 +110,12 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const [showRequestComposer, setShowRequestComposer] = useState(false)
   const [creatingRequest, setCreatingRequest] = useState(false)
   const [showLoopDetails, setShowLoopDetails] = useState(false)
-  const [teacherQuery, setTeacherQuery] = useState('')
-  const [teacherResults, setTeacherResults] = useState([])
-  const [teacherSearchLoading, setTeacherSearchLoading] = useState(false)
-  const [selectedTeacher, setSelectedTeacher] = useState(null)
-  const [recentTeachers, setRecentTeachers] = useState([])
-  const [recentTeachersLoading, setRecentTeachersLoading] = useState(false)
+  const [reviewerQuery, setReviewerQuery] = useState('')
+  const [reviewerResults, setReviewerResults] = useState([])
+  const [reviewerSearchLoading, setReviewerSearchLoading] = useState(false)
+  const [selectedReviewer, setSelectedReviewer] = useState(null)
+  const [recentReviewers, setRecentReviewers] = useState([])
+  const [recentReviewersLoading, setRecentReviewersLoading] = useState(false)
   const [creatingInvite, setCreatingInvite] = useState(false)
   const [showRequestDetails, setShowRequestDetails] = useState(false)
   const [showRequestHistory, setShowRequestHistory] = useState(false)
@@ -137,16 +139,16 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const [playbackSourceIndex, setPlaybackSourceIndex] = useState(0)
   const [playbackFailed, setPlaybackFailed] = useState(false)
   const playableUrl = playbackSources[playbackSourceIndex] || null
-  const selectedTeacherName = selectedTeacher?.display_name || selectedTeacher?.username || ''
+  const selectedReviewerName = selectedReviewer?.display_name || selectedReviewer?.username || ''
   const sortedReviewRequests = useMemo(
     () => [...reviewRequests].sort((left, right) => new Date(right.created_at) - new Date(left.created_at)),
     [reviewRequests],
   )
   const currentLoopRequest = sortedReviewRequests.find((item) => !['closed', 'revoked'].includes(item.status)) || sortedReviewRequests[0] || null
   const currentLoopStatus = String(currentLoopRequest?.status || '').trim().toLowerCase()
-  const waitingOnTeacher = ['requested', 'opened'].includes(currentLoopStatus)
+  const waitingOnReviewer = ['requested', 'opened'].includes(currentLoopStatus)
   const readyForFollowUp = ['responded', 'viewed', 'resubmitted'].includes(currentLoopStatus)
-  const canStartNewRequest = canEdit && canCreateShareLink && !waitingOnTeacher
+  const canStartNewRequest = canEdit && canCreateShareLink && !waitingOnReviewer
   const defaultRequestGoal = useMemo(() => {
     if (session?.practice_series) return `${session.practice_series} follow-up`
     return LESSON_GOAL_PRESETS[0]
@@ -169,10 +171,10 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   useEffect(() => {
     setReviewRequests([])
     setShowRequestComposer(false)
-    setTeacherQuery('')
-    setTeacherResults([])
-    setSelectedTeacher(null)
-    setRecentTeachers([])
+    setReviewerQuery('')
+    setReviewerResults([])
+    setSelectedReviewer(null)
+    setRecentReviewers([])
     setShowLoopDetails(false)
     setShowRequestDetails(false)
     setShowRequestHistory(false)
@@ -206,7 +208,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     if (!initialReviewRequestDraft || !canEdit) return
     setShowLoopDetails(true)
     setShowRequestComposer(true)
-    setSelectedTeacher(initialReviewRequestDraft.teacher || null)
+    setSelectedReviewer(initialReviewRequestDraft.reviewer || initialReviewRequestDraft.teacher || null)
     setShowRequestDetails(true)
     setRequestInstrument(initialReviewRequestDraft.instrument || 'drums')
     setRequestGoal(initialReviewRequestDraft.goal || '')
@@ -267,74 +269,74 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     if (!token || !canEdit) return undefined
 
     let cancelled = false
-    const loadRecentTeachers = async () => {
-      setRecentTeachersLoading(true)
+    const loadRecentReviewers = async () => {
+      setRecentReviewersLoading(true)
       try {
         const res = await fetch('/api/review-requests/?role=student', { headers: authHeaders })
         if (!res.ok) throw new Error('student-review-requests')
         const data = await res.json()
         const items = Array.isArray(data) ? data : data.results || []
         const seen = new Set()
-        const teachers = []
+        const reviewers = []
         items.forEach((item) => {
-          const teacher = item?.teacher
-          if (!teacher?.id || seen.has(teacher.id)) return
-          seen.add(teacher.id)
-          teachers.push(teacher)
+          const reviewer = item?.reviewer || item?.teacher
+          if (!reviewer?.id || seen.has(reviewer.id)) return
+          seen.add(reviewer.id)
+          reviewers.push(reviewer)
         })
         if (cancelled) return
-        setRecentTeachers(teachers.slice(0, 6))
-        setSelectedTeacher((current) => {
-          if (current?.id || initialReviewRequestDraft?.teacher?.id) return current
-          const storedTeacher = readLastTeacher()
-          if (storedTeacher?.id) {
-            return teachers.find((teacher) => teacher.id === storedTeacher.id) || storedTeacher
+        setRecentReviewers(reviewers.slice(0, 6))
+        setSelectedReviewer((current) => {
+          if (current?.id || initialReviewRequestDraft?.reviewer?.id || initialReviewRequestDraft?.teacher?.id) return current
+          const storedReviewer = readLastReviewer()
+          if (storedReviewer?.id) {
+            return reviewers.find((reviewer) => reviewer.id === storedReviewer.id) || storedReviewer
           }
-          if (teachers.length === 1) return teachers[0]
+          if (reviewers.length === 1) return reviewers[0]
           return current
         })
       } catch {
-        if (!cancelled) setRecentTeachers([])
+        if (!cancelled) setRecentReviewers([])
       } finally {
-        if (!cancelled) setRecentTeachersLoading(false)
+        if (!cancelled) setRecentReviewersLoading(false)
       }
     }
 
-    loadRecentTeachers()
+    loadRecentReviewers()
     return () => { cancelled = true }
-  }, [authHeaders, canEdit, initialReviewRequestDraft?.teacher?.id, token])
+  }, [authHeaders, canEdit, initialReviewRequestDraft?.reviewer?.id, initialReviewRequestDraft?.teacher?.id, token])
 
   useEffect(() => {
     if (!token || !canEdit) return undefined
-    const query = teacherQuery.trim()
+    const query = reviewerQuery.trim()
     if (query.length < 2) {
-      setTeacherResults([])
-      setTeacherSearchLoading(false)
+      setReviewerResults([])
+      setReviewerSearchLoading(false)
       return undefined
     }
 
     let cancelled = false
     const timer = window.setTimeout(async () => {
-      setTeacherSearchLoading(true)
+      setReviewerSearchLoading(true)
       try {
         const res = await fetch(`/api/users/search/?q=${encodeURIComponent(query)}`, { headers: authHeaders })
-        if (!res.ok) throw new Error('teacher-search')
+        if (!res.ok) throw new Error('reviewer-search')
         const data = await res.json()
         if (cancelled) return
         const results = Array.isArray(data) ? data : []
-        const autoPick = findTeacherAutoPick(query, results)
+        const autoPick = findReviewerAutoPick(query, results)
         if (autoPick) {
-          setSelectedTeacher(autoPick)
-          setTeacherQuery('')
-          setTeacherResults([])
-          writeLastTeacher(autoPick)
+          setSelectedReviewer(autoPick)
+          setReviewerQuery('')
+          setReviewerResults([])
+          writeLastReviewer(autoPick)
           return
         }
-        setTeacherResults(results)
+        setReviewerResults(results)
       } catch {
-        if (!cancelled) setTeacherResults([])
+        if (!cancelled) setReviewerResults([])
       } finally {
-        if (!cancelled) setTeacherSearchLoading(false)
+        if (!cancelled) setReviewerSearchLoading(false)
       }
     }, 250)
 
@@ -342,7 +344,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [authHeaders, canEdit, teacherQuery, token])
+  }, [authHeaders, canEdit, reviewerQuery, token])
 
   const startEditing = () => {
     setEditTitle(session.title || '')
@@ -351,11 +353,11 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     setEditing(true)
   }
 
-  const chooseTeacher = (teacher) => {
-    setSelectedTeacher(teacher)
-    setTeacherQuery('')
-    setTeacherResults([])
-    writeLastTeacher(teacher)
+  const chooseReviewer = (reviewer) => {
+    setSelectedReviewer(reviewer)
+    setReviewerQuery('')
+    setReviewerResults([])
+    writeLastReviewer(reviewer)
   }
 
   const saveEdits = async () => {
@@ -473,7 +475,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
 
   const createReviewRequest = async () => {
     if (!token || !session?.id) return
-    if (!selectedTeacher?.id) {
+    if (!selectedReviewer?.id) {
       toast.error('Choose a reviewer first')
       return
     }
@@ -482,7 +484,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     try {
       const payload = {
         session_id: session.id,
-        reviewer_id: selectedTeacher.id,
+        reviewer_id: selectedReviewer.id,
         parent_request_id: initialReviewRequestDraft?.parent_request_id || null,
       }
       const res = await fetch('/api/review-requests/', {
@@ -496,15 +498,15 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       }
       setReviewRequests((current) => [data, ...current])
       setShowRequestComposer(false)
-      setTeacherQuery('')
-      setTeacherResults([])
-      setSelectedTeacher(null)
+      setReviewerQuery('')
+      setReviewerResults([])
+      setSelectedReviewer(null)
       setShowRequestDetails(false)
       setRequestGoal('')
       setRequestExerciseOrSong('')
       onReviewRequestDraftCleared?.()
-      writeLastTeacher(selectedTeacher)
-      toast.success(`Request sent to ${selectedTeacher.display_name || selectedTeacher.username}`)
+      writeLastReviewer(selectedReviewer)
+      toast.success(`Request sent to ${selectedReviewer.display_name || selectedReviewer.username}`)
       if ((data?.feedback_link?.url || data?.review_link?.url)) {
         try {
           await navigator.clipboard.writeText(data.feedback_link?.url || data.review_link?.url)
@@ -792,10 +794,12 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   }
 
   const startFollowUp = (requestItem = currentLoopRequest) => {
-    if (!requestItem?.teacher) return
+    const reviewer = requestItem?.reviewer || requestItem?.teacher
+    if (!reviewer) return
     onRecordAnother?.({
       parent_request_id: requestItem.id,
-      teacher: requestItem.teacher,
+      reviewer,
+      teacher: reviewer,
       instrument: requestItem.instrument,
       goal: requestItem.goal,
       exercise_or_song: requestItem.exercise_or_song,
@@ -915,7 +919,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               {canEdit ? (
                 <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 space-y-3">
                   <div className="flex flex-wrap gap-2">
-                    {waitingOnTeacher && currentLoopRequest ? (
+                    {waitingOnReviewer && currentLoopRequest ? (
                       <>
                         <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
                           Open private thread
@@ -932,7 +936,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                         </button>
                       </>
                     ) : null}
-                    {!waitingOnTeacher && !readyForFollowUp ? (
+                    {!waitingOnReviewer && !readyForFollowUp ? (
                       <button type="button" onClick={openRequestComposer} disabled={!canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
                         Request feedback
                       </button>
@@ -1015,63 +1019,63 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                         </div>
                       ) : null}
 
-                      {selectedTeacherName ? (
+                      {selectedReviewerName ? (
                         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3">
                           <p className="text-xs font-medium uppercase tracking-wide text-emerald-800">Ready</p>
-                          <p className="text-sm text-emerald-900 mt-1">This will open a private thread with {selectedTeacherName}. Only the two of you can see it.</p>
+                          <p className="text-sm text-emerald-900 mt-1">This will open a private thread with {selectedReviewerName}. Only the two of you can see it.</p>
                         </div>
                       ) : null}
 
                       <div className="space-y-2">
                         <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">Reviewer</label>
-                        {selectedTeacher ? (
+                        {selectedReviewer ? (
                           <div className="rounded-lg border border-gray-200 bg-white px-3 py-3 flex items-center justify-between gap-3">
                             <div>
-                              <p className="text-sm font-medium text-gray-900">{selectedTeacher.display_name || selectedTeacher.username}</p>
-                              <p className="text-xs text-gray-500">@{selectedTeacher.username}</p>
+                              <p className="text-sm font-medium text-gray-900">{selectedReviewer.display_name || selectedReviewer.username}</p>
+                              <p className="text-xs text-gray-500">@{selectedReviewer.username}</p>
                             </div>
-                            <button type="button" onClick={() => { setSelectedTeacher(null); setTeacherQuery('') }} className="text-xs text-red-600 hover:text-red-700 transition-colors">Change</button>
+                            <button type="button" onClick={() => { setSelectedReviewer(null); setReviewerQuery('') }} className="text-xs text-red-600 hover:text-red-700 transition-colors">Change</button>
                           </div>
                         ) : (
                           <div className="space-y-2">
-                            {recentTeachersLoading ? <p className="text-xs text-gray-500">Loading recent reviewers…</p> : null}
-                            {recentTeachers.length > 0 ? (
+                            {recentReviewersLoading ? <p className="text-xs text-gray-500">Loading recent reviewers…</p> : null}
+                            {recentReviewers.length > 0 ? (
                               <div className="flex flex-wrap gap-2">
-                                {recentTeachers.map((teacher) => (
+                                {recentReviewers.map((reviewer) => (
                                   <button
-                                    key={teacher.id}
+                                    key={reviewer.id}
                                     type="button"
-                                    onClick={() => chooseTeacher(teacher)}
+                                    onClick={() => chooseReviewer(reviewer)}
                                     className="rounded-full border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
                                   >
-                                    {teacher.display_name || teacher.username}
+                                    {reviewer.display_name || reviewer.username}
                                   </button>
                                 ))}
                               </div>
                             ) : null}
                             <input
                               type="text"
-                              value={teacherQuery}
-                              onChange={(event) => setTeacherQuery(event.target.value)}
+                              value={reviewerQuery}
+                              onChange={(event) => setReviewerQuery(event.target.value)}
                               placeholder="Search by member name or username"
                               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
                             />
-                            {teacherSearchLoading ? <p className="text-xs text-gray-500">Searching…</p> : null}
-                            {teacherResults.length > 0 ? (
+                            {reviewerSearchLoading ? <p className="text-xs text-gray-500">Searching…</p> : null}
+                            {reviewerResults.length > 0 ? (
                               <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-                                {teacherResults.map((teacher) => (
+                                {reviewerResults.map((reviewer) => (
                                   <button
-                                    key={teacher.id}
+                                    key={reviewer.id}
                                     type="button"
-                                    onClick={() => chooseTeacher(teacher)}
+                                    onClick={() => chooseReviewer(reviewer)}
                                     className="w-full text-left px-3 py-3 hover:bg-gray-50 transition-colors border-b last:border-b-0 border-gray-100"
                                   >
-                                    <p className="text-sm font-medium text-gray-900">{teacher.display_name || teacher.username}</p>
-                                    <p className="text-xs text-gray-500 mt-1">@{teacher.username}</p>
+                                    <p className="text-sm font-medium text-gray-900">{reviewer.display_name || reviewer.username}</p>
+                                    <p className="text-xs text-gray-500 mt-1">@{reviewer.username}</p>
                                   </button>
                                 ))}
                               </div>
-                            ) : teacherQuery.trim().length >= 2 && !teacherSearchLoading ? <p className="text-xs text-gray-500">No matching members found yet.</p> : null}
+                            ) : reviewerQuery.trim().length >= 2 && !reviewerSearchLoading ? <p className="text-xs text-gray-500">No matching members found yet.</p> : null}
                           </div>
                         )}
                       </div>
@@ -1247,7 +1251,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                 Open request thread
                               </button>
                             ) : null}
-                            {requestItem.status !== 'closed' && requestItem.teacher ? (
+                            {requestItem.status !== 'closed' && (requestItem.reviewer || requestItem.teacher) ? (
                               <button
                                 type="button"
                                 onClick={() => startFollowUp(requestItem)}
