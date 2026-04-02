@@ -5,17 +5,17 @@ import { ToastProvider, useToast } from './components/Toast'
 import NotificationsBell from './components/NotificationsBell'
 import { ConfirmProvider, useConfirm } from './components/ConfirmDialog'
 import AuthForm from './components/AuthForm'
-import ReviewPage from './components/ReviewPage'
+const ReviewPage = React.lazy(() => import('./components/ReviewPage'))
 import SessionUpload from './components/SessionUpload'
 // Inline header create buttons to avoid any chance of circular init
-import SessionDetail from './components/SessionDetail'
+const SessionDetail = React.lazy(() => import('./components/SessionDetail'))
 import LibraryView from './components/LibraryView'
-import SeriesView from './components/SeriesView'
-import RequestsView from './components/TeachingView'
+const SeriesView = React.lazy(() => import('./components/SeriesView'))
+const RequestsView = React.lazy(() => import('./components/TeachingView'))
 import PrivacyPage from './components/PrivacyPage'
-import CalendarView from './components/CalendarView'
+const CalendarView = React.lazy(() => import('./components/CalendarView'))
 import RecorderModal from './components/RecorderModal'
-import RecorderPage from './components/RecorderPage'
+const RecorderPage = React.lazy(() => import('./components/RecorderPage'))
 
 const parseRoute = (pathname, search = '') => {
   const params = new URLSearchParams(search || '')
@@ -657,6 +657,7 @@ function AppContent() {
       </header>
 
       <main className="max-w-4xl mx-auto pb-24">
+        <React.Suspense fallback={<div className="px-4 sm:px-6 py-6 text-sm text-gray-500">Loading…</div>}>
         {view === 'library' && (
           <LibraryView
             sessions={sessions}
@@ -743,6 +744,7 @@ function AppContent() {
           <SeriesView
             seriesName={routeSeriesName}
             sessions={sessions}
+            sessionsLoading={sessionsLoading}
             reviewRequests={studentReviewRequests}
             token={token}
             onBack={() => navigate({ view: 'calendar', sessionId: null })}
@@ -840,6 +842,7 @@ function AppContent() {
             }}
           />
         )}
+        </React.Suspense>
       </main>
       {showRecorderModal ? (
         <RecorderModal

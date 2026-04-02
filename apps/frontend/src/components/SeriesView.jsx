@@ -21,7 +21,7 @@ const requestStatusLabel = (value = '') => {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1)
 }
 
-function SeriesView({ seriesName = '', sessions = [], reviewRequests = [], token = '', onBack, onOpenSession, onCreateVideo }) {
+function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, reviewRequests = [], token = '', onBack, onOpenSession, onCreateVideo }) {
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
   const toast = useToast()
@@ -61,6 +61,31 @@ function SeriesView({ seriesName = '', sessions = [], reviewRequests = [], token
     [seriesSessions],
   )
   const latestRequestStatus = String(latestSession?.activeRequest?.status || '').trim().toLowerCase()
+
+  if (sessionsLoading) {
+    return (
+      <div className="px-4 sm:px-6 py-6">
+        <div className="max-w-4xl mx-auto space-y-4">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-gray-500">Practice thread</p>
+              <div className="h-6 w-48 bg-gray-200 rounded animate-pulse mt-1" />
+              <div className="h-4 w-32 bg-gray-100 rounded animate-pulse mt-2" />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <div className="h-10 w-28 bg-gray-200 rounded animate-pulse" />
+              <div className="h-10 w-28 bg-gray-200 rounded animate-pulse" />
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div className="h-24 w-full bg-gray-100 rounded-2xl animate-pulse" />
+            <div className="h-24 w-full bg-gray-100 rounded-2xl animate-pulse" />
+            <div className="h-24 w-full bg-gray-100 rounded-2xl animate-pulse" />
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="px-4 sm:px-6 py-6">
