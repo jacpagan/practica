@@ -482,19 +482,8 @@ function AppContent() {
 
   useEffect(() => {
     if (autoQuickRecordCheckedRef.current) return
-    if (!user || view !== 'calendar') return
-    if (sessionsLoading || studentReviewRequestsLoading) return
-    // If calendar deep-linked with a date, do not auto-redirect to record
-    try {
-      const params = new URLSearchParams(window.location.search)
-      if ((params.get('date') || '').trim()) return
-    } catch {}
-
     autoQuickRecordCheckedRef.current = true
-    if (!hasActiveStudentLoop && ownReadySessionCount === 0) {
-      startQuickRecord()
-    }
-  }, [hasActiveStudentLoop, ownReadySessionCount, sessionsLoading, startQuickRecord, studentReviewRequestsLoading, user, view])
+  }, [])
 
   // Keep Requests route accessible; show graceful empty state when no teacher workspace
 
