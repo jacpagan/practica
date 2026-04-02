@@ -9,7 +9,6 @@ const ReviewPage = React.lazy(() => import('./components/ReviewPage'))
 import SessionUpload from './components/SessionUpload'
 // Inline header create buttons to avoid any chance of circular init
 const SessionDetail = React.lazy(() => import('./components/SessionDetail'))
-import LibraryView from './components/LibraryView'
 const SeriesView = React.lazy(() => import('./components/SeriesView'))
 const RequestsView = React.lazy(() => import('./components/TeachingView'))
 import PrivacyPage from './components/PrivacyPage'
