@@ -527,7 +527,7 @@ function AppContent() {
               <button onClick={() => navigate({ view: 'privacy', sessionId: null })} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
                 Privacy
               </button>
-              <span className="hidden sm:inline text-xs text-gray-400">{user.display_name}</span>
+              <span className="hidden sm:inline text-xs text-gray-400">{user.display_name || user.username}</span>
               <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
                 Log out
               </button>
