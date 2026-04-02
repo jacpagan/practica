@@ -468,7 +468,7 @@ class V1VideoFeaturesTests(APITestCase):
         self.assertEqual(hls_h264['MaxBitrate'], 5000000)
 
     @override_settings(AWS_STORAGE_BUCKET_NAME='test-bucket')
-    def test_mediaconvert_job_settings_route_audio_outputs_through_selector_group(self):
+    def test_mediaconvert_job_settings_use_default_audio_selector(self):
         session = self._create_session(user=self.owner)
         session.video_file = 'sessions/uploaded.mp4'
 
@@ -478,6 +478,7 @@ class V1VideoFeaturesTests(APITestCase):
         proxy_audio = settings_payload['OutputGroups'][0]['Outputs'][0]['AudioDescriptions'][0]
         hls_audio = settings_payload['OutputGroups'][1]['Outputs'][0]['AudioDescriptions'][0]
 
-        self.assertEqual(input_settings['AudioSelectorGroups']['mixAll']['AudioSelectorNames'], ['A1', 'A2'])
-        self.assertEqual(proxy_audio['AudioSourceName'], 'mixAll')
-        self.assertEqual(hls_audio['AudioSourceName'], 'mixAll')
+        self.assertEqual(input_settings['AudioSelectors'], {'A1': {'DefaultSelection': 'DEFAULT'}})
+        self.assertNotIn('AudioSelectorGroups', input_settings)
+        self.assertEqual(proxy_audio['AudioSourceName'], 'A1')
+        self.assertEqual(hls_audio['AudioSourceName'], 'A1')
