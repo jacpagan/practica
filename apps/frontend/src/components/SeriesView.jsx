@@ -21,7 +21,7 @@ const requestStatusLabel = (value = '') => {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1)
 }
 
-function SeriesView({ seriesName = '', sessions = [], reviewRequests = [], onBack, onOpenSession, onCreateVideo }) {
+function SeriesView({ seriesName = '', sessions = [], reviewRequests = [], token = '', onBack, onOpenSession, onCreateVideo }) {
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
   const toast = useToast()
@@ -210,7 +210,7 @@ function SeriesView({ seriesName = '', sessions = [], reviewRequests = [], onBac
                   try {
                     const res = await fetch(`/api/sessions/${editing.id}/`, {
                       method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
+                      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Token ${token}` } : {}) },
                       body: JSON.stringify({ practice_series: val }),
                     })
                     const data = await res.json().catch(() => ({}))

@@ -666,6 +666,7 @@ function AppContent() {
             seriesName={routeSeriesName}
             sessions={sessions}
             reviewRequests={studentReviewRequests}
+            token={token}
             onBack={() => navigate({ view: 'calendar', sessionId: null })}
             onOpenSession={openSession}
             onCreateVideo={() => {
