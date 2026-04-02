@@ -492,7 +492,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        throw new Error(data?.session_id?.[0] || data?.teacher_id?.[0] || data?.goal?.[0] || data?.error || 'Could not create review request')
+        throw new Error(data?.session_id?.[0] || data?.reviewer_id?.[0] || data?.teacher_id?.[0] || data?.goal?.[0] || data?.error || 'Could not create review request')
       }
       setReviewRequests((current) => [data, ...current])
       setShowRequestComposer(false)

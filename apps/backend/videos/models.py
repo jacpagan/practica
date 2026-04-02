@@ -272,7 +272,7 @@ class ReviewLink(models.Model):
 
 
 class TeacherRosterMembership(models.Model):
-    """A lightweight teacher-student relationship for repeat async review workflows."""
+    """A lightweight reviewer-member relationship for repeat async review workflows."""
 
     teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name='teacher_roster_memberships')
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='student_roster_memberships')
@@ -316,7 +316,7 @@ class TeacherRosterMembership(models.Model):
 
 
 class ReviewRequest(models.Model):
-    """A structured teacher-owned review workflow around a student session."""
+    """A structured reviewer-led feedback workflow around a member session."""
 
     STATUS_REQUESTED = 'requested'
     STATUS_OPENED = 'opened'
@@ -414,7 +414,7 @@ FeedbackRequest = ReviewRequest
 
 
 class FeedbackTemplate(models.Model):
-    """Reusable teacher note templates for faster async feedback."""
+    """Reusable reviewer note templates for faster async feedback."""
 
     teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name='feedback_templates')
     title = models.CharField(max_length=120)
@@ -429,4 +429,4 @@ class FeedbackTemplate(models.Model):
         ]
 
     def __str__(self):
-        return f"FeedbackTemplate teacher={self.teacher_id} title={self.title}"
+        return f"FeedbackTemplate reviewer={self.teacher_id} title={self.title}"

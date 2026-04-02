@@ -179,6 +179,16 @@ class FeedbackRequestApiTests(APITestCase):
         self.assertEqual(response.data[0]['pending_review_count'], 1)
         self.assertEqual(response.data[0]['total_review_count'], 1)
 
+    def test_reviewer_roster_alias_matches_member_connections(self):
+        self._create_review_request()
+
+        self._auth(self.teacher)
+        response = self.client.get('/api/reviewer/roster/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['member']['id'], self.student.id)
+
     def test_review_link_feedback_list_is_scoped_to_review_request(self):
         review_request = self._create_review_request()
         another_request = ReviewRequest.objects.create(
@@ -333,7 +343,8 @@ class FeedbackRequestApiTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('same teacher', response.data['teacher_id'][0].lower())
+        self.assertIn('same reviewer', response.data['reviewer_id'][0].lower())
+        self.assertIn('same reviewer', response.data['teacher_id'][0].lower())
 
     def test_feedback_insights_returns_category_and_member_trends(self):
         review_request = self._create_review_request()

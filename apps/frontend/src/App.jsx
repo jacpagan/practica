@@ -306,7 +306,7 @@ function AppContent() {
     }
   }, [fetchPaginated, token])
 
-  // Poll the teacher pending count periodically; pause when tab is hidden
+  // Poll the reviewer pending count periodically; pause when tab is hidden
   useEffect(() => {
     if (!token) return () => {}
     const start = () => {
@@ -485,7 +485,7 @@ function AppContent() {
     autoQuickRecordCheckedRef.current = true
   }, [])
 
-  // Keep Requests route accessible; show graceful empty state when no teacher workspace
+  // Keep Requests route accessible; show graceful empty state when no reviewer workspace
 
   useEffect(() => {
     if (!user) return
@@ -582,9 +582,6 @@ function AppContent() {
               />
               <button onClick={() => navigate({ view: 'privacy', sessionId: null })} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
                 Privacy
-              </button>
-              <button onClick={reportProblem} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
-                Report
               </button>
               <span className="hidden sm:inline text-xs text-gray-400">{user.display_name || user.username}</span>
               <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
@@ -700,7 +697,7 @@ function AppContent() {
             <div className="px-4 sm:px-6 py-6">
               <div className="max-w-3xl mx-auto">
                 <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center">
-                  <p className="text-sm font-semibold text-gray-900">No teacher workspace yet</p>
+                  <p className="text-sm font-semibold text-gray-900">No reviewer workspace yet</p>
                   <p className="text-xs text-gray-500 mt-1">Requests appear here when you’re assigned as a reviewer.</p>
                   <div className="mt-4">
               <button type="button" onClick={() => navigate({ view: 'calendar', sessionId: null })} className="text-xs rounded-lg bg-gray-900 text-white px-3 py-1.5 hover:bg-gray-800">Back to Home</button>

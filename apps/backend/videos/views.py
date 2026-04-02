@@ -769,6 +769,7 @@ teacher_templates = feedback_templates
 teacher_template_detail = feedback_template_detail
 reviewer_inbox = feedback_inbox
 reviewer_connections = member_connections
+reviewer_roster = member_connections
 reviewer_insights = feedback_insights
 reviewer_templates = feedback_templates
 reviewer_template_detail = feedback_template_detail

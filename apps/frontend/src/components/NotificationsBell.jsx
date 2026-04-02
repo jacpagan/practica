@@ -57,7 +57,7 @@ export default function NotificationsBell({ token, onOpenReviewRequest, onOpenPr
     if (!res.ok) throw new Error('review-requests')
     const data = await res.json()
     const list = Array.isArray(data) ? data : (Array.isArray(data?.results) ? data.results : [])
-    // Only items where teacher has responded and member hasn’t marked viewed yet.
+    // Only items where the reviewer has responded and the member hasn’t marked viewed yet.
     const responded = list.filter((r) => String(r?.status || '').toLowerCase() === 'responded')
     // Sort newest first.
     responded.sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
@@ -81,7 +81,7 @@ export default function NotificationsBell({ token, onOpenReviewRequest, onOpenPr
         const newOnes = incomingIds.filter((id) => !seen.has(id))
         if (newOnes.length > 0) {
           const newest = responded.find((r) => Number(r.id) === newOnes[0])
-          const who = newest?.teacher?.display_name || newest?.teacher?.username || 'Your teacher'
+          const who = newest?.reviewer?.display_name || newest?.teacher?.display_name || newest?.reviewer?.username || newest?.teacher?.username || 'Your reviewer'
           const what = newest?.session?.title || 'your video'
           toast.success(`New feedback from ${who} on “${what}”.`)
         }
@@ -183,7 +183,7 @@ export default function NotificationsBell({ token, onOpenReviewRequest, onOpenPr
             ) : items.map((r) => (
               <div key={r.id} className="rounded-lg border border-gray-200 p-3">
                 <p className="text-sm font-medium text-gray-900 line-clamp-1">{r.session?.title || 'Feedback'}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{r.teacher?.display_name || r.teacher?.username || 'Teacher'}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{r.reviewer?.display_name || r.teacher?.display_name || r.reviewer?.username || r.teacher?.username || 'Reviewer'}</p>
                 <div className="mt-2 flex gap-2 justify-end">
                   <button
                     type="button"

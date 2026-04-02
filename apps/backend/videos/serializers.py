@@ -447,6 +447,12 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
         ]
 
+    def _reviewer_validation_error(self, message):
+        return serializers.ValidationError({
+            'reviewer_id': message,
+            'teacher_id': message,
+        })
+
     def get_parent_request(self, obj):
         parent = obj.parent_request
         if not parent:
@@ -470,14 +476,14 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
         if not user or not user.is_authenticated:
             return ''
         if user.id == obj.teacher_id:
-            return 'teacher'
+            return 'reviewer'
         if user.id == obj.student_id:
             return 'student'
         return ''
 
     def get_current_member_role(self, obj):
         legacy = self.get_current_user_role(obj)
-        if legacy == 'teacher':
+        if legacy in {'teacher', 'reviewer'}:
             return 'reviewer'
         if legacy == 'student':
             return 'owner'
@@ -517,14 +523,14 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
         if session and session.processing_status != Session.STATUS_READY:
             raise serializers.ValidationError({'session_id': 'This session must be playback ready before requesting review.'})
         if not teacher:
-            raise serializers.ValidationError({'teacher_id': 'Choose a reviewer.'})
+            raise self._reviewer_validation_error('Choose a reviewer.')
         if teacher and teacher.id == user.id:
-            raise serializers.ValidationError({'teacher_id': 'Choose a reviewer other than yourself.'})
+            raise self._reviewer_validation_error('Choose a reviewer other than yourself.')
         if parent_request:
             if parent_request.student_id != user.id and not user.is_staff:
                 raise serializers.ValidationError({'parent_request_id': 'You can only follow up on your own review requests.'})
             if teacher and parent_request.teacher_id != teacher.id:
-                raise serializers.ValidationError({'teacher_id': 'Follow-up requests must use the same teacher as the parent request.'})
+                raise self._reviewer_validation_error('Follow-up requests must use the same reviewer as the parent request.')
             if session and parent_request.session_id == session.id:
                 raise serializers.ValidationError({'session_id': 'Choose a new session for this follow-up request.'})
         return attrs
