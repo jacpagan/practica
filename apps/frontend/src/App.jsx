@@ -435,11 +435,7 @@ function AppContent() {
     }
   }, [hasActiveStudentLoop, ownReadySessionCount, sessionsLoading, startQuickRecord, studentReviewRequestsLoading, user, view])
 
-  useEffect(() => {
-    if (view === 'requests' && !hasTeacherWorkspace) {
-      navigate({ view: 'calendar', sessionId: null }, { replace: true })
-    }
-  }, [hasTeacherWorkspace, navigate, view])
+  // Keep Requests route accessible; show graceful empty state when no teacher workspace
 
   useEffect(() => {
     if (!user) return
