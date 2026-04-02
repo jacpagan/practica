@@ -675,12 +675,26 @@ function AppContent() {
           />
         )}
 
-        {view === 'requests' && hasTeacherWorkspace && (
-          <RequestsView token={token} onOpenReviewRequest={(requestItem) => {
-            const requestLink = requestItem?.feedback_link || requestItem?.review_link
-            if (!requestLink?.token) return
-            navigate({ view: 'review', token: requestLink.token, sessionId: null })
-          }} />
+        {view === 'requests' && (
+          hasTeacherWorkspace ? (
+            <RequestsView token={token} onOpenReviewRequest={(requestItem) => {
+              const requestLink = requestItem?.feedback_link || requestItem?.review_link
+              if (!requestLink?.token) return
+              navigate({ view: 'review', token: requestLink.token, sessionId: null })
+            }} />
+          ) : (
+            <div className="px-4 sm:px-6 py-6">
+              <div className="max-w-3xl mx-auto">
+                <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center">
+                  <p className="text-sm font-semibold text-gray-900">No teacher workspace yet</p>
+                  <p className="text-xs text-gray-500 mt-1">Requests appear here when you’re assigned as a reviewer.</p>
+                  <div className="mt-4">
+                    <button type="button" onClick={() => navigate({ view: 'library', sessionId: null })} className="text-xs rounded-lg bg-gray-900 text-white px-3 py-1.5 hover:bg-gray-800">Back to Library</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
         )}
 
         {view === 'upload' && (
