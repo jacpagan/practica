@@ -648,28 +648,7 @@ function AppContent() {
         <React.Suspense fallback={<div className="px-4 sm:px-6 py-6 text-sm text-gray-500">Loading…</div>}>
         {/* List view removed. Calendar is primary. */}
 
-        {view === 'archive' && (
-          <LibraryView
-            sessions={sessions}
-            sessionsLoading={sessionsLoading}
-            reviewRequests={studentReviewRequests}
-            reviewRequestsLoading={studentReviewRequestsLoading}
-            hasReviewerWorkspace={hasTeacherWorkspace}
-            mode="archive"
-            token={token}
-            onOpenSession={openSession}
-            onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
-            onCreateVideo={startQuickRecord}
-            onOpenRequests={() => navigate({ view: 'requests', sessionId: null })}
-            onOpenCalendar={() => navigate({ view: 'calendar', sessionId: null })}
-            onOpenReviewRequest={(requestItem) => {
-              const requestLink = requestItem?.feedback_link || requestItem?.review_link
-              if (!requestLink?.token) return
-              navigate({ view: 'review', token: requestLink.token, sessionId: null })
-            }}
-            onRecordFollowUp={(draft) => handleRecordAnother(draft)}
-          />
-        )}
+        {/* Archive view removed. */}
 
         {view === 'calendar' && (
           <CalendarView
