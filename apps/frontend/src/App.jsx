@@ -48,7 +48,7 @@ const routePath = ({ view, sessionId, token, seriesName, date }) => {
   if (view === 'series' && seriesName) return `/series/${encodeURIComponent(seriesName)}`
   if (view === 'review' && token) return `/r/${token}`
   if (view === 'detail' && sessionId) return `/sessions/${sessionId}`
-  if (view === 'library') return date ? `/library?date=${encodeURIComponent(date)}` : '/library'
+  if (view === 'library') return date ? `/?date=${encodeURIComponent(date)}` : '/'
   if (view === 'calendar') return date ? `/?date=${encodeURIComponent(date)}` : '/'
   return '/'
 }
@@ -461,7 +461,7 @@ function AppContent() {
     navigate({ view: 'upload', sessionId: null })
   }, [navigate])
 
-  const openHomeWorkItem = useCallback((session, returnRoute = { view: 'library', sessionId: null, seriesName: '' }) => {
+  const openHomeWorkItem = useCallback((session, returnRoute = { view: 'calendar', sessionId: null, seriesName: '' }) => {
     if (!session?.id) return
     const activeRequest = activeStudentRequestBySessionId.get(Number(session.id))
     const tokenValue = activeRequest?.feedback_link?.token || activeRequest?.review_link?.token || ''
@@ -484,7 +484,7 @@ function AppContent() {
 
   useEffect(() => {
     if (autoQuickRecordCheckedRef.current) return
-    if (!user || view !== 'library') return
+    if (!user || view !== 'calendar') return
     if (sessionsLoading || studentReviewRequestsLoading) return
     // If calendar deep-linked with a date, do not auto-redirect to record
     try {
@@ -658,28 +658,7 @@ function AppContent() {
 
       <main className="max-w-4xl mx-auto pb-24">
         <React.Suspense fallback={<div className="px-4 sm:px-6 py-6 text-sm text-gray-500">Loading…</div>}>
-        {view === 'library' && (
-          <LibraryView
-            sessions={sessions}
-            sessionsLoading={sessionsLoading}
-            reviewRequests={studentReviewRequests}
-            reviewRequestsLoading={studentReviewRequestsLoading}
-            hasReviewerWorkspace={hasTeacherWorkspace}
-            mode="home"
-            token={token}
-            onOpenSession={openHomeWorkItem}
-            onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
-            onCreateVideo={startQuickRecord}
-            onOpenRequests={() => navigate({ view: 'requests', sessionId: null })}
-            onOpenCalendar={() => navigate({ view: 'calendar', sessionId: null })}
-            onOpenReviewRequest={(requestItem) => {
-              const requestLink = requestItem?.feedback_link || requestItem?.review_link
-              if (!requestLink?.token) return
-              navigate({ view: 'review', token: requestLink.token, sessionId: null })
-            }}
-            onRecordFollowUp={(draft) => handleRecordAnother(draft)}
-          />
-        )}
+        {/* List view removed. Calendar is primary. */}
 
         {view === 'archive' && (
           <LibraryView
@@ -712,7 +691,7 @@ function AppContent() {
             onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
             onOpenListDate={(dateKey) => {
               try { window.localStorage.setItem('practica.filter.date.v1', String(dateKey || '')) } catch {}
-              navigate({ view: 'library', sessionId: null, date: String(dateKey || '') })
+              navigate({ view: 'calendar', sessionId: null, date: String(dateKey || '') })
             }}
             onMonthChange={(monthDate) => {
               // Compute month bounds and load only that range
@@ -770,7 +749,7 @@ function AppContent() {
                   <p className="text-sm font-semibold text-gray-900">No teacher workspace yet</p>
                   <p className="text-xs text-gray-500 mt-1">Requests appear here when you’re assigned as a reviewer.</p>
                   <div className="mt-4">
-                    <button type="button" onClick={() => navigate({ view: 'library', sessionId: null })} className="text-xs rounded-lg bg-gray-900 text-white px-3 py-1.5 hover:bg-gray-800">Back to Library</button>
+              <button type="button" onClick={() => navigate({ view: 'calendar', sessionId: null })} className="text-xs rounded-lg bg-gray-900 text-white px-3 py-1.5 hover:bg-gray-800">Back to Home</button>
                   </div>
                 </div>
               </div>
