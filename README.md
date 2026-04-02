@@ -94,6 +94,15 @@ cd apps/frontend && npm run dev -- --host 0.0.0.0 --port 3000
 cd apps/frontend && npm run build
 ```
 
+### Frontend Build Flags
+
+- `VITE_SOURCEMAP=1` enables source maps in the built bundle (useful on staging for debugging runtime errors).
+- `VITE_MINIFY=terser` builds using Terser instead of esbuild (helps isolate minifier-only issues under production minification).
+
+### Backend Diagnostic Endpoints
+
+- `GET /version` returns `{ sha, built_at }` for the deployed build. `sha` is taken from `DEPLOYED_GIT_SHA`.
+
 ## Architecture
 
 ### Backend

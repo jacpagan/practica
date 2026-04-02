@@ -4,6 +4,7 @@ from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import render
+from django.http import JsonResponse
 from rest_framework.routers import DefaultRouter
 from videos.views import (
     SessionViewSet, ReviewRequestViewSet, health_check,
@@ -30,20 +31,38 @@ def spa_index(request):
         body = resp.content.decode('utf-8')
         sha = os.getenv('DEPLOYED_GIT_SHA', '')
         if sha:
-            # Append a cache-busting query param to built asset URLs
-            body = body.replace('.js"', f'.js?v={sha[:8]}"')
-            body = body.replace('.css"', f'.css?v={sha[:8]}"')
+            # Inject build SHA for client telemetry and diagnostics
+            injection = (
+                f'\n    <meta name="practica:sha" content="{sha}" />\n'
+                f'    <script>window.__DEPLOYED_GIT_SHA = "{sha}";</script>\n'
+            )
+            body = body.replace('</head>', injection + '</head>')
         resp.content = body.encode('utf-8')
     except Exception:
         pass
+    # Prevent caching of index.html so users pick up the newest manifest/assets
     resp['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     resp['Pragma'] = 'no-cache'
     resp['Expires'] = '0'
     return resp
 
+
+def version_view(request):
+    sha = os.getenv('DEPLOYED_GIT_SHA', '')
+    built_at = ''
+    try:
+        from django.conf import settings as dj_settings
+        index_path = (dj_settings.FRONTEND_DIR / 'index.html')
+        if index_path.exists():
+            built_at = str(int(index_path.stat().st_mtime))
+    except Exception:
+        built_at = ''
+    return JsonResponse({'sha': sha, 'built_at': built_at})
+
 urlpatterns = [
     path(settings.ADMIN_URL, admin.site.urls),
     path('api/', include(router.urls)),
+    path('version', version_view, name='version'),
     path('api/auth/register/', register_view, name='register'),
     path('api/auth/login/', login_view, name='login'),
     path('api/auth/me/', me_view, name='me'),

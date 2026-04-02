@@ -174,12 +174,22 @@ export const reportClientError = ({ message = '', stack = '', source = 'ui', ext
         store.setItem(CLIENT_TRACE_ID_KEY, traceId)
       }
     } catch {}
+    let buildSha = ''
+    try {
+      buildSha = String(window.__DEPLOYED_GIT_SHA || document.querySelector('meta[name="practica:sha"]')?.content || '').trim()
+    } catch {}
+    const hasToken = (() => {
+      try { return !!(window.localStorage && window.localStorage.getItem('token')) } catch { return false }
+    })()
+
     const payload = {
       message: trimLogValue(message, 300),
       stack: stack ? 'present' : '',
       source: trimLogValue(source, 64),
       path: trimLogValue(window.location.pathname, 512),
-      extra: extra && typeof extra === 'object' ? { ...extra, client_trace_id: traceId } : { client_trace_id: traceId },
+      extra: extra && typeof extra === 'object'
+        ? { ...extra, client_trace_id: traceId, build_sha: buildSha, auth_state: hasToken ? 'token_present' : 'no_token' }
+        : { client_trace_id: traceId, build_sha: buildSha, auth_state: hasToken ? 'token_present' : 'no_token' },
     }
     const body = JSON.stringify(payload)
     if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
