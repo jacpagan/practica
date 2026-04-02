@@ -25,7 +25,7 @@ const parseRoute = (pathname, search = '') => {
   if (pathname === '/privacy') return { view: 'privacy', sessionId: null }
   if (pathname === '/archive') return { view: 'calendar', sessionId: null }
   if (pathname === '/calendar') return { view: 'calendar', sessionId: null, date }
-  if (pathname === '/library') return { view: 'library', sessionId: null, date }
+  if (pathname === '/library') return { view: 'calendar', sessionId: null, date }
   if (pathname === '/upload') return { view: 'upload', sessionId: null }
   if (pathname === '/record' || pathname === '/recording') return { view: 'record', sessionId: null }
   if (pathname === '/requests') return { view: 'requests', sessionId: null }
@@ -35,7 +35,7 @@ const parseRoute = (pathname, search = '') => {
   if (seriesMatch) return { view: 'series', sessionId: null, seriesName: decodeURIComponent(seriesMatch[1]) }
   const sessionMatch = pathname.match(/^\/sessions\/(\d+)$/)
   if (sessionMatch) return { view: 'detail', sessionId: Number(sessionMatch[1]) }
-  return { view: 'library', sessionId: null }
+  return { view: 'calendar', sessionId: null }
 }
 
 const routePath = ({ view, sessionId, token, seriesName, date }) => {
@@ -47,7 +47,6 @@ const routePath = ({ view, sessionId, token, seriesName, date }) => {
   if (view === 'series' && seriesName) return `/series/${encodeURIComponent(seriesName)}`
   if (view === 'review' && token) return `/r/${token}`
   if (view === 'detail' && sessionId) return `/sessions/${sessionId}`
-  if (view === 'library') return date ? `/?date=${encodeURIComponent(date)}` : '/'
   if (view === 'calendar') return date ? `/?date=${encodeURIComponent(date)}` : '/'
   return '/'
 }
@@ -71,7 +70,7 @@ function AppContent() {
   const [hasTeacherWorkspace, setHasTeacherWorkspace] = useState(false)
   const [teacherPendingCount, setTeacherPendingCount] = useState(0)
   const teacherPollRef = useRef(null)
-  const [detailReturnRoute, setDetailReturnRoute] = useState({ view: 'library', sessionId: null, seriesName: '' })
+  const [detailReturnRoute, setDetailReturnRoute] = useState({ view: 'calendar', sessionId: null, seriesName: '' })
   const [openRecorderOnUpload, setOpenRecorderOnUpload] = useState(false)
   const [justUploadedSessionId, setJustUploadedSessionId] = useState(null)
   const [pendingFollowUpRequestDraft, setPendingFollowUpRequestDraft] = useState(null)
@@ -367,7 +366,7 @@ function AppContent() {
   }, [openSessionById, routeSeriesName, view])
 
   const goBack = useCallback(() => {
-    navigate(detailReturnRoute?.view ? detailReturnRoute : { view: 'library', sessionId: null, seriesName: '' })
+    navigate(detailReturnRoute?.view ? detailReturnRoute : { view: 'calendar', sessionId: null, seriesName: '' })
     setSelectedSession(null)
     setJustUploadedSessionId(null)
   }, [detailReturnRoute, navigate])
@@ -653,7 +652,7 @@ function AppContent() {
           <CalendarView
             sessions={sessions}
             sessionsLoading={sessionsLoading}
-            onOpenSession={(session) => navigate({ view: 'detail', sessionId: session.id })}
+            onOpenSession={(session, returnRoute) => openSession(session, returnRoute || { view: 'calendar', sessionId: null, seriesName: '' })}
             onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
             onOpenListDate={(dateKey) => {
               try { window.localStorage.setItem('practica.filter.date.v1', String(dateKey || '')) } catch {}
@@ -731,7 +730,7 @@ function AppContent() {
             onCancel={({ bypassUploadGuard = false } = {}) => navigate(
               pendingPracticeSeries
                 ? { view: 'series', sessionId: null, seriesName: pendingPracticeSeries }
-                : { view: 'library', sessionId: null },
+                : { view: 'calendar', sessionId: null },
               { bypassUploadGuard },
             )}
             initialRecorderOpen={openRecorderOnUpload}
