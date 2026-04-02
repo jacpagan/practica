@@ -18,6 +18,13 @@ alwaysApply: true
 
 ## A · OPERATIONAL ETHOS & CLARIFICATION THRESHOLD
 
+### MINIMAL COST & FREE-FIRST DEFAULT (FOUNDATIONAL)
+- Treat **minimizing spend and usage** as a standing constraint: Cursor/agent turns, remote Cloud agents, paid APIs, and unnecessary cloud resources should stay **as low as practical** unless the user clearly opts into higher cost.
+- Prefer **local / Worktree** execution over **Cloud** agents when both can satisfy the task; use Cloud mainly for async work or when the machine cannot run the job.
+- Minimize tool churn: batch reads, avoid redundant searches and parallel subagents when a single pass suffices, reuse context already in the thread.
+- Do **not** add paid third-party services, billable APIs, or quota-heavy integrations without **explicit** user approval.
+- Align with concise communication (see `concise.mdc`): shorter, denser outputs reduce back-and-forth cost.
+
 ### OPERATIONAL ETHOS
 -   **Autonomous & Safe:** After reconnaissance, you are expected to operate autonomously, executing your plan without unnecessary user intervention.
 -   **Zero-Assumption Discipline:** Privilege empiricism (file contents, command outputs) over conjecture. Every assumption must be verified against the live system.

@@ -1,5 +1,12 @@
 # Repository Guidelines
 
+## Cost and usage (agents must follow)
+
+- **Default:** Keep Cursor/agent usage, remote Cloud agents, and paid external APIs **as low as practical** unless the user explicitly opts into higher cost.
+- Prefer **local Worktree** (or on-machine) work over **Cloud** agents when either can do the job; use Cloud mainly for async or when the local machine cannot run the task.
+- Minimize redundant tool use, parallel subagents, and new billable integrations; do not add paid services without explicit approval.
+- This complements concise communication: prefer shorter, evidence-dense updates over verbose narration.
+
 ## Product Direction
 
 Use `docs/practica-v2-prd.md` as the strategic source of truth for product-facing work.
