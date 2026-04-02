@@ -207,9 +207,9 @@ def _public_review_request_preview(review_request):
 
 _review_request_forbidden_response = _feedback_request_forbidden_response
 _review_request_visible_to_user = _feedback_request_visible_to_user
-_review_request_teacher_can_respond = _feedback_request_reviewer_can_respond
+_review_request_reviewer_can_respond = _feedback_request_reviewer_can_respond
 _visible_review_requests_qs = _visible_feedback_requests_qs
-_ensure_teacher_roster_membership = _ensure_member_connection
+_ensure_reviewer_roster_membership = _ensure_member_connection
 _mark_review_request_viewed = _mark_feedback_request_viewed
 
 
@@ -600,7 +600,7 @@ def review_link_feedback(request, token):
             },
             status=status.HTTP_403_FORBIDDEN,
         )
-    if review_request and not _review_request_teacher_can_respond(review_request, request.user):
+    if review_request and not _review_request_reviewer_can_respond(review_request, request.user):
         return _review_request_forbidden_response(
             'Only the assigned reviewer can respond to this review request.'
         )
@@ -762,11 +762,6 @@ def feedback_template_detail(request, template_id):
     return Response(serializer.data)
 
 
-teacher_inbox = feedback_inbox
-teacher_roster = member_connections
-teacher_insights = feedback_insights
-teacher_templates = feedback_templates
-teacher_template_detail = feedback_template_detail
 reviewer_inbox = feedback_inbox
 reviewer_connections = member_connections
 reviewer_roster = member_connections
@@ -795,7 +790,7 @@ class ReviewRequestViewSet(viewsets.ModelViewSet):
         if session_id.isdigit():
             qs = qs.filter(session_id=int(session_id))
         role = str(self.request.query_params.get('role', '')).strip().lower()
-        if role in {'teacher', 'reviewer'}:
+        if role == 'reviewer':
             qs = qs.filter(teacher=self.request.user)
         elif role in {'student', 'owner'}:
             qs = qs.filter(student=self.request.user)
@@ -815,7 +810,7 @@ class ReviewRequestViewSet(viewsets.ModelViewSet):
                 parent_request.status = ReviewRequest.STATUS_RESUBMITTED
                 parent_request.resubmitted_at = timezone.now()
                 parent_request.save(update_fields=['status', 'resubmitted_at', 'updated_at'])
-            _ensure_teacher_roster_membership(
+            _ensure_reviewer_roster_membership(
                 teacher=review_request.teacher,
                 student=review_request.student,
                 created_by=self.request.user,

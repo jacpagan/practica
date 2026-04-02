@@ -16,7 +16,7 @@ class FeedbackRequestApiTests(APITestCase):
         self.teacher = User.objects.create_user(username='teacher-user', password='pass1234')
         self.outsider = User.objects.create_user(username='outsider-user', password='pass1234')
         Profile.objects.create(user=self.student, display_name='Student Musician')
-        Profile.objects.create(user=self.teacher, display_name='Drum Teacher')
+        Profile.objects.create(user=self.teacher, display_name='Drum Reviewer')
         Profile.objects.create(user=self.outsider, display_name='Random Reviewer')
         self.session = Session.objects.create(
             user=self.student,
@@ -40,7 +40,7 @@ class FeedbackRequestApiTests(APITestCase):
             '/api/review-requests/',
             {
                 'session_id': self.session.id,
-                'teacher_id': self.teacher.id,
+                'reviewer_id': self.teacher.id,
                 'instrument': 'drums',
                 'student_level': 'intermediate',
                 'goal': 'Improve ghost-note consistency',
@@ -299,11 +299,11 @@ class FeedbackRequestApiTests(APITestCase):
             '/api/review-requests/',
             {
                 'session_id': new_session.id,
-                'teacher_id': self.teacher.id,
+                'reviewer_id': self.teacher.id,
                 'parent_request_id': parent_request.id,
                 'instrument': 'drums',
                 'student_level': 'intermediate',
-                'goal': 'Follow up after teacher notes',
+                'goal': 'Follow up after reviewer notes',
                 'exercise_or_song': 'Same groove, second take',
             },
             format='json',
@@ -334,17 +334,16 @@ class FeedbackRequestApiTests(APITestCase):
             '/api/review-requests/',
             {
                 'session_id': new_session.id,
-                'teacher_id': another_teacher.id,
+                'reviewer_id': another_teacher.id,
                 'parent_request_id': parent_request.id,
                 'instrument': 'drums',
-                'goal': 'Wrong teacher follow-up',
+                'goal': 'Wrong reviewer follow-up',
             },
             format='json',
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('same reviewer', response.data['reviewer_id'][0].lower())
-        self.assertIn('same reviewer', response.data['teacher_id'][0].lower())
 
     def test_feedback_insights_returns_category_and_member_trends(self):
         review_request = self._create_review_request()

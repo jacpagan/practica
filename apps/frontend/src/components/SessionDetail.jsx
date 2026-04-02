@@ -208,7 +208,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     if (!initialReviewRequestDraft || !canEdit) return
     setShowLoopDetails(true)
     setShowRequestComposer(true)
-    setSelectedReviewer(initialReviewRequestDraft.reviewer || initialReviewRequestDraft.teacher || null)
+    setSelectedReviewer(initialReviewRequestDraft.reviewer || null)
     setShowRequestDetails(true)
     setRequestInstrument(initialReviewRequestDraft.instrument || 'drums')
     setRequestGoal(initialReviewRequestDraft.goal || '')
@@ -279,7 +279,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
         const seen = new Set()
         const reviewers = []
         items.forEach((item) => {
-          const reviewer = item?.reviewer || item?.teacher
+          const reviewer = item?.reviewer
           if (!reviewer?.id || seen.has(reviewer.id)) return
           seen.add(reviewer.id)
           reviewers.push(reviewer)
@@ -287,7 +287,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
         if (cancelled) return
         setRecentReviewers(reviewers.slice(0, 6))
         setSelectedReviewer((current) => {
-          if (current?.id || initialReviewRequestDraft?.reviewer?.id || initialReviewRequestDraft?.teacher?.id) return current
+          if (current?.id || initialReviewRequestDraft?.reviewer?.id) return current
           const storedReviewer = readLastReviewer()
           if (storedReviewer?.id) {
             return reviewers.find((reviewer) => reviewer.id === storedReviewer.id) || storedReviewer
@@ -304,7 +304,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
 
     loadRecentReviewers()
     return () => { cancelled = true }
-  }, [authHeaders, canEdit, initialReviewRequestDraft?.reviewer?.id, initialReviewRequestDraft?.teacher?.id, token])
+  }, [authHeaders, canEdit, initialReviewRequestDraft?.reviewer?.id, token])
 
   useEffect(() => {
     if (!token || !canEdit) return undefined
@@ -494,7 +494,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        throw new Error(data?.session_id?.[0] || data?.reviewer_id?.[0] || data?.teacher_id?.[0] || data?.goal?.[0] || data?.error || 'Could not create review request')
+        throw new Error(data?.session_id?.[0] || data?.reviewer_id?.[0] || data?.goal?.[0] || data?.error || 'Could not create review request')
       }
       setReviewRequests((current) => [data, ...current])
       setShowRequestComposer(false)
@@ -794,12 +794,11 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   }
 
   const startFollowUp = (requestItem = currentLoopRequest) => {
-    const reviewer = requestItem?.reviewer || requestItem?.teacher
+    const reviewer = requestItem?.reviewer
     if (!reviewer) return
     onRecordAnother?.({
       parent_request_id: requestItem.id,
       reviewer,
-      teacher: reviewer,
       instrument: requestItem.instrument,
       goal: requestItem.goal,
       exercise_or_song: requestItem.exercise_or_song,
@@ -1123,7 +1122,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           <div className="flex items-start justify-between gap-3 flex-wrap">
                             <div>
                               <div className="flex items-center gap-2 flex-wrap">
-                                <p className="text-sm font-medium text-gray-900">{requestItem.reviewer?.display_name || requestItem.teacher?.display_name || requestItem.reviewer?.username || requestItem.teacher?.username || 'Reviewer'}</p>
+                                <p className="text-sm font-medium text-gray-900">{requestItem.reviewer?.display_name || requestItem.reviewer?.username || 'Reviewer'}</p>
                                 <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${requestStatusTone[requestItem.status] || 'bg-gray-100 text-gray-700'}`}>
                                   {requestStatusLabel(requestItem.status)}
                                 </span>
@@ -1251,7 +1250,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                 Open request thread
                               </button>
                             ) : null}
-                            {requestItem.status !== 'closed' && (requestItem.reviewer || requestItem.teacher) ? (
+                            {requestItem.status !== 'closed' && requestItem.reviewer ? (
                               <button
                                 type="button"
                                 onClick={() => startFollowUp(requestItem)}

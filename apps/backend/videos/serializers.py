@@ -381,7 +381,6 @@ class ReviewVideoFeedbackSerializer(serializers.ModelSerializer):
 
 class ReviewRequestSerializer(serializers.ModelSerializer):
     student = UserSummarySerializer(read_only=True)
-    teacher = UserSummarySerializer(read_only=True)
     owner = UserSummarySerializer(source='student', read_only=True)
     reviewer = UserSummarySerializer(source='teacher', read_only=True)
     owner_id = serializers.IntegerField(source='student_id', read_only=True)
@@ -397,12 +396,6 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
         queryset=Session.objects.all(),
         write_only=True,
         required=True,
-    )
-    teacher_id = serializers.PrimaryKeyRelatedField(
-        source='teacher',
-        queryset=User.objects.all(),
-        write_only=True,
-        required=False,
     )
     review_link = ReviewLinkSerializer(read_only=True)
     feedback_link = ReviewLinkSerializer(source='review_link', read_only=True)
@@ -429,7 +422,6 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
             'id',
             'session', 'session_id',
             'student',
-            'teacher', 'teacher_id',
             'owner', 'owner_id', 'reviewer', 'reviewer_id',
             'review_link', 'feedback_link',
             'parent_request', 'parent_request_id',
@@ -441,17 +433,20 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
         ]
         read_only_fields = [
-            'id', 'student', 'teacher', 'owner', 'reviewer', 'session', 'review_link', 'feedback_link', 'parent_request', 'parent_feedback_request',
+            'id', 'student', 'owner', 'reviewer', 'session', 'review_link', 'feedback_link', 'parent_request', 'parent_feedback_request',
             'status', 'opened_at', 'responded_at', 'viewed_at', 'resubmitted_at', 'closed_at',
             'response_count', 'current_user_role', 'current_member_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count', 'feedback_category_counts',
             'created_at', 'updated_at',
         ]
 
     def _reviewer_validation_error(self, message):
-        return serializers.ValidationError({
-            'reviewer_id': message,
-            'teacher_id': message,
-        })
+        return serializers.ValidationError({'reviewer_id': message})
+
+    def to_internal_value(self, data):
+        payload = data.copy() if hasattr(data, 'copy') else dict(data)
+        if isinstance(payload, dict) and 'reviewer_id' not in payload and 'teacher_id' in payload:
+            payload['reviewer_id'] = payload.get('teacher_id')
+        return super().to_internal_value(payload)
 
     def get_parent_request(self, obj):
         parent = obj.parent_request
@@ -483,7 +478,7 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
 
     def get_current_member_role(self, obj):
         legacy = self.get_current_user_role(obj)
-        if legacy in {'teacher', 'reviewer'}:
+        if legacy == 'reviewer':
             return 'reviewer'
         if legacy == 'student':
             return 'owner'

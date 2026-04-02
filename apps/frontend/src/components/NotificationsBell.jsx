@@ -81,7 +81,7 @@ export default function NotificationsBell({ token, onOpenReviewRequest, onOpenPr
         const newOnes = incomingIds.filter((id) => !seen.has(id))
         if (newOnes.length > 0) {
           const newest = responded.find((r) => Number(r.id) === newOnes[0])
-          const who = newest?.reviewer?.display_name || newest?.teacher?.display_name || newest?.reviewer?.username || newest?.teacher?.username || 'Your reviewer'
+          const who = newest?.reviewer?.display_name || newest?.reviewer?.username || 'Your reviewer'
           const what = newest?.session?.title || 'your video'
           toast.success(`New feedback from ${who} on “${what}”.`)
         }
@@ -183,7 +183,7 @@ export default function NotificationsBell({ token, onOpenReviewRequest, onOpenPr
             ) : items.map((r) => (
               <div key={r.id} className="rounded-lg border border-gray-200 p-3">
                 <p className="text-sm font-medium text-gray-900 line-clamp-1">{r.session?.title || 'Feedback'}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{r.reviewer?.display_name || r.teacher?.display_name || r.reviewer?.username || r.teacher?.username || 'Reviewer'}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{r.reviewer?.display_name || r.reviewer?.username || 'Reviewer'}</p>
                 <div className="mt-2 flex gap-2 justify-end">
                   <button
                     type="button"

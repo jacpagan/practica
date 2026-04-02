@@ -536,7 +536,7 @@ function ReviewPage({ reviewToken = '' }) {
   }
 
   if (!user) {
-    const reviewerName = reviewRequest?.reviewer?.display_name || reviewRequest?.reviewer?.username || reviewRequest?.teacher?.display_name || reviewRequest?.teacher?.username || ''
+    const reviewerName = reviewRequest?.reviewer?.display_name || reviewRequest?.reviewer?.username || ''
     const ownerName = reviewRequest?.owner?.display_name || reviewRequest?.owner?.username || reviewRequest?.student?.display_name || reviewRequest?.student?.username || ''
     const authTitle = claimCode ? 'Continue this private review' : 'Sign in to continue'
     const authSubtitle = claimCode
@@ -783,7 +783,7 @@ function ReviewPage({ reviewToken = '' }) {
         ) : link?.allow_video_feedback ? (
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 space-y-2">
             <p className="text-sm font-semibold text-blue-900">This thread is ready for your reviewer</p>
-            <p className="text-sm text-blue-800">{reviewRequest?.reviewer?.display_name || reviewRequest?.teacher?.display_name || reviewRequest?.reviewer?.username || reviewRequest?.teacher?.username || 'Your reviewer'} can respond here privately. When you are ready to continue, record a new take from your library and send the next request.</p>
+            <p className="text-sm text-blue-800">{reviewRequest?.reviewer?.display_name || reviewRequest?.reviewer?.username || 'Your reviewer'} can respond here privately. When you are ready to continue, record a new take from your library and send the next request.</p>
           </div>
         ) : (
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 space-y-2">
