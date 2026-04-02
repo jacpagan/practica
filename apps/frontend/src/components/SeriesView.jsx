@@ -98,7 +98,7 @@ function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, r
             <div>
               <p className="text-xs uppercase tracking-wide text-gray-500">Practice thread</p>
               <h2 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">{seriesName}</h2>
-              <p className="text-sm text-gray-500 mt-2">{seriesSessions.length} takes{latestSession ? ` • latest ${new Date(latestSession.recorded_at || latestSession.created_at).toLocaleString(undefined, { hour12: undefined })}` : ''}</p>
+              <p className="text-sm text-gray-500 mt-2">{latestSession ? `Latest ${new Date(latestSession.recorded_at || latestSession.created_at).toLocaleString(undefined, { hour12: undefined })}` : 'No takes yet'}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {latestSession ? (
@@ -173,10 +173,7 @@ function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, r
                       <p className="text-sm font-medium text-gray-900 mt-1">{previousSession.title}</p>
                       <p className="text-xs text-gray-500 mt-1">{fmtDate(previousSession.recorded_at || previousSession.created_at)}</p>
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">Take {previousSession.takeNumber}</span>
-                      <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">{previousSession.video_feedback_count || 0} replies</span>
-                    </div>
+                    <div className="flex items-center gap-2 flex-wrap" />
                     <button type="button" onClick={() => onOpenSession?.(previousSession, { view: 'series', seriesName })} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors">
                       Open previous take
                     </button>
@@ -190,10 +187,7 @@ function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, r
                       <p className="text-sm font-medium text-gray-900 mt-1">{latestReviewedSession.title}</p>
                       <p className="text-xs text-gray-500 mt-1">{latestReviewedSession.video_feedback_count || 0} replies attached</p>
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[11px] uppercase tracking-wide bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full">Reviewed</span>
-                      <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">Take {latestReviewedSession.takeNumber}</span>
-                    </div>
+                    <div className="flex items-center gap-2 flex-wrap" />
                     <button type="button" onClick={() => onOpenSession?.(latestReviewedSession, { view: 'series', seriesName })} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors">
                       Open reviewed take
                     </button>
@@ -208,7 +202,6 @@ function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, r
                   <p className="text-sm font-semibold text-gray-900">Thread timeline</p>
                   <p className="text-xs text-gray-500 mt-1">Oldest to newest.</p>
                 </div>
-                <span className="text-xs text-gray-500">{seriesSessions.length} takes</span>
               </div>
               <div className="space-y-3">
                 {seriesSessions.map((session) => (
