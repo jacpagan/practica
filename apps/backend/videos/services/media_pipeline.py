@@ -163,7 +163,7 @@ def _create_job_settings(session):
                         'Height': 540,
                     },
                     'AudioDescriptions': [{
-                        'AudioSelectorGroupName': 'mixAll',
+                        'AudioSourceName': 'mixAll',
                         'CodecSettings': {
                             'Codec': 'AAC',
                             'AacSettings': {'Bitrate': 96000, 'CodingMode': 'CODING_MODE_2_0', 'SampleRate': 48000},
@@ -200,7 +200,7 @@ def _create_job_settings(session):
                         'Height': 720,
                     },
                     'AudioDescriptions': [{
-                        'AudioSelectorGroupName': 'mixAll',
+                        'AudioSourceName': 'mixAll',
                         'CodecSettings': {
                             'Codec': 'AAC',
                             'AacSettings': {'Bitrate': 96000, 'CodingMode': 'CODING_MODE_2_0', 'SampleRate': 48000},
