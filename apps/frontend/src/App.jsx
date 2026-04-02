@@ -54,6 +54,7 @@ const routePath = ({ view, sessionId, token, seriesName, date }) => {
 }
 
 function AppContent() {
+  const POST_LOGIN_REDIRECT_KEY = 'practica.post_login_redirect.v1'
   const { user, token, loading, logout } = useAuth()
   const toast = useToast()
   const confirm = useConfirm()
@@ -172,6 +173,10 @@ function AppContent() {
 
   useEffect(() => {
     const onAuthExpired = () => {
+      try {
+        const fullPath = (window.location && (window.location.pathname + (window.location.search || ''))) || '/'
+        window.sessionStorage.setItem(POST_LOGIN_REDIRECT_KEY, fullPath)
+      } catch {}
       try { toast.error('Session expired. Please sign in again.') } catch {}
       try { logout() } catch {}
       try { navigate({ view: 'calendar', sessionId: null }, { replace: true }) } catch {}
@@ -179,6 +184,21 @@ function AppContent() {
     window.addEventListener('practica:auth-expired', onAuthExpired, { once: true })
     return () => window.removeEventListener('practica:auth-expired', onAuthExpired)
   }, [logout, navigate, toast])
+
+  // After successful sign-in, return user to the last route if we saved one
+  useEffect(() => {
+    if (!user) return
+    let stored = ''
+    try { stored = window.sessionStorage.getItem(POST_LOGIN_REDIRECT_KEY) || '' } catch {}
+    if (!stored) return
+    try {
+      window.sessionStorage.removeItem(POST_LOGIN_REDIRECT_KEY)
+      const url = new URL(stored, window.location.origin)
+      const route = parseRoute(url.pathname, url.search)
+      applyRoute(route, { replace: true })
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
 
   useEffect(() => {
     const onPopState = () => {
