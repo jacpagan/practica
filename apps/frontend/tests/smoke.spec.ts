@@ -13,6 +13,12 @@ test('Library route (signed-out) shows Auth form without crashing', async ({ pag
   await page.goto('/library?date=2026-04-01')
   await expect(page.getByRole('button', { name: 'Log in' }).first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'Sign up' }).first()).toBeVisible()
+  // Query string should be preserved by route normalization
+  await expect(page).toHaveURL(/\/library\?date=/)
+  // Report link available and non-crashing
+  await page.getByRole('button', { name: 'Report a problem' }).click()
+  // No navigation expected
+  await expect(page).toHaveURL(/\/library\?date=/)
 })
 
 test('Requests route (signed-out) shows Auth form', async ({ page }) => {
