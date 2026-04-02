@@ -122,7 +122,6 @@ function TeachingView({ token, onOpenReviewRequest }) {
     }
   }
 
-  const pendingCount = requests.filter((item) => ['requested', 'opened'].includes(item.status)).length
   const sortedRequests = useMemo(() => {
     const priority = { requested: 0, opened: 1, responded: 2, viewed: 3, resubmitted: 4, closed: 5, revoked: 6 }
     return [...requests].sort((left, right) => {
@@ -155,9 +154,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
           <div className="space-y-3">
             <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Requests</h2>
             <p className="text-sm text-gray-500 mt-1">Open the next request fast.</p>
-            <div className="flex flex-wrap gap-2">
-              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{pendingCount} pending</span>
-            </div>
+            <div className="flex flex-wrap gap-2" />
           </div>
         </div>
 
@@ -174,10 +171,6 @@ function TeachingView({ token, onOpenReviewRequest }) {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-semibold text-gray-900">{nextRequest.session?.title || 'Feedback request'}</p>
-                    <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${statusTone[nextRequest.status] || 'bg-gray-100 text-gray-700'}`}>
-                      {statusLabel(nextRequest.status)}
-                    </span>
-                    {nextRequest.parent_request ? <span className="text-[11px] uppercase tracking-wide bg-violet-100 text-violet-800 px-2 py-1 rounded-full">Follow-up</span> : null}
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
                     {nextRequest.owner?.display_name || nextRequest.student?.display_name || nextRequest.owner?.username || nextRequest.student?.username || 'Member'} • {nextRequest.instrument}

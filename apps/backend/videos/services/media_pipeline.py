@@ -128,7 +128,14 @@ def _create_job_settings(session):
         'TimecodeConfig': {'Source': 'ZEROBASED'},
         'Inputs': [{
             'FileInput': input_uri,
-            'AudioSelectors': {'Audio Selector 1': {'DefaultSelection': 'DEFAULT'}},
+            # Mix default audio with track 2 if present so mic + app audio (e.g., metronome) are both audible.
+            'AudioSelectors': {
+                'A1': {'DefaultSelection': 'DEFAULT'},
+                'A2': {'SelectorType': 'TRACK', 'Tracks': [2]},
+            },
+            'AudioSelectorGroups': {
+                'mixAll': {'AudioSelectorNames': ['A1', 'A2']}
+            },
             'VideoSelector': {},
         }],
         'OutputGroups': [
@@ -156,6 +163,7 @@ def _create_job_settings(session):
                         'Height': 540,
                     },
                     'AudioDescriptions': [{
+                        'AudioSelectorGroupName': 'mixAll',
                         'CodecSettings': {
                             'Codec': 'AAC',
                             'AacSettings': {'Bitrate': 96000, 'CodingMode': 'CODING_MODE_2_0', 'SampleRate': 48000},
@@ -192,6 +200,7 @@ def _create_job_settings(session):
                         'Height': 720,
                     },
                     'AudioDescriptions': [{
+                        'AudioSelectorGroupName': 'mixAll',
                         'CodecSettings': {
                             'Codec': 'AAC',
                             'AacSettings': {'Bitrate': 96000, 'CodingMode': 'CODING_MODE_2_0', 'SampleRate': 48000},
