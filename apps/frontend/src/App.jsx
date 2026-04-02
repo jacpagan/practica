@@ -24,7 +24,7 @@ const parseRoute = (pathname, search = '') => {
     return { view: 'calendar', sessionId: null, date }
   }
   if (pathname === '/privacy') return { view: 'privacy', sessionId: null }
-  if (pathname === '/archive') return { view: 'archive', sessionId: null }
+  if (pathname === '/archive') return { view: 'calendar', sessionId: null }
   if (pathname === '/calendar') return { view: 'calendar', sessionId: null, date }
   if (pathname === '/library') return { view: 'library', sessionId: null, date }
   if (pathname === '/upload') return { view: 'upload', sessionId: null }
@@ -41,7 +41,7 @@ const parseRoute = (pathname, search = '') => {
 
 const routePath = ({ view, sessionId, token, seriesName, date }) => {
   if (view === 'privacy') return '/privacy'
-  if (view === 'archive') return '/archive'
+  if (view === 'archive') return '/'
   if (view === 'upload') return '/upload'
   if (view === 'record') return '/record'
   if (view === 'requests') return '/requests'
@@ -477,8 +477,8 @@ function AppContent() {
 
   useEffect(() => {
     if (!user) return
-    if (view === 'library' || view === 'archive' || view === 'series' || view === 'calendar') loadSessions()
-    if (view === 'library' || view === 'archive') loadStudentReviewRequests()
+    if (view === 'series' || view === 'calendar') loadSessions()
+    if (view === 'calendar') loadStudentReviewRequests()
     loadTeacherWorkspaceAvailability()
   }, [user, view, loadSessions, loadStudentReviewRequests, loadTeacherWorkspaceAvailability])
 
@@ -558,12 +558,6 @@ function AppContent() {
                   Home
                 </button>
                 <button
-                  onClick={() => navigate({ view: 'archive', sessionId: null })}
-                  className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'archive' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
-                >
-                  Archive
-                </button>
-                <button
                   onClick={() => navigate({ view: 'requests', sessionId: null })}
                   className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
                 >
@@ -620,12 +614,6 @@ function AppContent() {
                 className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'calendar' || view === 'detail' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
               >
                 Home
-              </button>
-              <button
-                onClick={() => navigate({ view: 'archive', sessionId: null })}
-                className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'archive' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
-              >
-                Archive
               </button>
               <button
                 onClick={() => navigate({ view: 'requests', sessionId: null })}
