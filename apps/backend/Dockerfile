@@ -6,6 +6,10 @@ WORKDIR /frontend
 COPY apps/frontend/package*.json ./
 RUN npm ci --no-audit --no-fund
 COPY apps/frontend/ .
+# Default to terser in production builds to avoid rare minifier TDZ issues; allow override at build time
+ENV VITE_MINIFY=terser
+# Do not emit sourcemaps by default in prod image; can be toggled per-env
+ENV VITE_SOURCEMAP=
 RUN npm run build
 
 # 2) Build backend image with Python

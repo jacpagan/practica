@@ -777,24 +777,32 @@ class ErrorBoundary extends React.Component {
     try {
       reportClientError({ source: 'ErrorBoundary', message: err?.message || 'render error', stack: err?.stack || '' })
     } catch {}
-    try {
-      if (typeof window !== 'undefined') {
-        const key = 'practica.errorboundary.reloaded'
-        const once = window.sessionStorage?.getItem(key)
-        if (!once) {
-          window.sessionStorage?.setItem(key, '1')
-          setTimeout(() => { try { window.location.reload() } catch {} }, 250)
-        }
-      }
-    } catch {}
+    // Do not auto-reload; let user choose to retry to avoid loops when a bad bundle is cached
   }
 
   render() {
     if (this.state.hasError) {
       return (
         <div className="min-h-screen bg-white flex items-center justify-center px-4">
-          <div className="text-center">
-            <p className="text-sm text-gray-600">Something went wrong. Reloading…</p>
+          <div className="text-center space-y-3">
+            <p className="text-sm text-gray-900 font-medium">Something went wrong.</p>
+            <p className="text-xs text-gray-500">Try reloading or return home.</p>
+            <div className="flex items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => { try { window.location.reload() } catch {} }}
+                className="rounded-lg bg-gray-900 text-white px-3 py-1.5 text-xs hover:bg-gray-800"
+              >
+                Reload
+              </button>
+              <button
+                type="button"
+                onClick={() => { try { window.history.pushState(null, '', '/') ; window.location.reload() } catch {} }}
+                className="rounded-lg border border-gray-200 bg-white text-gray-900 px-3 py-1.5 text-xs hover:bg-gray-50"
+              >
+                Go home
+              </button>
+            </div>
           </div>
         </div>
       )

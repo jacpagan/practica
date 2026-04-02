@@ -299,22 +299,29 @@ function LibraryView({
     }))
   }
 
-  const renderSessionRows = (items, returnRoute = { view: 'library', sessionId: null, seriesName: '' }) => items.map((session) => {
-    const ar = activeRequestBySessionId.get(Number(session.id)) || null
-    const onFollowUp = ar ? () => onRecordFollowUp?.({ parent_request_id: ar.id, practiceSeries: session.practice_series || '' }) : null
-    const openThreadPicker = () => setEditingThreadSession(session)
-    return (
-      <SessionListItem
-        key={session.id}
-        session={session}
-        status={ar?.status}
-        showSeries={Boolean(String(session.practice_series || '').trim())}
-        onOpen={() => onOpenSession?.(session, returnRoute)}
-        onChangeThread={openThreadPicker}
-        onRecordFollowUp={onFollowUp}
-      />
-    )
-  })
+  const renderSessionRows = (items, returnRoute = { view: 'library', sessionId: null, seriesName: '' }) => {
+    const seenDateKeys = new Set()
+    return items.map((session) => {
+      const ar = activeRequestBySessionId.get(Number(session.id)) || null
+      const onFollowUp = ar ? () => onRecordFollowUp?.({ parent_request_id: ar.id, practiceSeries: session.practice_series || '' }) : null
+      const openThreadPicker = () => setEditingThreadSession(session)
+      const anchorKey = byDateKey(session.recorded_at || session.created_at)
+      const anchorId = !seenDateKeys.has(anchorKey) ? `date-${anchorKey}` : ''
+      if (!seenDateKeys.has(anchorKey)) seenDateKeys.add(anchorKey)
+      return (
+        <div key={session.id} {...(anchorId ? { id: anchorId } : {})}>
+          <SessionListItem
+            session={session}
+            status={ar?.status}
+            showSeries={Boolean(String(session.practice_series || '').trim())}
+            onOpen={() => onOpenSession?.(session, returnRoute)}
+            onChangeThread={openThreadPicker}
+            onRecordFollowUp={onFollowUp}
+          />
+        </div>
+      )
+    })
+  }
 
   const saveThreadForEditing = async (nextValue = '') => {
     const s = editingThreadSession

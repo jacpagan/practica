@@ -241,6 +241,29 @@ if ! nginx -t || ! systemctl reload nginx; then
   echo "Nginx reload skipped (existing config may be unmanaged)." >&2
 fi
 
+# Optional CDN invalidation (CloudFront). If AWS_CLOUDFRONT_DISTRIBUTION_ID is set in environment,
+# trigger a short invalidation for HTML and asset paths. This is best-effort and non-fatal.
+if [ -n "${AWS_CLOUDFRONT_DISTRIBUTION_ID:-}" ]; then
+  echo "Creating CloudFront invalidation for index and assets..."
+  aws cloudfront create-invalidation \
+    --distribution-id "$AWS_CLOUDFRONT_DISTRIBUTION_ID" \
+    --paths "/index.html" "/" "/assets/*" "/static/*" "/favicon.ico" >/dev/null 2>&1 || \
+    echo "CloudFront invalidation skipped or failed (non-fatal)."
+fi
+
+# Quick public smoke: fetch index and check build SHA injection and asset tags are present.
+echo "Running public HTML smoke checks..."
+HTML=$(curl -fsS --max-time 10 https://practica.jpagan.com/ 2>/dev/null || true)
+if [ -n "$HTML" ]; then
+  if echo "$HTML" | grep -q "practica:sha" && echo "$HTML" | grep -q "assets/index-"; then
+    echo "Public HTML looks good (sha+assets)."
+  else
+    echo "Public HTML smoke check did not find expected markers (non-fatal)." >&2
+  fi
+else
+  echo "Public HTML fetch failed (non-fatal)." >&2
+fi
+
 public_ok=0
 for i in $(seq 1 30); do
   curl -fsS https://practica.jpagan.com/health/ && public_ok=1 && break || sleep 2
