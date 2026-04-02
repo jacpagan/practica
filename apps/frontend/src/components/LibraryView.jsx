@@ -176,6 +176,43 @@ function LibraryView({
   token = '',
 }) {
   const toast = useToast()
+  const SkeletonItem = () => (
+    <div className="rounded-2xl border border-gray-200 px-4 py-4 animate-pulse">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3 min-w-0">
+          <div className="w-24 h-16 rounded-xl bg-gray-200" />
+          <div className="min-w-0 space-y-2">
+            <div className="h-4 w-40 bg-gray-200 rounded" />
+            <div className="h-3 w-28 bg-gray-100 rounded" />
+          </div>
+        </div>
+        <div className="text-right shrink-0 space-y-2">
+          <div className="h-3 w-12 bg-gray-100 rounded ml-auto" />
+          <div className="h-7 w-28 bg-gray-200 rounded" />
+        </div>
+      </div>
+    </div>
+  )
+
+  if (sessionsLoading) {
+    return (
+      <div className="px-4 sm:px-6 py-6">
+        <div className="max-w-4xl mx-auto space-y-4">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Home</h2>
+              <p className="text-sm text-gray-500 mt-1">Loading your library…</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <SkeletonItem />
+            <SkeletonItem />
+            <SkeletonItem />
+          </div>
+        </div>
+      </div>
+    )
+  }
   const SORT_KEY = 'practica.sort.newestFirst.v1'
   const DATE_FILTER_KEY = 'practica.filter.date.v1'
   const [newestFirst, setNewestFirst] = useState(() => {

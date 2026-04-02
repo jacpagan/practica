@@ -141,7 +141,18 @@ function ReviewPage({ reviewToken = '' }) {
       setLoadError(null)
       try {
         const infoHeaders = authToken ? { Authorization: `Token ${authToken}` } : {}
-        const infoRes = await fetch(`/api/review/${token}/`, { headers: infoHeaders })
+        let infoRes
+        let attempt = 0
+        while (true) {
+          try {
+            infoRes = await fetch(`/api/review/${token}/`, { headers: infoHeaders })
+            if (infoRes.ok || infoRes.status < 500 || attempt >= 2) break
+          } catch (e) {
+            if (attempt >= 2) throw e
+          }
+          await new Promise((r) => setTimeout(r, 400 * Math.pow(2, attempt)))
+          attempt += 1
+        }
         const infoData = await infoRes.json().catch(() => ({}))
         if (!infoRes.ok) {
           throw { status: infoRes.status, data: infoData }
@@ -149,7 +160,18 @@ function ReviewPage({ reviewToken = '' }) {
 
         let feedbackData = []
         if (authToken) {
-          const feedbackRes = await fetch(`/api/review/${token}/feedback/`, { headers: { Authorization: `Token ${authToken}` } })
+          let feedbackRes
+          let fattempt = 0
+          while (true) {
+            try {
+              feedbackRes = await fetch(`/api/review/${token}/feedback/`, { headers: { Authorization: `Token ${authToken}` } })
+              if (feedbackRes.ok || feedbackRes.status < 500 || fattempt >= 2) break
+            } catch (e) {
+              if (fattempt >= 2) break
+            }
+            await new Promise((r) => setTimeout(r, 400 * Math.pow(2, fattempt)))
+            fattempt += 1
+          }
           feedbackData = await feedbackRes.json().catch(() => ({}))
           if (!feedbackRes.ok) {
             throw { status: feedbackRes.status, data: feedbackData }

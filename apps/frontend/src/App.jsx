@@ -80,6 +80,7 @@ function AppContent() {
   const uploadGuardRef = useRef({ active: false, abort: null })
   const currentPathRef = useRef(routePath(initialRoute))
   const autoQuickRecordCheckedRef = useRef(false)
+  const [offline, setOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false)
 
   const fetchPaginated = useCallback(async (path) => {
     if (!token) return []
@@ -87,9 +88,19 @@ function AppContent() {
     let items = []
 
     while (nextUrl) {
-      const res = await fetch(nextUrl, {
-        headers: { Authorization: `Token ${token}` },
-      })
+      let res
+      let attempt = 0
+      while (true) {
+        try {
+          res = await fetch(nextUrl, { headers: { Authorization: `Token ${token}` } })
+          // Retry only on 5xx; break on success or non-retriable
+          if (res.ok || res.status < 500 || attempt >= 2) break
+        } catch (e) {
+          if (attempt >= 2) throw e
+        }
+        await new Promise((r) => setTimeout(r, 400 * Math.pow(2, attempt)))
+        attempt += 1
+      }
       if (!res.ok) throw new Error('paginated-fetch')
       const data = await res.json()
       if (Array.isArray(data)) {
@@ -170,6 +181,18 @@ function AppContent() {
   useEffect(() => {
     currentPathRef.current = routePath({ view, sessionId: routeSessionId, token: reviewToken, seriesName: routeSeriesName, date: routeDate })
   }, [reviewToken, routeDate, routeSessionId, routeSeriesName, view])
+
+  useEffect(() => {
+    const updateOnline = () => setOffline(typeof navigator !== 'undefined' ? !navigator.onLine : false)
+    try {
+      window.addEventListener('online', updateOnline)
+      window.addEventListener('offline', updateOnline)
+      updateOnline()
+    } catch {}
+    return () => {
+      try { window.removeEventListener('online', updateOnline); window.removeEventListener('offline', updateOnline) } catch {}
+    }
+  }, [])
 
   useEffect(() => {
     const onAuthExpired = () => {
@@ -315,9 +338,18 @@ function AppContent() {
   const openSessionById = useCallback(async (sessionId, { updateUrl = true } = {}) => {
     if (!token) return
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/`, {
-        headers: { Authorization: `Token ${token}` },
-      })
+      let res
+      let attempt = 0
+      while (true) {
+        try {
+          res = await fetch(`/api/sessions/${sessionId}/`, { headers: { Authorization: `Token ${token}` } })
+          if (res.ok || res.status < 500 || attempt >= 2) break
+        } catch (e) {
+          if (attempt >= 2) throw e
+        }
+        await new Promise((r) => setTimeout(r, 400 * Math.pow(2, attempt)))
+        attempt += 1
+      }
       if (!res.ok) throw new Error('session')
       const data = await res.json()
       setSelectedSession(data)
@@ -506,6 +538,11 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-white">
+      {offline ? (
+        <div className="w-full bg-amber-50 border-b border-amber-200 text-amber-900 text-xs py-2 px-4 text-center">
+          You are offline. We will retry actions when back online.
+        </div>
+      ) : null}
       <header className="border-b border-gray-100 bg-white px-4 py-4 sm:px-6">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-4 min-w-0">
