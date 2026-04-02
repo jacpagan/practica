@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { feedbackCategoryLabel, feedbackCategoryTone, fmtDate } from '../utils'
+import { fmtDate } from '../utils'
 import { useToast } from './Toast'
 
 const statusTone = {
@@ -20,17 +20,10 @@ const statusLabel = (value = '') => {
 
 function TeachingView({ token, onOpenReviewRequest }) {
   const toast = useToast()
-  const [tab, setTab] = useState('inbox')
   const [showWorkspaceDetails, setShowWorkspaceDetails] = useState(false)
   const [requests, setRequests] = useState([])
   const [requestsLoading, setRequestsLoading] = useState(true)
-  const [roster, setRoster] = useState([])
-  const [rosterLoading, setRosterLoading] = useState(true)
-  const [templates, setTemplates] = useState([])
-  const [templatesLoading, setTemplatesLoading] = useState(true)
-  const [templateTitle, setTemplateTitle] = useState('')
-  const [templateText, setTemplateText] = useState('')
-  const [savingTemplate, setSavingTemplate] = useState(false)
+  // Simplified: remove roster/templates
 
   const authHeaders = useMemo(() => (token ? { Authorization: `Token ${token}` } : {}), [token])
 
@@ -48,40 +41,12 @@ function TeachingView({ token, onOpenReviewRequest }) {
     }
   }, [authHeaders])
 
-  const loadRoster = useCallback(async () => {
-    setRosterLoading(true)
-    try {
-      const res = await fetch('/api/connections/', { headers: authHeaders })
-      if (!res.ok) throw new Error('roster')
-      const data = await res.json()
-      setRoster(Array.isArray(data) ? data : [])
-    } catch {
-      setRoster([])
-    } finally {
-      setRosterLoading(false)
-    }
-  }, [authHeaders])
-
-  const loadTemplates = useCallback(async () => {
-    setTemplatesLoading(true)
-    try {
-      const res = await fetch('/api/feedback-templates/', { headers: authHeaders })
-      if (!res.ok) throw new Error('templates')
-      const data = await res.json()
-      setTemplates(Array.isArray(data) ? data : [])
-    } catch {
-      setTemplates([])
-    } finally {
-      setTemplatesLoading(false)
-    }
-  }, [authHeaders])
+  // Removed loadRoster/loadTemplates
 
   useEffect(() => {
     if (!token) return
     loadInbox()
-    loadRoster()
-    loadTemplates()
-  }, [loadInbox, loadRoster, loadTemplates, token])
+  }, [loadInbox, token])
 
   const createTemplate = async () => {
     if (!templateTitle.trim()) {
@@ -150,13 +115,8 @@ function TeachingView({ token, onOpenReviewRequest }) {
   return (
     <div className="px-4 sm:px-6 py-6">
       <div className="max-w-4xl mx-auto space-y-4">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="space-y-3">
-            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Requests</h2>
-            <p className="text-sm text-gray-500 mt-1">Open the next request fast.</p>
-            <div className="flex flex-wrap gap-2" />
-          </div>
-        </div>
+        <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Requests</h2>
+        <p className="text-sm text-gray-500">Open and respond.</p>
 
         {requestsLoading ? (
           <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading…</div>
