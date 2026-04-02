@@ -505,6 +505,14 @@ function AppContent() {
     }
   }, [user, view, routeSessionId, selectedSession?.id, openSessionById])
 
+  const reportProblem = useCallback(() => {
+    try {
+      const path = (window.location && (window.location.pathname + (window.location.search || ''))) || '/'
+      reportClientError({ source: 'UserReport', message: 'user_report', extra: { note: 'User pressed report', path } })
+      toast.success('Thanks for the report')
+    } catch {}
+  }, [toast])
+
   if (loading) {
     return <div className="min-h-screen bg-white flex items-center justify-center"><p className="text-sm text-gray-400">Loading...</p></div>
   }
@@ -525,14 +533,6 @@ function AppContent() {
     if (uploadGuardRef.current.active) requestAbortActiveUpload()
     logout()
   }
-
-  const reportProblem = useCallback(() => {
-    try {
-      const path = (window.location && (window.location.pathname + (window.location.search || ''))) || '/'
-      reportClientError({ source: 'UserReport', message: 'user_report', extra: { note: 'User pressed report', path } })
-      toast.success('Thanks for the report')
-    } catch {}
-  }, [toast])
 
   return (
     <div className="min-h-screen bg-white">
