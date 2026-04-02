@@ -28,7 +28,7 @@ from .models import (
     Session, Chapter, VideoFeedback, SessionLastSeen, Exercise,
     Tag, MultipartSessionUpload, SessionAsset,
     ReviewLink,
-    ReviewRequest, TeacherRosterMembership,
+    ReviewRequest, ReviewerRosterMembership,
     FeedbackTemplate,
     SignupInviteCode,
 )
@@ -137,7 +137,7 @@ def _feedback_request_visible_to_user(review_request, user):
         return False
     if user.is_staff:
         return True
-    return user.id in {review_request.student_id, review_request.teacher_id}
+    return user.id in {review_request.student_id, review_request.reviewer_id}
 
 
 def _feedback_request_reviewer_can_respond(review_request, user):
@@ -145,7 +145,7 @@ def _feedback_request_reviewer_can_respond(review_request, user):
         return False
     if user.is_staff:
         return True
-    return user.id == review_request.teacher_id
+    return user.id == review_request.reviewer_id
 
 
 def _visible_feedback_requests_qs(user):
@@ -153,12 +153,12 @@ def _visible_feedback_requests_qs(user):
         return ReviewRequest.objects.none()
     if user.is_staff:
         return ReviewRequest.objects.all()
-    return ReviewRequest.objects.filter(Q(student=user) | Q(teacher=user) | Q(created_by=user))
+    return ReviewRequest.objects.filter(Q(student=user) | Q(reviewer=user) | Q(created_by=user))
 
 
-def _ensure_member_connection(*, teacher, student, created_by=None):
-    membership, created = TeacherRosterMembership.objects.get_or_create(
-        teacher=teacher,
+def _ensure_member_connection(*, reviewer, student, created_by=None):
+    membership, created = ReviewerRosterMembership.objects.get_or_create(
+        reviewer=reviewer,
         student=student,
         defaults={
             'created_by': created_by,
@@ -199,9 +199,9 @@ def _public_review_request_preview(review_request):
         'instrument': review_request.instrument,
         'goal': review_request.goal,
         'owner': UserSummarySerializer(review_request.student).data,
-        'reviewer': UserSummarySerializer(review_request.teacher).data,
+        'reviewer': UserSummarySerializer(review_request.reviewer).data,
         'owner_id': review_request.student_id,
-        'reviewer_id': review_request.teacher_id,
+        'reviewer_id': review_request.reviewer_id,
     }
 
 
@@ -492,7 +492,7 @@ def review_link_info(request, token):
         )
     ReviewLink.objects.filter(pk=link.pk).update(last_accessed_at=timezone.now())
     link.refresh_from_db(fields=['last_accessed_at'])
-    if request.user.is_authenticated and review_request and review_request.status == ReviewRequest.STATUS_REQUESTED and request.user.id == review_request.teacher_id:
+    if request.user.is_authenticated and review_request and review_request.status == ReviewRequest.STATUS_REQUESTED and request.user.id == review_request.reviewer_id:
         review_request.status = ReviewRequest.STATUS_OPENED
         review_request.opened_at = timezone.now()
         review_request.save(update_fields=['status', 'opened_at', 'updated_at'])
@@ -656,8 +656,8 @@ def review_link_feedback(request, token):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def feedback_inbox(request):
-    qs = ReviewRequest.objects.filter(teacher=request.user).select_related(
-        'student', 'student__profile', 'teacher', 'teacher__profile', 'session', 'review_link'
+    qs = ReviewRequest.objects.filter(reviewer=request.user).select_related(
+        'student', 'student__profile', 'reviewer', 'reviewer__profile', 'session', 'review_link'
     ).order_by('-created_at')
     status_filter = str(request.query_params.get('status', '')).strip().lower()
     if status_filter:
@@ -668,7 +668,7 @@ def feedback_inbox(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def member_connections(request):
-    memberships = TeacherRosterMembership.objects.filter(teacher=request.user, is_active=True).select_related(
+    memberships = ReviewerRosterMembership.objects.filter(reviewer=request.user, is_active=True).select_related(
         'student', 'student__profile'
     ).order_by('student__username')
     return Response(MemberConnectionSerializer(memberships, many=True, context={'request': request}).data)
@@ -677,8 +677,8 @@ def member_connections(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def feedback_insights(request):
-    review_requests = ReviewRequest.objects.filter(teacher=request.user).select_related('student', 'student__profile')
-    feedback_items = VideoFeedback.objects.filter(review_request__teacher=request.user).select_related('review_request', 'review_request__student', 'review_request__student__profile')
+    review_requests = ReviewRequest.objects.filter(reviewer=request.user).select_related('student', 'student__profile')
+    feedback_items = VideoFeedback.objects.filter(review_request__reviewer=request.user).select_related('review_request', 'review_request__student', 'review_request__student__profile')
 
     category_counts = {}
     for feedback_item in feedback_items:
@@ -739,19 +739,19 @@ def feedback_insights(request):
 @permission_classes([IsAuthenticated])
 def feedback_templates(request):
     if request.method == 'GET':
-        templates = FeedbackTemplate.objects.filter(teacher=request.user).order_by('title', '-updated_at')
+        templates = FeedbackTemplate.objects.filter(reviewer=request.user).order_by('title', '-updated_at')
         return Response(FeedbackTemplateSerializer(templates, many=True, context={'request': request}).data)
 
     serializer = FeedbackTemplateSerializer(data=request.data, context={'request': request})
     serializer.is_valid(raise_exception=True)
-    template = serializer.save(teacher=request.user)
+    template = serializer.save(reviewer=request.user)
     return Response(FeedbackTemplateSerializer(template, context={'request': request}).data, status=status.HTTP_201_CREATED)
 
 
 @api_view(['PATCH', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def feedback_template_detail(request, template_id):
-    template = get_object_or_404(FeedbackTemplate, pk=template_id, teacher=request.user)
+    template = get_object_or_404(FeedbackTemplate, pk=template_id, reviewer=request.user)
     if request.method == 'DELETE':
         template.delete()
         return Response({'ok': True})
@@ -779,7 +779,7 @@ class ReviewRequestViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = _visible_review_requests_qs(self.request.user).select_related(
             'session', 'session__user', 'session__user__profile',
-            'teacher', 'teacher__profile',
+            'reviewer', 'reviewer__profile',
             'student', 'student__profile',
             'review_link',
             'parent_request',
@@ -791,7 +791,7 @@ class ReviewRequestViewSet(viewsets.ModelViewSet):
             qs = qs.filter(session_id=int(session_id))
         role = str(self.request.query_params.get('role', '')).strip().lower()
         if role == 'reviewer':
-            qs = qs.filter(teacher=self.request.user)
+            qs = qs.filter(reviewer=self.request.user)
         elif role in {'student', 'owner'}:
             qs = qs.filter(student=self.request.user)
         status_filter = str(self.request.query_params.get('status', '')).strip().lower()
@@ -811,7 +811,7 @@ class ReviewRequestViewSet(viewsets.ModelViewSet):
                 parent_request.resubmitted_at = timezone.now()
                 parent_request.save(update_fields=['status', 'resubmitted_at', 'updated_at'])
             _ensure_reviewer_roster_membership(
-                teacher=review_request.teacher,
+                reviewer=review_request.reviewer,
                 student=review_request.student,
                 created_by=self.request.user,
             )
@@ -839,7 +839,7 @@ class ReviewRequestViewSet(viewsets.ModelViewSet):
                 review_request.status = ReviewRequest.STATUS_RESUBMITTED
                 review_request.resubmitted_at = timezone.now()
                 review_request.save(update_fields=['status', 'resubmitted_at', 'updated_at'])
-            elif request.user.id in {review_request.student_id, review_request.teacher_id} and next_status == ReviewRequest.STATUS_CLOSED:
+            elif request.user.id in {review_request.student_id, review_request.reviewer_id} and next_status == ReviewRequest.STATUS_CLOSED:
                 review_request.status = ReviewRequest.STATUS_CLOSED
                 review_request.closed_at = timezone.now()
                 review_request.save(update_fields=['status', 'closed_at', 'updated_at'])
@@ -863,7 +863,7 @@ class ReviewRequestViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='mark-viewed')
     def mark_viewed(self, request, pk=None):
         review_request = self.get_object()
-        if request.user.id not in {review_request.student_id, review_request.teacher_id} and not request.user.is_staff:
+        if request.user.id not in {review_request.student_id, review_request.reviewer_id} and not request.user.is_staff:
             raise PermissionDenied('You do not have access to this review request.')
         if request.user.id == review_request.student_id:
             review_request.status = ReviewRequest.STATUS_VIEWED

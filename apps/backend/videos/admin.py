@@ -3,7 +3,7 @@ from .models import (
     Profile, Session, Chapter, VideoFeedback, MultipartSessionUpload, SessionAsset,
     SessionLastSeen,
     SignupInviteCode,
-    ReviewRequest, TeacherRosterMembership, FeedbackTemplate,
+    ReviewRequest, ReviewerRosterMembership, FeedbackTemplate,
 )
 
 
@@ -78,16 +78,16 @@ class SessionLastSeenAdmin(admin.ModelAdmin):
     raw_id_fields = ['user', 'session']
 
 
-@admin.register(TeacherRosterMembership)
-class TeacherRosterMembershipAdmin(admin.ModelAdmin):
+@admin.register(ReviewerRosterMembership)
+class ReviewerRosterMembershipAdmin(admin.ModelAdmin):
     list_display = ['reviewer_display', 'member_display', 'is_active', 'created_at']
     list_filter = ['is_active']
-    search_fields = ['teacher__username', 'student__username']
-    raw_id_fields = ['teacher', 'student', 'created_by']
+    search_fields = ['reviewer__username', 'student__username']
+    raw_id_fields = ['reviewer', 'student', 'created_by']
 
     @admin.display(description='Reviewer')
     def reviewer_display(self, obj):
-        return obj.teacher
+        return obj.reviewer
 
     @admin.display(description='Member')
     def member_display(self, obj):
@@ -98,8 +98,8 @@ class TeacherRosterMembershipAdmin(admin.ModelAdmin):
 class ReviewRequestAdmin(admin.ModelAdmin):
     list_display = ['id', 'session', 'owner_display', 'reviewer_display', 'instrument', 'status', 'created_at']
     list_filter = ['status', 'instrument']
-    search_fields = ['session__title', 'student__username', 'teacher__username', 'goal', 'exercise_or_song']
-    raw_id_fields = ['session', 'student', 'teacher', 'created_by', 'review_link']
+    search_fields = ['session__title', 'student__username', 'reviewer__username', 'goal', 'exercise_or_song']
+    raw_id_fields = ['session', 'student', 'reviewer', 'created_by', 'review_link']
 
     @admin.display(description='Owner')
     def owner_display(self, obj):
@@ -107,15 +107,15 @@ class ReviewRequestAdmin(admin.ModelAdmin):
 
     @admin.display(description='Reviewer')
     def reviewer_display(self, obj):
-        return obj.teacher
+        return obj.reviewer
 
 
 @admin.register(FeedbackTemplate)
 class FeedbackTemplateAdmin(admin.ModelAdmin):
     list_display = ['id', 'reviewer_display', 'title', 'updated_at']
-    search_fields = ['teacher__username', 'teacher__profile__display_name', 'title', 'text']
-    raw_id_fields = ['teacher']
+    search_fields = ['reviewer__username', 'reviewer__profile__display_name', 'title', 'text']
+    raw_id_fields = ['reviewer']
 
     @admin.display(description='Reviewer')
     def reviewer_display(self, obj):
-        return obj.teacher
+        return obj.reviewer

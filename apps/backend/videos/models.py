@@ -271,29 +271,21 @@ class ReviewLink(models.Model):
         return f"ReviewLink {self.token} session={self.session_id} active={self.is_active}"
 
 
-class TeacherRosterMembership(models.Model):
+class ReviewerRosterMembership(models.Model):
     """A lightweight reviewer-member relationship for repeat async review workflows."""
 
-    teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name='teacher_roster_memberships')
+    reviewer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviewer_roster_memberships')
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='student_roster_memberships')
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_teacher_roster_memberships')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_reviewer_roster_memberships')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['teacher_id', 'student_id']
+        ordering = ['reviewer_id', 'student_id']
         constraints = [
-            models.UniqueConstraint(fields=['teacher', 'student'], name='teacher_roster_membership_teacher_student_uniq'),
+            models.UniqueConstraint(fields=['reviewer', 'student'], name='reviewer_roster_membership_reviewer_student_uniq'),
         ]
-
-    @property
-    def reviewer(self):
-        return self.teacher
-
-    @reviewer.setter
-    def reviewer(self, value):
-        self.teacher = value
 
     @property
     def member(self):
@@ -312,7 +304,7 @@ class TeacherRosterMembership(models.Model):
         self.created_by = value
 
     def __str__(self):
-        return f"MemberConnection reviewer={self.teacher_id} member={self.student_id} active={self.is_active}"
+        return f"MemberConnection reviewer={self.reviewer_id} member={self.student_id} active={self.is_active}"
 
 
 class ReviewRequest(models.Model):
@@ -337,7 +329,7 @@ class ReviewRequest(models.Model):
 
     session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='review_requests')
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='review_requests_as_student')
-    teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name='review_requests_as_teacher')
+    reviewer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='review_requests_as_reviewer')
     parent_request = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='follow_up_requests')
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_review_requests_v2')
     review_link = models.OneToOneField(ReviewLink, on_delete=models.SET_NULL, null=True, blank=True, related_name='review_request')
@@ -360,7 +352,7 @@ class ReviewRequest(models.Model):
     class Meta:
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['teacher', 'status']),
+            models.Index(fields=['reviewer', 'status']),
             models.Index(fields=['student', 'status']),
         ]
 
@@ -371,14 +363,6 @@ class ReviewRequest(models.Model):
     @owner.setter
     def owner(self, value):
         self.student = value
-
-    @property
-    def reviewer(self):
-        return self.teacher
-
-    @reviewer.setter
-    def reviewer(self, value):
-        self.teacher = value
 
     @property
     def feedback_link(self):
@@ -399,24 +383,24 @@ class ReviewRequest(models.Model):
     def member_role_for(self, user):
         if not user or not getattr(user, 'is_authenticated', False):
             return ''
-        if user.id == self.teacher_id:
+        if user.id == self.reviewer_id:
             return 'reviewer'
         if user.id == self.student_id:
             return 'owner'
         return ''
 
     def __str__(self):
-        return f"FeedbackRequest #{self.id} session={self.session_id} reviewer={self.teacher_id} status={self.status}"
+        return f"FeedbackRequest #{self.id} session={self.session_id} reviewer={self.reviewer_id} status={self.status}"
 
 
-MemberConnection = TeacherRosterMembership
+MemberConnection = ReviewerRosterMembership
 FeedbackRequest = ReviewRequest
 
 
 class FeedbackTemplate(models.Model):
     """Reusable reviewer note templates for faster async feedback."""
 
-    teacher = models.ForeignKey(User, on_delete=models.CASCADE, related_name='feedback_templates')
+    reviewer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='feedback_templates')
     title = models.CharField(max_length=120)
     text = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -425,8 +409,8 @@ class FeedbackTemplate(models.Model):
     class Meta:
         ordering = ['title', '-updated_at']
         constraints = [
-            models.UniqueConstraint(fields=['teacher', 'title'], name='feedback_template_teacher_title_uniq'),
+            models.UniqueConstraint(fields=['reviewer', 'title'], name='feedback_template_reviewer_title_uniq'),
         ]
 
     def __str__(self):
-        return f"FeedbackTemplate reviewer={self.teacher_id} title={self.title}"
+        return f"FeedbackTemplate reviewer={self.reviewer_id} title={self.title}"

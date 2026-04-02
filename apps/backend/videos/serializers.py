@@ -9,7 +9,7 @@ from .models import (
     SessionAsset,
     ReviewLink,
     ReviewRequest,
-    TeacherRosterMembership,
+    ReviewerRosterMembership,
     FeedbackTemplate,
     SignupInviteCode,
 )
@@ -382,10 +382,10 @@ class ReviewVideoFeedbackSerializer(serializers.ModelSerializer):
 class ReviewRequestSerializer(serializers.ModelSerializer):
     student = UserSummarySerializer(read_only=True)
     owner = UserSummarySerializer(source='student', read_only=True)
-    reviewer = UserSummarySerializer(source='teacher', read_only=True)
+    reviewer = UserSummarySerializer(read_only=True)
     owner_id = serializers.IntegerField(source='student_id', read_only=True)
     reviewer_id = serializers.PrimaryKeyRelatedField(
-        source='teacher',
+        source='reviewer',
         queryset=User.objects.all(),
         write_only=True,
         required=False,
@@ -470,7 +470,7 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
         user = getattr(request, 'user', None) if request else None
         if not user or not user.is_authenticated:
             return ''
-        if user.id == obj.teacher_id:
+        if user.id == obj.reviewer_id:
             return 'reviewer'
         if user.id == obj.student_id:
             return 'student'
@@ -506,7 +506,7 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         session = attrs.get('session') or getattr(self.instance, 'session', None)
-        teacher = attrs.get('teacher') or getattr(self.instance, 'teacher', None)
+        reviewer = attrs.get('reviewer') or getattr(self.instance, 'reviewer', None)
         parent_request = attrs.get('parent_request') or getattr(self.instance, 'parent_request', None)
         request = self.context.get('request')
         user = getattr(request, 'user', None) if request else None
@@ -517,14 +517,14 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'session_id': 'You can only request review on your own sessions.'})
         if session and session.processing_status != Session.STATUS_READY:
             raise serializers.ValidationError({'session_id': 'This session must be playback ready before requesting review.'})
-        if not teacher:
+        if not reviewer:
             raise self._reviewer_validation_error('Choose a reviewer.')
-        if teacher and teacher.id == user.id:
+        if reviewer and reviewer.id == user.id:
             raise self._reviewer_validation_error('Choose a reviewer other than yourself.')
         if parent_request:
             if parent_request.student_id != user.id and not user.is_staff:
                 raise serializers.ValidationError({'parent_request_id': 'You can only follow up on your own review requests.'})
-            if teacher and parent_request.teacher_id != teacher.id:
+            if reviewer and parent_request.reviewer_id != reviewer.id:
                 raise self._reviewer_validation_error('Follow-up requests must use the same reviewer as the parent request.')
             if session and parent_request.session_id == session.id:
                 raise serializers.ValidationError({'session_id': 'Choose a new session for this follow-up request.'})
@@ -534,47 +534,48 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
 class MemberConnectionSerializer(serializers.ModelSerializer):
     student = UserSummarySerializer(read_only=True)
     member = UserSummarySerializer(source='student', read_only=True)
+    reviewer = UserSummarySerializer(read_only=True)
     pending_review_count = serializers.SerializerMethodField()
     total_review_count = serializers.SerializerMethodField()
     last_request_at = serializers.SerializerMethodField()
 
     class Meta:
-        model = TeacherRosterMembership
+        model = ReviewerRosterMembership
         fields = [
-            'id', 'student', 'member', 'is_active',
+            'id', 'student', 'member', 'reviewer', 'is_active',
             'pending_review_count', 'total_review_count', 'last_request_at',
             'created_at', 'updated_at',
         ]
 
-    def _teacher(self):
+    def _reviewer(self):
         request = self.context.get('request')
         return getattr(request, 'user', None) if request else None
 
     def get_pending_review_count(self, obj):
-        teacher = self._teacher()
-        if not teacher or not teacher.is_authenticated:
+        reviewer = self._reviewer()
+        if not reviewer or not reviewer.is_authenticated:
             return 0
         return ReviewRequest.objects.filter(
-            teacher=teacher,
+            reviewer=reviewer,
             student=obj.student,
             status__in=[ReviewRequest.STATUS_REQUESTED, ReviewRequest.STATUS_OPENED],
         ).count()
 
     def get_total_review_count(self, obj):
-        teacher = self._teacher()
-        if not teacher or not teacher.is_authenticated:
+        reviewer = self._reviewer()
+        if not reviewer or not reviewer.is_authenticated:
             return 0
-        return ReviewRequest.objects.filter(teacher=teacher, student=obj.student).count()
+        return ReviewRequest.objects.filter(reviewer=reviewer, student=obj.student).count()
 
     def get_last_request_at(self, obj):
-        teacher = self._teacher()
-        if not teacher or not teacher.is_authenticated:
+        reviewer = self._reviewer()
+        if not reviewer or not reviewer.is_authenticated:
             return None
-        last_request = ReviewRequest.objects.filter(teacher=teacher, student=obj.student).order_by('-created_at').first()
+        last_request = ReviewRequest.objects.filter(reviewer=reviewer, student=obj.student).order_by('-created_at').first()
         return last_request.created_at if last_request else None
 
 
-TeacherRosterStudentSerializer = MemberConnectionSerializer
+ReviewerRosterStudentSerializer = MemberConnectionSerializer
 
 
 class FeedbackTemplateSerializer(serializers.ModelSerializer):
@@ -595,7 +596,7 @@ class FeedbackTemplateSerializer(serializers.ModelSerializer):
         title = attrs.get('title') or getattr(self.instance, 'title', '')
         if not user or not user.is_authenticated:
             raise serializers.ValidationError('Authentication required.')
-        existing = FeedbackTemplate.objects.filter(teacher=user, title__iexact=title.strip())
+        existing = FeedbackTemplate.objects.filter(reviewer=user, title__iexact=title.strip())
         if self.instance:
             existing = existing.exclude(pk=self.instance.pk)
         if existing.exists():

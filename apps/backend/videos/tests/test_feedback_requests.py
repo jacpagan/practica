@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
-from videos.models import FeedbackTemplate, Profile, ReviewRequest, Session, SessionLastSeen, TeacherRosterMembership, VideoFeedback
+from videos.models import FeedbackTemplate, Profile, ReviewRequest, ReviewerRosterMembership, Session, SessionLastSeen, VideoFeedback
 
 
 class FeedbackRequestApiTests(APITestCase):
@@ -58,13 +58,13 @@ class FeedbackRequestApiTests(APITestCase):
         review_request = self._create_review_request()
 
         self.assertEqual(review_request.student, self.student)
-        self.assertEqual(review_request.teacher, self.teacher)
+        self.assertEqual(review_request.reviewer, self.teacher)
         self.assertEqual(review_request.status, ReviewRequest.STATUS_REQUESTED)
         self.assertEqual(review_request.instrument, 'drums')
         self.assertTrue(bool(review_request.review_link))
         self.assertTrue(
-            TeacherRosterMembership.objects.filter(
-                teacher=self.teacher,
+            ReviewerRosterMembership.objects.filter(
+                reviewer=self.teacher,
                 student=self.student,
                 is_active=True,
             ).exists()
@@ -194,7 +194,7 @@ class FeedbackRequestApiTests(APITestCase):
         another_request = ReviewRequest.objects.create(
             session=self.session,
             student=self.student,
-            teacher=self.teacher,
+            reviewer=self.teacher,
             created_by=self.student,
             instrument='drums',
             goal='Second thread',
@@ -358,7 +358,7 @@ class FeedbackRequestApiTests(APITestCase):
         follow_up_request = ReviewRequest.objects.create(
             session=follow_up_session,
             student=self.student,
-            teacher=self.teacher,
+            reviewer=self.teacher,
             created_by=self.student,
             parent_request=review_request,
             instrument='drums',

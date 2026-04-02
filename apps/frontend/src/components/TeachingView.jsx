@@ -62,41 +62,12 @@ function TeachingView({ token, onOpenReviewRequest }) {
 
         {requestsLoading ? (
           <div className="rounded-2xl border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">Loading…</div>
-        ) : nextRequest ? (
-          <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 space-y-3">
-            <div>
-              <p className="text-sm font-semibold text-gray-900">Recent</p>
-              <p className="text-xs text-gray-500 mt-1">Your latest review.</p>
-            </div>
-            <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3">
-              <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-semibold text-gray-900">{nextRequest.session?.title || 'Feedback request'}</p>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {nextRequest.owner?.display_name || nextRequest.student?.display_name || nextRequest.owner?.username || nextRequest.student?.username || 'Member'} • {nextRequest.instrument}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-2">Requested {fmtDate(nextRequest.created_at)}</p>
-                </div>
-                <div className="shrink-0 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onOpenReviewRequest?.(nextRequest)}
-                    className="rounded-xl bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
-                  >
-                    {['requested', 'opened'].includes(nextRequestStatus) ? 'Review' : 'Open'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
+        ) : requests.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
             <p className="text-sm text-gray-700">No feedback requests yet.</p>
             <p className="text-xs text-gray-500 mt-1">New requests show up here.</p>
           </div>
-        )}
+        ) : null}
 
         {sortedRequests.length > 1 ? (
           <div className="space-y-3">
