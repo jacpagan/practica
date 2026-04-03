@@ -194,13 +194,6 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
                   >
                     {newestFirst ? 'Newest first' : 'Oldest first'}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => { try { window.localStorage.setItem('practica.filter.date.v1', selectedDateKey) } catch {} ; onOpenListDate?.(selectedDateKey) }}
-                    className="text-[11px] rounded-full px-2.5 py-1 border bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                  >
-                    Open day
-                  </button>
                   <button type="button" onClick={() => setShowDayModal(false)} className="text-xs text-gray-500 hover:text-gray-900 rounded-lg border border-gray-200 px-2 py-1">Close</button>
                 </div>
               </div>
