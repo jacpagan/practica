@@ -59,6 +59,10 @@ from .reviews.queries import (
     reviewer_can_respond,
     visible_review_requests_qs,
 )
+from .reviews.presentation import (
+    public_review_request_preview,
+    review_request_forbidden_response,
+)
 from .services.feedback_video_processing import prepare_feedback_video_upload
 from .video_uploads import is_allowed_video_upload
 
@@ -134,16 +138,6 @@ def _sanitized_client_path(path):
     return base
 
 
-def _feedback_request_forbidden_response(message='You do not have access to this feedback request.'):
-    return Response(
-        {
-            'error': message,
-            'code': 'review_request_forbidden',
-        },
-        status=status.HTTP_403_FORBIDDEN,
-    )
-
-
 def _ensure_member_connection(*, reviewer, student, created_by=None):
     return ensure_member_connection_service(reviewer=reviewer, student=student, created_by=created_by)
 
@@ -158,27 +152,13 @@ def _mark_feedback_request_viewed(review_request, user):
     mark_review_request_viewed_service(review_request=review_request, actor=user)
 
 
-def _public_review_request_preview(review_request):
-    if not review_request:
-        return None
-    return {
-        'id': review_request.id,
-        'status': review_request.status,
-        'instrument': review_request.instrument,
-        'goal': review_request.goal,
-        'owner': UserSummarySerializer(review_request.student).data,
-        'reviewer': UserSummarySerializer(review_request.reviewer).data,
-        'owner_id': review_request.student_id,
-        'reviewer_id': review_request.reviewer_id,
-    }
-
-
-_review_request_forbidden_response = _feedback_request_forbidden_response
+_review_request_forbidden_response = review_request_forbidden_response
 _review_request_visible_to_user = review_request_visible_to_user
 _review_request_reviewer_can_respond = reviewer_can_respond
 _visible_review_requests_qs = visible_review_requests_qs
 _ensure_reviewer_roster_membership = _ensure_member_connection
 _mark_review_request_viewed = _mark_feedback_request_viewed
+_public_review_request_preview = public_review_request_preview
 
 
 def can_edit_session(user, session):
