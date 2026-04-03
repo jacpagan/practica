@@ -77,7 +77,7 @@ export default function RecorderPage({ onCancel, onComplete }) {
               onRecorded={(f) => handleRecorded(f)}
               onCancel={onCancel}
               maxDuration={MAX_RECORDER_DURATION_SECONDS}
-              autoUseOnStop={false}
+              autoUseOnStop={true}
               minAutoUseSeconds={0}
               autoOpenOnMount={true}
             />
