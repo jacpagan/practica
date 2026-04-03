@@ -7,16 +7,29 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from rest_framework.routers import DefaultRouter
 from videos.views import (
-    SessionViewSet, ReviewRequestViewSet, health_check,
+    SessionViewSet, health_check,
     ready_check,
     register_view, login_view, me_view,
     user_search_view,
     client_error_view,
     invite_codes, invite_code_detail,
-    review_link_info, review_link_feedback,
-    feedback_inbox, member_connections, feedback_insights, feedback_templates, feedback_template_detail,
-    reviewer_inbox, reviewer_connections, reviewer_roster, reviewer_insights, reviewer_templates, reviewer_template_detail,
     favicon,
+)
+from videos.reviews.api import (
+    ReviewRequestViewSet,
+    review_link_info,
+    review_link_feedback,
+    feedback_inbox,
+    member_connections,
+    feedback_insights,
+    feedback_templates,
+    feedback_template_detail,
+    reviewer_inbox,
+    reviewer_connections,
+    reviewer_roster,
+    reviewer_insights,
+    reviewer_templates,
+    reviewer_template_detail,
 )
 
 router = DefaultRouter()
