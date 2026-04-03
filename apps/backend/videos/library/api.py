@@ -14,7 +14,7 @@ from rest_framework.response import Response
 from videos.media.api import SessionMediaActionsMixin
 from videos.media.services import maybe_refresh_session_processing, normalized_client_upload_id, start_processing_pipeline
 from videos.media.uploads import attach_tags_to_session, parse_tag_names
-from videos.models import Chapter, Exercise, ReviewLink, Session, SessionAsset, SessionLastSeen, Tag, VideoFeedback
+from videos.models import Chapter, Exercise, ReviewLink, ReviewRequest, ReviewRequestEvent, Session, SessionAsset, SessionLastSeen, Tag, VideoFeedback
 from videos.serializers import ChapterSerializer, ReviewLinkSerializer, ReviewVideoFeedbackSerializer, SessionListSerializer, SessionSerializer
 from videos.services.feedback_video_processing import prepare_feedback_video_upload
 from videos.video_uploads import is_allowed_video_upload
@@ -120,7 +120,29 @@ class SessionViewSet(SessionMediaActionsMixin, viewsets.ModelViewSet):
         if old_name == new_name:
             return Response({'old_practice_series': old_name, 'new_practice_series': new_name, 'affected_count': 0}, status=status.HTTP_200_OK)
 
-        affected_count = Session.objects.filter(user=request.user, practice_series=old_name).update(practice_series=new_name)
+        sessions = list(Session.objects.filter(user=request.user, practice_series=old_name))
+        affected_count = len(sessions)
+        if affected_count:
+            Session.objects.filter(pk__in=[session.id for session in sessions]).update(practice_series=new_name)
+            open_requests = ReviewRequest.objects.filter(
+                session_id__in=[session.id for session in sessions],
+                status__in=[
+                    ReviewRequest.STATUS_REQUESTED,
+                    ReviewRequest.STATUS_OPENED,
+                    ReviewRequest.STATUS_RESPONDED,
+                    ReviewRequest.STATUS_VIEWED,
+                    ReviewRequest.STATUS_NEEDS_RESUBMISSION,
+                    ReviewRequest.STATUS_DECLINED_UNRELATED,
+                    ReviewRequest.STATUS_RESUBMITTED,
+                ],
+            )
+            for review_request in open_requests:
+                ReviewRequestEvent.objects.create(
+                    review_request=review_request,
+                    actor=request.user,
+                    event_type=ReviewRequestEvent.EVENT_THREAD_RENAMED,
+                    note=f'Thread renamed from "{old_name}" to "{new_name}".',
+                )
 
         return Response(
             {

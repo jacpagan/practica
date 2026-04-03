@@ -263,7 +263,11 @@ function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, r
                     const data = await res.json().catch(() => ({}))
                     if (!res.ok) throw new Error(data?.error || 'Could not rename thread')
                     try { window.dispatchEvent(new CustomEvent('practica:thread-renamed', { detail: { oldSeriesName: renamingThread, newSeriesName: val } })) } catch {}
-                    toast.success(data?.affected_count === 1 ? 'Renamed thread on 1 take' : `Renamed thread on ${data?.affected_count || 0} takes`)
+                    toast.success(
+                      data?.affected_count === 1
+                        ? `Renamed “${renamingThread}” to “${val}” on 1 take`
+                        : `Renamed “${renamingThread}” to “${val}” on ${data?.affected_count || 0} takes`
+                    )
                   } catch (e) { toast.error(e?.message || 'Could not rename thread') }
                   setSaving(false)
                   setRenamingThread('')

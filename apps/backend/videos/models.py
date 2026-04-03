@@ -418,12 +418,14 @@ class ReviewRequestEvent(models.Model):
     EVENT_STATUS_CHANGED = 'status_changed'
     EVENT_RESPONDED = 'responded'
     EVENT_VIEWED = 'viewed'
+    EVENT_THREAD_RENAMED = 'thread_renamed'
     EVENT_TYPES = [
         (EVENT_CREATED, 'Created'),
         (EVENT_OPENED, 'Opened'),
         (EVENT_STATUS_CHANGED, 'Status Changed'),
         (EVENT_RESPONDED, 'Responded'),
         (EVENT_VIEWED, 'Viewed'),
+        (EVENT_THREAD_RENAMED, 'Thread Renamed'),
     ]
 
     review_request = models.ForeignKey(ReviewRequest, on_delete=models.CASCADE, related_name='events')
