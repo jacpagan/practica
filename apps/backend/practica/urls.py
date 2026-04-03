@@ -7,7 +7,7 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from rest_framework.routers import DefaultRouter
 from videos.views import (
-    SessionViewSet, health_check,
+    health_check,
     ready_check,
     register_view, login_view, me_view,
     user_search_view,
@@ -15,6 +15,7 @@ from videos.views import (
     invite_codes, invite_code_detail,
     favicon,
 )
+from videos.library.api import SessionViewSet
 from videos.reviews.api import (
     ReviewRequestViewSet,
     review_link_info,
