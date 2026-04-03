@@ -58,7 +58,7 @@ class V1VideoFeaturesTests(APITestCase):
         self.client.force_authenticate(user=self.owner)
 
         with patch(
-            'videos.views.prepare_feedback_video_upload',
+            'videos.library.api.prepare_feedback_video_upload',
             return_value=self._video_file('reply-browser.mp4', content_type='video/mp4'),
         ):
             response = self.client.post(
@@ -75,7 +75,7 @@ class V1VideoFeaturesTests(APITestCase):
         self.assertTrue(feedback.feedback_video.name.endswith('.mp4'))
 
     @patch(
-        'videos.views.prepare_feedback_video_upload',
+        'videos.library.api.prepare_feedback_video_upload',
         side_effect=ValueError('This feedback video needs browser playback conversion before Chrome and iPhone can open it, but conversion is unavailable right now. Please upload an MP4 or try again later.'),
     )
     def test_video_feedback_returns_clear_error_when_conversion_is_unavailable(self, prepare_feedback_video_upload):
@@ -158,7 +158,7 @@ class V1VideoFeaturesTests(APITestCase):
         AWS_MEDIA_CONVERT_ROLE_ARN='',
         AWS_MEDIA_CONVERT_ENDPOINT_URL='',
     )
-    @patch('videos.views.enqueue_local_session_transcode', return_value=(False, 'ffmpeg missing'))
+    @patch('videos.media.services.enqueue_local_session_transcode', return_value=(False, 'ffmpeg missing'))
     def test_session_create_fails_when_conversion_is_unavailable(self, enqueue_local_transcode):
         self.client.force_authenticate(user=self.owner)
 
@@ -183,7 +183,7 @@ class V1VideoFeaturesTests(APITestCase):
         AWS_MEDIA_CONVERT_ROLE_ARN='',
         AWS_MEDIA_CONVERT_ENDPOINT_URL='',
     )
-    @patch('videos.views.enqueue_local_session_transcode', return_value=(True, ''))
+    @patch('videos.media.services.enqueue_local_session_transcode', return_value=(True, ''))
     def test_session_create_accepts_android_mp4_with_application_mime(self, enqueue_local_transcode):
         self.client.force_authenticate(user=self.owner)
 
@@ -207,7 +207,7 @@ class V1VideoFeaturesTests(APITestCase):
         AWS_MEDIA_CONVERT_ROLE_ARN='',
         AWS_MEDIA_CONVERT_ENDPOINT_URL='',
     )
-    @patch('videos.views.enqueue_local_session_transcode', return_value=(True, ''))
+    @patch('videos.media.services.enqueue_local_session_transcode', return_value=(True, ''))
     def test_retry_processing_requeues_mobile_compatible_transcode(self, enqueue_local_transcode):
         session = Session.objects.create(
             user=self.owner,
@@ -285,7 +285,7 @@ class V1VideoFeaturesTests(APITestCase):
         AWS_MEDIA_CONVERT_ROLE_ARN='',
         AWS_MEDIA_CONVERT_ENDPOINT_URL='',
     )
-    @patch('videos.views.enqueue_local_session_transcode', return_value=(False, 'ffmpeg missing'))
+    @patch('videos.media.services.enqueue_local_session_transcode', return_value=(False, 'ffmpeg missing'))
     def test_mov_session_without_transcoding_fails_with_clear_message(self, enqueue_local_transcode):
         self.client.force_authenticate(user=self.owner)
 
@@ -310,7 +310,7 @@ class V1VideoFeaturesTests(APITestCase):
         AWS_MEDIA_CONVERT_ROLE_ARN='',
         AWS_MEDIA_CONVERT_ENDPOINT_URL='',
     )
-    @patch('videos.views.enqueue_local_session_transcode', return_value=(True, ''))
+    @patch('videos.media.services.enqueue_local_session_transcode', return_value=(True, ''))
     def test_mov_session_uses_local_transcode_fallback_when_available(self, enqueue_local_transcode):
         self.client.force_authenticate(user=self.owner)
 
@@ -391,7 +391,7 @@ class V1VideoFeaturesTests(APITestCase):
         AWS_MEDIA_CONVERT_ROLE_ARN='arn:aws:iam::123456789012:role/practica-mediaconvert',
         AWS_MEDIA_CONVERT_ENDPOINT_URL='https://mediaconvert.us-east-1.amazonaws.com',
     )
-    @patch('videos.views.enqueue_session_processing', return_value=(True, '', 'mc-job-123'))
+    @patch('videos.media.services.enqueue_session_processing', return_value=(True, '', 'mc-job-123'))
     def test_session_create_stores_mediaconvert_job_id(self, enqueue_session_processing):
         self.client.force_authenticate(user=self.owner)
 

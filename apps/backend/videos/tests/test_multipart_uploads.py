@@ -59,7 +59,7 @@ class MultipartUploadApiTests(APITestCase):
         fake_s3 = FakeS3Client()
         self.client.force_authenticate(user=self.member)
 
-        with patch('videos.views._s3_client', return_value=fake_s3):
+        with patch('videos.media.api.s3_client', return_value=fake_s3):
             init_res = self.client.post(
                 '/api/sessions/multipart/initiate/',
                 {
@@ -121,7 +121,7 @@ class MultipartUploadApiTests(APITestCase):
         )
 
         self.client.force_authenticate(user=self.member)
-        with patch('videos.views._s3_client', return_value=fake_s3):
+        with patch('videos.media.api.s3_client', return_value=fake_s3):
             sign_res = self.client.post(
                 '/api/sessions/multipart/sign-part/',
                 {'multipart_upload_id': upload.id, 'part_number': 1},
@@ -152,7 +152,7 @@ class MultipartUploadApiTests(APITestCase):
         )
 
         self.client.force_authenticate(user=self.member)
-        with patch('videos.views._s3_client', return_value=fake_s3):
+        with patch('videos.media.api.s3_client', return_value=fake_s3):
             status_res = self.client.post(
                 '/api/sessions/multipart/status/',
                 {'multipart_upload_id': upload.id},
@@ -182,7 +182,7 @@ class MultipartUploadApiTests(APITestCase):
         )
 
         self.client.force_authenticate(user=self.member)
-        with patch('videos.views._s3_client', return_value=fake_s3):
+        with patch('videos.media.api.s3_client', return_value=fake_s3):
             status_res = self.client.post(
                 '/api/sessions/multipart/status/',
                 {'multipart_upload_id': upload.id},
@@ -195,7 +195,7 @@ class MultipartUploadApiTests(APITestCase):
         fake_s3 = FakeS3Client()
         self.client.force_authenticate(user=self.member)
 
-        with patch('videos.views._s3_client', return_value=fake_s3):
+        with patch('videos.media.api.s3_client', return_value=fake_s3):
             init_res = self.client.post(
                 '/api/sessions/multipart/initiate/',
                 {
@@ -214,7 +214,7 @@ class MultipartUploadApiTests(APITestCase):
         fake_s3 = FakeS3Client()
         self.client.force_authenticate(user=self.member)
 
-        with patch('videos.views._s3_client', return_value=fake_s3):
+        with patch('videos.media.api.s3_client', return_value=fake_s3):
             init_res = self.client.post(
                 '/api/sessions/multipart/initiate/',
                 {
@@ -229,12 +229,12 @@ class MultipartUploadApiTests(APITestCase):
 
         self.assertEqual(init_res.status_code, status.HTTP_201_CREATED)
 
-    @patch('videos.views.enqueue_local_session_transcode', return_value=(True, ''))
+    @patch('videos.media.services.enqueue_local_session_transcode', return_value=(True, ''))
     def test_multipart_complete_queues_transcode_for_android_mp4_with_application_mime(self, enqueue_local_transcode):
         fake_s3 = FakeS3Client()
         self.client.force_authenticate(user=self.member)
 
-        with patch('videos.views._s3_client', return_value=fake_s3):
+        with patch('videos.media.api.s3_client', return_value=fake_s3):
             init_res = self.client.post(
                 '/api/sessions/multipart/initiate/',
                 {

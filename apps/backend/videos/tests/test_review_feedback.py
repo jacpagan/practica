@@ -204,7 +204,7 @@ class ReviewFeedbackApiTests(APITestCase):
         self._auth(self.reviewer)
 
         with patch(
-            'videos.views.prepare_feedback_video_upload',
+            'videos.reviews.api.prepare_feedback_video_upload',
             return_value=self._video_file('updated-browser.mp4', content_type='video/mp4'),
         ):
             response = self.client.patch(
@@ -224,7 +224,7 @@ class ReviewFeedbackApiTests(APITestCase):
         self._auth(self.reviewer)
 
         with patch(
-            'videos.views.prepare_feedback_video_upload',
+            'videos.reviews.api.prepare_feedback_video_upload',
             side_effect=ValueError('This feedback video needs browser playback conversion before Chrome and iPhone can open it, but conversion is unavailable right now. Please upload an MP4 or try again later.'),
         ):
             response = self.client.post(

@@ -131,7 +131,7 @@ class SessionMediaActionsMixin:
 
         if upload.status == MultipartSessionUpload.STATUS_INITIATED:
             try:
-                uploaded_parts = list_uploaded_parts(upload)
+                uploaded_parts = list_uploaded_parts(upload, client=s3_client())
             except ClientError as exc:
                 code = str(exc.response.get('Error', {}).get('Code', ''))
                 if code == 'NoSuchUpload':
