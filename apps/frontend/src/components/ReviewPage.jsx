@@ -220,20 +220,32 @@ function ReviewPage({ reviewToken = '' }) {
 
   const memberRole = reviewRequest?.current_member_role || reviewRequest?.current_user_role || ''
   const canRespondToRequest = !reviewRequest || memberRole === 'reviewer'
-  const reviewerShouldRespond = memberRole === 'reviewer' && ['requested', 'opened', 'resubmitted'].includes(String(reviewRequest?.status || '').trim().toLowerCase())
+  const reviewerShouldRespond = memberRole === 'reviewer' && ['requested', 'opened'].includes(String(reviewRequest?.status || '').trim().toLowerCase())
   const hasCurrentUserFeedback = feedback.some((item) => item.authored_by_current_user)
 
   const canStudentClose = memberRole === 'student' || memberRole === 'owner'
   const statusKey = String(reviewRequest?.status || '').trim().toLowerCase()
-  const canShowClosure = Boolean(reviewRequest && canStudentClose && ['responded', 'viewed', 'resubmitted'].includes(statusKey))
-  const canShowRetry = Boolean(reviewRequest && canStudentClose && ['responded', 'viewed'].includes(statusKey))
+  const canShowClosure = Boolean(reviewRequest && canStudentClose && ['responded', 'viewed', 'resubmitted', 'needs_resubmission', 'declined_unrelated', 'flagged'].includes(statusKey))
+  const canShowRetry = Boolean(reviewRequest && canStudentClose && ['responded', 'viewed', 'needs_resubmission', 'declined_unrelated'].includes(statusKey))
+  const reviewerCanModerate = Boolean(reviewRequest && memberRole === 'reviewer' && ['requested', 'opened'].includes(statusKey))
 
-  const patchReviewRequestStatus = async (nextStatus) => {
+  const reasonLabel = (value = '') => {
+    const normalized = String(value || '').trim().toLowerCase()
+    if (!normalized) return ''
+    if (normalized === 'needs_new_take') return 'Needs new take'
+    if (normalized === 'unrelated_video') return 'Unrelated take'
+    if (normalized === 'unsafe_content') return 'Unsafe content'
+    if (normalized === 'spam') return 'Spam'
+    if (normalized === 'other') return 'Other'
+    return normalized.replace(/_/g, ' ')
+  }
+
+  const patchReviewRequestStatus = async (nextStatus, extra = {}) => {
     if (!authToken || !reviewRequest?.id) return
     const res = await fetch(`/api/review-requests/${reviewRequest.id}/`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: `Token ${authToken}` },
-      body: JSON.stringify({ status: nextStatus }),
+      body: JSON.stringify({ status: nextStatus, ...extra }),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(data?.error || 'Could not update request')
@@ -251,6 +263,18 @@ function ReviewPage({ reviewToken = '' }) {
     if (!canShowRetry || closing) return
     setClosing(true)
     try { await patchReviewRequestStatus('resubmitted') } catch {}
+    setClosing(false)
+  }
+
+  const handleReviewerLoopState = async (nextStatus, statusReason) => {
+    if (!reviewerCanModerate || closing) return
+    const statusNote = typeof window !== 'undefined'
+      ? window.prompt('Optional note for the owner', '') || ''
+      : ''
+    setClosing(true)
+    try {
+      await patchReviewRequestStatus(nextStatus, { status_reason: statusReason, status_note: statusNote })
+    } catch {}
     setClosing(false)
   }
 
@@ -547,18 +571,20 @@ function ReviewPage({ reviewToken = '' }) {
       <div className="min-h-screen bg-white px-4 py-6 sm:px-6">
         <main className="max-w-3xl mx-auto grid gap-6 lg:grid-cols-[1.1fr_0.9fr] items-start">
           <div className="space-y-4">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Private review</p>
-              <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-2">{session?.title || 'Review this take'}</h1>
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Private review</p>
+          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-2">{session?.title || 'Review this take'}</h1>
               <p className="text-sm text-gray-600 mt-2">
                 {reviewerName
                   ? `${reviewerName} has been invited into a private feedback thread in Practica.`
                   : 'You have been invited into a private feedback thread in Practica.'}
               </p>
               {ownerName ? <p className="text-xs text-gray-500 mt-2">Shared privately by {ownerName}.</p> : null}
-              {reviewRequest?.goal ? <p className="text-xs text-gray-500 mt-1">Focus: {reviewRequest.goal}</p> : null}
-              {link?.expires_at ? <p className="text-xs text-gray-500 mt-1">Private access • sign-in required • expires {new Date(link.expires_at).toLocaleString(undefined, { hour12: undefined })}</p> : null}
-            </div>
+          {reviewRequest?.goal ? <p className="text-xs text-gray-500 mt-1">Focus: {reviewRequest.goal}</p> : null}
+          {reviewRequest?.status_reason ? <p className="text-xs text-gray-500 mt-1">Reason: {reasonLabel(reviewRequest.status_reason)}</p> : null}
+          {reviewRequest?.status_note ? <p className="text-xs text-gray-500 mt-1">Note: {reviewRequest.status_note}</p> : null}
+          {link?.expires_at ? <p className="text-xs text-gray-500 mt-1">Private access • sign-in required • expires {new Date(link.expires_at).toLocaleString(undefined, { hour12: undefined })}</p> : null}
+        </div>
 
             <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
               <div className="aspect-video bg-black">
@@ -634,12 +660,30 @@ function ReviewPage({ reviewToken = '' }) {
           </div>
         </div>
 
-        {link?.allow_video_feedback && canRespondToRequest ? (
+        {link?.allow_video_feedback && canRespondToRequest && (!reviewRequest || reviewerShouldRespond || hasCurrentUserFeedback) ? (
           <div ref={responseComposerRef} className="rounded-xl border border-gray-200 p-3 space-y-4">
             <div>
               <p className="text-sm font-semibold text-gray-900">{reviewerShouldRespond && !hasCurrentUserFeedback ? 'Add your response' : 'Add another response'}</p>
               <p className="text-xs text-gray-500 mt-1">Record here or upload a video you already have.</p>
             </div>
+
+            {reviewerCanModerate ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Reviewer actions</p>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => handleReviewerLoopState('needs_resubmission', 'needs_new_take')} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
+                    Needs new take
+                  </button>
+                  <button type="button" onClick={() => handleReviewerLoopState('declined_unrelated', 'unrelated_video')} className="text-xs text-rose-700 border border-rose-200 rounded-lg px-3 py-2 hover:bg-rose-100 transition-colors">
+                    Unrelated take
+                  </button>
+                  <button type="button" onClick={() => handleReviewerLoopState('flagged', 'unsafe_content')} className="text-xs text-red-700 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-100 transition-colors">
+                    Report unsafe
+                  </button>
+                </div>
+                <p className="text-xs text-amber-900">Use this when the take needs a different submission, does not match the request, or appears unsafe or inappropriate.</p>
+              </div>
+            ) : null}
 
             {false ? (
               <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-3 space-y-3">
@@ -895,7 +939,17 @@ function ReviewPage({ reviewToken = '' }) {
           canRetry={canShowRetry}
           onClose={handleCloseRequest}
           onRetry={handleRetryRequest}
-          subtleText={statusKey === 'responded' ? 'Feedback delivered • Finish the loop when ready' : 'Ready to close this thread'}
+          subtleText={
+            statusKey === 'responded'
+              ? 'Feedback delivered • Finish the loop when ready'
+              : statusKey === 'needs_resubmission'
+                ? 'Reviewer asked for a new take'
+                : statusKey === 'declined_unrelated'
+                  ? 'This take did not match the requested thread'
+                  : statusKey === 'flagged'
+                    ? 'This request is flagged and removed from the normal reviewer inbox'
+                    : 'Ready to close this thread'
+          }
         />
       ) : null}
     </div>

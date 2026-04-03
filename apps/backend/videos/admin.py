@@ -3,7 +3,7 @@ from .models import (
     Profile, Session, Chapter, VideoFeedback, MultipartSessionUpload, SessionAsset,
     SessionLastSeen,
     SignupInviteCode,
-    ReviewRequest, ReviewerRosterMembership, FeedbackTemplate,
+    ReviewRequest, ReviewRequestEvent, ReviewerRosterMembership, FeedbackTemplate,
 )
 
 
@@ -119,3 +119,11 @@ class FeedbackTemplateAdmin(admin.ModelAdmin):
     @admin.display(description='Reviewer')
     def reviewer_display(self, obj):
         return obj.reviewer
+
+
+@admin.register(ReviewRequestEvent)
+class ReviewRequestEventAdmin(admin.ModelAdmin):
+    list_display = ['id', 'review_request', 'event_type', 'from_status', 'to_status', 'reason_code', 'actor', 'created_at']
+    list_filter = ['event_type', 'to_status', 'reason_code', 'created_at']
+    search_fields = ['review_request__goal', 'review_request__session__title', 'actor__username', 'note']
+    raw_id_fields = ['review_request', 'actor']

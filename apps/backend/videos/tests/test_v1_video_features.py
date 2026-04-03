@@ -231,6 +231,17 @@ class V1VideoFeaturesTests(APITestCase):
         self.assertEqual(session.processing_status, Session.STATUS_PROCESSING)
         enqueue_local_transcode.assert_called_once()
 
+    def test_retry_processing_rejects_take_already_processing(self):
+        session = self._create_session(user=self.owner)
+        session.processing_status = Session.STATUS_PROCESSING
+        session.save(update_fields=['processing_status'])
+
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.post(f'/api/sessions/{session.id}/retry-processing/')
+
+        self.assertEqual(res.status_code, status.HTTP_409_CONFLICT)
+        self.assertIn('already being processed', res.data['error'].lower())
+
     def test_session_asset_urls_fall_back_to_media_urls_when_storage_lookup_fails(self):
         session = self._create_session(user=self.owner)
         SessionAsset.objects.create(
@@ -347,6 +358,33 @@ class V1VideoFeaturesTests(APITestCase):
         session.refresh_from_db()
         self.assertEqual(session.processing_status, Session.STATUS_READY)
         self.assertEqual(session.assets.count(), 1)
+
+    @override_settings(MEDIA_PROCESSING_CALLBACK_TOKEN='callback-secret')
+    def test_processing_update_endpoint_rejects_ready_transition_when_not_processing(self):
+        session = self._create_session()
+        session.processing_status = Session.STATUS_UPLOADED
+        session.save(update_fields=['processing_status'])
+
+        payload = {
+            'status': 'ready',
+            'assets': [
+                {
+                    'asset_type': 'proxy_mp4',
+                    'object_key': 'processed/sessions/1/proxy/video_proxy.mp4',
+                    'content_type': 'video/mp4',
+                },
+            ],
+        }
+
+        res = self.client.post(
+            f'/api/sessions/{session.id}/processing-update/',
+            payload,
+            format='json',
+            HTTP_X_PROCESSING_TOKEN='callback-secret',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('cannot move processing status', res.data['error'].lower())
 
     @override_settings(
         AWS_STORAGE_BUCKET_NAME='test-bucket',

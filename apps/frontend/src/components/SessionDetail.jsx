@@ -9,6 +9,9 @@ const requestStatusTone = {
   opened: 'bg-blue-100 text-blue-800',
   responded: 'bg-emerald-100 text-emerald-800',
   viewed: 'bg-violet-100 text-violet-800',
+  needs_resubmission: 'bg-orange-100 text-orange-800',
+  declined_unrelated: 'bg-rose-100 text-rose-800',
+  flagged: 'bg-red-100 text-red-800',
   resubmitted: 'bg-fuchsia-100 text-fuchsia-800',
   closed: 'bg-gray-100 text-gray-700',
   revoked: 'bg-red-100 text-red-700',
@@ -17,7 +20,18 @@ const requestStatusTone = {
 const requestStatusLabel = (value = '') => {
   const normalized = String(value || '').trim().toLowerCase()
   if (!normalized) return 'Unknown'
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1)
+  return normalized.split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')
+}
+
+const requestReasonLabel = (value = '') => {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (!normalized) return ''
+  if (normalized === 'needs_new_take') return 'Needs new take'
+  if (normalized === 'unrelated_video') return 'Unrelated take'
+  if (normalized === 'unsafe_content') return 'Unsafe content'
+  if (normalized === 'spam') return 'Spam'
+  if (normalized === 'other') return 'Other'
+  return normalized.replace(/_/g, ' ')
 }
 
 const LAST_REVIEWER_KEY = 'practica.last_reviewer.v1'
@@ -147,7 +161,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const currentLoopRequest = sortedReviewRequests.find((item) => !['closed', 'revoked'].includes(item.status)) || sortedReviewRequests[0] || null
   const currentLoopStatus = String(currentLoopRequest?.status || '').trim().toLowerCase()
   const waitingOnReviewer = ['requested', 'opened'].includes(currentLoopStatus)
-  const readyForFollowUp = ['responded', 'viewed', 'resubmitted'].includes(currentLoopStatus)
+  const readyForFollowUp = ['responded', 'viewed', 'needs_resubmission', 'declined_unrelated'].includes(currentLoopStatus)
   const canStartNewRequest = canEdit && canCreateShareLink && !waitingOnReviewer
   const defaultRequestGoal = useMemo(() => {
     if (session?.practice_series) return `${session.practice_series} follow-up`
@@ -1137,6 +1151,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           <div>
                             <p className="text-sm text-gray-800">{requestItem.goal}</p>
                             {requestItem.exercise_or_song ? <p className="text-xs text-gray-500 mt-1">Focus: {requestItem.exercise_or_song}</p> : null}
+                            {requestItem.status_reason ? <p className="text-xs text-gray-600 mt-2">Reason: {requestReasonLabel(requestItem.status_reason)}</p> : null}
+                            {requestItem.status_note ? <p className="text-xs text-gray-600 mt-1">Note: {requestItem.status_note}</p> : null}
                             {/* Notes removed from display */}
                             {requestItem.feedback_category_counts && Object.keys(requestItem.feedback_category_counts).length > 0 ? (
                               <div className="flex flex-wrap gap-2 mt-3">
@@ -1250,7 +1266,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                 Open request thread
                               </button>
                             ) : null}
-                            {requestItem.status !== 'closed' && requestItem.reviewer ? (
+                            {['responded', 'viewed', 'needs_resubmission', 'declined_unrelated'].includes(requestItem.status) && requestItem.reviewer ? (
                               <button
                                 type="button"
                                 onClick={() => startFollowUp(requestItem)}
@@ -1264,7 +1280,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                 Mark viewed
                               </button>
                             ) : null}
-                            {['viewed', 'responded'].includes(requestItem.status) ? (
+                            {['viewed', 'responded', 'needs_resubmission', 'declined_unrelated'].includes(requestItem.status) ? (
                               <button type="button" onClick={() => patchReviewRequestStatus(requestItem, 'resubmitted', 'Marked as retried')} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
                                 Mark retried
                               </button>
@@ -1274,7 +1290,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                 Turn off request
                               </button>
                             ) : null}
-                            {['viewed', 'resubmitted'].includes(requestItem.status) ? (
+                            {['viewed', 'resubmitted', 'needs_resubmission', 'declined_unrelated', 'flagged'].includes(requestItem.status) ? (
                               <button type="button" onClick={() => patchReviewRequestStatus(requestItem, 'closed', 'Feedback request closed')} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
                                 Close request
                               </button>

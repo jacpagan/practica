@@ -152,6 +152,16 @@ class FeedbackRequestApiTests(APITestCase):
         self.assertIsNotNone(review_request.viewed_at)
         self.assertTrue(SessionLastSeen.objects.filter(user=self.student, session=self.session).exists())
 
+    def test_owner_cannot_mark_feedback_request_viewed_before_response(self):
+        review_request = self._create_review_request()
+
+        self._auth(self.student)
+        response = self.client.post(f'/api/review-requests/{review_request.id}/mark-viewed/')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        review_request.refresh_from_db()
+        self.assertEqual(review_request.status, ReviewRequest.STATUS_REQUESTED)
+
     def test_owner_opening_feedback_request_link_auto_marks_viewed_after_response(self):
         review_request = self._create_review_request()
         review_request.status = ReviewRequest.STATUS_RESPONDED
@@ -259,6 +269,47 @@ class FeedbackRequestApiTests(APITestCase):
         self.assertEqual(delete_response.status_code, status.HTTP_200_OK)
         self.assertEqual(delete_response.data, {'ok': True})
         self.assertFalse(FeedbackTemplate.objects.filter(pk=template_id).exists())
+
+    def test_reviewer_can_mark_request_needs_resubmission_with_event(self):
+        review_request = self._create_review_request()
+
+        self._auth(self.reviewer)
+        response = self.client.patch(
+            f'/api/review-requests/{review_request.id}/',
+            {
+                'status': 'needs_resubmission',
+                'status_reason': 'needs_new_take',
+                'status_note': 'Please send a cleaner full take from bar 1.',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        review_request.refresh_from_db()
+        self.assertEqual(review_request.status, ReviewRequest.STATUS_NEEDS_RESUBMISSION)
+        self.assertEqual(review_request.status_reason, ReviewRequest.REASON_NEEDS_NEW_TAKE)
+        self.assertIn('cleaner full take', review_request.status_note)
+        self.assertEqual(response.data['events'][0]['to_status'], ReviewRequest.STATUS_NEEDS_RESUBMISSION)
+        self.assertEqual(response.data['events'][0]['reason_code'], ReviewRequest.REASON_NEEDS_NEW_TAKE)
+
+    def test_flagged_request_is_hidden_from_reviewer_inbox(self):
+        review_request = self._create_review_request()
+
+        self._auth(self.reviewer)
+        patch_response = self.client.patch(
+            f'/api/review-requests/{review_request.id}/',
+            {
+                'status': 'flagged',
+                'status_reason': 'unsafe_content',
+                'status_note': 'This upload looks inappropriate for the thread.',
+            },
+            format='json',
+        )
+        self.assertEqual(patch_response.status_code, status.HTTP_200_OK)
+
+        inbox_response = self.client.get('/api/inbox/')
+        self.assertEqual(inbox_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(inbox_response.data, [])
 
     def test_review_request_detail_includes_request_specific_feedback_items(self):
         review_request = self._create_review_request()

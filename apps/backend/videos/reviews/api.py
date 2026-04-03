@@ -12,6 +12,7 @@ from videos.models import FeedbackTemplate, ReviewLink, ReviewRequest, ReviewerR
 from videos.reviews.presentation import public_review_request_preview, review_request_forbidden_response
 from videos.reviews.queries import filter_review_requests_for_role, review_request_visible_to_user, reviewer_can_respond, visible_review_requests_qs
 from videos.reviews.services import create_review_request, mark_review_request_viewed, transition_review_request_status
+from videos.reviews.services import mark_review_request_opened, mark_review_request_responded
 from videos.serializers import FeedbackTemplateSerializer, MemberConnectionSerializer, PublicSessionSerializer, ReviewLinkSerializer, ReviewRequestSerializer, ReviewVideoFeedbackSerializer, UserSummarySerializer
 from videos.services.feedback_video_processing import prepare_feedback_video_upload
 from videos.video_uploads import is_allowed_video_upload
@@ -86,9 +87,8 @@ def review_link_info(request, token):
     ReviewLink.objects.filter(pk=link.pk).update(last_accessed_at=timezone.now())
     link.refresh_from_db(fields=['last_accessed_at'])
     if request.user.is_authenticated and review_request and review_request.status == ReviewRequest.STATUS_REQUESTED and request.user.id == review_request.reviewer_id:
-        review_request.status = ReviewRequest.STATUS_OPENED
-        review_request.opened_at = timezone.now()
-        review_request.save(update_fields=['status', 'opened_at', 'updated_at'])
+        mark_review_request_opened(review_request=review_request, actor=request.user)
+        review_request.refresh_from_db()
     elif request.user.is_authenticated and review_request and request.user.id == review_request.student_id:
         if review_request.status == ReviewRequest.STATUS_RESPONDED:
             mark_review_request_viewed(review_request=review_request, actor=request.user)
@@ -237,9 +237,7 @@ def review_link_feedback(request, token):
         is_legacy_text_feedback=False,
     )
     if review_request:
-        review_request.status = ReviewRequest.STATUS_RESPONDED
-        review_request.responded_at = timezone.now()
-        review_request.save(update_fields=['status', 'responded_at', 'updated_at'])
+        mark_review_request_responded(review_request=review_request, actor=request.user)
     return Response(
         ReviewVideoFeedbackSerializer(item, context={'request': request, 'session': link.session}).data,
         status=status.HTTP_201_CREATED,
@@ -251,7 +249,10 @@ def review_link_feedback(request, token):
 def feedback_inbox(request):
     qs = ReviewRequest.objects.filter(reviewer=request.user).select_related(
         'student', 'student__profile', 'reviewer', 'reviewer__profile', 'session', 'review_link'
-    ).order_by('-created_at')
+    ).prefetch_related(
+        'feedback_items', 'feedback_items__user', 'feedback_items__user__profile',
+        'events', 'events__actor', 'events__actor__profile',
+    ).exclude(status=ReviewRequest.STATUS_FLAGGED).order_by('-created_at')
     status_filter = str(request.query_params.get('status', '')).strip().lower()
     if status_filter:
         qs = qs.filter(status=status_filter)
@@ -321,7 +322,7 @@ def feedback_insights(request):
     return Response({
         'total_review_requests': review_requests.count(),
         'pending_review_requests': review_requests.filter(status__in=[ReviewRequest.STATUS_REQUESTED, ReviewRequest.STATUS_OPENED]).count(),
-        'responded_review_requests': review_requests.filter(status__in=[ReviewRequest.STATUS_RESPONDED, ReviewRequest.STATUS_VIEWED, ReviewRequest.STATUS_RESUBMITTED, ReviewRequest.STATUS_CLOSED]).count(),
+        'responded_review_requests': review_requests.filter(status__in=[ReviewRequest.STATUS_RESPONDED, ReviewRequest.STATUS_VIEWED, ReviewRequest.STATUS_NEEDS_RESUBMISSION, ReviewRequest.STATUS_DECLINED_UNRELATED, ReviewRequest.STATUS_RESUBMITTED, ReviewRequest.STATUS_CLOSED]).count(),
         'follow_up_review_requests': review_requests.exclude(parent_request__isnull=True).count(),
         'category_counts': category_counts,
         'top_students': top_students,
@@ -378,6 +379,7 @@ class ReviewRequestViewSet(viewsets.ModelViewSet):
             'parent_request',
         ).prefetch_related(
             'feedback_items', 'feedback_items__user', 'feedback_items__user__profile',
+            'events', 'events__actor', 'events__actor__profile',
         )
         return filter_review_requests_for_role(
             qs,
@@ -400,7 +402,11 @@ class ReviewRequestViewSet(viewsets.ModelViewSet):
             transition_review_request_status(
                 review_request=review_request,
                 actor=request.user,
-                next_status=request.data.get('status', ''),
+                next_status={
+                    'status': request.data.get('status', ''),
+                    'status_reason': request.data.get('status_reason', ''),
+                    'status_note': request.data.get('status_note', ''),
+                },
             )
 
         partial_payload = {key: value for key, value in request.data.items() if key in allowed_fields}

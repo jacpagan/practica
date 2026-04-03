@@ -9,6 +9,7 @@ from .models import (
     SessionAsset,
     ReviewLink,
     ReviewRequest,
+    ReviewRequestEvent,
     ReviewerRosterMembership,
     FeedbackTemplate,
     SignupInviteCode,
@@ -379,6 +380,15 @@ class ReviewVideoFeedbackSerializer(serializers.ModelSerializer):
         return value
 
 
+class ReviewRequestEventSerializer(serializers.ModelSerializer):
+    actor = UserSummarySerializer(read_only=True)
+
+    class Meta:
+        model = ReviewRequestEvent
+        fields = ['id', 'event_type', 'from_status', 'to_status', 'reason_code', 'note', 'actor', 'created_at']
+        read_only_fields = fields
+
+
 class ReviewRequestSerializer(serializers.ModelSerializer):
     student = UserSummarySerializer(read_only=True)
     owner = UserSummarySerializer(source='student', read_only=True)
@@ -415,6 +425,7 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
     latest_feedback_at = serializers.SerializerMethodField()
     follow_up_request_count = serializers.SerializerMethodField()
     feedback_category_counts = serializers.SerializerMethodField()
+    events = serializers.SerializerMethodField()
 
     class Meta:
         model = ReviewRequest
@@ -428,14 +439,14 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
             'parent_feedback_request',
             'instrument', 'student_level', 'goal', 'exercise_or_song', 'notes',
             'requested_turnaround_hours', 'deadline',
-            'status', 'opened_at', 'responded_at', 'viewed_at', 'resubmitted_at', 'closed_at',
-            'response_count', 'current_user_role', 'current_member_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count', 'feedback_category_counts',
+            'status', 'status_reason', 'status_note', 'opened_at', 'responded_at', 'viewed_at', 'flagged_at', 'resubmitted_at', 'closed_at',
+            'response_count', 'current_user_role', 'current_member_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count', 'feedback_category_counts', 'events',
             'created_at', 'updated_at',
         ]
         read_only_fields = [
             'id', 'student', 'owner', 'reviewer', 'session', 'review_link', 'feedback_link', 'parent_request', 'parent_feedback_request',
-            'status', 'opened_at', 'responded_at', 'viewed_at', 'resubmitted_at', 'closed_at',
-            'response_count', 'current_user_role', 'current_member_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count', 'feedback_category_counts',
+            'status', 'status_reason', 'status_note', 'opened_at', 'responded_at', 'viewed_at', 'flagged_at', 'resubmitted_at', 'closed_at',
+            'response_count', 'current_user_role', 'current_member_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count', 'feedback_category_counts', 'events',
             'created_at', 'updated_at',
         ]
 
@@ -503,6 +514,10 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
                 continue
             counts[category] = counts.get(category, 0) + 1
         return counts
+
+    def get_events(self, obj):
+        events = obj.events.select_related('actor', 'actor__profile').all()
+        return ReviewRequestEventSerializer(events, many=True, context=self.context).data
 
     def validate(self, attrs):
         session = attrs.get('session') or getattr(self.instance, 'session', None)

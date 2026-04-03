@@ -314,6 +314,9 @@ class ReviewRequest(models.Model):
     STATUS_OPENED = 'opened'
     STATUS_RESPONDED = 'responded'
     STATUS_VIEWED = 'viewed'
+    STATUS_NEEDS_RESUBMISSION = 'needs_resubmission'
+    STATUS_DECLINED_UNRELATED = 'declined_unrelated'
+    STATUS_FLAGGED = 'flagged'
     STATUS_RESUBMITTED = 'resubmitted'
     STATUS_CLOSED = 'closed'
     STATUS_REVOKED = 'revoked'
@@ -322,10 +325,19 @@ class ReviewRequest(models.Model):
         (STATUS_OPENED, 'Opened'),
         (STATUS_RESPONDED, 'Responded'),
         (STATUS_VIEWED, 'Viewed'),
+        (STATUS_NEEDS_RESUBMISSION, 'Needs Resubmission'),
+        (STATUS_DECLINED_UNRELATED, 'Declined Unrelated'),
+        (STATUS_FLAGGED, 'Flagged'),
         (STATUS_RESUBMITTED, 'Resubmitted'),
         (STATUS_CLOSED, 'Closed'),
         (STATUS_REVOKED, 'Revoked'),
     ]
+
+    REASON_NEEDS_NEW_TAKE = 'needs_new_take'
+    REASON_UNRELATED_VIDEO = 'unrelated_video'
+    REASON_UNSAFE_CONTENT = 'unsafe_content'
+    REASON_SPAM = 'spam'
+    REASON_OTHER = 'other'
 
     session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='review_requests')
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='review_requests_as_student')
@@ -340,10 +352,13 @@ class ReviewRequest(models.Model):
     notes = models.TextField(blank=True)
     requested_turnaround_hours = models.PositiveIntegerField(null=True, blank=True)
     deadline = models.DateTimeField(null=True, blank=True)
-    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_REQUESTED)
+    status = models.CharField(max_length=24, choices=STATUS_CHOICES, default=STATUS_REQUESTED)
+    status_reason = models.CharField(max_length=64, blank=True)
+    status_note = models.TextField(blank=True)
     opened_at = models.DateTimeField(null=True, blank=True)
     responded_at = models.DateTimeField(null=True, blank=True)
     viewed_at = models.DateTimeField(null=True, blank=True)
+    flagged_at = models.DateTimeField(null=True, blank=True)
     resubmitted_at = models.DateTimeField(null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -395,6 +410,39 @@ class ReviewRequest(models.Model):
 
 MemberConnection = ReviewerRosterMembership
 FeedbackRequest = ReviewRequest
+
+
+class ReviewRequestEvent(models.Model):
+    EVENT_CREATED = 'created'
+    EVENT_OPENED = 'opened'
+    EVENT_STATUS_CHANGED = 'status_changed'
+    EVENT_RESPONDED = 'responded'
+    EVENT_VIEWED = 'viewed'
+    EVENT_TYPES = [
+        (EVENT_CREATED, 'Created'),
+        (EVENT_OPENED, 'Opened'),
+        (EVENT_STATUS_CHANGED, 'Status Changed'),
+        (EVENT_RESPONDED, 'Responded'),
+        (EVENT_VIEWED, 'Viewed'),
+    ]
+
+    review_request = models.ForeignKey(ReviewRequest, on_delete=models.CASCADE, related_name='events')
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='review_request_events')
+    event_type = models.CharField(max_length=32, choices=EVENT_TYPES)
+    from_status = models.CharField(max_length=24, blank=True)
+    to_status = models.CharField(max_length=24, blank=True)
+    reason_code = models.CharField(max_length=64, blank=True)
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        indexes = [
+            models.Index(fields=['review_request', 'created_at']),
+        ]
+
+    def __str__(self):
+        return f"ReviewRequestEvent request={self.review_request_id} type={self.event_type} to={self.to_status or 'n/a'}"
 
 
 class FeedbackTemplate(models.Model):

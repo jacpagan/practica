@@ -458,6 +458,16 @@ def apply_processing_update(session, status, error='', assets=None):
     if next_status not in {Session.STATUS_PROCESSING, Session.STATUS_READY, Session.STATUS_FAILED}:
         raise ValueError('Invalid processing status')
 
+    current_status = str(session.processing_status or '').strip().lower()
+    allowed_transitions = {
+        Session.STATUS_UPLOADED: {Session.STATUS_PROCESSING, Session.STATUS_FAILED},
+        Session.STATUS_PROCESSING: {Session.STATUS_PROCESSING, Session.STATUS_READY, Session.STATUS_FAILED},
+        Session.STATUS_READY: {Session.STATUS_PROCESSING, Session.STATUS_READY, Session.STATUS_FAILED},
+        Session.STATUS_FAILED: {Session.STATUS_PROCESSING, Session.STATUS_FAILED},
+    }
+    if next_status not in allowed_transitions.get(current_status, set()):
+        raise ValueError(f'Cannot move processing status from {current_status or "unknown"} to {next_status}')
+
     if next_status == Session.STATUS_READY:
         for asset in _normalized_assets(assets):
             SessionAsset.objects.update_or_create(

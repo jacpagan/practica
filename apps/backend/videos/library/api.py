@@ -152,6 +152,8 @@ class SessionViewSet(SessionMediaActionsMixin, viewsets.ModelViewSet):
         session = self.get_object()
         if not can_edit_session(request.user, session):
             raise PermissionDenied("You can only reprocess your own sessions.")
+        if session.processing_status not in {Session.STATUS_READY, Session.STATUS_FAILED}:
+            return Response({'error': 'This take is already being processed.'}, status=status.HTTP_409_CONFLICT)
 
         session.assets.filter(asset_type=SessionAsset.TYPE_PROXY_MP4).delete()
         start_processing_pipeline(session)

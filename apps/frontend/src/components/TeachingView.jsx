@@ -6,6 +6,9 @@ const statusTone = {
   opened: 'bg-blue-100 text-blue-800',
   responded: 'bg-emerald-100 text-emerald-800',
   viewed: 'bg-violet-100 text-violet-800',
+  needs_resubmission: 'bg-orange-100 text-orange-800',
+  declined_unrelated: 'bg-rose-100 text-rose-800',
+  flagged: 'bg-red-100 text-red-800',
   resubmitted: 'bg-fuchsia-100 text-fuchsia-800',
   closed: 'bg-gray-100 text-gray-700',
   revoked: 'bg-red-100 text-red-700',
@@ -14,7 +17,7 @@ const statusTone = {
 const statusLabel = (value = '') => {
   const normalized = String(value || '').trim().toLowerCase()
   if (!normalized) return 'Unknown'
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1)
+  return normalized.split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')
 }
 
 function TeachingView({ token, onOpenReviewRequest }) {
@@ -43,7 +46,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
   }, [loadInbox, token])
 
   const sortedRequests = useMemo(() => {
-    const priority = { requested: 0, opened: 1, responded: 2, viewed: 3, resubmitted: 4, closed: 5, revoked: 6 }
+    const priority = { requested: 0, opened: 1, responded: 2, viewed: 3, needs_resubmission: 4, declined_unrelated: 5, flagged: 6, resubmitted: 7, closed: 8, revoked: 9 }
     return [...requests].sort((left, right) => {
       const leftPriority = priority[String(left.status || '').trim().toLowerCase()] ?? 99
       const rightPriority = priority[String(right.status || '').trim().toLowerCase()] ?? 99
