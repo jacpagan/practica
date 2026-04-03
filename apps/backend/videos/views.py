@@ -47,6 +47,18 @@ from .services.media_pipeline import (
     media_pipeline_enabled,
     sync_mediaconvert_session,
 )
+from .reviews.services import (
+    create_review_request as create_review_request_service,
+    ensure_member_connection as ensure_member_connection_service,
+    mark_review_request_viewed as mark_review_request_viewed_service,
+    transition_review_request_status as transition_review_request_status_service,
+)
+from .reviews.queries import (
+    filter_review_requests_for_role,
+    review_request_visible_to_user,
+    reviewer_can_respond,
+    visible_review_requests_qs,
+)
 from .services.feedback_video_processing import prepare_feedback_video_upload
 from .video_uploads import is_allowed_video_upload
 
@@ -132,45 +144,8 @@ def _feedback_request_forbidden_response(message='You do not have access to this
     )
 
 
-def _feedback_request_visible_to_user(review_request, user):
-    if not user.is_authenticated:
-        return False
-    if user.is_staff:
-        return True
-    return user.id in {review_request.student_id, review_request.reviewer_id}
-
-
-def _feedback_request_reviewer_can_respond(review_request, user):
-    if not user.is_authenticated:
-        return False
-    if user.is_staff:
-        return True
-    return user.id == review_request.reviewer_id
-
-
-def _visible_feedback_requests_qs(user):
-    if not user.is_authenticated:
-        return ReviewRequest.objects.none()
-    if user.is_staff:
-        return ReviewRequest.objects.all()
-    return ReviewRequest.objects.filter(Q(student=user) | Q(reviewer=user) | Q(created_by=user))
-
-
 def _ensure_member_connection(*, reviewer, student, created_by=None):
-    membership, created = ReviewerRosterMembership.objects.get_or_create(
-        reviewer=reviewer,
-        student=student,
-        defaults={
-            'created_by': created_by,
-            'is_active': True,
-        },
-    )
-    if not created and not membership.is_active:
-        membership.is_active = True
-        if created_by and membership.created_by_id is None:
-            membership.created_by = created_by
-        membership.save(update_fields=['is_active', 'created_by', 'updated_at'])
-    return membership
+    return ensure_member_connection_service(reviewer=reviewer, student=student, created_by=created_by)
 
 
 def _mark_feedback_request_viewed(review_request, user):
@@ -180,14 +155,7 @@ def _mark_feedback_request_viewed(review_request, user):
         return
     if review_request.status != ReviewRequest.STATUS_RESPONDED:
         return
-    review_request.status = ReviewRequest.STATUS_VIEWED
-    review_request.viewed_at = timezone.now()
-    review_request.save(update_fields=['status', 'viewed_at', 'updated_at'])
-    SessionLastSeen.objects.update_or_create(
-        user=user,
-        session=review_request.session,
-        defaults={},
-    )
+    mark_review_request_viewed_service(review_request=review_request, actor=user)
 
 
 def _public_review_request_preview(review_request):
@@ -206,9 +174,9 @@ def _public_review_request_preview(review_request):
 
 
 _review_request_forbidden_response = _feedback_request_forbidden_response
-_review_request_visible_to_user = _feedback_request_visible_to_user
-_review_request_reviewer_can_respond = _feedback_request_reviewer_can_respond
-_visible_review_requests_qs = _visible_feedback_requests_qs
+_review_request_visible_to_user = review_request_visible_to_user
+_review_request_reviewer_can_respond = reviewer_can_respond
+_visible_review_requests_qs = visible_review_requests_qs
 _ensure_reviewer_roster_membership = _ensure_member_connection
 _mark_review_request_viewed = _mark_feedback_request_viewed
 
@@ -786,46 +754,16 @@ class ReviewRequestViewSet(viewsets.ModelViewSet):
         ).prefetch_related(
             'feedback_items', 'feedback_items__user', 'feedback_items__user__profile',
         )
-        session_id = str(self.request.query_params.get('session_id', '')).strip()
-        if session_id.isdigit():
-            qs = qs.filter(session_id=int(session_id))
-        role = str(self.request.query_params.get('role', '')).strip().lower()
-        if role == 'reviewer':
-            qs = qs.filter(reviewer=self.request.user)
-        elif role in {'student', 'owner'}:
-            qs = qs.filter(student=self.request.user)
-        status_filter = str(self.request.query_params.get('status', '')).strip().lower()
-        if status_filter:
-            qs = qs.filter(status=status_filter)
-        return qs
+        return filter_review_requests_for_role(
+            qs,
+            user=self.request.user,
+            role=self.request.query_params.get('role', ''),
+            session_id=self.request.query_params.get('session_id', ''),
+            status_filter=self.request.query_params.get('status', ''),
+        )
 
     def perform_create(self, serializer):
-        with transaction.atomic():
-            review_request = serializer.save(
-                student=self.request.user,
-                created_by=self.request.user,
-            )
-            if review_request.parent_request_id:
-                parent_request = review_request.parent_request
-                parent_request.status = ReviewRequest.STATUS_RESUBMITTED
-                parent_request.resubmitted_at = timezone.now()
-                parent_request.save(update_fields=['status', 'resubmitted_at', 'updated_at'])
-            _ensure_reviewer_roster_membership(
-                reviewer=review_request.reviewer,
-                student=review_request.student,
-                created_by=self.request.user,
-            )
-            expires_at = timezone.now() + timedelta(days=7)
-            link = ReviewLink.objects.create(
-                session=review_request.session,
-                token=secrets.token_urlsafe(16),
-                created_by=self.request.user,
-                expires_at=expires_at,
-                is_active=True,
-                allow_video_feedback=True,
-            )
-            review_request.review_link = link
-            review_request.save(update_fields=['review_link', 'updated_at'])
+        create_review_request_service(serializer=serializer, actor=self.request.user)
 
     def partial_update(self, request, *args, **kwargs):
         review_request = self.get_object()
@@ -834,23 +772,11 @@ class ReviewRequestViewSet(viewsets.ModelViewSet):
 
         allowed_fields = {'goal', 'exercise_or_song', 'notes', 'deadline', 'requested_turnaround_hours', 'student_level'}
         if 'status' in request.data:
-            next_status = str(request.data.get('status', '')).strip().lower()
-            if request.user.id == review_request.student_id and next_status == ReviewRequest.STATUS_RESUBMITTED:
-                review_request.status = ReviewRequest.STATUS_RESUBMITTED
-                review_request.resubmitted_at = timezone.now()
-                review_request.save(update_fields=['status', 'resubmitted_at', 'updated_at'])
-            elif request.user.id in {review_request.student_id, review_request.reviewer_id} and next_status == ReviewRequest.STATUS_CLOSED:
-                review_request.status = ReviewRequest.STATUS_CLOSED
-                review_request.closed_at = timezone.now()
-                review_request.save(update_fields=['status', 'closed_at', 'updated_at'])
-            elif request.user.id == review_request.student_id and next_status == ReviewRequest.STATUS_REVOKED:
-                review_request.status = ReviewRequest.STATUS_REVOKED
-                review_request.closed_at = timezone.now()
-                if review_request.review_link_id:
-                    ReviewLink.objects.filter(pk=review_request.review_link_id).update(is_active=False)
-                review_request.save(update_fields=['status', 'closed_at', 'updated_at'])
-            else:
-                raise PermissionDenied('This status transition is not allowed.')
+            transition_review_request_status_service(
+                review_request=review_request,
+                actor=request.user,
+                next_status=request.data.get('status', ''),
+            )
 
         partial_payload = {key: value for key, value in request.data.items() if key in allowed_fields}
         if partial_payload:
@@ -863,17 +789,7 @@ class ReviewRequestViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='mark-viewed')
     def mark_viewed(self, request, pk=None):
         review_request = self.get_object()
-        if request.user.id not in {review_request.student_id, review_request.reviewer_id} and not request.user.is_staff:
-            raise PermissionDenied('You do not have access to this review request.')
-        if request.user.id == review_request.student_id:
-            review_request.status = ReviewRequest.STATUS_VIEWED
-            review_request.viewed_at = timezone.now()
-            review_request.save(update_fields=['status', 'viewed_at', 'updated_at'])
-        SessionLastSeen.objects.update_or_create(
-            user=request.user,
-            session=review_request.session,
-            defaults={},
-        )
+        mark_review_request_viewed_service(review_request=review_request, actor=request.user)
         return Response(self.get_serializer(review_request).data)
 
 
