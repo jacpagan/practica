@@ -23,6 +23,7 @@ const requestStatusLabel = (value = '') => {
 
 function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, reviewRequests = [], token = '', onBack, onOpenSession, onCreateVideo }) {
   const [editing, setEditing] = useState(null)
+  const [renamingThread, setRenamingThread] = useState('')
   const [saving, setSaving] = useState(false)
   const toast = useToast()
   const threadOptions = useMemo(() => Array.from(new Set(sessions.map(s => String(s.practice_series || '').trim()).filter(Boolean))).sort(), [sessions])
@@ -202,6 +203,9 @@ function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, r
                   <p className="text-sm font-semibold text-gray-900">Thread timeline</p>
                   <p className="text-xs text-gray-500 mt-1">Oldest to newest.</p>
                 </div>
+                <button type="button" onClick={() => setRenamingThread(seriesName)} className="text-xs text-gray-600 hover:text-gray-900">
+                  Rename thread
+                </button>
               </div>
               <div className="space-y-3">
                 {seriesSessions.map((session) => (
@@ -238,6 +242,31 @@ function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, r
                   } catch (e) { toast.error(e?.message || 'Could not update thread') }
                   setSaving(false)
                   setEditing(null)
+                }}
+              />
+              <ThreadPickerModal
+                open={Boolean(renamingThread)}
+                title="Rename thread"
+                initialValue={renamingThread || ''}
+                options={threadOptions}
+                saving={saving}
+                onClose={() => setRenamingThread('')}
+                onSave={async (val) => {
+                  if (!renamingThread || !token) return
+                  setSaving(true)
+                  try {
+                    const res = await fetch('/api/sessions/threads/rename/', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Token ${token}` } : {}) },
+                      body: JSON.stringify({ old_practice_series: renamingThread, new_practice_series: val }),
+                    })
+                    const data = await res.json().catch(() => ({}))
+                    if (!res.ok) throw new Error(data?.error || 'Could not rename thread')
+                    try { window.dispatchEvent(new CustomEvent('practica:thread-renamed', { detail: { oldSeriesName: renamingThread, newSeriesName: val } })) } catch {}
+                    toast.success(data?.affected_count === 1 ? 'Renamed thread on 1 take' : `Renamed thread on ${data?.affected_count || 0} takes`)
+                  } catch (e) { toast.error(e?.message || 'Could not rename thread') }
+                  setSaving(false)
+                  setRenamingThread('')
                 }}
               />
             </div>

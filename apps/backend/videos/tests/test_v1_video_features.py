@@ -53,6 +53,45 @@ class V1VideoFeaturesTests(APITestCase):
         self.assertFalse(feedback.is_legacy_text_feedback)
         self.assertTrue(bool(feedback.feedback_video))
 
+    def test_rename_thread_updates_all_owner_sessions_in_thread(self):
+        first = self._create_session(user=self.owner, title='One')
+        second = self._create_session(user=self.owner, title='Two')
+        outsider = self._create_session(user=self.viewer, title='Other')
+        first.practice_series = 'Groove Lab'
+        second.practice_series = 'Groove Lab'
+        outsider.practice_series = 'Groove Lab'
+        first.save(update_fields=['practice_series'])
+        second.save(update_fields=['practice_series'])
+        outsider.save(update_fields=['practice_series'])
+
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.post(
+            '/api/sessions/threads/rename/',
+            {'old_practice_series': 'Groove Lab', 'new_practice_series': 'Pocket Lab'},
+            format='json',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['affected_count'], 2)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        outsider.refresh_from_db()
+        self.assertEqual(first.practice_series, 'Pocket Lab')
+        self.assertEqual(second.practice_series, 'Pocket Lab')
+        self.assertEqual(outsider.practice_series, 'Groove Lab')
+
+    def test_rename_thread_requires_nonempty_names(self):
+        self.client.force_authenticate(user=self.owner)
+
+        res = self.client.post(
+            '/api/sessions/threads/rename/',
+            {'old_practice_series': '', 'new_practice_series': 'Pocket Lab'},
+            format='json',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('current thread name is required', res.data['error'].lower())
+
     def test_video_feedback_accepts_android_3gpp_with_generic_content_type(self):
         session = self._create_session(user=self.owner)
         self.client.force_authenticate(user=self.owner)

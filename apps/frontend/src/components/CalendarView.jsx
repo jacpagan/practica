@@ -30,6 +30,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
   const [selectedDateKey, setSelectedDateKey] = useState(initialSelected)
   const [showDayModal, setShowDayModal] = useState(false)
   const [editing, setEditing] = useState(null)
+  const [renamingThread, setRenamingThread] = useState('')
   const [saving, setSaving] = useState(false)
   const threadOptions = useMemo(() => Array.from(new Set(sessions.map(s => String(s.practice_series || '').trim()).filter(Boolean))).sort(), [sessions])
   const { token } = useAuth()
@@ -215,13 +216,22 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-xs uppercase tracking-wide text-gray-500">{group.seriesName}</p>
                           {group.seriesName !== '(no thread)' && (
-                            <button
-                              type="button"
-                              onClick={() => onOpenSeries?.(group.seriesName)}
-                              className="text-xs text-gray-600 hover:text-gray-900"
-                            >
-                              Open thread
-                            </button>
+                            <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={() => onOpenSeries?.(group.seriesName)}
+                                className="text-xs text-gray-600 hover:text-gray-900"
+                              >
+                                Open thread
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setRenamingThread(group.seriesName)}
+                                className="text-xs text-gray-600 hover:text-gray-900"
+                              >
+                                Rename thread
+                              </button>
+                            </div>
                           )}
                         </div>
                         <div className="space-y-2">
@@ -260,6 +270,33 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
             } catch (e) { toast.error(e?.message || 'Could not update thread') }
             setSaving(false)
             setEditing(null)
+          }}
+        />
+        <ThreadPickerModal
+          open={Boolean(renamingThread)}
+          title="Rename thread"
+          initialValue={renamingThread || ''}
+          options={threadOptions}
+          saving={saving}
+          onClose={() => setRenamingThread('')}
+          onSave={async (val) => {
+            if (!renamingThread || !token) return
+            setSaving(true)
+            try {
+              const res = await fetch('/api/sessions/threads/rename/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Token ${token}` },
+                body: JSON.stringify({ old_practice_series: renamingThread, new_practice_series: val }),
+              })
+              const data = await res.json().catch(() => ({}))
+              if (!res.ok) throw new Error(data?.error || 'Could not rename thread')
+              try { window.dispatchEvent(new CustomEvent('practica:thread-renamed', { detail: { oldSeriesName: renamingThread, newSeriesName: val } })) } catch {}
+              toast.success(data?.affected_count === 1 ? 'Renamed thread on 1 take' : `Renamed thread on ${data?.affected_count || 0} takes`)
+            } catch (e) {
+              toast.error(e?.message || 'Could not rename thread')
+            }
+            setSaving(false)
+            setRenamingThread('')
           }}
         />
       </div>

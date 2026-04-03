@@ -108,6 +108,29 @@ class SessionViewSet(SessionMediaActionsMixin, viewsets.ModelViewSet):
             raise PermissionDenied("You can only delete your own sessions.")
         instance.delete()
 
+    @action(detail=False, methods=['post'], url_path='threads/rename')
+    def rename_thread(self, request):
+        old_name = str(request.data.get('old_practice_series', '') or '').strip()
+        new_name = str(request.data.get('new_practice_series', '') or '').strip()
+
+        if not old_name:
+            return Response({'error': 'Current thread name is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not new_name:
+            return Response({'error': 'New thread name is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if old_name == new_name:
+            return Response({'old_practice_series': old_name, 'new_practice_series': new_name, 'affected_count': 0}, status=status.HTTP_200_OK)
+
+        affected_count = Session.objects.filter(user=request.user, practice_series=old_name).update(practice_series=new_name)
+
+        return Response(
+            {
+                'old_practice_series': old_name,
+                'new_practice_series': new_name,
+                'affected_count': affected_count,
+            },
+            status=status.HTTP_200_OK,
+        )
+
     @action(detail=True, methods=['post', 'delete'], url_path='share')
     def create_share_link(self, request, pk=None):
         session = self.get_object()
