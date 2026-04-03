@@ -13,10 +13,10 @@ from videos.models import FeedbackTemplate, Profile, ReviewRequest, ReviewerRost
 class FeedbackRequestApiTests(APITestCase):
     def setUp(self):
         self.student = User.objects.create_user(username='student-user', password='pass1234')
-        self.teacher = User.objects.create_user(username='teacher-user', password='pass1234')
+        self.reviewer = User.objects.create_user(username='reviewer-user', password='pass1234')
         self.outsider = User.objects.create_user(username='outsider-user', password='pass1234')
         Profile.objects.create(user=self.student, display_name='Student Musician')
-        Profile.objects.create(user=self.teacher, display_name='Drum Reviewer')
+        Profile.objects.create(user=self.reviewer, display_name='Drum Reviewer')
         Profile.objects.create(user=self.outsider, display_name='Random Reviewer')
         self.session = Session.objects.create(
             user=self.student,
@@ -40,7 +40,7 @@ class FeedbackRequestApiTests(APITestCase):
             '/api/review-requests/',
             {
                 'session_id': self.session.id,
-                'reviewer_id': self.teacher.id,
+                'reviewer_id': self.reviewer.id,
                 'instrument': 'drums',
                 'student_level': 'intermediate',
                 'goal': 'Improve ghost-note consistency',
@@ -58,13 +58,13 @@ class FeedbackRequestApiTests(APITestCase):
         review_request = self._create_review_request()
 
         self.assertEqual(review_request.student, self.student)
-        self.assertEqual(review_request.reviewer, self.teacher)
+        self.assertEqual(review_request.reviewer, self.reviewer)
         self.assertEqual(review_request.status, ReviewRequest.STATUS_REQUESTED)
         self.assertEqual(review_request.instrument, 'drums')
         self.assertTrue(bool(review_request.review_link))
         self.assertTrue(
             ReviewerRosterMembership.objects.filter(
-                reviewer=self.teacher,
+                reviewer=self.reviewer,
                 student=self.student,
                 is_active=True,
             ).exists()
@@ -73,7 +73,7 @@ class FeedbackRequestApiTests(APITestCase):
     def test_feedback_inbox_lists_assigned_feedback_requests(self):
         review_request = self._create_review_request()
 
-        self._auth(self.teacher)
+        self._auth(self.reviewer)
         response = self.client.get('/api/inbox/')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -110,7 +110,7 @@ class FeedbackRequestApiTests(APITestCase):
     def test_reviewer_open_and_reply_updates_feedback_request_status(self):
         review_request = self._create_review_request()
 
-        self._auth(self.teacher)
+        self._auth(self.reviewer)
         open_response = self.client.get(f'/api/review/{review_request.review_link.token}/')
         self.assertEqual(open_response.status_code, status.HTTP_200_OK)
         review_request.refresh_from_db()
@@ -132,7 +132,7 @@ class FeedbackRequestApiTests(APITestCase):
         review_request.refresh_from_db()
         self.assertEqual(review_request.status, ReviewRequest.STATUS_RESPONDED)
         self.assertIsNotNone(review_request.responded_at)
-        feedback = VideoFeedback.objects.get(session=self.session, user=self.teacher)
+        feedback = VideoFeedback.objects.get(session=self.session, user=self.reviewer)
         self.assertEqual(feedback.feedback_category, 'technique')
         self.assertEqual(feedback.timestamp_seconds, 42)
         self.assertEqual(feedback.review_request, review_request)
@@ -170,7 +170,7 @@ class FeedbackRequestApiTests(APITestCase):
     def test_member_connections_include_owner_request_counts(self):
         self._create_review_request()
 
-        self._auth(self.teacher)
+        self._auth(self.reviewer)
         response = self.client.get('/api/connections/')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -182,7 +182,7 @@ class FeedbackRequestApiTests(APITestCase):
     def test_reviewer_roster_alias_matches_member_connections(self):
         self._create_review_request()
 
-        self._auth(self.teacher)
+        self._auth(self.reviewer)
         response = self.client.get('/api/reviewer/roster/')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -194,7 +194,7 @@ class FeedbackRequestApiTests(APITestCase):
         another_request = ReviewRequest.objects.create(
             session=self.session,
             student=self.student,
-            reviewer=self.teacher,
+            reviewer=self.reviewer,
             created_by=self.student,
             instrument='drums',
             goal='Second thread',
@@ -203,7 +203,7 @@ class FeedbackRequestApiTests(APITestCase):
         VideoFeedback.objects.create(
             session=self.session,
             review_request=review_request,
-            user=self.teacher,
+            user=self.reviewer,
             text='Feedback for request one',
             timestamp_seconds=12,
             feedback_video=self._video_file('one.mp4'),
@@ -212,14 +212,14 @@ class FeedbackRequestApiTests(APITestCase):
         VideoFeedback.objects.create(
             session=self.session,
             review_request=another_request,
-            user=self.teacher,
+            user=self.reviewer,
             text='Feedback for request two',
             timestamp_seconds=34,
             feedback_video=self._video_file('two.mp4'),
             is_legacy_text_feedback=False,
         )
 
-        self._auth(self.teacher)
+        self._auth(self.reviewer)
         response = self.client.get(f'/api/review/{review_request.review_link.token}/feedback/')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -228,7 +228,7 @@ class FeedbackRequestApiTests(APITestCase):
         self.assertEqual(response.data[0]['review_request_id'], review_request.id)
 
     def test_reviewer_can_manage_feedback_templates(self):
-        self._auth(self.teacher)
+        self._auth(self.reviewer)
 
         create_response = self.client.post(
             '/api/feedback-templates/',
@@ -265,7 +265,7 @@ class FeedbackRequestApiTests(APITestCase):
         VideoFeedback.objects.create(
             session=self.session,
             review_request=review_request,
-            user=self.teacher,
+            user=self.reviewer,
             feedback_category='timing',
             text='Focus on kick-snare balance.',
             timestamp_seconds=18,
@@ -299,7 +299,7 @@ class FeedbackRequestApiTests(APITestCase):
             '/api/review-requests/',
             {
                 'session_id': new_session.id,
-                'reviewer_id': self.teacher.id,
+                'reviewer_id': self.reviewer.id,
                 'parent_request_id': parent_request.id,
                 'instrument': 'drums',
                 'student_level': 'intermediate',
@@ -318,8 +318,8 @@ class FeedbackRequestApiTests(APITestCase):
 
     def test_follow_up_feedback_request_requires_same_reviewer(self):
         parent_request = self._create_review_request()
-        another_teacher = User.objects.create_user(username='other-teacher', password='pass1234')
-        Profile.objects.create(user=another_teacher, display_name='Other Teacher')
+        another_reviewer = User.objects.create_user(username='other-reviewer', password='pass1234')
+        Profile.objects.create(user=another_reviewer, display_name='Other Reviewer')
         new_session = Session.objects.create(
             user=self.student,
             title='Follow-up mismatch',
@@ -334,7 +334,7 @@ class FeedbackRequestApiTests(APITestCase):
             '/api/review-requests/',
             {
                 'session_id': new_session.id,
-                'reviewer_id': another_teacher.id,
+                'reviewer_id': another_reviewer.id,
                 'parent_request_id': parent_request.id,
                 'instrument': 'drums',
                 'goal': 'Wrong reviewer follow-up',
@@ -358,7 +358,7 @@ class FeedbackRequestApiTests(APITestCase):
         follow_up_request = ReviewRequest.objects.create(
             session=follow_up_session,
             student=self.student,
-            reviewer=self.teacher,
+            reviewer=self.reviewer,
             created_by=self.student,
             parent_request=review_request,
             instrument='drums',
@@ -368,7 +368,7 @@ class FeedbackRequestApiTests(APITestCase):
         VideoFeedback.objects.create(
             session=self.session,
             review_request=review_request,
-            user=self.teacher,
+            user=self.reviewer,
             feedback_category='timing',
             text='Timing note one',
             feedback_video=self._video_file('timing.mp4'),
@@ -377,14 +377,14 @@ class FeedbackRequestApiTests(APITestCase):
         VideoFeedback.objects.create(
             session=follow_up_session,
             review_request=follow_up_request,
-            user=self.teacher,
+            user=self.reviewer,
             feedback_category='groove',
             text='Groove note one',
             feedback_video=self._video_file('groove.mp4'),
             is_legacy_text_feedback=False,
         )
 
-        self._auth(self.teacher)
+        self._auth(self.reviewer)
         response = self.client.get('/api/feedback-insights/')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
