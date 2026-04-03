@@ -1,12 +1,10 @@
 import secrets
-import uuid
-import math
 import logging
 import os
 from datetime import timedelta
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse, HttpResponse
-from django.db import connection, transaction
+from django.db import connection
 from django.db.models import Q
 from django.utils import timezone
 from django.conf import settings
@@ -21,12 +19,10 @@ from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
-import boto3
-from botocore.exceptions import BotoCoreError, ClientError
 
 from .models import (
     Session, Chapter, VideoFeedback, SessionLastSeen, Exercise,
-    Tag, MultipartSessionUpload, SessionAsset,
+    Tag, SessionAsset,
     ReviewLink,
     SignupInviteCode,
 )
@@ -37,14 +33,14 @@ from .serializers import (
     ReviewLinkSerializer, ReviewVideoFeedbackSerializer,
     SignupInviteCodeSerializer,
 )
+from .media.api import SessionMediaActionsMixin
 from .services.media_pipeline import (
-    apply_processing_update,
-    enqueue_local_session_transcode,
-    enqueue_session_processing,
     local_transcode_enabled,
     media_pipeline_enabled,
-    sync_mediaconvert_session,
 )
+from .media.security import processing_callback_authorized
+from .media.services import maybe_refresh_session_processing, normalized_client_upload_id, start_processing_pipeline
+from .media.uploads import attach_tags_to_session, parse_tag_names
 from .services.feedback_video_processing import prepare_feedback_video_upload
 from .video_uploads import is_allowed_video_upload
 
@@ -77,80 +73,6 @@ def can_edit_session(user, session):
     return user.is_staff or session.user_id == user.id
 
 
-def _direct_uploads_enabled():
-    return bool(getattr(settings, 'AWS_STORAGE_BUCKET_NAME', ''))
-
-
-def _s3_client():
-    return boto3.client(
-        's3',
-        region_name=getattr(settings, 'AWS_S3_REGION_NAME', None),
-    )
-
-
-def _recommended_part_size(size_bytes):
-    min_part_size = 5 * 1024 * 1024
-    max_parts = 10000
-    part_size = max(min_part_size, math.ceil(size_bytes / max_parts))
-    part_size_mb = math.ceil(part_size / (1024 * 1024))
-    return part_size_mb * 1024 * 1024
-
-
-def _sanitize_filename(name):
-    safe = (name or 'session-video.mp4').strip().replace('\\', '/').split('/')[-1]
-    return safe or 'session-video.mp4'
-
-
-def _opaque_video_storage_key(*, user_id, filename, prefix='sessions'):
-    safe_name = _sanitize_filename(filename)
-    extension = ''
-    if '.' in safe_name:
-        extension = f".{safe_name.rsplit('.', 1)[-1].lower()}"
-    return f"{prefix}/{user_id}/{uuid.uuid4().hex}{extension}"
-
-
-def _list_uploaded_parts(upload, client=None):
-    client = client or _s3_client()
-    parts = []
-    marker = None
-    while True:
-        params = {
-            'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
-            'Key': upload.s3_key,
-            'UploadId': upload.s3_upload_id,
-            'MaxParts': 1000,
-        }
-        if marker:
-            params['PartNumberMarker'] = marker
-        resp = client.list_parts(**params)
-        for part in resp.get('Parts', []):
-            parts.append({
-                'part_number': part.get('PartNumber'),
-                'etag': str(part.get('ETag', '')).strip(),
-                'size': part.get('Size'),
-            })
-        if not resp.get('IsTruncated'):
-            break
-        marker = resp.get('NextPartNumberMarker')
-        if not marker:
-            break
-    return parts
-
-
-def _parse_tag_names(raw_tags):
-    if isinstance(raw_tags, str):
-        return [t.strip() for t in raw_tags.split(',') if t.strip()]
-    if isinstance(raw_tags, list):
-        return [str(t).strip() for t in raw_tags if str(t).strip()]
-    return []
-
-
-def _attach_tags_to_session(session, raw_tags):
-    for name in _parse_tag_names(raw_tags):
-        tag, _ = Tag.objects.get_or_create(name__iexact=name, defaults={'name': name})
-        session.tags.add(tag)
-
-
 def _can_view_session(user, session):
     if not user.is_authenticated:
         return False
@@ -162,56 +84,19 @@ def _can_modify_session(user, session):
 
 
 def _start_processing_pipeline(session):
-    session.processing_status = Session.STATUS_PROCESSING
-    session.processing_job_id = ''
-    session.processing_error = ''
-    session.save(update_fields=['processing_status', 'processing_job_id', 'processing_error', 'updated_at'])
-
-    queued, error, job_id = enqueue_session_processing(session)
-    if queued:
-        session.processing_job_id = job_id
-        session.save(update_fields=['processing_job_id', 'updated_at'])
-        return
-
-    # Fallback when managed transcoding is unavailable.
-    if 'not configured' in error.lower():
-        queued_local, local_error = enqueue_local_session_transcode(session)
-        if queued_local:
-            return
-        session.processing_status = Session.STATUS_FAILED
-        session.processing_error = (
-            'Upload finished, but browser playback needs transcoding and playback conversion is unavailable. '
-            f'Local transcoding is unavailable: {local_error or "ffmpeg missing"}. '
-            'Enable AWS MediaConvert or local ffmpeg so uploaded videos can be converted for browser playback.'
-        )
-    else:
-        session.processing_status = Session.STATUS_FAILED
-        session.processing_error = (error or 'Failed to enqueue media processing')[:2000]
-    session.processing_job_id = ''
-    session.save(update_fields=['processing_status', 'processing_job_id', 'processing_error', 'updated_at'])
+    return start_processing_pipeline(session)
 
 
 def _maybe_refresh_session_processing(session):
-    if not session:
-        return session
-    if session.processing_status != Session.STATUS_PROCESSING:
-        return session
-    if not getattr(session, 'processing_job_id', ''):
-        return session
-    return sync_mediaconvert_session(session)
+    return maybe_refresh_session_processing(session)
 
 
 def _processing_callback_authorized(request):
-    shared_token = (getattr(settings, 'MEDIA_PROCESSING_CALLBACK_TOKEN', '') or '').strip()
-    if shared_token:
-        provided = str(request.headers.get('X-Processing-Token', '')).strip()
-        return provided and secrets.compare_digest(provided, shared_token)
-    return bool(request.user.is_authenticated and request.user.is_staff)
+    return processing_callback_authorized(request)
 
 
 def _normalized_client_upload_id(raw_value):
-    value = str(raw_value or '').strip()
-    return value[:64]
+    return normalized_client_upload_id(raw_value)
 
 
 # ── Auth views ──────────────────────────────────────────────────────
@@ -339,7 +224,7 @@ def client_error_view(request):
 # ── Session views ───────────────────────────────────────────────────
 
 @method_decorator(csrf_exempt, name='dispatch')
-class SessionViewSet(viewsets.ModelViewSet):
+class SessionViewSet(SessionMediaActionsMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
@@ -393,7 +278,7 @@ class SessionViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         session = serializer.save(user=self.request.user)
-        _attach_tags_to_session(session, self.request.data.get('tags', ''))
+        attach_tags_to_session(session, self.request.data.get('tags', ''))
         _start_processing_pipeline(session)
 
     def perform_update(self, serializer):
@@ -459,295 +344,6 @@ class SessionViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(session)
         return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
 
-    @action(detail=False, methods=['post'], url_path='multipart/initiate')
-    def multipart_initiate(self, request):
-        if not _direct_uploads_enabled():
-            return Response({'error': 'Direct uploads are not configured'}, status=status.HTTP_400_BAD_REQUEST)
-
-        title = str(request.data.get('title', '')).strip()
-        if not title:
-            return Response({'error': 'Title is required'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            size_bytes = int(request.data.get('size_bytes', 0))
-        except (TypeError, ValueError):
-            return Response({'error': 'Invalid file size'}, status=status.HTTP_400_BAD_REQUEST)
-        if size_bytes <= 0:
-            return Response({'error': 'Invalid file size'}, status=status.HTTP_400_BAD_REQUEST)
-
-        max_bytes = int(getattr(settings, 'UPLOAD_MAX_BYTES', 2147483648))
-        if size_bytes > max_bytes:
-            return Response({'error': 'File exceeds max upload size (2GB)'}, status=status.HTTP_400_BAD_REQUEST)
-
-        content_type = str(request.data.get('content_type', '')).strip().lower()
-        if not is_allowed_video_upload(content_type, request.data.get('filename')):
-            return Response({'error': 'Only video files allowed'}, status=status.HTTP_400_BAD_REQUEST)
-
-        filename = _sanitize_filename(request.data.get('filename'))
-        key = _opaque_video_storage_key(user_id=request.user.id, filename=filename)
-        part_size = _recommended_part_size(size_bytes)
-        total_parts = math.ceil(size_bytes / part_size)
-
-        try:
-            raw_duration_seconds = request.data.get('duration_seconds', '')
-            if raw_duration_seconds is None or str(raw_duration_seconds).strip().lower() in {'', 'none', 'null'}:
-                duration_seconds = None
-            else:
-                duration_seconds = int(raw_duration_seconds)
-        except (TypeError, ValueError):
-            return Response({'error': 'Invalid duration'}, status=status.HTTP_400_BAD_REQUEST)
-
-        tags_csv = ','.join(_parse_tag_names(request.data.get('tags', [])))
-        expires_at = timezone.now() + timedelta(hours=24)
-
-        try:
-            create_kwargs = {
-                'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
-                'Key': key,
-            }
-            if content_type:
-                create_kwargs['ContentType'] = content_type
-            resp = _s3_client().create_multipart_upload(**create_kwargs)
-        except (BotoCoreError, ClientError):
-            return Response({'error': 'Could not start multipart upload'}, status=status.HTTP_502_BAD_GATEWAY)
-
-        upload = MultipartSessionUpload.objects.create(
-            user=request.user,
-            status=MultipartSessionUpload.STATUS_INITIATED,
-            title=title,
-            practice_series=str(request.data.get('practice_series', '')).strip(),
-            description=str(request.data.get('description', '')).strip(),
-            reference_title=str(request.data.get('reference_title', '')).strip(),
-            reference_url=str(request.data.get('reference_url', '')).strip(),
-            tags_csv=tags_csv,
-            duration_seconds=duration_seconds,
-            original_filename=filename,
-            content_type=content_type,
-            size_bytes=size_bytes,
-            s3_key=key,
-            s3_upload_id=resp['UploadId'],
-            expires_at=expires_at,
-        )
-
-        return Response({
-            'multipart_upload_id': upload.id,
-            'part_size': part_size,
-            'total_parts': total_parts,
-            'expires_at': upload.expires_at,
-        }, status=status.HTTP_201_CREATED)
-
-    @action(detail=False, methods=['post'], url_path='multipart/status')
-    def multipart_status(self, request):
-        if not _direct_uploads_enabled():
-            return Response({'error': 'Direct uploads are not configured'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            upload_id = int(request.data.get('multipart_upload_id'))
-        except (TypeError, ValueError):
-            return Response({'error': 'Invalid multipart upload'}, status=status.HTTP_400_BAD_REQUEST)
-
-        upload = get_object_or_404(MultipartSessionUpload, pk=upload_id, user=request.user)
-        if upload.status == MultipartSessionUpload.STATUS_INITIATED and upload.expires_at < timezone.now():
-            upload.status = MultipartSessionUpload.STATUS_EXPIRED
-            upload.save(update_fields=['status'])
-
-        part_size = _recommended_part_size(upload.size_bytes)
-        total_parts = math.ceil(upload.size_bytes / part_size)
-        uploaded_parts = []
-
-        if upload.status == MultipartSessionUpload.STATUS_INITIATED:
-            try:
-                uploaded_parts = _list_uploaded_parts(upload)
-            except ClientError as exc:
-                code = str(exc.response.get('Error', {}).get('Code', ''))
-                if code == 'NoSuchUpload':
-                    upload.status = MultipartSessionUpload.STATUS_EXPIRED
-                    upload.save(update_fields=['status'])
-                    return Response({'error': 'Upload session no longer exists'}, status=status.HTTP_410_GONE)
-                return Response({'error': 'Could not fetch multipart upload status'}, status=status.HTTP_502_BAD_GATEWAY)
-            except BotoCoreError:
-                return Response({'error': 'Could not fetch multipart upload status'}, status=status.HTTP_502_BAD_GATEWAY)
-
-        return Response({
-            'multipart_upload_id': upload.id,
-            'status': upload.status,
-            'expires_at': upload.expires_at,
-            'size_bytes': upload.size_bytes,
-            'part_size': part_size,
-            'total_parts': total_parts,
-            'uploaded_parts': uploaded_parts,
-        })
-
-    @action(detail=False, methods=['post'], url_path='multipart/sign-part')
-    def multipart_sign_part(self, request):
-        if not _direct_uploads_enabled():
-            return Response({'error': 'Direct uploads are not configured'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            upload_id = int(request.data.get('multipart_upload_id'))
-            part_number = int(request.data.get('part_number'))
-        except (TypeError, ValueError):
-            return Response({'error': 'Invalid multipart upload or part number'}, status=status.HTTP_400_BAD_REQUEST)
-        if part_number <= 0:
-            return Response({'error': 'Part number must be greater than 0'}, status=status.HTTP_400_BAD_REQUEST)
-
-        upload = get_object_or_404(MultipartSessionUpload, pk=upload_id, user=request.user)
-        if upload.status != MultipartSessionUpload.STATUS_INITIATED:
-            return Response({'error': 'Upload is not open'}, status=status.HTTP_400_BAD_REQUEST)
-        if upload.expires_at < timezone.now():
-            upload.status = MultipartSessionUpload.STATUS_EXPIRED
-            upload.save(update_fields=['status'])
-            return Response({'error': 'Upload has expired'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            signed_url = _s3_client().generate_presigned_url(
-                ClientMethod='upload_part',
-                Params={
-                    'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
-                    'Key': upload.s3_key,
-                    'UploadId': upload.s3_upload_id,
-                    'PartNumber': part_number,
-                },
-                ExpiresIn=3600,
-                HttpMethod='PUT',
-            )
-        except (BotoCoreError, ClientError):
-            return Response({'error': 'Could not sign upload part'}, status=status.HTTP_502_BAD_GATEWAY)
-
-        return Response({'signed_url': signed_url})
-
-    @action(detail=False, methods=['post'], url_path='multipart/complete')
-    def multipart_complete(self, request):
-        if not _direct_uploads_enabled():
-            return Response({'error': 'Direct uploads are not configured'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            upload_id = int(request.data.get('multipart_upload_id'))
-        except (TypeError, ValueError):
-            return Response({'error': 'Invalid multipart upload'}, status=status.HTTP_400_BAD_REQUEST)
-
-        raw_parts = request.data.get('parts', [])
-        if not isinstance(raw_parts, list) or not raw_parts:
-            return Response({'error': 'Parts are required'}, status=status.HTTP_400_BAD_REQUEST)
-
-        parts = []
-        for part in raw_parts:
-            if not isinstance(part, dict):
-                return Response({'error': 'Invalid part payload'}, status=status.HTTP_400_BAD_REQUEST)
-            try:
-                part_number = int(part.get('part_number'))
-            except (TypeError, ValueError):
-                return Response({'error': 'Invalid part number'}, status=status.HTTP_400_BAD_REQUEST)
-            etag = str(part.get('etag', '')).strip()
-            if part_number <= 0 or not etag:
-                return Response({'error': 'Each part needs part_number and etag'}, status=status.HTTP_400_BAD_REQUEST)
-            parts.append({'PartNumber': part_number, 'ETag': etag})
-
-        parts = sorted(parts, key=lambda p: p['PartNumber'])
-
-        with transaction.atomic():
-            upload = get_object_or_404(
-                MultipartSessionUpload.objects.select_for_update(),
-                pk=upload_id,
-                user=request.user,
-            )
-            if upload.status != MultipartSessionUpload.STATUS_INITIATED:
-                return Response({'error': 'Upload is not open'}, status=status.HTTP_400_BAD_REQUEST)
-            if upload.expires_at < timezone.now():
-                upload.status = MultipartSessionUpload.STATUS_EXPIRED
-                upload.save(update_fields=['status'])
-                return Response({'error': 'Upload has expired'}, status=status.HTTP_400_BAD_REQUEST)
-
-            try:
-                _s3_client().complete_multipart_upload(
-                    Bucket=settings.AWS_STORAGE_BUCKET_NAME,
-                    Key=upload.s3_key,
-                    UploadId=upload.s3_upload_id,
-                    MultipartUpload={'Parts': parts},
-                )
-            except (BotoCoreError, ClientError):
-                return Response({'error': 'Could not finalize multipart upload'}, status=status.HTTP_502_BAD_GATEWAY)
-
-            session = Session.objects.create(
-                user=request.user,
-                title=upload.title,
-                practice_series=upload.practice_series,
-                description=upload.description,
-                reference_title=upload.reference_title,
-                reference_url=upload.reference_url,
-                video_file=upload.s3_key,
-                duration_seconds=upload.duration_seconds,
-            )
-            _attach_tags_to_session(session, upload.tags_csv)
-
-            upload.status = MultipartSessionUpload.STATUS_COMPLETED
-            upload.completed_at = timezone.now()
-            upload.session = session
-            upload.save(update_fields=['status', 'completed_at', 'session'])
-
-        _start_processing_pipeline(session)
-
-        serializer = SessionSerializer(session, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-    @action(detail=False, methods=['post'], url_path='multipart/abort')
-    def multipart_abort(self, request):
-        if not _direct_uploads_enabled():
-            return Response({'error': 'Direct uploads are not configured'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            upload_id = int(request.data.get('multipart_upload_id'))
-        except (TypeError, ValueError):
-            return Response({'error': 'Invalid multipart upload'}, status=status.HTTP_400_BAD_REQUEST)
-
-        upload = get_object_or_404(MultipartSessionUpload, pk=upload_id, user=request.user)
-        if upload.status != MultipartSessionUpload.STATUS_INITIATED:
-            return Response({'status': upload.status})
-
-        try:
-            _s3_client().abort_multipart_upload(
-                Bucket=settings.AWS_STORAGE_BUCKET_NAME,
-                Key=upload.s3_key,
-                UploadId=upload.s3_upload_id,
-            )
-        except (BotoCoreError, ClientError):
-            # Treat as best effort; upload can still be marked aborted locally.
-            pass
-
-        upload.status = MultipartSessionUpload.STATUS_ABORTED
-        upload.save(update_fields=['status'])
-        return Response({'status': 'aborted'})
-
-    @action(detail=True, methods=['post'], url_path='processing-update', permission_classes=[AllowAny])
-    def processing_update(self, request, pk=None):
-        if not _processing_callback_authorized(request):
-            return Response({'error': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
-
-        session = get_object_or_404(Session, pk=pk)
-        next_status = str(request.data.get('status', '')).strip().lower()
-        processing_error = str(request.data.get('processing_error', '')).strip()
-        assets = request.data.get('assets', [])
-        if not isinstance(assets, list):
-            return Response({'error': 'assets must be a list'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            apply_processing_update(
-                session=session,
-                status=next_status,
-                error=processing_error,
-                assets=assets,
-            )
-            if next_status in {Session.STATUS_READY, Session.STATUS_FAILED}:
-                session.processing_job_id = ''
-                session.save(update_fields=['processing_job_id', 'updated_at'])
-        except ValueError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception:
-            logger.exception('Failed processing update for session_id=%s', session.id)
-            return Response({'error': 'Could not apply processing update'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        return Response(SessionSerializer(session, context={'request': request}).data)
-
     @action(detail=True, methods=['post'])
     def set_tags(self, request, pk=None):
         session = self.get_object()
@@ -755,7 +351,7 @@ class SessionViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
         tag_names = request.data.get('tags', [])
         if isinstance(tag_names, str):
-            tag_names = [t.strip() for t in tag_names.split(',') if t.strip()]
+            tag_names = parse_tag_names(tag_names)
         session.tags.clear()
         for name in tag_names:
             tag, _ = Tag.objects.get_or_create(name__iexact=name, defaults={'name': name})
