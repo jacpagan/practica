@@ -9,6 +9,10 @@ const STATES = {
   RECORDED: 'recorded',
 }
 
+const MIN_BPM = 40
+const MAX_BPM = 240
+const BPM_PRESETS = [60, 72, 84, 96, 108, 120, 132, 144, 152, 160, 172, 184, 192, 200]
+
 const METRONOME_SYNC_KEY = 'practica.metronome.syncOffsetMs.v1'
 
 const readSyncOffsetMs = () => {
@@ -18,6 +22,12 @@ const readSyncOffsetMs = () => {
     if (Number.isFinite(parsed)) return Math.max(-120, Math.min(180, parsed))
   } catch {}
   return 0
+}
+
+const clampBpm = (value) => {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 80
+  return Math.max(MIN_BPM, Math.min(MAX_BPM, Math.round(parsed)))
 }
 
 function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop = true, minAutoUseSeconds = 2, autoOpenOnMount = false }) {
@@ -36,6 +46,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   const [micGain, setMicGain] = useState(1)
   const [micLevel, setMicLevel] = useState(0)
   const [countInRemaining, setCountInRemaining] = useState(null)
+  const [bpmInput, setBpmInput] = useState('80')
 
   const liveRef = useRef(null)
   const playbackRef = useRef(null)
@@ -66,6 +77,18 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   const videoContainerRef = useRef(null)
   const draggingRef = useRef(null) // {type: 'move'|'resize', startX, startY, start}
   const isCaptureMode = state === STATES.PREVIEWING || state === STATES.RECORDING || state === STATES.RECORDED
+
+  useEffect(() => {
+    setBpmInput(String(bpm))
+  }, [bpm])
+
+  const updateBpm = useCallback((nextValue) => {
+    setBpm(clampBpm(nextValue))
+  }, [])
+
+  const nudgeBpm = useCallback((delta) => {
+    setBpm((current) => clampBpm(current + delta))
+  }, [])
 
   const metronomeRecordDelaySeconds = useCallback(() => {
     const ctx = audioContextRef.current
@@ -766,28 +789,102 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
             {showTimingTools ? (
               <div className="space-y-3">
                 <div className="rounded-2xl bg-white/5 px-3 py-3 flex items-center gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[11px] uppercase tracking-wide text-white/60">Tempo</p>
-                    <p className="text-sm font-medium text-white">{bpm} BPM</p>
+                  <div className="w-full space-y-3">
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div className="min-w-0">
+                        <p className="text-[11px] uppercase tracking-wide text-white/60">Tempo</p>
+                        <p className="text-sm font-medium text-white">Dial in the click precisely on phone.</p>
+                      </div>
+                      <select
+                        value={beatsPerBar}
+                        onChange={(e) => setBeatsPerBar(Number(e.target.value))}
+                        className="bg-white/10 text-white text-sm rounded-lg px-2 py-2 border border-white/10"
+                      >
+                        {[2, 3, 4, 6].map((beats) => (
+                          <option key={beats} value={beats} className="text-gray-900">{beats}/4</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-black/10 px-3 py-3 space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => nudgeBpm(-5)}
+                          className="rounded-xl px-3 py-2 text-sm bg-white/10 text-white/80 hover:bg-white/20 transition-colors"
+                        >
+                          -5
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => nudgeBpm(-1)}
+                          className="rounded-xl px-3 py-2 text-sm bg-white/10 text-white/80 hover:bg-white/20 transition-colors"
+                        >
+                          -1
+                        </button>
+                        <div className="flex-1 min-w-[128px] text-center">
+                          <label className="block text-[11px] uppercase tracking-wide text-white/50">BPM</label>
+                          <input
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={bpmInput}
+                            onChange={(e) => setBpmInput(e.target.value.replace(/[^0-9]/g, '').slice(0, 3))}
+                            onBlur={() => updateBpm(bpmInput || bpm)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                updateBpm(bpmInput || bpm)
+                              }
+                            }}
+                            className="mt-1 w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-center text-xl font-semibold text-white focus:outline-none focus:border-white/30"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => nudgeBpm(1)}
+                          className="rounded-xl px-3 py-2 text-sm bg-white/10 text-white/80 hover:bg-white/20 transition-colors"
+                        >
+                          +1
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => nudgeBpm(5)}
+                          className="rounded-xl px-3 py-2 text-sm bg-white/10 text-white/80 hover:bg-white/20 transition-colors"
+                        >
+                          +5
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {BPM_PRESETS.map((preset) => (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => updateBpm(preset)}
+                            className={`rounded-full px-3 py-1.5 text-xs transition-colors ${bpm === preset ? 'bg-white text-gray-900' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
+                          >
+                            {preset}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[11px] text-white/50">
+                          <span>Fine tune</span>
+                          <span>{bpm} BPM</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={String(MIN_BPM)}
+                          max={String(MAX_BPM)}
+                          step="1"
+                          value={bpm}
+                          onChange={(e) => updateBpm(e.target.value)}
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <input
-                    type="range"
-                    min="40"
-                    max="240"
-                    step="1"
-                    value={bpm}
-                    onChange={(e) => setBpm(Number(e.target.value))}
-                    className="flex-1"
-                  />
-                  <select
-                    value={beatsPerBar}
-                    onChange={(e) => setBeatsPerBar(Number(e.target.value))}
-                    className="bg-white/10 text-white text-sm rounded-lg px-2 py-2 border border-white/10"
-                  >
-                    {[2, 3, 4, 6].map((beats) => (
-                      <option key={beats} value={beats} className="text-gray-900">{beats}/4</option>
-                    ))}
-                  </select>
                 </div>
 
                 <div className="rounded-2xl bg-white/5 px-3 py-3 flex items-center justify-between gap-3">
