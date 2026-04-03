@@ -12,7 +12,9 @@ export default function RecorderPage({ onCancel, onComplete }) {
   const [title, setTitle] = useState('')
   const [isUploading, setIsUploading] = useState(false)
   const [progress, setProgress] = useState(null)
+  const [saveError, setSaveError] = useState('')
   const ownedPreviewUrlRef = useRef('')
+  const shouldAutoSaveRef = useRef(false)
 
   useEffect(() => () => {
     if (ownedPreviewUrlRef.current) {
@@ -30,6 +32,8 @@ export default function RecorderPage({ onCancel, onComplete }) {
   const handleRecorded = (nextFile) => {
     setFile(nextFile)
     setTitle(defaultTitle())
+    setSaveError('')
+    shouldAutoSaveRef.current = true
     if (ownedPreviewUrlRef.current) {
       try { URL.revokeObjectURL(ownedPreviewUrlRef.current) } catch {}
     }
@@ -37,10 +41,11 @@ export default function RecorderPage({ onCancel, onComplete }) {
     setPreviewUrl(ownedPreviewUrlRef.current)
   }
 
-  const handleSave = async () => {
+  const handleSave = async ({ auto = false } = {}) => {
     if (!file || !title.trim() || !token) return
     setIsUploading(true)
     setProgress(0)
+    setSaveError('')
     try {
       const res = await createSessionUpload({
         token,
@@ -49,19 +54,30 @@ export default function RecorderPage({ onCancel, onComplete }) {
         onProgress: (p) => setProgress(p),
       })
       if (!res.ok) {
-        toast.error(uploadErrorMessage(res))
+        const message = uploadErrorMessage(res)
+        setSaveError(message)
+        toast.error(message)
         setIsUploading(false)
         setProgress(null)
         return
       }
-      toast.success('Saved to your private library')
+      if (!auto) toast.success('Saved to your private library')
       try { onComplete?.(res.data) } catch {}
     } catch {
-      toast.error('Upload failed')
+      const message = 'Upload failed'
+      setSaveError(message)
+      toast.error(message)
     } finally {
       setIsUploading(false)
     }
   }
+
+  useEffect(() => {
+    if (!file || !title.trim() || !token) return
+    if (!shouldAutoSaveRef.current) return
+    shouldAutoSaveRef.current = false
+    handleSave({ auto: true })
+  }, [file, title, token])
 
   return (
     <div className="min-h-screen bg-white px-4 py-6 sm:px-6">
@@ -93,9 +109,10 @@ export default function RecorderPage({ onCancel, onComplete }) {
                 <input value={title} onChange={(e) => setTitle(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" />
               </div>
               <div className="flex items-center justify-between">
-                <button type="button" onClick={() => setFile(null)} className="text-sm text-gray-600 hover:text-gray-900">Re-record</button>
+                <button type="button" onClick={() => { shouldAutoSaveRef.current = false; setSaveError(''); setFile(null) }} className="text-sm text-gray-600 hover:text-gray-900">Re-record</button>
                 <button type="button" onClick={handleSave} disabled={isUploading || !title.trim()} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2 hover:bg-gray-800 disabled:opacity-50">{isUploading ? 'Saving…' : 'Save'}</button>
               </div>
+              {saveError ? <p className="text-sm text-red-600">{saveError}</p> : null}
               {isUploading ? (
                 <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
                   <div className="h-full bg-gray-900 transition-all" style={{ width: `${Math.max(5, progress || 0)}%` }} />
