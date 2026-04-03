@@ -436,6 +436,20 @@ const asApiError = (res) => {
   return err
 }
 
+const isRetriableApiResponse = (res) => {
+  const status = Number(res?.status || 0)
+  if (!status) return true
+  return status === 408 || status === 425 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504
+}
+
+const retryJsonPost = async ({ url, token, body, signal, maxAttempts = MAX_PART_RETRIES }) => {
+  return retry(async () => {
+    const res = await authedJsonPost({ url, token, body, signal })
+    if (!res.ok && isRetriableApiResponse(res)) throw asApiError(res)
+    return res
+  }, maxAttempts, signal)
+}
+
 const parseUploadedParts = (rawParts, totalParts) => {
   const partsByNumber = new Map()
   if (!Array.isArray(rawParts)) return partsByNumber
@@ -473,7 +487,7 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
 
     const resumeRecord = readResumeRecord(storageKey)
     if (resumeRecord?.upload_id && Number(resumeRecord?.size_bytes) === Number(videoFile.size)) {
-      const statusRes = await authedJsonPost({
+      const statusRes = await retryJsonPost({
         url: '/api/sessions/multipart/status/',
         token,
         body: { multipart_upload_id: resumeRecord.upload_id },
@@ -484,6 +498,10 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
         partSize = statusRes.data?.part_size
         totalParts = statusRes.data?.total_parts
         uploadedParts = statusRes.data?.uploaded_parts || []
+      } else if (statusRes.ok && statusRes.data?.status === 'completed' && statusRes.data?.session) {
+        clearResumeRecord(storageKey)
+        if (onProgress) onProgress(100, videoFile.size, videoFile.size)
+        return { ok: true, status: 200, data: statusRes.data.session, text: '' }
       } else if (statusRes.ok || [400, 404, 410].includes(statusRes.status)) {
         clearResumeRecord(storageKey)
       } else {
@@ -492,7 +510,7 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
     }
 
     if (!uploadId) {
-      const initRes = await authedJsonPost({
+      const initRes = await retryJsonPost({
         url: '/api/sessions/multipart/initiate/',
         token,
         body: {
@@ -607,7 +625,7 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
       }
     }
 
-    const completeRes = await authedJsonPost({
+    const completeRes = await retryJsonPost({
       url: '/api/sessions/multipart/complete/',
       token,
       body: {

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import VideoRecorder from './VideoRecorder'
-import { MAX_RECORDER_DURATION_SECONDS, createSessionUpload } from '../utils'
+import { MAX_RECORDER_DURATION_SECONDS, createSessionUpload, uploadErrorMessage } from '../utils'
 import { useAuth } from '../auth'
 import { useToast } from './Toast'
 
@@ -49,7 +49,7 @@ export default function RecorderPage({ onCancel, onComplete }) {
         onProgress: (p) => setProgress(p),
       })
       if (!res.ok) {
-        toast.error('Could not save')
+        toast.error(uploadErrorMessage(res))
         setIsUploading(false)
         setProgress(null)
         return

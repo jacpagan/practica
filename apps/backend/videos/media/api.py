@@ -142,6 +142,15 @@ class SessionMediaActionsMixin:
             except BotoCoreError:
                 return Response({'error': 'Could not fetch multipart upload status'}, status=status.HTTP_502_BAD_GATEWAY)
 
+        if upload.status == MultipartSessionUpload.STATUS_COMPLETED and upload.session_id:
+            session = get_object_or_404(Session, pk=upload.session_id, user=request.user)
+            serializer = SessionSerializer(session, context={'request': request})
+            return Response({
+                'multipart_upload_id': upload.id,
+                'status': upload.status,
+                'session': serializer.data,
+            })
+
         return Response({
             'multipart_upload_id': upload.id,
             'status': upload.status,
