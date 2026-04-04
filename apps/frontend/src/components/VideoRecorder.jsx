@@ -14,6 +14,7 @@ const MAX_BPM = 240
 const BPM_PRESETS = [60, 72, 84, 96, 108, 120, 132, 144, 152, 160, 172, 184, 192, 200]
 
 const METRONOME_SYNC_KEY = 'practica.metronome.syncOffsetMs.v1'
+const AUDIO_INPUT_STORAGE_KEY = 'practica.recorder.audioInputId.v1'
 
 const readSyncOffsetMs = () => {
   try {
@@ -23,6 +24,15 @@ const readSyncOffsetMs = () => {
   } catch {}
   return 0
 }
+
+const readStoredAudioInputId = () => {
+  try {
+    return window.localStorage.getItem(AUDIO_INPUT_STORAGE_KEY) || ''
+  } catch {}
+  return ''
+}
+
+const getAudioInputLabel = (device, index) => device.label || `Microphone ${index + 1}`
 
 const clampBpm = (value) => {
   const parsed = Number(value)
@@ -47,6 +57,8 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   const [micLevel, setMicLevel] = useState(0)
   const [countInRemaining, setCountInRemaining] = useState(null)
   const [bpmInput, setBpmInput] = useState('80')
+  const [audioInputs, setAudioInputs] = useState([])
+  const [selectedAudioInputId, setSelectedAudioInputId] = useState(readStoredAudioInputId)
 
   const liveRef = useRef(null)
   const playbackRef = useRef(null)
@@ -81,6 +93,42 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   useEffect(() => {
     setBpmInput(String(bpm))
   }, [bpm])
+
+  const refreshAudioInputs = useCallback(async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) return
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const nextAudioInputs = devices.filter((device) => device.kind === 'audioinput')
+      setAudioInputs(nextAudioInputs)
+      setSelectedAudioInputId((current) => (
+        current && nextAudioInputs.some((device) => device.deviceId === current)
+          ? current
+          : ''
+      ))
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    refreshAudioInputs()
+    if (!navigator.mediaDevices?.addEventListener) return undefined
+    const handleDeviceChange = () => {
+      refreshAudioInputs()
+    }
+    navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange)
+    return () => {
+      navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange)
+    }
+  }, [refreshAudioInputs])
+
+  useEffect(() => {
+    try {
+      if (selectedAudioInputId) {
+        window.localStorage.setItem(AUDIO_INPUT_STORAGE_KEY, selectedAudioInputId)
+      } else {
+        window.localStorage.removeItem(AUDIO_INPUT_STORAGE_KEY)
+      }
+    } catch {}
+  }, [selectedAudioInputId])
 
   const updateBpm = useCallback((nextValue) => {
     setBpm(clampBpm(nextValue))
@@ -192,6 +240,26 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       el.play().catch(() => {})
     }
   }, [])
+
+  const getAudioConstraints = useCallback(() => {
+    const constraints = musicMode
+      ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+      : {}
+    if (selectedAudioInputId) {
+      constraints.deviceId = { exact: selectedAudioInputId }
+    }
+    return Object.keys(constraints).length ? constraints : true
+  }, [musicMode, selectedAudioInputId])
+
+  const getCaptureErrorMessage = useCallback((e) => {
+    if (e?.name === 'NotAllowedError') {
+      return 'Camera permission denied. Please allow access in your browser settings.'
+    }
+    if ((e?.name === 'NotFoundError' || e?.name === 'OverconstrainedError') && selectedAudioInputId) {
+      return 'Selected microphone is unavailable. Reconnect your interface or choose another input.'
+    }
+    return 'Could not access camera. Please check your device.'
+  }, [selectedAudioInputId])
 
   const ensureAudioMix = useCallback(async (stream) => {
     if (typeof window === 'undefined') return null
@@ -379,19 +447,18 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera not supported')
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
-        audio: musicMode ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false } : true,
+        audio: getAudioConstraints(),
       })
       camStreamRef.current = stream
       streamRef.current = stream
       await ensureAudioMix(stream)
+      await refreshAudioInputs()
       setMode('camera')
       setState(STATES.PREVIEWING)
       // Attach after state change triggers re-render with video element
       requestAnimationFrame(() => attachStream())
     } catch (e) {
-      setError(e.name === 'NotAllowedError'
-        ? 'Camera permission denied. Please allow access in your browser settings.'
-        : 'Could not access camera. Please check your device.')
+      setError(getCaptureErrorMessage(e))
       setState(STATES.IDLE)
     }
   }
@@ -410,9 +477,10 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
 
       const cam = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 640 }, height: { ideal: 360 }, facingMode: 'user' },
-        audio: musicMode ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false } : true,
+        audio: getAudioConstraints(),
       })
       camStreamRef.current = cam
+      await refreshAudioInputs()
 
       const screenVideo = document.createElement('video')
       screenVideo.muted = true
@@ -507,7 +575,11 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
         }
       })
     } catch (e) {
-      const message = e?.name === 'NotAllowedError' ? 'Screen capture permission denied.' : (e?.message || 'Could not start screen capture.')
+      const message = e?.name === 'NotAllowedError'
+        ? 'Screen capture permission denied.'
+        : ((e?.name === 'NotFoundError' || e?.name === 'OverconstrainedError') && selectedAudioInputId)
+            ? 'Selected microphone is unavailable. Reconnect your interface or choose another input.'
+            : (e?.message || 'Could not start screen capture.')
       setError(message)
       setState(STATES.IDLE)
     }
@@ -657,6 +729,35 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   }
 
   const timerProgress = maxDuration > 0 ? Math.min(elapsed / maxDuration, 1) : 0
+  const hasNamedAudioInputs = audioInputs.some((device) => device.label)
+
+  const renderAudioInputPicker = (extraClassName = '') => (
+    <div className={extraClassName}>
+      <label className="block text-[11px] uppercase tracking-wide text-white/60 mb-2">Microphone input</label>
+      <select
+        value={selectedAudioInputId}
+        onChange={(e) => setSelectedAudioInputId(e.target.value)}
+        disabled={state === STATES.RECORDING}
+        className="w-full max-w-sm bg-white/10 text-white text-sm rounded-xl px-3 py-2 border border-white/10 disabled:opacity-60"
+      >
+        <option value="" className="text-gray-900">System default microphone</option>
+        {audioInputs.map((device, index) => (
+          <option key={device.deviceId || `audio-input-${index}`} value={device.deviceId} className="text-gray-900">
+            {getAudioInputLabel(device, index)}
+          </option>
+        ))}
+      </select>
+      <p className="mt-2 text-[11px] text-white/55">
+        Choose your Scarlett or a loopback input here. Use Screen + Cam with shared audio to include browser or tab sound.
+      </p>
+      {!hasNamedAudioInputs ? (
+        <p className="mt-1 text-[11px] text-white/45">Allow mic access once to reveal device names like Scarlett or Loopback.</p>
+      ) : null}
+      {(state === STATES.PREVIEWING || state === STATES.RECORDED) ? (
+        <p className="mt-1 text-[11px] text-white/45">If you switch inputs, close and reopen the recorder preview to apply it.</p>
+      ) : null}
+    </div>
+  )
 
   // ── Render ──
 
@@ -676,6 +777,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
               <button onClick={openCamera} className="text-xs text-white/60 hover:text-white underline transition-colors">
                 Try again
               </button>
+              {renderAudioInputPicker('w-full max-w-md pt-2')}
             </>
           ) : (
             <>
@@ -701,6 +803,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                 </button>
               </div>
               <p className="text-xs text-white/40">Tap to open camera or screen + cam</p>
+              {renderAudioInputPicker('w-full max-w-md pt-2')}
             </>
           )}
         </div>
@@ -785,6 +888,8 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                 </div>
               </div>
             </div>
+
+            {renderAudioInputPicker('rounded-2xl bg-white/5 px-3 py-3')}
 
             {showTimingTools ? (
               <div className="space-y-3">
