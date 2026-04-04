@@ -162,9 +162,13 @@ Deployment strategy:
 
 - Do not commit `.env` or `.env.*` files with real values. Use `.env.template` and `env.example` for reference only.
 - Production deploys read environment from the GitHub Actions secret `ENV_PRODUCTION` (written remotely on the host during deploy).
+- Production backend AWS access should come from the EC2 instance profile, not long-lived `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` values.
+- GitHub Actions AWS access should come from OIDC role assumption (`AWS_ROLE_ARN`), not stored IAM user keys.
+- Treat any historical AWS key exposure as compromised even after it is removed from the latest code; rotate first, then scrub history.
 - The CI pipeline includes a guard (`scripts/guard-no-secrets.sh`) that fails if:
   - Any tracked `.env`/`.env.*` file (other than `.env.template` or `env.example`) is present, or
-  - Tracked files contain assignments to common secrets like `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, or `DJANGO_SECRET_KEY`.
+  - Tracked files contain assignments to common secrets like `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, or `DJANGO_SECRET_KEY`, or
+  - `docker-compose.prod.yml` tries to pass static AWS access keys into production containers.
 - If a secret is ever committed, rotate it immediately and remove the file from git history (e.g., with `git filter-repo`), then force-push and rebase open branches.
 
 ## License

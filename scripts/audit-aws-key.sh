@@ -19,7 +19,18 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-echo "== AccessKey: $KEY_ID =="
+mask_key() {
+  local raw="${1:-}"
+  if [[ ${#raw} -le 8 ]]; then
+    printf '%s' '****'
+    return
+  fi
+  printf '%s****************%s' "${raw:0:4}" "${raw: -4}"
+}
+
+MASKED_KEY_ID=$(mask_key "$KEY_ID")
+
+echo "== AccessKey: $MASKED_KEY_ID =="
 
 echo "-- Last used (IAM) --"
 aws iam get-access-key-last-used --access-key-id "$KEY_ID" || true
@@ -61,4 +72,3 @@ fi
 
 echo "-- Recommendation --"
 echo "If keys were ever exposed publicly or CloudTrail shows unexpected services/regions/IPs, rotate immediately."
-

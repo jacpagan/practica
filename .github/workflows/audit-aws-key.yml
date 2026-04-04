@@ -36,24 +36,27 @@ jobs:
       - name: Run audit
         id: audit
         env:
-          KEY_ID: ${{ github.event.inputs.access_key_id }}
-          DAYS: ${{ github.event.inputs.days || '14' }}
+          KEY_ID: ${{ inputs.access_key_id }}
+          DAYS: ${{ inputs.days }}
         run: |
-          bash scripts/audit-aws-key.sh "$KEY_ID" --days "$DAYS" | tee audit.out
+          DAYS_VALUE="${DAYS:-14}"
+          bash scripts/audit-aws-key.sh "$KEY_ID" --days "$DAYS_VALUE" | tee audit.out
           echo "audit_log<<EOF" >> $GITHUB_OUTPUT
           sed -n '1,200p' audit.out >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Summary
         run: |
+          DAYS_VALUE="${{ inputs.days }}"
+          if [ -z "$DAYS_VALUE" ]; then
+            DAYS_VALUE="14"
+          fi
           {
             echo "### AWS Access Key Audit"
-            echo "- Access Key: \
-\`${{ github.event.inputs.access_key_id }}\`"
-            echo "- Window: ${{ github.event.inputs.days || '14' }} days"
+            echo "- Access key ID was provided at manual run time"
+            echo "- Window: ${DAYS_VALUE} days"
             echo
             echo '```'
             sed -n '1,200p' audit.out
             echo '```'
           } >> $GITHUB_STEP_SUMMARY
-

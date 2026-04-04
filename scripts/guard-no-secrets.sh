@@ -36,6 +36,13 @@ if grep -E -n '^[[:space:]]*(AWS_SECRET_ACCESS_KEY|AWS_ACCESS_KEY_ID|DJANGO_SECR
   fail=1
 fi
 
+# 3) Production compose must not pass static AWS access keys into the backend.
+if grep -E -n 'AWS_(ACCESS_KEY_ID|SECRET_ACCESS_KEY)' docker-compose.prod.yml >/dev/null 2>&1; then
+  echo "[guard][error] docker-compose.prod.yml must not pass static AWS access keys to production containers." >&2
+  echo "Use the EC2 instance profile for backend AWS access instead." >&2
+  fail=1
+fi
+
 rm -f "$TMP_LIST"
 
 if [[ "$fail" != "0" ]]; then
@@ -44,4 +51,3 @@ if [[ "$fail" != "0" ]]; then
 fi
 
 echo "[guard] Secret guard passed."
-

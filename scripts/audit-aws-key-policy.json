@@ -1,0 +1,32 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "IamAccessKeyAuditReadOnly",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetAccessKeyLastUsed",
+        "iam:ListAccessKeys",
+        "iam:GetUser"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudTrailAccessKeyAuditReadOnly",
+      "Effect": "Allow",
+      "Action": [
+        "cloudtrail:LookupEvents"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "GuardDutyAccessKeyAuditReadOnly",
+      "Effect": "Allow",
+      "Action": [
+        "guardduty:ListDetectors",
+        "guardduty:ListFindings"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
