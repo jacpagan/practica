@@ -1102,7 +1102,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           Cancel
                         </button>
                         <button type="button" disabled={creatingRequest || !canCreateShareLink} onClick={createReviewRequest} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                          {creatingRequest ? 'Sending…' : 'Send request'}
+                          {creatingRequest ? 'Sending…' : (selectedReviewerName ? `Send to ${selectedReviewerName}` : 'Choose reviewer')}
                         </button>
                       </div>
                     </div>
