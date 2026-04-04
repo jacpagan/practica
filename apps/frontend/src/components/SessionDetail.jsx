@@ -929,7 +929,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 </div>
               ) : null}
 
-              {canEdit ? (
+              {canEdit && !showRequestComposer ? (
                 <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 space-y-3">
                   <div className="flex flex-wrap gap-2">
                     {waitingOnReviewer && currentLoopRequest ? (
@@ -955,14 +955,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       </button>
                     ) : null}
                   </div>
-                  <div className="flex flex-wrap gap-2 border-t border-gray-200 pt-3">
-                    <button type="button" onClick={startEditing} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
-                      Edit video
-                    </button>
-                    <button type="button" onClick={deleteSession} disabled={deleting} className="text-sm text-red-600 border border-red-200 rounded-lg px-4 py-2.5 hover:bg-red-50 disabled:opacity-50 transition-colors">
-                      {deleting ? 'Deleting…' : 'Delete video'}
-                    </button>
-                  </div>
                 </div>
               ) : null}
 
@@ -973,7 +965,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       <p className="text-sm font-semibold text-gray-900">Need a simple private link instead?</p>
                       <p className="text-xs text-gray-500 mt-1">Use this when you want a lighter private share instead of a named review thread.</p>
                     </div>
-                    <span className="text-xs text-gray-500">{showLegacyLinkTools ? 'Hide' : 'Show'}</span>
+                    <span className="text-xs text-gray-500">{showLegacyLinkTools ? 'Hide option' : 'Use simple link instead'}</span>
                   </summary>
                   <div className="space-y-3 pt-4">
                   {activeReviewLink?.url ? (
@@ -1099,11 +1091,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           <button type="button" onClick={inviteNewReviewer} disabled={creatingInvite || !canCreateShareLink} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2 hover:bg-gray-50 disabled:opacity-50 transition-colors">
                             {creatingInvite ? 'Creating invite…' : 'Invite someone new'}
                           </button>
-                          <button type="button" onClick={createShare} disabled={sharing || !canCreateShareLink} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2 hover:bg-gray-50 disabled:opacity-50 transition-colors">
-                            {sharing ? 'Creating link…' : 'Copy private feedback link'}
-                          </button>
                         </div>
-                        <p className="text-xs text-gray-500">Use a member search, invite someone new, or send a private feedback link.</p>
+                        <p className="text-xs text-gray-500">Use member search to pick a reviewer, or invite someone new if they are not here yet.</p>
                       </div>
 
                       {/* Title of the practice thread is sufficient context; no extra request fields */}
@@ -1308,6 +1297,16 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               <details className="border-t border-gray-100 pt-4">
                 <summary className="cursor-pointer list-none text-sm text-gray-500 hover:text-gray-900 transition-colors">More options</summary>
                 <div className="flex flex-wrap gap-2 pt-4">
+                  {canEdit ? (
+                    <button type="button" onClick={startEditing} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                      Edit video
+                    </button>
+                  ) : null}
+                  {canEdit ? (
+                    <button type="button" onClick={deleteSession} disabled={deleting} className="text-sm text-red-600 border border-red-200 rounded-lg px-4 py-2.5 hover:bg-red-50 disabled:opacity-50 transition-colors">
+                      {deleting ? 'Deleting…' : 'Delete video'}
+                    </button>
+                  ) : null}
                   <button type="button" onClick={refreshSession} disabled={refreshing} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 disabled:opacity-50 transition-colors">
                     {refreshing ? 'Refreshing…' : 'Refresh'}
                   </button>
