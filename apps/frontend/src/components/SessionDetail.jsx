@@ -125,6 +125,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const [creatingRequest, setCreatingRequest] = useState(false)
   const [showLoopDetails, setShowLoopDetails] = useState(false)
   const [reviewerQuery, setReviewerQuery] = useState('')
+  const [designatedReviewers, setDesignatedReviewers] = useState([])
   const [reviewerResults, setReviewerResults] = useState([])
   const [reviewerSearchLoading, setReviewerSearchLoading] = useState(false)
   const [selectedReviewer, setSelectedReviewer] = useState(null)
@@ -161,8 +162,67 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const currentLoopRequest = sortedReviewRequests.find((item) => !['closed', 'revoked'].includes(item.status)) || sortedReviewRequests[0] || null
   const currentLoopStatus = String(currentLoopRequest?.status || '').trim().toLowerCase()
   const waitingOnReviewer = ['requested', 'opened'].includes(currentLoopStatus)
-  const readyForFollowUp = ['responded', 'viewed', 'needs_resubmission', 'declined_unrelated'].includes(currentLoopStatus)
+  const feedbackReadyToReview = currentLoopStatus === 'responded'
+  const readyForFollowUp = ['viewed', 'needs_resubmission', 'declined_unrelated'].includes(currentLoopStatus)
   const canStartNewRequest = canEdit && canCreateShareLink && !waitingOnReviewer
+  const currentLoopReviewerName = currentLoopRequest?.reviewer?.display_name || currentLoopRequest?.reviewer?.username || 'your reviewer'
+  const currentLoopSummary = useMemo(() => {
+    if (!currentLoopRequest) return null
+    if (currentLoopStatus === 'requested') {
+      return {
+        tone: 'border-amber-200 bg-amber-50',
+        title: `Waiting on ${currentLoopReviewerName}`,
+        message: 'Your review request is live. Open the private thread to check the request and any updates.',
+      }
+    }
+    if (currentLoopStatus === 'opened') {
+      return {
+        tone: 'border-blue-200 bg-blue-50',
+        title: `${currentLoopReviewerName} opened this request`,
+        message: 'Your reviewer has seen the take. Open the private thread to follow the feedback conversation.',
+      }
+    }
+    if (currentLoopStatus === 'responded') {
+      return {
+        tone: 'border-emerald-200 bg-emerald-50',
+        title: 'Feedback is ready',
+        message: 'Open the private thread to watch the response before you decide on the next take.',
+      }
+    }
+    if (currentLoopStatus === 'viewed') {
+      return {
+        tone: 'border-violet-200 bg-violet-50',
+        title: 'Ready for the next take',
+        message: 'You have seen the feedback. Record the next take when you are ready, or reopen the private thread.',
+      }
+    }
+    if (currentLoopStatus === 'needs_resubmission') {
+      return {
+        tone: 'border-orange-200 bg-orange-50',
+        title: 'New take requested',
+        message: 'Your reviewer asked for a cleaner or more complete take. Record a new take to continue this loop.',
+      }
+    }
+    if (currentLoopStatus === 'declined_unrelated') {
+      return {
+        tone: 'border-rose-200 bg-rose-50',
+        title: 'Matching take needed',
+        message: 'Your reviewer said this take does not match the requested thread. Record the right take to continue.',
+      }
+    }
+    if (currentLoopStatus === 'flagged') {
+      return {
+        tone: 'border-red-200 bg-red-50',
+        title: 'Request flagged',
+        message: 'This request is out of the normal loop for now. Open the private thread to review the note.',
+      }
+    }
+    return {
+      tone: 'border-gray-200 bg-gray-50',
+      title: 'Private review thread',
+      message: 'Open the private thread to review the current status.',
+    }
+  }, [currentLoopRequest, currentLoopReviewerName, currentLoopStatus])
   const defaultRequestGoal = useMemo(() => {
     if (session?.practice_series) return `${session.practice_series} follow-up`
     return LESSON_GOAL_PRESETS[0]
@@ -186,6 +246,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     setReviewRequests([])
     setShowRequestComposer(false)
     setReviewerQuery('')
+    setDesignatedReviewers([])
     setReviewerResults([])
     setSelectedReviewer(null)
     setRecentReviewers([])
@@ -286,31 +347,51 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     const loadRecentReviewers = async () => {
       setRecentReviewersLoading(true)
       try {
-        const res = await fetch('/api/review-requests/?role=student', { headers: authHeaders })
-        if (!res.ok) throw new Error('student-review-requests')
+        const res = await fetch('/api/connections/?role=student', { headers: authHeaders })
+        if (!res.ok) throw new Error('designated-reviewers')
         const data = await res.json()
         const items = Array.isArray(data) ? data : data.results || []
         const seen = new Set()
         const reviewers = []
-        items.forEach((item) => {
+        const sortedItems = [...items].sort((left, right) => {
+          const leftDate = new Date(left?.last_request_at || left?.created_at || 0)
+          const rightDate = new Date(right?.last_request_at || right?.created_at || 0)
+          return rightDate - leftDate
+        })
+        sortedItems.forEach((item) => {
           const reviewer = item?.reviewer
           if (!reviewer?.id || seen.has(reviewer.id)) return
           seen.add(reviewer.id)
-          reviewers.push(reviewer)
+          reviewers.push({
+            ...reviewer,
+            pending_review_count: item?.pending_review_count || 0,
+            total_review_count: item?.total_review_count || 0,
+            last_request_at: item?.last_request_at || '',
+            membership_id: item?.id,
+          })
         })
         if (cancelled) return
+        setDesignatedReviewers(reviewers)
         setRecentReviewers(reviewers.slice(0, 6))
         setSelectedReviewer((current) => {
-          if (current?.id || initialReviewRequestDraft?.reviewer?.id) return current
+          if (initialReviewRequestDraft?.reviewer?.id) {
+            return reviewers.find((reviewer) => reviewer.id === initialReviewRequestDraft.reviewer.id) || initialReviewRequestDraft.reviewer
+          }
+          if (current?.id) {
+            return reviewers.find((reviewer) => reviewer.id === current.id) || null
+          }
           const storedReviewer = readLastReviewer()
           if (storedReviewer?.id) {
-            return reviewers.find((reviewer) => reviewer.id === storedReviewer.id) || storedReviewer
+            return reviewers.find((reviewer) => reviewer.id === storedReviewer.id) || null
           }
           if (reviewers.length === 1) return reviewers[0]
-          return current
+          return null
         })
       } catch {
-        if (!cancelled) setRecentReviewers([])
+        if (!cancelled) {
+          setDesignatedReviewers([])
+          setRecentReviewers([])
+        }
       } finally {
         if (!cancelled) setRecentReviewersLoading(false)
       }
@@ -328,37 +409,26 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       setReviewerSearchLoading(false)
       return undefined
     }
-
-    let cancelled = false
-    const timer = window.setTimeout(async () => {
-      setReviewerSearchLoading(true)
-      try {
-        const res = await fetch(`/api/users/search/?q=${encodeURIComponent(query)}`, { headers: authHeaders })
-        if (!res.ok) throw new Error('reviewer-search')
-        const data = await res.json()
-        if (cancelled) return
-        const results = Array.isArray(data) ? data : []
-        const autoPick = findReviewerAutoPick(query, results)
-        if (autoPick) {
-          setSelectedReviewer(autoPick)
-          setReviewerQuery('')
-          setReviewerResults([])
-          writeLastReviewer(autoPick)
-          return
-        }
-        setReviewerResults(results)
-      } catch {
-        if (!cancelled) setReviewerResults([])
-      } finally {
-        if (!cancelled) setReviewerSearchLoading(false)
-      }
-    }, 250)
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
+    setReviewerSearchLoading(true)
+    const normalizedQuery = normalizeReviewerText(query)
+    const results = designatedReviewers.filter((reviewer) => {
+      const display = normalizeReviewerText(reviewer.display_name)
+      const username = normalizeReviewerText(reviewer.username)
+      return display.includes(normalizedQuery) || username.includes(normalizedQuery)
+    })
+    const autoPick = findReviewerAutoPick(query, results)
+    if (autoPick) {
+      setSelectedReviewer(autoPick)
+      setReviewerQuery('')
+      setReviewerResults([])
+      writeLastReviewer(autoPick)
+      setReviewerSearchLoading(false)
+      return undefined
     }
-  }, [authHeaders, canEdit, reviewerQuery, token])
+    setReviewerResults(results)
+    setReviewerSearchLoading(false)
+    return undefined
+  }, [canEdit, designatedReviewers, reviewerQuery, token])
 
   const startEditing = () => {
     setEditTitle(session.title || '')
@@ -931,25 +1001,52 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
 
               {canEdit && !showRequestComposer ? (
                 <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 space-y-3">
+                  {currentLoopSummary ? (
+                    <div className={`rounded-lg border px-3 py-3 ${currentLoopSummary.tone}`}>
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{currentLoopSummary.title}</p>
+                          <p className="text-sm text-gray-700 mt-1">{currentLoopSummary.message}</p>
+                        </div>
+                        {currentLoopRequest ? (
+                          <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${requestStatusTone[currentLoopRequest.status] || 'bg-gray-100 text-gray-700'}`}>
+                            {requestStatusLabel(currentLoopRequest.status)}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="flex flex-wrap gap-2">
                     {waitingOnReviewer && currentLoopRequest ? (
                       <>
                         <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
-                          Open private thread
+                          Check request
+                        </button>
+                      </>
+                    ) : null}
+                    {feedbackReadyToReview && currentLoopRequest ? (
+                      <>
+                        <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
+                          Review feedback
                         </button>
                       </>
                     ) : null}
                     {readyForFollowUp && currentLoopRequest ? (
                       <>
                         <button type="button" onClick={() => startFollowUp(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
-                          Record next take
+                          {currentLoopStatus === 'needs_resubmission' ? 'Record new take' : currentLoopStatus === 'declined_unrelated' ? 'Record matching take' : 'Record next take'}
                         </button>
                         <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
                           Open private thread
                         </button>
                       </>
                     ) : null}
-                    {!waitingOnReviewer && !readyForFollowUp ? (
+                    {currentLoopStatus === 'flagged' && currentLoopRequest ? (
+                      <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
+                        Open private thread
+                      </button>
+                    ) : null}
+                    {!waitingOnReviewer && !feedbackReadyToReview && !readyForFollowUp && currentLoopStatus !== 'flagged' ? (
                       <button type="button" onClick={openRequestComposer} disabled={!canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
                         Request feedback
                       </button>
@@ -1043,7 +1140,13 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           </div>
                         ) : (
                           <div className="space-y-2">
-                            {recentReviewersLoading ? <p className="text-xs text-gray-500">Loading recent reviewers…</p> : null}
+                            {recentReviewersLoading ? <p className="text-xs text-gray-500">Loading designated reviewers…</p> : null}
+                            {!recentReviewersLoading && designatedReviewers.length === 0 ? (
+                              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
+                                <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Designated reviewer required</p>
+                                <p className="text-sm text-amber-900 mt-1">Structured review requests only work with reviewers already assigned to your roster. Ask an admin to add one, or use a private link below.</p>
+                              </div>
+                            ) : null}
                             {recentReviewers.length > 0 ? (
                               <div className="flex flex-wrap gap-2">
                                 {recentReviewers.map((reviewer) => (
@@ -1058,29 +1161,34 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                 ))}
                               </div>
                             ) : null}
-                            <input
-                              type="text"
-                              value={reviewerQuery}
-                              onChange={(event) => setReviewerQuery(event.target.value)}
-                              placeholder="Search by member name or username"
-                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
-                            />
-                            {reviewerSearchLoading ? <p className="text-xs text-gray-500">Searching…</p> : null}
-                            {reviewerResults.length > 0 ? (
-                              <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-                                {reviewerResults.map((reviewer) => (
-                                  <button
-                                    key={reviewer.id}
-                                    type="button"
-                                    onClick={() => chooseReviewer(reviewer)}
-                                    className="w-full text-left px-3 py-3 hover:bg-gray-50 transition-colors border-b last:border-b-0 border-gray-100"
-                                  >
-                                    <p className="text-sm font-medium text-gray-900">{reviewer.display_name || reviewer.username}</p>
-                                    <p className="text-xs text-gray-500 mt-1">@{reviewer.username}</p>
-                                  </button>
-                                ))}
-                              </div>
-                            ) : reviewerQuery.trim().length >= 2 && !reviewerSearchLoading ? <p className="text-xs text-gray-500">No matching members found yet.</p> : null}
+                            {designatedReviewers.length > 0 ? (
+                              <>
+                                <input
+                                  type="text"
+                                  value={reviewerQuery}
+                                  onChange={(event) => setReviewerQuery(event.target.value)}
+                                  placeholder="Search designated reviewers"
+                                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                                />
+                                <p className="text-xs text-gray-500">Only reviewers already on your roster can receive a formal review request.</p>
+                                {reviewerSearchLoading ? <p className="text-xs text-gray-500">Searching…</p> : null}
+                                {reviewerResults.length > 0 ? (
+                                  <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+                                    {reviewerResults.map((reviewer) => (
+                                      <button
+                                        key={reviewer.id}
+                                        type="button"
+                                        onClick={() => chooseReviewer(reviewer)}
+                                        className="w-full text-left px-3 py-3 hover:bg-gray-50 transition-colors border-b last:border-b-0 border-gray-100"
+                                      >
+                                        <p className="text-sm font-medium text-gray-900">{reviewer.display_name || reviewer.username}</p>
+                                        <p className="text-xs text-gray-500 mt-1">@{reviewer.username}</p>
+                                      </button>
+                                    ))}
+                                  </div>
+                                ) : reviewerQuery.trim().length >= 2 && !reviewerSearchLoading ? <p className="text-xs text-gray-500">No matching designated reviewers found yet.</p> : null}
+                              </>
+                            ) : null}
                           </div>
                         )}
                       </div>
@@ -1089,10 +1197,10 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Other ways</p>
                         <div className="flex flex-wrap gap-2">
                           <button type="button" onClick={inviteNewReviewer} disabled={creatingInvite || !canCreateShareLink} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2 hover:bg-gray-50 disabled:opacity-50 transition-colors">
-                            {creatingInvite ? 'Creating invite…' : 'Invite someone new'}
+                            {creatingInvite ? 'Creating invite…' : 'Invite with private link'}
                           </button>
                         </div>
-                        <p className="text-xs text-gray-500">Use member search to pick a reviewer, or invite someone new if they are not here yet.</p>
+                        <p className="text-xs text-gray-500">This sends a private link invitation. It does not add someone as a designated reviewer for formal review requests.</p>
                       </div>
 
                       {/* Title of the practice thread is sufficient context; no extra request fields */}
@@ -1101,7 +1209,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                         <button type="button" onClick={() => setShowRequestComposer(false)} className="text-sm text-gray-600 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
                           Cancel
                         </button>
-                        <button type="button" disabled={creatingRequest || !canCreateShareLink} onClick={createReviewRequest} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
+                        <button type="button" disabled={creatingRequest || !canCreateShareLink || !selectedReviewer?.id} onClick={createReviewRequest} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
                           {creatingRequest ? 'Sending…' : (selectedReviewerName ? `Send to ${selectedReviewerName}` : 'Choose reviewer')}
                         </button>
                       </div>

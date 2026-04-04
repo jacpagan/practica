@@ -1,6 +1,32 @@
 from django.db import migrations
 
 
+def _drop_legacy_feedback_request_column(apps, schema_editor):
+    if schema_editor.connection.vendor != 'postgresql':
+        return
+    schema_editor.execute(
+        """
+        ALTER TABLE videos_coachevent
+        DROP COLUMN IF EXISTS feedback_request_id CASCADE;
+        """
+    )
+
+
+def _drop_legacy_table(schema_editor, table_name):
+    if schema_editor.connection.vendor == 'postgresql':
+        schema_editor.execute(f'DROP TABLE IF EXISTS {table_name} CASCADE;')
+        return
+    schema_editor.execute(f'DROP TABLE IF EXISTS {table_name};')
+
+
+def _drop_feedback_assignment_table(apps, schema_editor):
+    _drop_legacy_table(schema_editor, 'videos_feedbackassignment')
+
+
+def _drop_feedback_request_table(apps, schema_editor):
+    _drop_legacy_table(schema_editor, 'videos_feedbackrequest')
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -8,12 +34,9 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunSQL(
-            sql="""
-                ALTER TABLE videos_coachevent
-                DROP COLUMN IF EXISTS feedback_request_id CASCADE;
-            """,
-            reverse_sql=migrations.RunSQL.noop,
+        migrations.RunPython(
+            _drop_legacy_feedback_request_column,
+            migrations.RunPython.noop,
         ),
         migrations.SeparateDatabaseAndState(
             state_operations=[
@@ -24,9 +47,9 @@ class Migration(migrations.Migration):
             ],
             database_operations=[],
         ),
-        migrations.RunSQL(
-            sql="DROP TABLE IF EXISTS videos_feedbackassignment CASCADE;",
-            reverse_sql=migrations.RunSQL.noop,
+        migrations.RunPython(
+            _drop_feedback_assignment_table,
+            migrations.RunPython.noop,
         ),
         migrations.SeparateDatabaseAndState(
             state_operations=[
@@ -36,9 +59,9 @@ class Migration(migrations.Migration):
             ],
             database_operations=[],
         ),
-        migrations.RunSQL(
-            sql="DROP TABLE IF EXISTS videos_feedbackrequest CASCADE;",
-            reverse_sql=migrations.RunSQL.noop,
+        migrations.RunPython(
+            _drop_feedback_request_table,
+            migrations.RunPython.noop,
         ),
         migrations.SeparateDatabaseAndState(
             state_operations=[

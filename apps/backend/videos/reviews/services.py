@@ -120,12 +120,6 @@ def create_review_request(*, serializer, actor):
             to_status=parent_request.status,
         )
 
-    ensure_member_connection(
-        reviewer=review_request.reviewer,
-        student=review_request.student,
-        created_by=actor,
-    )
-
     link = ReviewLink.objects.create(
         session=review_request.session,
         token=secrets.token_urlsafe(16),

@@ -1,6 +1,21 @@
 from django.db import migrations
 
 
+def _drop_legacy_table(schema_editor, table_name):
+    if schema_editor.connection.vendor == 'postgresql':
+        schema_editor.execute(f'DROP TABLE IF EXISTS {table_name} CASCADE;')
+        return
+    schema_editor.execute(f'DROP TABLE IF EXISTS {table_name};')
+
+
+def _drop_coachdailymetric_table(apps, schema_editor):
+    _drop_legacy_table(schema_editor, 'videos_coachdailymetric')
+
+
+def _drop_coachevent_table(apps, schema_editor):
+    _drop_legacy_table(schema_editor, 'videos_coachevent')
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -16,13 +31,13 @@ class Migration(migrations.Migration):
             model_name='multipartsessionupload',
             name='space',
         ),
-        migrations.RunSQL(
-            sql='DROP TABLE IF EXISTS videos_coachdailymetric CASCADE;',
-            reverse_sql=migrations.RunSQL.noop,
+        migrations.RunPython(
+            _drop_coachdailymetric_table,
+            migrations.RunPython.noop,
         ),
-        migrations.RunSQL(
-            sql='DROP TABLE IF EXISTS videos_coachevent CASCADE;',
-            reverse_sql=migrations.RunSQL.noop,
+        migrations.RunPython(
+            _drop_coachevent_table,
+            migrations.RunPython.noop,
         ),
         migrations.DeleteModel(
             name='DailyCheckInItem',

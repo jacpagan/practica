@@ -22,7 +22,9 @@ Primary shipped flows reviewed:
 2. private library upload
 3. session detail and processing
 4. private share-link creation and revocation
-5. reviewer access and video-feedback submission
+5. structured review-request creation and follow-up
+6. reviewer access and video-feedback submission
+7. reviewer workspace triage
 
 ## Current-State Flow Map
 
@@ -58,16 +60,33 @@ Primary shipped flows reviewed:
 - Owner can copy or revoke the link from the session detail page.
 - Reviewer opens `/r/:token`, authenticates, watches the source video, and can submit a feedback video if the link allows it.
 
-### 5. Reviewer feedback flow
+### 5. Structured review-request flow
+
+- Owner opens session detail and starts `Request feedback`.
+- Frontend loads designated reviewers from `/api/connections/?role=student`.
+- Owner can only assign a reviewer who already has an active roster relationship with that member.
+- Frontend posts to `/api/review-requests/`.
+- Backend creates a `ReviewRequest`, attaches a `ReviewLink`, records events, and preserves member ownership of the `Session`.
+- Follow-up requests can be created on a new session while keeping the same reviewer and thread continuity.
+
+### 6. Reviewer feedback flow
 
 - Reviewer opens `/r/:token`.
 - Frontend loads:
   - `/api/review/:token/`
   - `/api/review/:token/feedback/`
 - Backend resolves the link through shared review-link logic and returns explicit invalid, expired, or revoked states.
+- If the link belongs to a `ReviewRequest`, only the assigned reviewer and owner can access the structured thread.
 - Reviewer records or uploads a response video.
 - Frontend posts feedback to `/api/review/:token/feedback/`.
-- Backend saves a `VideoFeedback` row and returns the created feedback item.
+- Backend saves a `VideoFeedback` row, updates request state, and returns the created feedback item.
+
+### 7. Reviewer workspace flow
+
+- Reviewer opens `/requests`.
+- Frontend loads `/api/inbox/`.
+- Requests are grouped by next action: `needs action`, `waiting on member`, and `done`.
+- Reviewer can open a thread directly into the private review page.
 
 ## What Is Working Well In The Shipped Foundation
 
@@ -75,49 +94,53 @@ Primary shipped flows reviewed:
 - Review-link invalid, expired, and revoked states are modeled explicitly in backend responses and frontend UX.
 - Share-link creation is gated on playback readiness.
 - Review responses are already video-first and can include timestamps plus optional notes.
+- `ReviewRequest` is now a real workflow primitive with assignee, status, events, and follow-up chaining.
+- Reviewer inbox, roster-backed assignment, templates, and lightweight insights exist in the shipped foundation.
+- Assigned review requests now fail closed: owners can only assign designated reviewers already on their roster.
+- The owner and reviewer surfaces now expose clearer next steps across `requested`, `responded`, `needs_resubmission`, and follow-up states.
 - The product has stronger privacy semantics than general-purpose messaging or file-sharing tools.
 
 ## Top Flow Gaps For The Member-First v2 With Teacher Workflow Layer
 
-### P0 — The review flow is built for generic authenticated responders, not assigned teacher workflow owners
+### P0 — Designated reviewer permissions exist, but reviewer provisioning is still thin
 
-The current review flow enforces authenticated access and explicit invalid, expired, and revoked states, but it does not model an assigned teacher workflow object.
-
-Impact:
-
-- Any logged-in authorized responder can act like the reviewer.
-- Teacher queue ownership, response promises, and routing are not first-class.
-- This is good enough for private-link collaboration but not yet for a structured teacher workflow layer.
-
-### P0 — `ReviewLink` is an access primitive, not a workflow primitive
-
-The current product uses `ReviewLink` to gate access, but teacher-led workflows need a structured request object with intent and ownership.
+The shipped app now enforces roster-backed reviewer assignment for formal `ReviewRequest` creation. The remaining gap is how those roster relationships are created and managed.
 
 Impact:
 
-- There is no native place for goal, turnaround, designated teacher, or request status.
-- Teacher inbox, roster, and cycle analytics cannot be modeled cleanly on links alone.
-- The product cannot yet distinguish a casual share from a formal feedback request.
+- Formal requests currently depend on admin- or invite-seeded roster setup.
+- Private-link invites do not yet upgrade someone into a designated reviewer relationship.
+- Repeated teacher workflows still require manual setup outside the main request composer.
 
-### P1 — There is no teacher inbox or roster surface
+### P0 — The review cycle exists, but continuation still spans multiple surfaces
 
-The shipped product gives owners a library and reviewers a link page, but it does not give teachers an operational home.
-
-Impact:
-
-- Teachers cannot see all pending work in one place.
-- Repeated use depends on memory, ad hoc links, or external coordination.
-- The product still behaves more like a tool than a platform.
-
-### P1 — Member archive ownership is clear, but teacher workflow ownership is not
-
-The current data model keeps `Session.user` as the archive owner, which is strategically correct for v2. What is missing is a relationship and workflow layer that gives teachers controlled access without taking content ownership away from members.
+The core `submission -> feedback -> resubmission` loop is present, but members still move between thread view, session detail, and fresh recording flow to continue the cycle.
 
 Impact:
 
-- There is no explicit teacher-student roster model scoped to workflow context.
-- The system cannot express designated reviewer permissions cleanly.
-- Studio and multi-teacher expansion remain awkward until this layer exists.
+- The next action is clearer than before, but still split across more than one surface.
+- Members may understand the thread state before they understand exactly where to record the next take.
+- The product is close to a durable loop, but not yet fully frictionless.
+
+### P1 — The reviewer workspace is now real, but intentionally minimal
+
+The shipped reviewer workspace now supports inbox triage and thread entry, but it is still deliberately lightweight.
+
+Impact:
+
+- Reviewers can separate urgent work from waiting threads, which is good.
+- Roster browsing, lightweight workload context, and repeated-use habits are still thin.
+- This is the right tradeoff for now, but it remains a product area to harden carefully.
+
+### P1 — Member archive ownership is correct, but reviewer provisioning remains operationally awkward
+
+The current model correctly preserves `Session.user` as the member-owned archive artifact and uses `ReviewRequest` plus roster membership for workflow context. What remains awkward is the operational path into that relationship.
+
+Impact:
+
+- The ownership model is right for v2.
+- The permission model is safer than before.
+- The setup path into designated reviewer relationships is still not a first-class product moment.
 
 ### P1 — Standardization is too light for analytics, routing, and future matching
 
@@ -128,6 +151,16 @@ Impact:
 - Search, analytics, and AI summarization will remain shallow.
 - Teacher triage will be slower than necessary.
 - Platform learning loops will be hard to compare across submissions.
+
+### P1 — Local validation and environment reliability lag behind the shipped workflow layer
+
+The product layer has moved faster than the local validation path.
+
+Impact:
+
+- The backend test path is still sensitive to local Postgres environment leakage.
+- The SQLite path still hits legacy migration SQL incompatibilities and stale local schema issues.
+- This slows down confidence-building work on otherwise focused product changes.
 
 ### P2 — The current low-pressure UX can be damaged by overbuilding v2
 
@@ -142,16 +175,17 @@ Impact:
 ## Recommended Delivery Order
 
 1. Preserve and harden the current trusted private-library and playback flow.
-2. Add `ReviewRequest` as a workflow object without breaking existing sharing.
-3. Add a teacher inbox for pending and completed requests.
-4. Add a lightweight roster and designated-teacher permissions.
-5. Add structured request metadata and reusable templates.
-6. Add cycle analytics after the workflow object exists.
+2. Harden designated-reviewer provisioning without breaking private-link sharing.
+3. Keep optimizing the completed review cycle: `submission -> feedback -> resubmission`.
+4. Strengthen the lightweight reviewer workspace without turning it into a heavy dashboard.
+5. Add structured request metadata and reusable templates where they directly improve routing and repeated use.
+6. Improve local validation reliability so workflow changes are easy to verify.
+7. Add richer cycle analytics only after workflow, permissions, and reliability are stable.
 
 ## Suggested Definition Of Done For v2 Foundation Work
 
 - The member can still record, upload, watch, and privately share without extra friction.
-- A teacher can own a request from inbox to response without using external tools.
+- An assigned reviewer can own a request from inbox to response without using external tools.
 - The system can distinguish a generic link from a formal teacher review request.
 - Permissions fail closed and are easy to explain in the UI.
 - Completed review cycles are measurable from backend events and visible in product surfaces.

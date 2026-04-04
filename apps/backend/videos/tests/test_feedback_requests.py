@@ -12,12 +12,20 @@ from videos.models import FeedbackTemplate, Profile, ReviewRequest, ReviewerRost
 
 class FeedbackRequestApiTests(APITestCase):
     def setUp(self):
+        self.admin = User.objects.create_user(username='admin-user', password='pass1234', is_staff=True)
         self.student = User.objects.create_user(username='student-user', password='pass1234')
         self.reviewer = User.objects.create_user(username='reviewer-user', password='pass1234')
         self.outsider = User.objects.create_user(username='outsider-user', password='pass1234')
+        Profile.objects.create(user=self.admin, display_name='Studio Admin')
         Profile.objects.create(user=self.student, display_name='Student Musician')
         Profile.objects.create(user=self.reviewer, display_name='Drum Reviewer')
         Profile.objects.create(user=self.outsider, display_name='Random Reviewer')
+        self.roster_membership = ReviewerRosterMembership.objects.create(
+            reviewer=self.reviewer,
+            student=self.student,
+            created_by=self.admin,
+            is_active=True,
+        )
         self.session = Session.objects.create(
             user=self.student,
             title='Groove Practice',
@@ -54,7 +62,7 @@ class FeedbackRequestApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         return ReviewRequest.objects.get(pk=response.data['id'])
 
-    def test_owner_can_create_feedback_request_with_link_and_connection(self):
+    def test_owner_can_create_feedback_request_with_designated_reviewer(self):
         review_request = self._create_review_request()
 
         self.assertEqual(review_request.student, self.student)
@@ -62,13 +70,36 @@ class FeedbackRequestApiTests(APITestCase):
         self.assertEqual(review_request.status, ReviewRequest.STATUS_REQUESTED)
         self.assertEqual(review_request.instrument, 'drums')
         self.assertTrue(bool(review_request.review_link))
-        self.assertTrue(
+        self.roster_membership.refresh_from_db()
+        self.assertTrue(self.roster_membership.is_active)
+        self.assertEqual(self.roster_membership.created_by, self.admin)
+        self.assertEqual(
             ReviewerRosterMembership.objects.filter(
                 reviewer=self.reviewer,
                 student=self.student,
                 is_active=True,
-            ).exists()
+            ).count(),
+            1,
         )
+
+    def test_owner_cannot_create_feedback_request_for_reviewer_outside_roster(self):
+        self._auth(self.student)
+        response = self.client.post(
+            '/api/review-requests/',
+            {
+                'session_id': self.session.id,
+                'reviewer_id': self.outsider.id,
+                'instrument': 'drums',
+                'student_level': 'intermediate',
+                'goal': 'Improve ghost-note consistency',
+                'exercise_or_song': 'Funky groove in 4/4',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('designated reviewer', response.data['reviewer_id'][0].lower())
+        self.assertFalse(ReviewRequest.objects.filter(student=self.student, reviewer=self.outsider).exists())
 
     def test_feedback_inbox_lists_assigned_feedback_requests(self):
         review_request = self._create_review_request()
@@ -186,6 +217,19 @@ class FeedbackRequestApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['member']['id'], self.student.id)
+        self.assertEqual(response.data[0]['pending_review_count'], 1)
+        self.assertEqual(response.data[0]['total_review_count'], 1)
+
+    def test_owner_connections_list_designated_reviewers(self):
+        self._create_review_request()
+
+        self._auth(self.student)
+        response = self.client.get('/api/connections/?role=student')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['reviewer']['id'], self.reviewer.id)
+        self.assertEqual(response.data[0]['student']['id'], self.student.id)
         self.assertEqual(response.data[0]['pending_review_count'], 1)
         self.assertEqual(response.data[0]['total_review_count'], 1)
 

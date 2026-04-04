@@ -262,9 +262,15 @@ def feedback_inbox(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def member_connections(request):
-    memberships = ReviewerRosterMembership.objects.filter(reviewer=request.user, is_active=True).select_related(
-        'student', 'student__profile'
-    ).order_by('student__username')
+    role = str(request.query_params.get('role', '')).strip().lower()
+    if role in {'student', 'owner'}:
+        memberships = ReviewerRosterMembership.objects.filter(student=request.user, is_active=True).select_related(
+            'reviewer', 'reviewer__profile', 'student', 'student__profile'
+        ).order_by('reviewer__username')
+    else:
+        memberships = ReviewerRosterMembership.objects.filter(reviewer=request.user, is_active=True).select_related(
+            'student', 'student__profile', 'reviewer', 'reviewer__profile'
+        ).order_by('student__username')
     return Response(MemberConnectionSerializer(memberships, many=True, context={'request': request}).data)
 
 

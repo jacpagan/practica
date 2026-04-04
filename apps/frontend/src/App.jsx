@@ -766,7 +766,10 @@ function AppContent() {
         )}
 
         {view === 'review' && (
-          <ReviewPage reviewToken={reviewToken} />
+          <ReviewPage
+            reviewToken={reviewToken}
+            onContinueLoop={(draft) => handleRecordAnother(draft)}
+          />
         )}
 
         {view === 'detail' && selectedSession && (

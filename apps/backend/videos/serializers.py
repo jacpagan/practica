@@ -543,6 +543,12 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
                 raise self._reviewer_validation_error('Follow-up requests must use the same reviewer as the parent request.')
             if session and parent_request.session_id == session.id:
                 raise serializers.ValidationError({'session_id': 'Choose a new session for this follow-up request.'})
+        if reviewer and not ReviewerRosterMembership.objects.filter(
+            reviewer=reviewer,
+            student=user,
+            is_active=True,
+        ).exists():
+            raise self._reviewer_validation_error('Choose a designated reviewer from your roster.')
         return attrs
 
 
@@ -562,31 +568,47 @@ class MemberConnectionSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
         ]
 
-    def _reviewer(self):
+    def _request_user(self):
         request = self.context.get('request')
         return getattr(request, 'user', None) if request else None
 
+    def _review_request_scope(self, obj):
+        request_user = self._request_user()
+        if not request_user or not request_user.is_authenticated:
+            return None
+        if request_user.id == obj.reviewer_id:
+            return {'reviewer': request_user, 'student': obj.student}
+        if request_user.id == obj.student_id:
+            return {'reviewer': obj.reviewer, 'student': request_user}
+        return None
+
     def get_pending_review_count(self, obj):
-        reviewer = self._reviewer()
-        if not reviewer or not reviewer.is_authenticated:
+        scope = self._review_request_scope(obj)
+        if not scope:
             return 0
         return ReviewRequest.objects.filter(
-            reviewer=reviewer,
-            student=obj.student,
+            reviewer=scope['reviewer'],
+            student=scope['student'],
             status__in=[ReviewRequest.STATUS_REQUESTED, ReviewRequest.STATUS_OPENED],
         ).count()
 
     def get_total_review_count(self, obj):
-        reviewer = self._reviewer()
-        if not reviewer or not reviewer.is_authenticated:
+        scope = self._review_request_scope(obj)
+        if not scope:
             return 0
-        return ReviewRequest.objects.filter(reviewer=reviewer, student=obj.student).count()
+        return ReviewRequest.objects.filter(
+            reviewer=scope['reviewer'],
+            student=scope['student'],
+        ).count()
 
     def get_last_request_at(self, obj):
-        reviewer = self._reviewer()
-        if not reviewer or not reviewer.is_authenticated:
+        scope = self._review_request_scope(obj)
+        if not scope:
             return None
-        last_request = ReviewRequest.objects.filter(reviewer=reviewer, student=obj.student).order_by('-created_at').first()
+        last_request = ReviewRequest.objects.filter(
+            reviewer=scope['reviewer'],
+            student=scope['student'],
+        ).order_by('-created_at').first()
         return last_request.created_at if last_request else None
 
 

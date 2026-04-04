@@ -6,6 +6,8 @@ export default function ClosureBar({
   onClose = () => {},
   onRetry = () => {},
   subtleText = '',
+  retryLabel = 'Continue loop',
+  closeLabel = 'Close thread',
 }) {
   if (!canClose && !canRetry) return null
   return (
@@ -15,12 +17,12 @@ export default function ClosureBar({
         <div className="flex items-center gap-1">
           {canRetry ? (
             <button type="button" onClick={onRetry} className="text-xs text-gray-700 border border-gray-200 rounded-full px-3 py-1.5 hover:bg-gray-50 transition-colors">
-              Request revision
+              {retryLabel}
             </button>
           ) : null}
           {canClose ? (
             <button type="button" onClick={onClose} className="text-xs font-medium text-white bg-gray-900 rounded-full px-4 py-1.5 hover:bg-gray-800 transition-colors">
-              Mark resolved
+              {closeLabel}
             </button>
           ) : null}
         </div>
@@ -28,4 +30,3 @@ export default function ClosureBar({
     </div>
   )
 }
-

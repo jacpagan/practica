@@ -42,7 +42,7 @@ const reviewLinkSubmitErrorMessage = ({ status, data }) => {
   return data?.error || 'Could not send feedback.'
 }
 
-function ReviewPage({ reviewToken = '' }) {
+function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
   const { user, token: authToken } = useAuth()
   const videoRef = useRef(null)
   const inputRef = useRef(null)
@@ -226,8 +226,153 @@ function ReviewPage({ reviewToken = '' }) {
   const canStudentClose = memberRole === 'student' || memberRole === 'owner'
   const statusKey = String(reviewRequest?.status || '').trim().toLowerCase()
   const canShowClosure = Boolean(reviewRequest && canStudentClose && ['responded', 'viewed', 'resubmitted', 'needs_resubmission', 'declined_unrelated', 'flagged'].includes(statusKey))
-  const canShowRetry = Boolean(reviewRequest && canStudentClose && ['responded', 'viewed', 'needs_resubmission', 'declined_unrelated'].includes(statusKey))
+  const canShowRetry = Boolean(reviewRequest && canStudentClose && ['viewed', 'needs_resubmission', 'declined_unrelated'].includes(statusKey))
   const reviewerCanModerate = Boolean(reviewRequest && memberRole === 'reviewer' && ['requested', 'opened'].includes(statusKey))
+  const reviewerName = reviewRequest?.reviewer?.display_name || reviewRequest?.reviewer?.username || 'your reviewer'
+  const reviewPageHeading = useMemo(() => {
+    if (!reviewRequest) {
+      return {
+        title: 'Private review',
+        subtitle: 'Watch the take and keep feedback inside one trusted thread.',
+      }
+    }
+    if (memberRole === 'reviewer') {
+      if (reviewerShouldRespond) {
+        return {
+          title: 'Review this take',
+          subtitle: 'Watch the take, then record or upload one response video.',
+        }
+      }
+      if (hasCurrentUserFeedback) {
+        return {
+          title: 'Response sent',
+          subtitle: 'Your feedback is already in the thread. You can update it or add another response.',
+        }
+      }
+      return {
+        title: 'Private review',
+        subtitle: 'This thread stays private to the owner and assigned reviewer.',
+      }
+    }
+    if (statusKey === 'responded') {
+      return {
+        title: 'Feedback is ready',
+        subtitle: 'Watch the response, then decide whether to continue or close the thread.',
+      }
+    }
+    if (statusKey === 'viewed') {
+      return {
+        title: 'Ready for the next take',
+        subtitle: 'You have seen the feedback. Continue the loop when you are ready.',
+      }
+    }
+    if (statusKey === 'needs_resubmission') {
+      return {
+        title: 'New take requested',
+        subtitle: 'Your reviewer asked for a cleaner or more complete take.',
+      }
+    }
+    if (statusKey === 'declined_unrelated') {
+      return {
+        title: 'Matching take needed',
+        subtitle: 'This take did not match the requested thread.',
+      }
+    }
+    if (statusKey === 'flagged') {
+      return {
+        title: 'Request flagged',
+        subtitle: 'This request is out of the normal reviewer inbox for now.',
+      }
+    }
+    if (statusKey === 'resubmitted') {
+      return {
+        title: 'Loop continuing',
+        subtitle: 'Record the next take from your library when you are ready.',
+      }
+    }
+    return {
+      title: 'Private review',
+      subtitle: 'Keep this feedback thread moving one take at a time.',
+    }
+  }, [hasCurrentUserFeedback, memberRole, reviewRequest, reviewerShouldRespond, statusKey])
+  const statusBanner = useMemo(() => {
+    if (!reviewRequest) return null
+    if (memberRole === 'reviewer' && reviewerShouldRespond) {
+      return {
+        tone: 'border-blue-200 bg-blue-50',
+        title: 'Your response is next',
+        message: 'Watch the take, then send one response video. Use reviewer actions only if the owner needs a different submission.',
+      }
+    }
+    if (memberRole === 'reviewer' && hasCurrentUserFeedback) {
+      return {
+        tone: 'border-emerald-200 bg-emerald-50',
+        title: 'Response delivered',
+        message: 'Your feedback is in the thread. Reopen it anytime to edit, add another response, or follow the next take.',
+      }
+    }
+    if (canStudentClose && statusKey === 'responded') {
+      return {
+        tone: 'border-emerald-200 bg-emerald-50',
+        title: 'Feedback is ready',
+        message: `Open the response from ${reviewerName}, then continue the loop or close the thread when you are done.`,
+      }
+    }
+    if (canStudentClose && statusKey === 'viewed') {
+      return {
+        tone: 'border-violet-200 bg-violet-50',
+        title: 'Ready for the next take',
+        message: 'You have seen the feedback. Record the next take from your library when you are ready.',
+      }
+    }
+    if (canStudentClose && statusKey === 'needs_resubmission') {
+      return {
+        tone: 'border-orange-200 bg-orange-50',
+        title: 'New take requested',
+        message: 'Your reviewer asked for a cleaner or more complete take. Continue the loop only when you are ready to resend.',
+      }
+    }
+    if (canStudentClose && statusKey === 'declined_unrelated') {
+      return {
+        tone: 'border-rose-200 bg-rose-50',
+        title: 'Matching take needed',
+        message: 'Your reviewer said this take does not match the request. Continue only if you want to send the right take.',
+      }
+    }
+    if (canStudentClose && statusKey === 'flagged') {
+      return {
+        tone: 'border-red-200 bg-red-50',
+        title: 'Request flagged',
+        message: 'This request is removed from the normal reviewer inbox for now. Review the thread note before continuing.',
+      }
+    }
+    if (canStudentClose && statusKey === 'resubmitted') {
+      return {
+        tone: 'border-fuchsia-200 bg-fuchsia-50',
+        title: 'Loop continuing',
+        message: 'This thread is marked for continuation. Record the next take from your library when you are ready.',
+      }
+    }
+    return null
+  }, [canStudentClose, hasCurrentUserFeedback, memberRole, reviewRequest, reviewerName, reviewerShouldRespond, statusKey])
+  const closureBarRetryLabel = statusKey === 'needs_resubmission'
+    ? 'Continue with new take'
+    : statusKey === 'declined_unrelated'
+      ? 'Continue with matching take'
+      : 'Continue loop'
+  const closureBarSubtleText = statusKey === 'responded'
+    ? 'Feedback is ready. Watch it, then continue or close the thread.'
+    : statusKey === 'viewed'
+      ? 'You have seen the feedback. Continue when you are ready, or close this thread.'
+      : statusKey === 'needs_resubmission'
+        ? 'Your reviewer asked for a new take.'
+        : statusKey === 'declined_unrelated'
+          ? 'This take did not match the requested thread.'
+          : statusKey === 'flagged'
+            ? 'This request is flagged and removed from the normal reviewer inbox.'
+            : statusKey === 'resubmitted'
+              ? 'Loop marked for continuation. Record the next take from your library when ready.'
+              : 'Ready to close this thread'
 
   const reasonLabel = (value = '') => {
     const normalized = String(value || '').trim().toLowerCase()
@@ -250,7 +395,21 @@ function ReviewPage({ reviewToken = '' }) {
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(data?.error || 'Could not update request')
     setReviewRequest((current) => ({ ...(current || {}), ...data }))
+    return data
   }
+
+  const continueLoopDraft = useMemo(() => {
+    if (!reviewRequest?.id || !reviewRequest?.reviewer?.id) return null
+    return {
+      parent_request_id: reviewRequest.id,
+      reviewer: reviewRequest.reviewer,
+      instrument: reviewRequest.instrument || 'drums',
+      goal: reviewRequest.goal || '',
+      exercise_or_song: reviewRequest.exercise_or_song || '',
+      notes: reviewRequest.notes || '',
+      practiceSeries: session?.practice_series || '',
+    }
+  }, [reviewRequest, session?.practice_series])
 
   const handleCloseRequest = async () => {
     if (!canShowClosure || closing) return
@@ -262,7 +421,19 @@ function ReviewPage({ reviewToken = '' }) {
   const handleRetryRequest = async () => {
     if (!canShowRetry || closing) return
     setClosing(true)
-    try { await patchReviewRequestStatus('resubmitted') } catch {}
+    try {
+      const updated = await patchReviewRequestStatus('resubmitted')
+      const draft = continueLoopDraft || {
+        parent_request_id: updated?.id,
+        reviewer: updated?.reviewer,
+        instrument: updated?.instrument || 'drums',
+        goal: updated?.goal || '',
+        exercise_or_song: updated?.exercise_or_song || '',
+        notes: updated?.notes || '',
+        practiceSeries: session?.practice_series || '',
+      }
+      onContinueLoop?.(draft)
+    } catch {}
     setClosing(false)
   }
 
@@ -616,15 +787,26 @@ function ReviewPage({ reviewToken = '' }) {
     <div className="min-h-screen bg-white px-4 py-6 sm:px-6">
       <main className="max-w-3xl mx-auto space-y-4">
         <div>
-          <div className="flex items-center justify-between gap-3">
-            <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Leave video feedback</h1>
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Private review</p>
+          <div className="flex items-start justify-between gap-3 mt-2">
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">{reviewPageHeading.title}</h1>
+              <p className="text-sm text-gray-600 mt-1">{reviewPageHeading.subtitle}</p>
+            </div>
             {reviewRequest ? <StatusChip status={reviewRequest.status} /> : null}
           </div>
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Private review</p>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mt-2">Respond with video</h1>
           <p className="text-xs text-gray-500 mt-2">Signed in as {user.display_name || user.username}.</p>
           {link?.expires_at ? <p className="text-xs text-gray-500 mt-1">Private access • sign-in required • expires {new Date(link.expires_at).toLocaleString(undefined, { hour12: undefined })}</p> : null}
         </div>
+
+        {statusBanner ? (
+          <div className={`rounded-xl border px-4 py-3 ${statusBanner.tone}`}>
+            <p className="text-sm font-semibold text-gray-900">{statusBanner.title}</p>
+            <p className="text-sm text-gray-700 mt-1">{statusBanner.message}</p>
+            {reviewRequest?.status_reason ? <p className="text-xs text-gray-600 mt-2">Reason: {reasonLabel(reviewRequest.status_reason)}</p> : null}
+            {reviewRequest?.status_note ? <p className="text-xs text-gray-600 mt-1">Note: {reviewRequest.status_note}</p> : null}
+          </div>
+        ) : null}
 
         {/* Thread title is enough; omit extra request metadata here */}
 
@@ -939,17 +1121,9 @@ function ReviewPage({ reviewToken = '' }) {
           canRetry={canShowRetry}
           onClose={handleCloseRequest}
           onRetry={handleRetryRequest}
-          subtleText={
-            statusKey === 'responded'
-              ? 'Feedback delivered • Finish the loop when ready'
-              : statusKey === 'needs_resubmission'
-                ? 'Reviewer asked for a new take'
-                : statusKey === 'declined_unrelated'
-                  ? 'This take did not match the requested thread'
-                  : statusKey === 'flagged'
-                    ? 'This request is flagged and removed from the normal reviewer inbox'
-                    : 'Ready to close this thread'
-          }
+          subtleText={closureBarSubtleText}
+          retryLabel={closureBarRetryLabel}
+          closeLabel="Close thread"
         />
       ) : null}
     </div>
