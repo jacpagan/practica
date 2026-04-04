@@ -665,6 +665,7 @@ function AppContent() {
             sessionsLoading={sessionsLoading}
             onOpenSession={(session, returnRoute) => openSession(session, returnRoute || { view: 'calendar', sessionId: null, seriesName: '' })}
             onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
+            onContinueThread={(seriesName) => handleRecordAnother({ practiceSeries: String(seriesName || '').trim() })}
             onOpenListDate={(dateKey) => {
               try { window.localStorage.setItem('practica.filter.date.v1', String(dateKey || '')) } catch {}
               navigate({ view: 'calendar', sessionId: null, date: String(dateKey || '') })

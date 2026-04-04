@@ -37,7 +37,7 @@ const formatKey = (d) => {
   return `${yyyy}-${mm}-${dd}`
 }
 
-function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, onOpenSeries, onMonthChange, onOpenListDate }) {
+function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, onOpenSeries, onMonthChange, onOpenListDate, onContinueThread }) {
   const today = startOfDay(new Date())
   const [activeMonth, setActiveMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
   const DATE_FILTER_KEY = 'practica.filter.date.v1'
@@ -312,6 +312,13 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
                           <p className="text-xs uppercase tracking-wide text-gray-500">{group.seriesName}</p>
                           {group.seriesName !== '(no thread)' && (
                             <div className="flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={() => onContinueThread?.(group.seriesName)}
+                                className="text-xs text-gray-600 hover:text-gray-900"
+                              >
+                                Continue thread
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => onOpenSeries?.(group.seriesName)}
