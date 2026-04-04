@@ -314,7 +314,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
                             <div className="flex items-center gap-3">
                               <button
                                 type="button"
-                                onClick={() => onContinueThread?.(group.seriesName)}
+                                onClick={() => onContinueThread?.(group.seriesName, selectedDateKey)}
                                 className="text-xs text-gray-600 hover:text-gray-900"
                               >
                                 Continue thread
