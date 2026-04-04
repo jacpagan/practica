@@ -6,11 +6,28 @@ import { useAuth } from '../auth'
 import { useToast } from './Toast'
 
 const monthLabel = (date) => date.toLocaleString(undefined, { month: 'long', year: 'numeric' })
+const dayLabel = (date) => date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+const TODAY_KEY = (() => {
+  const now = new Date()
+  const yyyy = now.getFullYear()
+  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  const dd = String(now.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+})()
+const UNTHREADED_LABEL = 'Unthreaded'
 
 const startOfDay = (d) => {
   const nd = new Date(d)
   nd.setHours(0, 0, 0, 0)
   return nd
+}
+
+const parseDateKey = (key) => {
+  const raw = String(key || '').trim()
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return startOfDay(new Date())
+  const [, year, month, day] = match
+  return new Date(Number(year), Number(month) - 1, Number(day))
 }
 
 const formatKey = (d) => {
@@ -68,19 +85,54 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
     return map
   }, [sessions])
 
+  const daySummaries = useMemo(() => {
+    const map = new Map()
+    sessions.forEach((session) => {
+      const when = new Date(session.recorded_at || session.created_at)
+      const key = formatKey(startOfDay(when))
+      if (!map.has(key)) {
+        map.set(key, { count: 0, seriesMap: new Map() })
+      }
+      const entry = map.get(key)
+      entry.count += 1
+      const seriesName = String(session.practice_series || '').trim() || UNTHREADED_LABEL
+      const current = entry.seriesMap.get(seriesName) || { count: 0, latestAt: 0 }
+      entry.seriesMap.set(seriesName, {
+        count: current.count + 1,
+        latestAt: Math.max(current.latestAt, when.getTime() || 0),
+      })
+    })
+
+    return new Map(Array.from(map.entries()).map(([key, value]) => {
+      const rankedSeries = Array.from(value.seriesMap.entries())
+        .sort((left, right) => {
+          if (right[1].count !== left[1].count) return right[1].count - left[1].count
+          return right[1].latestAt - left[1].latestAt
+        })
+        .map(([seriesName]) => seriesName)
+      return [key, {
+        count: value.count,
+        topSeriesNames: rankedSeries.slice(0, 2),
+        extraSeriesCount: Math.max(0, rankedSeries.length - 2),
+      }]
+    }))
+  }, [sessions])
+
   const days = useMemo(() => {
     const items = []
     const d = new Date(monthBounds.gridStart)
     while (d <= monthBounds.gridEnd) {
       const key = formatKey(d)
       const inMonth = d.getMonth() === activeMonth.getMonth()
-      items.push({ key, date: new Date(d), inMonth, count: (sessionsByDate.get(key) || []).length })
+      const summary = daySummaries.get(key) || { count: 0, topSeriesNames: [], extraSeriesCount: 0 }
+      items.push({ key, date: new Date(d), inMonth, count: summary.count, summary })
       d.setDate(d.getDate() + 1)
     }
     return items
-  }, [activeMonth, monthBounds.gridEnd, monthBounds.gridStart, sessionsByDate])
+  }, [activeMonth, daySummaries, monthBounds.gridEnd, monthBounds.gridStart])
 
   const selectedSessions = useMemo(() => sessionsByDate.get(selectedDateKey) || [], [sessionsByDate, selectedDateKey])
+  const selectedDate = useMemo(() => parseDateKey(selectedDateKey), [selectedDateKey])
 
   const sessionsByThread = useMemo(() => {
     const groups = new Map()
@@ -116,6 +168,24 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
   const gotoNextMonth = useCallback(() => {
     setActiveMonth((cur) => new Date(cur.getFullYear(), cur.getMonth() + 1, 1))
   }, [])
+  const gotoToday = useCallback(() => {
+    const todayDate = parseDateKey(TODAY_KEY)
+    setActiveMonth(new Date(todayDate.getFullYear(), todayDate.getMonth(), 1))
+    setSelectedDateKey(TODAY_KEY)
+  }, [])
+
+  const openDate = useCallback((dateKey) => {
+    setSelectedDateKey(dateKey)
+    setShowDayModal(true)
+  }, [])
+
+  const moveSelectedDay = useCallback((deltaDays) => {
+    const nextDate = parseDateKey(selectedDateKey)
+    nextDate.setDate(nextDate.getDate() + deltaDays)
+    setSelectedDateKey(formatKey(nextDate))
+    setActiveMonth(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1))
+    setShowDayModal(true)
+  }, [selectedDateKey])
 
   const weekLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -124,6 +194,10 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
     try { onMonthChange?.(new Date(activeMonth)) } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMonth])
+
+  useEffect(() => {
+    try { window.localStorage.setItem(DATE_FILTER_KEY, selectedDateKey) } catch {}
+  }, [DATE_FILTER_KEY, selectedDateKey])
 
   return (
     <div className="px-4 sm:px-6 py-6">
@@ -135,6 +209,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
           </div>
           <div className="flex items-center gap-2">
             <button type="button" onClick={gotoPrevMonth} className="rounded-full border border-gray-200 bg-white text-gray-900 px-3 py-1.5 text-sm hover:bg-gray-50">Prev</button>
+            <button type="button" onClick={gotoToday} className="rounded-full border border-gray-200 bg-white text-gray-900 px-3 py-1.5 text-sm hover:bg-gray-50">Today</button>
             <div className="text-sm font-medium text-gray-900">{monthLabel(activeMonth)}</div>
             <button type="button" onClick={gotoNextMonth} className="rounded-full border border-gray-200 bg-white text-gray-900 px-3 py-1.5 text-sm hover:bg-gray-50">Next</button>
           </div>
@@ -149,11 +224,12 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
               const isToday = formatKey(d.date) === formatKey(new Date())
               const isSelected = d.key === selectedDateKey
               const has = d.count > 0
+              const topSeriesNames = d.summary.topSeriesNames || []
               return (
                 <button
                   key={d.key}
                   type="button"
-                  onClick={() => { setSelectedDateKey(d.key); setShowDayModal(true) }}
+                  onClick={() => openDate(d.key)}
                   className={`h-20 rounded-xl border text-left p-2 transition-colors ${
                     isSelected ? 'border-gray-900 bg-gray-900/5' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
                   } ${d.inMonth ? '' : 'opacity-50'}`}
@@ -163,10 +239,22 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
                     {isToday ? <span className="text-[10px] text-gray-500">Today</span> : null}
                   </div>
                   {has ? (
-                    <div className="mt-3">
-                      <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
+                    <div className="mt-2 space-y-1">
+                      <span className="inline-flex text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
                         {d.count} {d.count === 1 ? 'take' : 'takes'}
                       </span>
+                      {topSeriesNames.length ? (
+                        <div className="space-y-0.5">
+                          {topSeriesNames.map((seriesName) => (
+                            <p key={seriesName} className="text-[10px] leading-tight text-gray-500 truncate">
+                              {seriesName}
+                            </p>
+                          ))}
+                          {d.summary.extraSeriesCount > 0 ? (
+                            <p className="text-[10px] leading-tight text-gray-400">+{d.summary.extraSeriesCount} more</p>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
                 </button>
@@ -182,10 +270,24 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
             <div className="absolute inset-x-4 sm:inset-x-auto sm:right-6 sm:w-[520px] top-10 bottom-10 rounded-2xl bg-white shadow-xl border border-gray-200 flex flex-col">
               <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">{selectedDateKey}</p>
+                  <p className="text-sm font-semibold text-gray-900">{dayLabel(selectedDate)}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{selectedSessions.length} {selectedSessions.length === 1 ? 'take' : 'takes'}</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => moveSelectedDay(-1)}
+                    className="text-xs text-gray-500 hover:text-gray-900 rounded-lg border border-gray-200 px-2 py-1"
+                  >
+                    Prev day
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveSelectedDay(1)}
+                    className="text-xs text-gray-500 hover:text-gray-900 rounded-lg border border-gray-200 px-2 py-1"
+                  >
+                    Next day
+                  </button>
                   <button
                     type="button"
                     onClick={() => setNewestFirst((v) => !v)}
