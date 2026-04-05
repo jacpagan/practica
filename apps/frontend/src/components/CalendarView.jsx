@@ -74,6 +74,15 @@ const requestSignalPriority = (status = '') => {
   return 0
 }
 
+const requestStatusRank = (status = '') => {
+  const normalized = String(status || '').trim().toLowerCase()
+  if (['needs_resubmission', 'declined_unrelated'].includes(normalized)) return 4
+  if (['responded', 'viewed'].includes(normalized)) return 3
+  if (normalized === 'resubmitted') return 2
+  if (['requested', 'opened'].includes(normalized)) return 1
+  return 0
+}
+
 function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '', reviewRequests = [], onOpenSession, onOpenSeries, onMonthChange, onOpenListDate, onContinueThread }) {
   const today = startOfDay(new Date())
   const initialMonthDate = routeDateKey ? parseDateKey(routeDateKey) : today
@@ -88,7 +97,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
   const [editing, setEditing] = useState(null)
   const [renamingThread, setRenamingThread] = useState('')
   const [saving, setSaving] = useState(false)
-  const [pendingFollowUpSignal, setPendingFollowUpSignal] = useState('')
+  const [pendingFollowUpTarget, setPendingFollowUpTarget] = useState(null)
   const [highlightedGroupName, setHighlightedGroupName] = useState('')
   const groupRefs = useRef(new Map())
   const threadOptions = useMemo(() => Array.from(new Set(sessions.map(s => String(s.practice_series || '').trim()).filter(Boolean))).sort(), [sessions])
@@ -147,7 +156,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
       const when = new Date(session.recorded_at || session.created_at)
       const key = formatKey(startOfDay(when))
       if (!map.has(key)) {
-        map.set(key, { count: 0, seriesMap: new Map(), followUpSignal: '' })
+        map.set(key, { count: 0, seriesMap: new Map(), followUpStatus: '', followUpSeriesName: '', followUpUpdatedAt: 0 })
       }
       const entry = map.get(key)
       entry.count += 1
@@ -159,8 +168,13 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
       })
 
       const requestStatus = String(activeRequestBySessionId.get(Number(session.id))?.status || '').trim().toLowerCase()
-      if (requestSignalPriority(requestStatus) > requestSignalPriority(entry.followUpSignal)) {
-        entry.followUpSignal = requestStatus
+      const requestUpdatedAt = new Date(activeRequestBySessionId.get(Number(session.id))?.updated_at || activeRequestBySessionId.get(Number(session.id))?.created_at || when).getTime() || 0
+      const nextRank = requestStatusRank(requestStatus)
+      const currentRank = requestStatusRank(entry.followUpStatus)
+      if (nextRank > currentRank || (nextRank === currentRank && requestUpdatedAt > entry.followUpUpdatedAt)) {
+        entry.followUpStatus = requestStatus
+        entry.followUpSeriesName = seriesName
+        entry.followUpUpdatedAt = requestUpdatedAt
       }
     })
 
@@ -175,7 +189,8 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
         count: value.count,
         topSeriesNames: rankedSeries.slice(0, 2),
         extraSeriesCount: Math.max(0, rankedSeries.length - 2),
-        followUpSignal: requestSignalKey(value.followUpSignal),
+        followUpSignal: requestSignalKey(value.followUpStatus),
+        followUpSeriesName: value.followUpSeriesName,
       }]
     }))
   }, [activeRequestBySessionId, sessions])
@@ -242,9 +257,40 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
       activeDays,
       topThreadName: topThread?.[0] || '',
       topThreadCount: topThread?.[1] || 0,
-      followUpDays: Array.from(daySummaries.values()).filter((item) => item.followUpSignal === 'feedback_ready').length,
+      feedbackReadyDays: Array.from(daySummaries.values()).filter((item) => item.followUpSignal === 'feedback_ready').length,
+      awaitingReviewDays: Array.from(daySummaries.values()).filter((item) => item.followUpSignal === 'awaiting_review').length,
     }
   }, [daySummaries, sessions])
+
+  const smartFollowUpTarget = useMemo(() => {
+    let best = null
+    sessions.forEach((session) => {
+      const requestItem = activeRequestBySessionId.get(Number(session.id))
+      const status = String(requestItem?.status || '').trim().toLowerCase()
+      const rank = requestStatusRank(status)
+      if (!rank) return
+      const updatedAt = new Date(requestItem?.updated_at || requestItem?.created_at || session.recorded_at || session.created_at).getTime() || 0
+      const candidate = {
+        dateKey: formatKey(startOfDay(new Date(session.recorded_at || session.created_at))),
+        signal: requestSignalKey(status),
+        seriesName: String(session.practice_series || '').trim() || '(no thread)',
+        status,
+        rank,
+        updatedAt,
+      }
+      if (!best || candidate.rank > best.rank || (candidate.rank === best.rank && candidate.updatedAt > best.updatedAt)) {
+        best = candidate
+      }
+    })
+    return best
+  }, [activeRequestBySessionId, sessions])
+
+  const smartFollowUpLabel = useMemo(() => {
+    if (!smartFollowUpTarget) return ''
+    if (['needs_resubmission', 'declined_unrelated'].includes(smartFollowUpTarget.status)) return 'Record next take'
+    if (smartFollowUpTarget.signal === 'feedback_ready') return 'Review feedback'
+    return 'Check latest review'
+  }, [smartFollowUpTarget])
 
   const selectedThreadCount = sessionsByThread.length
 
@@ -260,16 +306,16 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
     setSelectedDateKey(TODAY_KEY)
   }, [])
 
-  const openDate = useCallback((dateKey, followUpSignal = '') => {
+  const openDate = useCallback((dateKey, followUpTarget = null) => {
     setSelectedDateKey(dateKey)
     setShowDayModal(true)
-    setPendingFollowUpSignal(followUpSignal)
+    setPendingFollowUpTarget(followUpTarget)
     onOpenListDate?.(dateKey)
   }, [onOpenListDate])
 
   const closeDayModal = useCallback(() => {
     setShowDayModal(false)
-    setPendingFollowUpSignal('')
+    setPendingFollowUpTarget(null)
     setHighlightedGroupName('')
     onOpenListDate?.('')
   }, [onOpenListDate])
@@ -316,20 +362,23 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
   }, [routeDateKey])
 
   useEffect(() => {
-    if (!showDayModal || !pendingFollowUpSignal) return
-    const targetGroup = sessionsByThread.find((group) => requestSignalKey(group.activeRequest?.status) === pendingFollowUpSignal)
+    if (!showDayModal || !pendingFollowUpTarget) return
+    const targetGroup = sessionsByThread.find((group) => {
+      if (pendingFollowUpTarget.seriesName && group.seriesName === pendingFollowUpTarget.seriesName) return true
+      return requestSignalKey(group.activeRequest?.status) === pendingFollowUpTarget.signal
+    })
     if (!targetGroup?.seriesName) return
     setHighlightedGroupName(targetGroup.seriesName)
     const frameId = requestAnimationFrame(() => {
       groupRefs.current.get(targetGroup.seriesName)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      setPendingFollowUpSignal('')
+      setPendingFollowUpTarget(null)
     })
     const timerId = window.setTimeout(() => setHighlightedGroupName(''), 1800)
     return () => {
       cancelAnimationFrame(frameId)
       window.clearTimeout(timerId)
     }
-  }, [pendingFollowUpSignal, sessionsByThread, showDayModal])
+  }, [pendingFollowUpTarget, sessionsByThread, showDayModal])
 
   return (
     <div className="px-4 sm:px-6 py-6">
@@ -345,10 +394,18 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
               <span className="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
                 {monthStats.activeDays} active {monthStats.activeDays === 1 ? 'day' : 'days'}
               </span>
-              {monthStats.followUpDays > 0 ? (
-                <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">
-                  {monthStats.followUpDays} follow-up {monthStats.followUpDays === 1 ? 'day' : 'days'}
-                </span>
+              {smartFollowUpTarget ? (
+                <button
+                  type="button"
+                  onClick={() => openDate(smartFollowUpTarget.dateKey, smartFollowUpTarget)}
+                  className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${requestSignalMeta[smartFollowUpTarget.signal]?.dayTone || 'bg-gray-100 text-gray-700'}`}
+                  title={smartFollowUpTarget.seriesName ? `${smartFollowUpLabel} in ${smartFollowUpTarget.seriesName}` : smartFollowUpLabel}
+                >
+                  {smartFollowUpLabel}
+                  <span className="ml-2 opacity-75">
+                    {smartFollowUpTarget.signal === 'feedback_ready' ? monthStats.feedbackReadyDays : monthStats.awaitingReviewDays}
+                  </span>
+                </button>
               ) : null}
               {monthStats.topThreadName ? (
                 <span className="hidden sm:inline-flex items-center rounded-full bg-white border border-gray-200 px-3 py-1 text-xs font-medium text-gray-700">
@@ -450,7 +507,10 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                       type="button"
                       onClick={(event) => {
                         event.stopPropagation()
-                        openDate(d.key, d.summary.followUpSignal)
+                        openDate(d.key, {
+                          signal: d.summary.followUpSignal,
+                          seriesName: d.summary.followUpSeriesName || '',
+                        })
                       }}
                       className={`absolute bottom-1.5 left-1.5 z-20 inline-flex rounded-full px-1.5 py-0.5 text-[10px] sm:bottom-2 sm:left-2 sm:px-2 sm:py-1 sm:text-[11px] ${followUpMeta.dayTone}`}
                     >
