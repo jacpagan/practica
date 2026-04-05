@@ -6,7 +6,8 @@ test.beforeAll(async ({ request }) => {
 
 test('Privacy page renders without API and shows content', async ({ page }) => {
   await page.goto('/privacy')
-  await expect(page.getByRole('heading', { name: 'Private by default' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Your private practice mirror' })).toBeVisible()
+  await expect(page.locator('text=private self-review first').first()).toBeVisible()
 })
 
 test('Library route (signed-out) shows Auth form without crashing', async ({ page }) => {
