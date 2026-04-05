@@ -216,7 +216,15 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
     onOpenListDate?.(nextKey)
   }, [onOpenListDate, selectedDateKey])
 
-  const weekLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const weekLabels = [
+    { short: 'S', full: 'Sun' },
+    { short: 'M', full: 'Mon' },
+    { short: 'T', full: 'Tue' },
+    { short: 'W', full: 'Wed' },
+    { short: 'T', full: 'Thu' },
+    { short: 'F', full: 'Fri' },
+    { short: 'S', full: 'Sat' },
+  ]
 
   // Notify parent when month changes so it can load month-bounded data
   React.useEffect(() => {
@@ -254,23 +262,30 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                 {monthStats.activeDays} active {monthStats.activeDays === 1 ? 'day' : 'days'}
               </span>
               {monthStats.topThreadName ? (
-                <span className="inline-flex items-center rounded-full bg-white border border-gray-200 px-3 py-1 text-xs font-medium text-gray-700">
+                <span className="hidden sm:inline-flex items-center rounded-full bg-white border border-gray-200 px-3 py-1 text-xs font-medium text-gray-700">
                   Top thread: {monthStats.topThreadName} · {monthStats.topThreadCount}
                 </span>
               ) : null}
             </div>
           </div>
-          <div className="flex items-center gap-2 self-start rounded-2xl border border-gray-200 bg-white p-1 shadow-sm">
-            <button type="button" onClick={gotoPrevMonth} className="rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Prev</button>
-            <div className="min-w-[140px] text-center text-sm font-medium text-gray-900">{monthLabel(activeMonth)}</div>
-            <button type="button" onClick={gotoNextMonth} className="rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Next</button>
-            <button type="button" onClick={gotoToday} className="rounded-xl bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800">Today</button>
+          <div className="w-full sm:w-auto">
+            <div className="flex items-center gap-1 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm sm:gap-2">
+              <button type="button" onClick={gotoPrevMonth} className="rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Prev</button>
+              <div className="flex-1 min-w-0 text-center text-sm font-medium text-gray-900 sm:min-w-[140px]">{monthLabel(activeMonth)}</div>
+              <button type="button" onClick={gotoNextMonth} className="rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Next</button>
+              <button type="button" onClick={gotoToday} className="rounded-xl bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800">Today</button>
+            </div>
           </div>
         </div>
 
         <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
           <div className="grid grid-cols-7 gap-2 text-[11px] text-gray-500 mb-3">
-            {weekLabels.map((w) => (<div key={w} className="text-center uppercase tracking-wide">{w}</div>))}
+            {weekLabels.map((w) => (
+              <div key={w.full} className="text-center uppercase tracking-wide">
+                <span className="sm:hidden">{w.short}</span>
+                <span className="hidden sm:inline">{w.full}</span>
+              </div>
+            ))}
           </div>
           <div className="grid grid-cols-7 gap-2">
             {days.map((d) => {
@@ -289,7 +304,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                   type="button"
                   onClick={() => openDate(d.key)}
                   aria-pressed={isSelected}
-                  className={`relative h-24 rounded-2xl border text-left p-2.5 transition-all ${
+                  className={`relative h-[78px] sm:h-24 rounded-2xl border text-left p-1.5 sm:p-2.5 transition-all ${
                     isSelected
                       ? 'border-gray-900 bg-gray-900 text-white shadow-md'
                       : has
@@ -299,16 +314,16 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                 >
                   {!isSelected && has ? <div className={`absolute inset-x-0 top-0 h-1 ${intensityClass}`} /> : null}
                   <div className="flex items-center justify-between text-xs relative z-10">
-                    <span className={isSelected ? 'text-white' : 'text-gray-700'}>{d.date.getDate()}</span>
+                    <span className={`text-xs sm:text-sm ${isSelected ? 'text-white' : 'text-gray-700'}`}>{d.date.getDate()}</span>
                     {isToday ? (
-                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${isSelected ? 'bg-white/15 text-white' : 'bg-gray-900/5 text-gray-600'}`}>
+                      <span className={`rounded-full px-1 py-0.5 text-[9px] sm:px-1.5 sm:text-[10px] ${isSelected ? 'bg-white/15 text-white' : 'bg-gray-900/5 text-gray-600'}`}>
                         Today
                       </span>
                     ) : null}
                   </div>
                   {has ? (
-                    <div className="mt-2 space-y-1.5 relative z-10">
-                      <span className={`inline-flex text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${isSelected ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-700'}`}>
+                    <div className="mt-1.5 sm:mt-2 space-y-1 sm:space-y-1.5 relative z-10">
+                      <span className={`inline-flex text-[10px] sm:text-[11px] uppercase tracking-wide px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${isSelected ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-700'}`}>
                         {d.count} {d.count === 1 ? 'take' : 'takes'}
                       </span>
                       <div className="flex items-center gap-1">
@@ -317,7 +332,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                         ))}
                       </div>
                       {topSeriesNames.length ? (
-                        <div className="space-y-0.5">
+                        <div className="hidden sm:block space-y-0.5">
                           {topSeriesNames.map((seriesName) => (
                             <p key={seriesName} className={`text-[10px] leading-tight truncate ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>
                               {seriesName}
@@ -340,8 +355,8 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
         {showDayModal ? (
           <div className="fixed inset-0 z-50">
             <div className="absolute inset-0 bg-black/30" onClick={closeDayModal} />
-            <div className="absolute inset-x-4 sm:inset-x-auto sm:right-6 sm:w-[560px] top-10 bottom-10 rounded-3xl bg-white shadow-2xl border border-gray-200 flex flex-col overflow-hidden">
-              <div className="px-4 py-4 border-b border-gray-100 flex items-start justify-between gap-3 bg-white/95 backdrop-blur">
+            <div className="absolute inset-x-0 bottom-0 top-20 rounded-t-3xl rounded-b-none bg-white shadow-2xl border border-gray-200 flex flex-col overflow-hidden sm:inset-x-auto sm:right-6 sm:w-[560px] sm:top-10 sm:bottom-10 sm:rounded-3xl">
+              <div className="px-4 py-4 border-b border-gray-100 flex flex-col items-stretch justify-between gap-3 bg-white/95 backdrop-blur sm:flex-row sm:items-start">
                 <div className="space-y-2">
                   <p className="text-sm font-semibold text-gray-900">{dayLabel(selectedDate)}</p>
                   <div className="flex flex-wrap items-center gap-2">
@@ -353,33 +368,33 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap justify-end">
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-wrap sm:justify-end">
                   <button
                     type="button"
                     onClick={() => moveSelectedDay(-1)}
-                    className="text-xs text-gray-500 hover:text-gray-900 rounded-lg border border-gray-200 px-2 py-1"
+                    className="text-xs text-gray-500 hover:text-gray-900 rounded-lg border border-gray-200 px-2 py-2"
                   >
                     Prev day
                   </button>
                   <button
                     type="button"
                     onClick={() => moveSelectedDay(1)}
-                    className="text-xs text-gray-500 hover:text-gray-900 rounded-lg border border-gray-200 px-2 py-1"
+                    className="text-xs text-gray-500 hover:text-gray-900 rounded-lg border border-gray-200 px-2 py-2"
                   >
                     Next day
                   </button>
                   <button
                     type="button"
                     onClick={() => setNewestFirst((v) => !v)}
-                    className={`text-[11px] rounded-full px-2.5 py-1 border ${newestFirst ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
+                    className={`col-span-2 text-[11px] rounded-xl px-2.5 py-2 border sm:col-span-1 sm:rounded-full sm:py-1 ${newestFirst ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
                     title="Toggle sort order"
                   >
                     {newestFirst ? 'Newest first' : 'Oldest first'}
                   </button>
-                  <button type="button" onClick={closeDayModal} className="text-xs text-gray-500 hover:text-gray-900 rounded-lg border border-gray-200 px-2 py-1">Close</button>
+                  <button type="button" onClick={closeDayModal} className="col-span-2 text-xs text-gray-500 hover:text-gray-900 rounded-lg border border-gray-200 px-2 py-2 sm:col-span-1 sm:px-2 sm:py-1">Close</button>
                 </div>
               </div>
-              <div className="p-4 overflow-y-auto">
+              <div className="p-4 overflow-y-auto pb-6 sm:pb-4">
                 {sessionsLoading ? (
                   <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-500">Loading…</div>
                 ) : sessionsByThread.length === 0 ? (
@@ -397,11 +412,11 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                             <p className="text-xs text-gray-500 mt-1">{group.items.length} {group.items.length === 1 ? 'take' : 'takes'} in this thread</p>
                           </div>
                           {group.seriesName !== '(no thread)' && (
-                            <div className="flex items-center gap-2 flex-wrap">
+                            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center sm:flex-wrap">
                               <button
                                 type="button"
                                 onClick={() => onContinueThread?.(group.seriesName, selectedDateKey)}
-                                className="rounded-xl bg-gray-900 px-3 py-2 text-xs font-medium text-white hover:bg-gray-800"
+                                className="col-span-2 rounded-xl bg-gray-900 px-3 py-2 text-xs font-medium text-white hover:bg-gray-800 sm:col-span-1"
                               >
                                 Continue thread
                               </button>
