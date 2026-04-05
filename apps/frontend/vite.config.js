@@ -6,6 +6,7 @@ const enableSourcemaps = !!(process.env.VITE_SOURCEMAP || process.env.VITE_SOURC
 // Allow minifier override to help isolate prod-only minifier issues
 // Values: 'esbuild' (default) or 'terser'
 const minifyChoice = process.env.VITE_MINIFY === 'terser' ? 'terser' : 'esbuild'
+const apiProxyTarget = process.env.VITE_API_PROXY_TARGET || 'http://localhost:8000'
 
 export default defineConfig({
   plugins: [react()],
@@ -14,12 +15,22 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: apiProxyTarget,
         changeOrigin: true,
         secure: false,
       },
       '/media': {
-        target: 'http://localhost:8000',
+        target: apiProxyTarget,
+        changeOrigin: true,
+        secure: false,
+      },
+      '/health': {
+        target: apiProxyTarget,
+        changeOrigin: true,
+        secure: false,
+      },
+      '/ready': {
+        target: apiProxyTarget,
         changeOrigin: true,
         secure: false,
       }

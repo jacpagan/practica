@@ -9,10 +9,18 @@ export default defineConfig({
     viewport: { width: 1280, height: 800 },
   },
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
-  webServer: {
-    command: 'npm run preview -- --port 4173',
-    port: 4173,
-    reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
-  },
+  webServer: [
+    {
+      command: '../../scripts/run-e2e-backend.sh',
+      port: 8010,
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+    {
+      command: 'VITE_API_PROXY_TARGET=http://127.0.0.1:8010 npm run dev -- --host 127.0.0.1 --port 4173',
+      port: 4173,
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+  ],
 })
