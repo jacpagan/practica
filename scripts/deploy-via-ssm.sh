@@ -7,6 +7,7 @@ ECR_REGISTRY_B64=$(printf '%s' "${ECR_REGISTRY:-}" | base64 | tr -d '\n')
 ECR_PASSWORD_B64=$(printf '%s' "${ECR_PASSWORD:-}" | base64 | tr -d '\n')
 MEDIA_CONVERT_ROLE_ARN_B64=$(printf '%s' "${AWS_MEDIA_CONVERT_ROLE_ARN:-}" | base64 | tr -d '\n')
 MEDIA_CONVERT_ENDPOINT_URL_B64=$(printf '%s' "${AWS_MEDIA_CONVERT_ENDPOINT_URL:-}" | base64 | tr -d '\n')
+ADMIN_URL_B64=$(printf '%s' "${ADMIN_URL:-}" | base64 | tr -d '\n')
 
 REMOTE_SCRIPT=$(cat <<'EOS'
 #!/usr/bin/env bash
@@ -68,6 +69,7 @@ export DEPLOYED_GIT_SHA=$(git rev-parse HEAD 2>/dev/null || echo '')
 printf '%s' "__ENV_B64__" | base64 -d > .env.production
 MEDIA_CONVERT_ROLE_ARN=$(printf '%s' "__MEDIA_CONVERT_ROLE_ARN_B64__" | base64 -d)
 MEDIA_CONVERT_ENDPOINT_URL=$(printf '%s' "__MEDIA_CONVERT_ENDPOINT_URL_B64__" | base64 -d)
+ADMIN_URL=$(printf '%s' "__ADMIN_URL_B64__" | base64 -d)
 python3 - <<'PY'
 from pathlib import Path
 import os
@@ -77,10 +79,13 @@ lines = p.read_text().splitlines()
 updates = {}
 role_arn = os.environ.get('MEDIA_CONVERT_ROLE_ARN', '').strip()
 endpoint_url = os.environ.get('MEDIA_CONVERT_ENDPOINT_URL', '').strip()
+admin_url = os.environ.get('ADMIN_URL', '').strip()
 if role_arn:
     updates['AWS_MEDIA_CONVERT_ROLE_ARN'] = role_arn
 if endpoint_url:
     updates['AWS_MEDIA_CONVERT_ENDPOINT_URL'] = endpoint_url
+if admin_url:
+    updates['ADMIN_URL'] = admin_url
 
 if updates:
     out = []
@@ -285,6 +290,7 @@ REMOTE_SCRIPT="${REMOTE_SCRIPT//__ECR_REGISTRY_B64__/$ECR_REGISTRY_B64}"
 REMOTE_SCRIPT="${REMOTE_SCRIPT//__ECR_PASSWORD_B64__/$ECR_PASSWORD_B64}"
 REMOTE_SCRIPT="${REMOTE_SCRIPT//__MEDIA_CONVERT_ROLE_ARN_B64__/$MEDIA_CONVERT_ROLE_ARN_B64}"
 REMOTE_SCRIPT="${REMOTE_SCRIPT//__MEDIA_CONVERT_ENDPOINT_URL_B64__/$MEDIA_CONVERT_ENDPOINT_URL_B64}"
+REMOTE_SCRIPT="${REMOTE_SCRIPT//__ADMIN_URL_B64__/$ADMIN_URL_B64}"
 REMOTE_SCRIPT="${REMOTE_SCRIPT//__GIT_REF__/${GIT_REF:-main}}"
 REMOTE_B64=$(printf '%s' "$REMOTE_SCRIPT" | base64 | tr -d '\n')
 COMMAND="mkdir -p /opt/practica /opt/practica-runtime /opt/practica-backups && rm -f /opt/practica-runtime/.deploy-success /opt/practica-runtime/.deploy-failed && : > /opt/practica-runtime/deploy.log && echo '$REMOTE_B64' | base64 -d > /tmp/practica-deploy.sh && chmod +x /tmp/practica-deploy.sh && nohup /bin/bash /tmp/practica-deploy.sh >> /opt/practica-runtime/deploy.log 2>&1 </dev/null & echo launched"

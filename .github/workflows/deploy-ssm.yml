@@ -104,6 +104,7 @@ jobs:
           ECR_PASSWORD: ${{ steps.ecr_deploy_auth.outputs.password }}
           AWS_MEDIA_CONVERT_ROLE_ARN: ${{ secrets.AWS_MEDIA_CONVERT_ROLE_ARN }}
           AWS_MEDIA_CONVERT_ENDPOINT_URL: ${{ secrets.AWS_MEDIA_CONVERT_ENDPOINT_URL }}
+          ADMIN_URL: ${{ secrets.ADMIN_URL }}
           PUBLIC_VERIFY_TIMEOUT_SECONDS: 900
           PUBLIC_VERIFY_INTERVAL_SECONDS: 5
           PUBLIC_STABLE_SUCCESSES: 3
