@@ -66,7 +66,7 @@ class Tag(models.Model):
 
 
 class Session(models.Model):
-    """A private library video uploaded by a user."""
+    """A learner-owned private take inside the practice mirror."""
     STATUS_UPLOADED = 'uploaded'
     STATUS_PROCESSING = 'processing'
     STATUS_READY = 'ready'
@@ -137,7 +137,7 @@ class SessionAsset(models.Model):
 
 
 class MultipartSessionUpload(models.Model):
-    """Tracks direct-to-S3 multipart uploads before a library video is created."""
+    """Tracks direct-to-S3 multipart uploads before a private take is created."""
 
     STATUS_INITIATED = 'initiated'
     STATUS_COMPLETED = 'completed'
@@ -254,7 +254,7 @@ class VideoFeedback(models.Model):
 # ── Private feedback links ──────────────────────────────────────────
 
 class ReviewLink(models.Model):
-    """A time-limited private link for requesting authenticated video feedback."""
+    """A time-limited private link for inviting trusted authenticated feedback."""
     session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='review_links')
     token = models.CharField(max_length=40, unique=True)
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_review_links')
@@ -272,7 +272,7 @@ class ReviewLink(models.Model):
 
 
 class ReviewerRosterMembership(models.Model):
-    """A lightweight reviewer-member relationship for repeat async review workflows."""
+    """A lightweight trusted-reviewer relationship for repeat async feedback workflows."""
 
     reviewer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviewer_roster_memberships')
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='student_roster_memberships')
@@ -308,7 +308,7 @@ class ReviewerRosterMembership(models.Model):
 
 
 class ReviewRequest(models.Model):
-    """A structured reviewer-led feedback workflow around a member session."""
+    """A structured trusted-feedback workflow around a learner-owned take."""
 
     STATUS_REQUESTED = 'requested'
     STATUS_OPENED = 'opened'
@@ -448,7 +448,7 @@ class ReviewRequestEvent(models.Model):
 
 
 class FeedbackTemplate(models.Model):
-    """Reusable reviewer note templates for faster async feedback."""
+    """Reusable reviewer note templates for faster trusted async feedback."""
 
     reviewer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='feedback_templates')
     title = models.CharField(max_length=120)

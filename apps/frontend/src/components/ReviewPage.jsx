@@ -232,15 +232,15 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
   const reviewPageHeading = useMemo(() => {
     if (!reviewRequest) {
       return {
-        title: 'Private review',
-        subtitle: 'Watch the take and keep feedback inside one trusted thread.',
+        title: 'Trusted feedback',
+        subtitle: 'Watch the take and keep trusted feedback attached to one private thread.',
       }
     }
     if (memberRole === 'reviewer') {
       if (reviewerShouldRespond) {
         return {
-          title: 'Review this take',
-          subtitle: 'Watch the take, then record or upload one response video.',
+          title: 'Respond to this take',
+          subtitle: 'Watch the take, then record or upload one private response video.',
         }
       }
       if (hasCurrentUserFeedback) {
@@ -249,10 +249,10 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
           subtitle: 'Your feedback is already in the thread. You can update it or add another response.',
         }
       }
-      return {
-        title: 'Private review',
-        subtitle: 'This thread stays private to the owner and assigned reviewer.',
-      }
+        return {
+          title: 'Trusted feedback',
+          subtitle: 'This thread stays private to the owner and assigned reviewer.',
+        }
     }
     if (statusKey === 'responded') {
       return {
@@ -735,8 +735,8 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
     const ownerName = reviewRequest?.owner?.display_name || reviewRequest?.owner?.username || reviewRequest?.student?.display_name || reviewRequest?.student?.username || ''
     const authTitle = claimCode ? 'Continue this private review' : 'Sign in to continue'
     const authSubtitle = claimCode
-      ? 'Create your account once to watch the take, leave your response, and keep everything in one private thread.'
-      : 'This private review stays inside a trusted thread and opens right where you left off.'
+      ? 'Create your account once to watch the take, leave trusted feedback, and keep everything in one private thread.'
+      : 'This trusted feedback thread stays private and opens right where you left off.'
 
     return (
       <div className="min-h-screen bg-white px-4 py-6 sm:px-6">

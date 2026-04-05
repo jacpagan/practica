@@ -1,29 +1,41 @@
-# Documentation Index
+# Practica Docs
 
-This repository now has an explicit product-strategy source of truth.
+Practica is a private video practice mirror where learners lead their own progress and bring in trusted feedback when they want it.
 
 ## Source Of Truth
 
-- `docs/practica-v2-prd.md`: strategic product requirements document for Practica v2.
-- `docs/platform-effects-mvp-playbook.md`: shipped v1 baseline and current-product playbook for the private-library MVP.
-- `docs/flow-audit.md`: implementation audit of the shipped flows and the platform-foundation gaps that matter before and during v2.
+- `docs/practica-v2-prd.md`: strategic product direction and roadmap
+- `docs/platform-effects-mvp-playbook.md`: shipped v1 baseline
+- `docs/flow-audit.md`: current flow audit and gaps
+- `docs/platform-revolution-audit.md`: interaction and platform analysis
 
-## How To Use These Docs
+## Product Framing
 
-- Use the v2 PRD when making roadmap, copy, architecture, and prioritization decisions.
-- Use the v1 playbook when preserving or refactoring the shipped private-library and private-link workflow.
-- Use the flow audit when fixing trust, privacy, playback, and review-cycle reliability issues.
+Use this order of truth when talking about Practica:
 
-## Current Strategic Direction
+1. It is a private practice mirror.
+2. It helps learners review themselves clearly over time.
+3. It supports trusted feedback when useful.
+4. It can support structured reviewer or teacher workflows without becoming a public marketplace or heavy LMS.
 
-Practica is a private member-first video feedback platform with a teacher workflow layer.
+## Naming Guidance
 
-Key strategic decisions:
+Preferred global language:
 
-- Keep `member` as the global account identity model.
-- Use `teacher`/`student` as workflow-context labels on explicit workflow objects.
-- Keep video archives private and member-owned.
-- Treat repeated takes and durable feedback history as the core unit of value.
-- Add `ReviewRequest`, teacher inbox, roster, and designated-teacher permissions as workflow primitives.
-- Grow through trusted invites, not open public signup or discovery.
-- Preserve lightweight UX and avoid heavy LMS patterns.
+- `learner`
+- `member`
+- `take`
+- `practice thread`
+- `private archive`
+- `practice mirror`
+- `trusted feedback`
+
+Allowed workflow-context language:
+
+- `reviewer`
+- `teacher`
+- `student`
+- `review request`
+- `reviewer inbox`
+
+Avoid broad public-marketplace framing or role-heavy identity framing unless a specific workflow needs it.

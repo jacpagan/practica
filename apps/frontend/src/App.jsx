@@ -794,8 +794,8 @@ function AppContent() {
             <div className="px-4 sm:px-6 py-6">
               <div className="max-w-3xl mx-auto">
                 <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center">
-                  <p className="text-sm font-semibold text-gray-900">No reviewer workspace yet</p>
-                  <p className="text-xs text-gray-500 mt-1">Requests appear here when you’re assigned as a reviewer.</p>
+                  <p className="text-sm font-semibold text-gray-900">No trusted feedback inbox yet</p>
+                  <p className="text-xs text-gray-500 mt-1">Structured requests appear here when someone brings you into their practice loop.</p>
                   <div className="mt-4">
               <button type="button" onClick={() => navigate({ view: 'calendar', sessionId: null })} className="text-xs rounded-lg bg-gray-900 text-white px-3 py-1.5 hover:bg-gray-800">Back to Home</button>
                   </div>

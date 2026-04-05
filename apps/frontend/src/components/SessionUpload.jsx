@@ -350,8 +350,8 @@ function SessionUpload({
       <div className="max-w-lg mx-auto">
         <div className="mb-6 space-y-3">
           <div>
-            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">New video</h2>
-            <p className="text-sm text-gray-500 mt-1">Record or upload.</p>
+            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">New take</h2>
+            <p className="text-sm text-gray-500 mt-1">Record or upload a private take for your practice mirror.</p>
           </div>
 
           <div className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-4">

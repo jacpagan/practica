@@ -370,8 +370,8 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
       <div className="max-w-4xl mx-auto space-y-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-2">
-            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Calendar</h2>
-            <p className="text-sm text-gray-500 mt-1">View your takes by day.</p>
+            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Practice mirror</h2>
+            <p className="text-sm text-gray-500 mt-1">Review your private takes day by day.</p>
             {smartFollowUpTarget ? (
               <div className="flex flex-wrap items-center gap-2">
                 <button

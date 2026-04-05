@@ -23,7 +23,7 @@ function AuthForm({
   const [loading, setLoading] = useState(false)
 
   const title = contextTitle || 'Practica'
-  const subtitle = contextSubtitle || 'Private video reviews for music lessons.'
+  const subtitle = contextSubtitle || 'A private video practice mirror for self-led learning and trusted feedback.'
 
   const handleSubmit = async (e) => {
     e.preventDefault()

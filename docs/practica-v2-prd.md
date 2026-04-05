@@ -4,290 +4,264 @@
 
 This document is the strategic source of truth for Practica v2.
 
-It replaces older role-heavy framing and clarifies the current direction:
-Practica is a private video practice archive with trusted feedback, built on a member-first identity model with an explicit teacher workflow layer.
+The product thesis is now centered on one sentence:
+
+> Practica is a private video practice mirror where learners lead their own progress and bring in trusted feedback when they want it.
 
 Related docs:
 
 - `docs/platform-effects-mvp-playbook.md`: shipped v1 baseline
 - `docs/flow-audit.md`: implementation audit and reliability gaps
+- `docs/platform-revolution-audit.md`: interaction and platform analysis
 
 ## Executive Summary
 
-Practica v2 is a private, video-first platform for ongoing practice and feedback among trusted people.
+Practica is a private, video-first product for self-led improvement.
 
-The core bet is:
+The learner records a take, watches themselves honestly, notices posture, timing, expression, alignment, and movement, then decides what to do next.
 
-- identity should stay member-first and role-light,
-- every take should remain private by default,
-- feedback should stay attached to the video,
-- repeated takes should be easy to organize over time,
-- and the product should optimize for durable practice history and completed review cycles rather than public discovery.
+Trusted feedback is important, but it is optional and secondary to the learner-owned mirror.
 
-Practica is not a marketplace, a social feed, or a school workspace.
-It is a private place to record, revisit, and exchange trusted feedback.
+That means Practica should optimize first for:
+
+- fast private capture,
+- easy replay and revisiting,
+- repeated takes over time,
+- self-review and comparison,
+- and optional trusted feedback attached to the take.
+
+Teacher or reviewer workflows remain valuable, but they should sit on top of the learner-led product rather than define the whole product.
 
 ## Product Thesis
 
-Practica should become the private operating system for video-based improvement.
+Practica should become the private operating environment for embodied practice.
 
 The core value proposition is:
 
-"Record a take, keep it private, get video feedback from trusted people, and build a durable history of progress over time."
+> Record a take, watch yourself clearly, track your own progress over time, and invite trusted feedback only when it helps.
 
 ## Product Model
 
-Practica is a member-first private platform with a teacher workflow layer.
+Practica is a learner-led private practice mirror with an optional trusted-feedback layer.
 
 That means:
 
-- no permanent teacher/student identity model as the global account ontology,
-- no public discovery,
-- no public profiles or marketplace mechanics,
-- no role-based hierarchy as the foundation of identity,
-- and explicit workflow objects for teacher-led operations where they add operational value.
-
-People can still mentor each other, teach each other, review each other, or invite each other.
-Those are relationship and permission patterns attached to workflows, not permanent platform identities.
+- the learner owns the archive,
+- the archive is private by default,
+- the video is the center of the experience,
+- repeated takes should stay organized over time,
+- feedback should stay attached to the take,
+- and reviewer workflows should support the learner rather than replace learner agency.
 
 ## Canonical Architecture Model
 
 Practica v2 should be implemented as two compatible layers:
 
-### 1. Identity layer (member-first)
+### 1. Practice mirror layer
 
-- `member` is the base account identity.
-- `session owner` owns archive artifacts and sharing intent.
-- `reviewer` can respond to feedback links and review requests.
-- `inviter` is a permission capability, not a separate identity class.
+- `member` is the base identity.
+- `session owner` owns the take and the archive artifact.
+- `practice thread` groups repeated takes over time.
+- `Session` remains the core artifact.
 
-### 2. Workflow layer (teacher-led where needed)
+### 2. Trusted feedback layer
 
-- `ReviewRequest` is the primary workflow object for structured review cycles.
-- `teacher` and `student` are workflow-context labels, not global account types.
-- `teacher inbox`, `roster`, and `designated-teacher permissions` operate on top of member identities.
-- `ReviewLink` remains an access primitive and can coexist with `ReviewRequest`.
+- `ReviewLink` supports lightweight trusted sharing.
+- `ReviewRequest` supports more structured async feedback cycles.
+- `reviewer`, `teacher`, and `student` remain workflow-context labels, not global identity types.
+- reviewer inbox, roster, and templates exist to support repeated trusted feedback where useful.
 
 ## Core Roles
 
-Practica should prefer situational roles over fixed role labels.
+### Learner
 
-### Session owner
-
-- Records or uploads a video.
-- Owns the private archive entry.
-- Controls whether a feedback link exists.
+- Records or uploads private takes.
+- Watches and revisits their own practice.
+- Decides when to continue alone and when to ask for feedback.
+- Owns the archive artifact and the progression over time.
 
 ### Reviewer
 
-- Receives a private feedback link.
-- Watches the video.
-- Responds with video feedback.
+- Watches a take shared by the learner.
+- Responds with private video feedback.
+- Supports the learner without taking ownership of the archive.
+
+### Teacher
+
+- A reviewer inside a more structured teaching workflow.
+- Useful for repeated async instruction and inbox-style review work.
+- Still a workflow role, not the global product identity.
 
 ### Member
 
-- Any authenticated person inside the trusted network.
-- Can be a session owner on one video and a reviewer on another.
-
-### Inviter
-
-- A trusted person or platform admin who brings someone into Practica.
-- Invite permissions are product policy, not identity class.
-
-### Teacher (workflow role)
-
-- A member assigned to one or more `ReviewRequest` items.
-- Owns request execution from inbox to response.
-- Never takes ownership of the student archive artifact.
-
-### Student (workflow role)
-
-- A member who submits takes for teacher feedback within a request cycle.
-- Retains ownership of their private archive entries.
+- Any authenticated person in the trusted network.
+- Can be practicing on one take and reviewing another.
 
 ## Product Principles
 
 - `Private by default`: nothing is public unless explicitly shared.
-- `Video first`: the video is the center of the experience.
-- `Feedback attached to the artifact`: feedback belongs with the source video.
-- `Member-first identity`: the product should avoid rigid global teacher/student ontology.
-- `Teacher workflow primitives`: structured teacher operations should be modeled with explicit workflow objects.
-- `Progress through repetition`: the product should make repeated takes easy to organize.
-- `Low pressure`: no streaks, no gamified accountability loops, no public performance layer.
-- `Trusted network growth`: membership should expand through invites and existing trust, not open viral loops.
+- `Video first`: self-observation starts with the take itself.
+- `Learner-led`: the learner leads their own progress.
+- `Mirror before marketplace`: the product should help someone see themselves clearly before trying to create public discovery or social pressure.
+- `Feedback attached to the artifact`: trusted responses belong with the take.
+- `Progress through repetition`: repeated takes should be easy to organize and revisit.
+- `Low pressure`: no public feed, no streak pressure, no gamified accountability loop.
+- `Trusted network growth`: the product should spread through existing relationships, not public visibility.
 
 ## Primary User Stories
 
-### Practice archive
+### Private practice mirror
 
-- As a member, I want to record or upload a private take quickly.
-- As a member, I want to revisit my previous takes easily.
-- As a member, I want repeated takes on the same skill to live together.
+- As a learner, I want to record or upload a private take quickly.
+- As a learner, I want to watch myself clearly and notice what changed.
+- As a learner, I want repeated takes on the same skill to stay together.
+- As a learner, I want my archive to remain mine.
 
 ### Trusted feedback
 
-- As a session owner, I want to share one private link for feedback.
-- As a reviewer, I want to respond with a video quickly.
-- As a reviewer, I may add a short optional caption, but the feedback remains video-first.
-- As a feedback author, I want to edit or delete my own feedback.
+- As a learner, I want to ask for trusted feedback only when I want it.
+- As a reviewer, I want to respond privately with video feedback attached to the take.
+- As a learner, I want feedback to stay with the take so I can revisit it later.
 
-### Practice threads
+### Structured reviewer workflows
 
-- As a member, I want multiple takes of the same exercise to stay grouped over days and weeks.
-- As a member, I want to open one thread like `Singles @ 120 BPM` and see the timeline of takes.
-- As a member, I want starting a new take in the same thread to feel fast and natural.
-
-### Invite-only trust model
-
-- As a platform admin, I want to control who can sign up.
-- As a product, Practica should prefer invite-only onboarding over open account creation.
-- As a new member, I should join with context and trust, not into an empty app.
-
-## Current Strategic Direction
-
-Practica is moving toward a private member network with a first-class teacher workflow layer.
-
-Key decisions:
-
-- keep the private library,
-- keep private feedback links,
-- keep video-first responses,
-- add lightweight practice threads for repeated takes,
-- add `ReviewRequest` as a workflow primitive for structured cycles,
-- add teacher inbox + roster + designated-teacher permissions on top of member identity,
-- require trusted onboarding,
-- and avoid hard-coding fixed teacher/student identity into the long-term account model.
+- As a learner, I want optional formal review requests when I am working with a repeated reviewer or teacher.
+- As a reviewer, I want an inbox that shows what needs my attention now.
+- As a teacher, I want to support repeated cycles without turning the product into a heavy LMS.
 
 ## What Practica Is
 
-- A private video archive
-- A trusted feedback tool
-- A place for repeated practice history
-- A member-first product
-- A teacher-workflow-capable product
-- A lightweight private network
+- A private video practice mirror
+- A private archive of repeated takes
+- A tool for self-led embodied learning
+- A place to bring in trusted feedback when useful
+- A lightweight async review workflow when needed
 
 ## What Practica Is Not
 
 - A public marketplace
-- A social content feed
-- A school workspace platform
+- A public social feed
+- A creator-discovery platform
+- A heavy school operating system
 - A role-heavy LMS
-- A practice-plan or streak app
-- A public creator discovery system
+- A streak or practice-plan app
+
+## Go-To-Market Reality
+
+The product truth is broader than the first wedge.
+
+Practica can be useful for drums, piano, movement practice, posture-heavy work, performance prep, martial arts forms, breathwork, qigong, or any skill where seeing yourself changes how you learn.
+
+But the initial go-to-market should still stay narrow.
+
+Recommended wedge:
+
+- independent drum teachers,
+- using Practica with their existing students,
+- for async between-lesson video review.
+
+That wedge is easier to explain, recruit, and charge for than a broad “all embodied learning” positioning.
 
 ## Growth Model
 
-Practica should grow through trusted relationships, not through open signups and public visibility.
+Practica should grow through trusted relationships.
 
-Preferred growth loop:
+Preferred loop:
 
-1. One trusted member joins.
-2. They record private videos.
-3. They share a private feedback link or invite another trusted person.
-4. That person joins in context.
-5. The network grows through real practice relationships.
-
-## Invite Policy
-
-The default posture should be invite-only.
-
-Near-term recommendation:
-
-- platform admins control signup access,
-- signup requires a valid invite code,
-- invite codes should be limited-use,
-- and new accounts should enter through a trusted path.
-
-Future options can include:
-
-- admin-generated member invites,
-- member-generated invites within limits,
-- or context-specific invite links.
+1. A learner joins through a trusted path.
+2. They record private takes.
+3. They get value from self-review immediately.
+4. They invite one trusted reviewer or teacher when they want outside eyes.
+5. Repeated practice and trusted exchange deepen usage over time.
 
 ## Naming Guidance
 
 Preferred product language:
 
+- `learner`
 - `member`
 - `session owner`
-- `reviewer`
-- `responder`
-- `feedback`
-- `feedback link`
-- `review request`
-- `practice thread`
 - `take`
-- `private library`
+- `practice thread`
+- `private archive`
+- `practice mirror`
+- `trusted feedback`
+- `reviewer`
 
-Allowed workflow language (when discussing structured teaching workflows):
+Allowed workflow language where needed:
 
 - `teacher`
 - `student`
 - `teacher inbox`
 - `roster`
-- `designated teacher`
+- `review request`
 
-Avoid as foundational identity language:
+Avoid as foundational product framing:
 
-- rigid global `teacher` account type
-- rigid global `student` account type
-- role hierarchy as the basis of account identity
-
-Teacher/student terms are valid in workflow contexts, but should not define the global identity ontology.
+- fixed teacher/student identity ontology
+- public coaching marketplace language
+- heavy institutional workflow language
 
 ## Success Metrics
 
-Practica should care about both retained practice behavior and completed review-cycle workflow quality.
+Practica should measure both self-led practice value and trusted-feedback value.
 
-Early indicators:
+### Practice mirror metrics
 
-- repeat uploads per member,
-- repeated takes inside the same practice thread,
-- feedback-link creation rate,
-- video feedback response rate,
-- revisit behavior on older takes,
-- review-request completion rate,
-- and median submission-to-feedback turnaround.
+- repeat uploads per member
+- repeated takes inside the same practice thread
+- revisit behavior on older takes
+- comparison behavior across takes
+- retention of active learners week over week
+
+### Trusted feedback metrics
+
+- feedback-link creation rate
+- review-request creation rate
+- reviewer response rate
+- review-request completion rate
+- median submission-to-feedback turnaround
+- resubmission rate after feedback
 
 ## Near-Term Roadmap
 
-### 1. Private library reliability
+### 1. Private mirror reliability
 
 - Make upload, playback, and session detail boringly reliable.
+- Preserve private ownership of the archive.
 
 ### 2. Practice threads
 
 - Group repeated takes under one private thread.
-- Make comparison over time easier.
+- Make self-comparison over time easier.
 
-### 3. Video-first trusted feedback
+### 3. Trusted feedback
 
-- Keep link-based video feedback simple.
-- Support optional short captions attached to feedback videos.
-- Preserve author edit/delete for their own feedback.
+- Keep private-link feedback simple.
+- Keep feedback attached to the take.
+- Preserve edit/delete for the feedback author.
 
-### 4. Teacher workflow layer
+### 4. Reviewer workflow layer
 
-- Add `ReviewRequest` with assignee, goal, turnaround, and status.
-- Add teacher inbox for pending/in-progress/completed requests.
-- Add lightweight roster and designated-teacher permissions.
-- Preserve `Session` ownership with the submitting member.
+- Keep `ReviewRequest` for structured repeated workflows.
+- Keep reviewer inbox and roster lightweight.
+- Do not let reviewer tooling overpower the learner-led product.
 
-### 5. Invite-only membership
+### 5. Invite-only growth
 
-- Gate signup through invite codes.
-- Keep onboarding inside trusted boundaries.
+- Keep trusted onboarding.
+- Keep sharing private and intentional.
 
-## Migration Note
+## Strategic Boundaries
 
-The repository still contains mixed naming and structures tied to both learner-first and teacher-led phrasing.
+Practica should not chase broad public attention.
 
-That should be treated as implementation history, not the long-term product ontology.
+The product should win by compressing attention around one meaningful next step:
 
-The practical direction is:
+- record,
+- watch,
+- notice,
+- retry,
+- and invite trusted feedback when it helps.
 
-- update product docs first,
-- rename product-facing UI next,
-- add member-first + workflow-aware API aliases before deep model renames,
-- and only later decide whether the database/domain model should be fully renamed.
+That is a much stronger product identity than trying to maximize generic engagement.

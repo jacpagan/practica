@@ -1110,8 +1110,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 <div ref={loopDetailsRef} className="rounded-xl border border-gray-200 bg-white px-4 py-3 space-y-4">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">{reviewRequests.length > 0 ? 'Private review' : 'Request feedback'}</p>
-                      <p className="text-xs text-gray-500 mt-1">{reviewRequests.length > 0 ? `${reviewRequests.length} review request${reviewRequests.length === 1 ? '' : 's'} on this take.` : 'Privately send this take to a trusted person.'}</p>
+                      <p className="text-sm font-semibold text-gray-900">{reviewRequests.length > 0 ? 'Trusted feedback' : 'Bring in feedback'}</p>
+                      <p className="text-xs text-gray-500 mt-1">{reviewRequests.length > 0 ? `${reviewRequests.length} trusted feedback request${reviewRequests.length === 1 ? '' : 's'} on this take.` : 'Bring trusted feedback into this take only when you want it.'}</p>
                     </div>
                     <div className="flex items-center gap-2" />
                   </div>
@@ -1148,7 +1148,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                             {!recentReviewersLoading && designatedReviewers.length === 0 ? (
                               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
                                 <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Designated reviewer required</p>
-                                <p className="text-sm text-amber-900 mt-1">Structured review requests only work with reviewers already assigned to your roster. Ask an admin to add one, or use a private link below.</p>
+                                <p className="text-sm text-amber-900 mt-1">Structured feedback requests only work with reviewers already assigned to your roster. Ask an admin to add one, or use a lighter private link below.</p>
                               </div>
                             ) : null}
                             {recentReviewers.length > 0 ? (
@@ -1174,7 +1174,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                   placeholder="Search designated reviewers"
                                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
                                 />
-                                <p className="text-xs text-gray-500">Only reviewers already on your roster can receive a formal review request.</p>
+                                <p className="text-xs text-gray-500">Only reviewers already on your roster can receive a structured feedback request.</p>
                                 {reviewerSearchLoading ? <p className="text-xs text-gray-500">Searching…</p> : null}
                                 {reviewerResults.length > 0 ? (
                                   <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
@@ -1204,7 +1204,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                             {creatingInvite ? 'Creating invite…' : 'Invite with private link'}
                           </button>
                         </div>
-                        <p className="text-xs text-gray-500">This sends a private link invitation. It does not add someone as a designated reviewer for formal review requests.</p>
+                        <p className="text-xs text-gray-500">This sends a private invitation link for trusted feedback. It does not add someone as a designated reviewer for structured requests.</p>
                       </div>
 
                       {/* Title of the practice thread is sufficient context; no extra request fields */}

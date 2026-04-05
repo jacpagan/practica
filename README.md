@@ -1,46 +1,42 @@
 # Practica
 
-Practica is a Django + React application for private video practice and trusted feedback, built around the idea that everyone is still learning.
+Practica is a Django + React application built around one idea:
 
-The shipped product already supports:
+> Practica is a private video practice mirror where learners lead their own progress and bring in trusted feedback when they want it.
 
-- a private member video library,
-- upload and in-app recording,
-- authenticated private review flows,
-- video-first feedback replies,
-- and playback processing for review-ready sessions.
+The product is strongest when it helps someone:
 
-The v2 product direction is to deepen the private-library foundation with trusted invites, practice threads, and video-first feedback between members.
+- record a private take,
+- watch themselves clearly,
+- notice posture, timing, expression, alignment, or movement,
+- organize repeated attempts over time,
+- and invite trusted feedback only when it helps.
 
 ## Product Docs
 
-- `docs/practica-v2-prd.md`: strategic source of truth for Practica v2.
-- `docs/platform-effects-mvp-playbook.md`: shipped v1 baseline and product model.
-- `docs/flow-audit.md`: implementation audit and v2 foundation gaps.
-- `docs/README.md`: documentation index.
+- `docs/practica-v2-prd.md`: strategic source of truth for Practica v2
+- `docs/platform-effects-mvp-playbook.md`: shipped v1 baseline
+- `docs/flow-audit.md`: current flow audit and product gaps
+- `docs/platform-revolution-audit.md`: platform and interaction analysis
+- `docs/README.md`: documentation index
 
 ## Product Positioning
 
-### Current shipped foundation
+### Core product truth
 
-Practica is currently strongest as a private async video feedback tool:
+Practica is a private practice mirror.
 
-- members upload or record videos into a private library,
-- owners create private feedback links,
-- reviewers log in and respond with video feedback,
-- and feedback stays attached to the original source video.
+The archive belongs to the learner, the video stays central, and trusted feedback is an optional layer on top of self-led progress.
 
-### V2 strategic direction
+### Go-to-market wedge
 
-Practica v2 is a learner-first private platform for practice and feedback.
+The first commercial wedge can still stay narrow:
 
-Strategic decisions:
+- independent drum teachers,
+- working with existing students,
+- using Practica for async between-lesson review.
 
-- treat everyone as a learner rather than a fixed teacher/student identity,
-- keep archives private and member-owned,
-- organize repeated takes into private practice threads,
-- grow through trusted invite-only onboarding rather than open discovery,
-- and optimize for repeated practice plus attached feedback over time.
+That wedge does not change the broader product truth.
 
 ## Quick Start
 
@@ -96,12 +92,12 @@ cd apps/frontend && npm run build
 
 ### Frontend Build Flags
 
-- `VITE_SOURCEMAP=1` enables source maps in the built bundle (useful on staging for debugging runtime errors).
-- `VITE_MINIFY=terser` builds using Terser instead of esbuild (helps isolate minifier-only issues under production minification).
+- `VITE_SOURCEMAP=1` enables source maps in the built bundle.
+- `VITE_MINIFY=terser` builds using Terser instead of esbuild.
 
 ### Backend Diagnostic Endpoints
 
-- `GET /version` returns `{ sha, built_at }` for the deployed build. `sha` is taken from `DEPLOYED_GIT_SHA`.
+- `GET /version` returns `{ sha, built_at }` for the deployed build.
 
 ## Architecture
 
@@ -116,60 +112,26 @@ cd apps/frontend && npm run build
 
 - React 18 + Vite
 - Tailwind CSS
-- Route-driven SPA around library, upload, session detail, and review surfaces
-- Shared upload utilities for regular and multipart upload flows
+- Route-driven SPA around archive, upload, session detail, and trusted feedback surfaces
 
 ### Infrastructure
 
 - Terraform under `infra/`
 - Docker-based local development
-- EC2 deploy path through `scripts/deploy-via-ssm.sh`
-
-## Project Structure
-
-```text
-practica/
-├── apps/
-│   ├── backend/          # Django API and domain logic
-│   └── frontend/         # React app
-├── docs/                 # Product and implementation docs
-├── infra/                # Terraform and infra configs
-├── scripts/              # Dev and deploy scripts
-├── docker-compose.yml    # Local development
-└── requirements.txt      # Python dependencies
-```
+- EC2 deploy path through GitHub Actions + `scripts/deploy-via-ssm.sh`
 
 ## Deployment Notes
 
-- `scripts/dev.sh`: local Docker helper commands.
-- `scripts/deploy-via-ssm.sh`: production deploy to EC2 via AWS SSM.
-- `scripts/branch-audit.sh`: compare remote branches against a base branch.
-
-Deployment strategy:
-
 - `main` is the production branch.
-- Deployment contract is `feature branch -> PR -> main -> production`.
-- Backup, smoke checks, and rollback remain part of the production flow.
+- Deploy contract is `feature branch -> PR -> main -> production`.
+- Production deploys happen through `.github/workflows/deploy-ssm.yml`.
+- Read-only production commands can run through `.github/workflows/debug-ssm-prod.yml`.
 
-## Monitoring And Security
+## Security Notes
 
-- Health checks are built into Docker Compose.
-- Product metrics are defined in `docs/practica-v2-prd.md`.
-- Local development uses SQLite by default.
-- Sensitive values belong in environment variables, not in git.
-
-### Secrets Management
-
-- Do not commit `.env` or `.env.*` files with real values. Use `.env.template` and `env.example` for reference only.
-- Production deploys read environment from the GitHub Actions secret `ENV_PRODUCTION` (written remotely on the host during deploy).
-- Production backend AWS access should come from the EC2 instance profile, not long-lived `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` values.
-- GitHub Actions AWS access should come from OIDC role assumption (`AWS_ROLE_ARN`), not stored IAM user keys.
-- Treat any historical AWS key exposure as compromised even after it is removed from the latest code; rotate first, then scrub history.
-- The CI pipeline includes a guard (`scripts/guard-no-secrets.sh`) that fails if:
-  - Any tracked `.env`/`.env.*` file (other than `.env.template` or `env.example`) is present, or
-  - Tracked files contain assignments to common secrets like `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, or `DJANGO_SECRET_KEY`, or
-  - `docker-compose.prod.yml` tries to pass static AWS access keys into production containers.
-- If a secret is ever committed, rotate it immediately and remove the file from git history (e.g., with `git filter-repo`), then force-push and rebase open branches.
+- Do not commit secrets.
+- Prefer short-lived AWS credentials through GitHub OIDC and EC2 instance roles.
+- Keep production admin on a hidden path with a strong password.
 
 ## License
 

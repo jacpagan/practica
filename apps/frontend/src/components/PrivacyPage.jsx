@@ -12,8 +12,8 @@ function PrivacyPage({ onBack = null, signedIn = false }) {
 
         <div className="space-y-3">
           <p className="text-xs uppercase tracking-wide text-gray-500">Privacy</p>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Private by default</h1>
-          <p className="text-sm text-gray-600">Practica is designed for private video improvement inside trusted relationships. It is not a public network, public marketplace, or discovery surface.</p>
+          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Your private practice mirror</h1>
+          <p className="text-sm text-gray-600">Practica is built for private self-review first. Your takes stay private by default, and you bring in trusted feedback only when you want it.</p>
         </div>
 
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
@@ -22,11 +22,11 @@ function PrivacyPage({ onBack = null, signedIn = false }) {
 
         <div className="grid grid-cols-1 gap-4">
           <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-2">
-            <p className="text-sm font-semibold text-gray-900">No practice tracking</p>
+            <p className="text-sm font-semibold text-gray-900">No background surveillance</p>
             <ul className="text-sm text-gray-600 space-y-1">
-              <li>Practica does not track your practice or gameplay in the background.</li>
+              <li>Practica does not watch, score, or track your practice in the background.</li>
               <li>No device telemetry or auto-logging of sessions.</li>
-              <li>Only what you record or upload—and the feedback you exchange—is stored.</li>
+              <li>Only what you intentionally record or upload—and any trusted feedback you choose to keep—is stored.</li>
             </ul>
           </div>
 
@@ -48,7 +48,7 @@ function PrivacyPage({ onBack = null, signedIn = false }) {
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-2">
-            <p className="text-sm font-semibold text-gray-900">How review access works</p>
+            <p className="text-sm font-semibold text-gray-900">How trusted feedback works</p>
             <ul className="text-sm text-gray-600 space-y-1">
               <li>Review links are authenticated and revocable.</li>
               <li>Assigned review requests are visible only to the owner and assigned reviewer.</li>
@@ -59,7 +59,7 @@ function PrivacyPage({ onBack = null, signedIn = false }) {
           <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-2">
             <p className="text-sm font-semibold text-gray-900">What the platform stores</p>
             <ul className="text-sm text-gray-600 space-y-1">
-              <li>Account identity, private videos, feedback videos, and workflow history needed to run the product.</li>
+              <li>Account identity, private videos, trusted feedback videos, and workflow history needed to run the product.</li>
               <li>Minimal operational logs for uptime, errors, and debugging.</li>
               <li>Browser playback versions derived from uploaded videos.</li>
             </ul>
@@ -85,7 +85,7 @@ function PrivacyPage({ onBack = null, signedIn = false }) {
         </div>
 
         {!signedIn ? (
-          <p className="text-xs text-gray-500">Use invite-only signup if you want access inside the trusted network.</p>
+          <p className="text-xs text-gray-500">Use invite-only signup if you want access to the private practice network.</p>
         ) : null}
       </div>
     </div>
