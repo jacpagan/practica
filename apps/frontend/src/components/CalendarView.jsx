@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect } from 'react'
+import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react'
 import VideoThumbnail from './VideoThumbnail'
 import SessionListItem from './SessionListItem'
 import ThreadPickerModal from './ThreadPickerModal'
@@ -88,6 +88,9 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
   const [editing, setEditing] = useState(null)
   const [renamingThread, setRenamingThread] = useState('')
   const [saving, setSaving] = useState(false)
+  const [pendingFollowUpSignal, setPendingFollowUpSignal] = useState('')
+  const [highlightedGroupName, setHighlightedGroupName] = useState('')
+  const groupRefs = useRef(new Map())
   const threadOptions = useMemo(() => Array.from(new Set(sessions.map(s => String(s.practice_series || '').trim()).filter(Boolean))).sort(), [sessions])
   const { token } = useAuth()
   const toast = useToast()
@@ -257,14 +260,17 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
     setSelectedDateKey(TODAY_KEY)
   }, [])
 
-  const openDate = useCallback((dateKey) => {
+  const openDate = useCallback((dateKey, followUpSignal = '') => {
     setSelectedDateKey(dateKey)
     setShowDayModal(true)
+    setPendingFollowUpSignal(followUpSignal)
     onOpenListDate?.(dateKey)
   }, [onOpenListDate])
 
   const closeDayModal = useCallback(() => {
     setShowDayModal(false)
+    setPendingFollowUpSignal('')
+    setHighlightedGroupName('')
     onOpenListDate?.('')
   }, [onOpenListDate])
 
@@ -308,6 +314,22 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
     setActiveMonth(new Date(routeDate.getFullYear(), routeDate.getMonth(), 1))
     setShowDayModal(true)
   }, [routeDateKey])
+
+  useEffect(() => {
+    if (!showDayModal || !pendingFollowUpSignal) return
+    const targetGroup = sessionsByThread.find((group) => requestSignalKey(group.activeRequest?.status) === pendingFollowUpSignal)
+    if (!targetGroup?.seriesName) return
+    setHighlightedGroupName(targetGroup.seriesName)
+    const frameId = requestAnimationFrame(() => {
+      groupRefs.current.get(targetGroup.seriesName)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      setPendingFollowUpSignal('')
+    })
+    const timerId = window.setTimeout(() => setHighlightedGroupName(''), 1800)
+    return () => {
+      cancelAnimationFrame(frameId)
+      window.clearTimeout(timerId)
+    }
+  }, [pendingFollowUpSignal, sessionsByThread, showDayModal])
 
   return (
     <div className="px-4 sm:px-6 py-6">
@@ -373,58 +395,69 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                   ? 'bg-gray-900/5'
                   : 'bg-transparent'
               return (
-                <button
-                  key={d.key}
-                  type="button"
-                  onClick={() => openDate(d.key)}
-                  aria-pressed={isSelected}
-                  className={`relative h-[78px] sm:h-24 rounded-2xl border text-left p-1.5 sm:p-2.5 transition-all ${
-                    isSelected
-                      ? 'border-gray-900 bg-gray-900 text-white shadow-md'
-                      : has
-                        ? 'border-gray-300 bg-white hover:border-gray-400 hover:shadow-sm'
-                        : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
-                  } ${d.inMonth ? '' : 'opacity-50'} overflow-hidden`}
-                >
-                  {!isSelected && has ? <div className={`absolute inset-x-0 top-0 h-1 ${intensityClass}`} /> : null}
-                  <div className="flex items-center justify-between text-xs relative z-10">
-                    <span className={`text-xs sm:text-sm ${isSelected ? 'text-white' : 'text-gray-700'}`}>{d.date.getDate()}</span>
-                    {isToday ? (
-                      <span className={`rounded-full px-1 py-0.5 text-[9px] sm:px-1.5 sm:text-[10px] ${isSelected ? 'bg-white/15 text-white' : 'bg-gray-900/5 text-gray-600'}`}>
-                        Today
-                      </span>
-                    ) : null}
-                  </div>
-                  {has ? (
-                    <div className="mt-1.5 sm:mt-2 space-y-1 sm:space-y-1.5 relative z-10">
-                      <span className={`inline-flex text-[10px] sm:text-[11px] uppercase tracking-wide px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${isSelected ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-700'}`}>
-                        {d.count} {d.count === 1 ? 'take' : 'takes'}
-                      </span>
-                      {followUpMeta ? (
-                        <span className={`inline-flex text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full ${isSelected ? 'bg-white/15 text-white' : followUpMeta.dayTone}`}>
-                          {followUpMeta.label}
+                <div key={d.key} className={`relative h-[78px] sm:h-24 rounded-2xl overflow-hidden ${d.inMonth ? '' : 'opacity-50'}`}>
+                  <button
+                    type="button"
+                    onClick={() => openDate(d.key)}
+                    aria-pressed={isSelected}
+                    aria-label={`${dayLabel(d.date)}${has ? `, ${d.count} ${d.count === 1 ? 'take' : 'takes'}` : ''}`}
+                    className={`absolute inset-0 rounded-2xl border text-left p-1.5 sm:p-2.5 transition-all ${
+                      isSelected
+                        ? 'border-gray-900 bg-gray-900 text-white shadow-md'
+                        : has
+                          ? 'border-gray-300 bg-white hover:border-gray-400 hover:shadow-sm'
+                          : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                    }`}
+                  >
+                    {!isSelected && has ? <div className={`absolute inset-x-0 top-0 h-1 ${intensityClass}`} /> : null}
+                  </button>
+                  <div className="pointer-events-none relative z-10 p-1.5 sm:p-2.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className={`text-xs sm:text-sm ${isSelected ? 'text-white' : 'text-gray-700'}`}>{d.date.getDate()}</span>
+                      {isToday ? (
+                        <span className={`rounded-full px-1 py-0.5 text-[9px] sm:px-1.5 sm:text-[10px] ${isSelected ? 'bg-white/15 text-white' : 'bg-gray-900/5 text-gray-600'}`}>
+                          Today
                         </span>
                       ) : null}
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: Math.min(4, d.count) }).map((_, index) => (
-                          <span key={`${d.key}-dot-${index}`} className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-white/80' : 'bg-gray-400'}`} />
-                        ))}
-                      </div>
-                      {topSeriesNames.length ? (
-                        <div className="hidden sm:block space-y-0.5">
-                          {topSeriesNames.map((seriesName) => (
-                            <p key={seriesName} className={`text-[10px] leading-tight truncate ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>
-                              {seriesName}
-                            </p>
-                          ))}
-                          {d.summary.extraSeriesCount > 0 ? (
-                            <p className={`text-[10px] leading-tight ${isSelected ? 'text-white/60' : 'text-gray-400'}`}>+{d.summary.extraSeriesCount} more</p>
-                          ) : null}
-                        </div>
-                      ) : null}
                     </div>
+                    {has ? (
+                      <div className="mt-1.5 sm:mt-2 space-y-1 sm:space-y-1.5">
+                        <span className={`inline-flex text-[10px] sm:text-[11px] uppercase tracking-wide px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${isSelected ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-700'}`}>
+                          {d.count} {d.count === 1 ? 'take' : 'takes'}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: Math.min(4, d.count) }).map((_, index) => (
+                            <span key={`${d.key}-dot-${index}`} className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-white/80' : 'bg-gray-400'}`} />
+                          ))}
+                        </div>
+                        {topSeriesNames.length ? (
+                          <div className="hidden sm:block space-y-0.5">
+                            {topSeriesNames.map((seriesName) => (
+                              <p key={seriesName} className={`text-[10px] leading-tight truncate ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>
+                                {seriesName}
+                              </p>
+                            ))}
+                            {d.summary.extraSeriesCount > 0 ? (
+                              <p className={`text-[10px] leading-tight ${isSelected ? 'text-white/60' : 'text-gray-400'}`}>+{d.summary.extraSeriesCount} more</p>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                  {followUpMeta ? (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        openDate(d.key, d.summary.followUpSignal)
+                      }}
+                      className={`absolute bottom-1.5 left-1.5 z-20 inline-flex rounded-full px-1.5 py-0.5 text-[10px] sm:bottom-2 sm:left-2 sm:px-2 sm:py-1 sm:text-[11px] ${followUpMeta.dayTone}`}
+                    >
+                      {followUpMeta.label}
+                    </button>
                   ) : null}
-                </button>
+                </div>
               )
             })}
           </div>
@@ -473,9 +506,17 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                   <button type="button" onClick={closeDayModal} className="col-span-2 text-xs text-gray-500 hover:text-gray-900 rounded-lg border border-gray-200 px-2 py-2 sm:col-span-1 sm:px-2 sm:py-1">Close</button>
                 </div>
               </div>
-              <div className="p-4 overflow-y-auto pb-6 sm:pb-4">
+              <div className="p-4 overflow-y-auto pb-6 sm:pb-4" aria-busy={sessionsLoading ? 'true' : 'false'}>
                 {sessionsLoading ? (
-                  <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-500">Loading…</div>
+                  <div className="space-y-3">
+                    {Array.from({ length: 3 }).map((_, idx) => (
+                      <div key={idx} className="rounded-2xl border border-gray-200 bg-white p-3">
+                        <div className="h-4 bg-gray-100 rounded w-32 animate-pulse" />
+                        <div className="h-3 bg-gray-100 rounded w-48 mt-2 animate-pulse" />
+                        <div className="h-24 bg-gray-50 rounded-xl mt-3 animate-pulse" />
+                      </div>
+                    ))}
+                  </div>
                 ) : sessionsByThread.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center">
                     <p className="text-sm font-medium text-gray-700">No takes on this day.</p>
@@ -484,7 +525,14 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                 ) : (
                   <div className="space-y-4">
                     {sessionsByThread.map((group) => (
-                      <div key={group.seriesName} className="space-y-3 rounded-2xl border border-gray-200 bg-gray-50/70 p-3">
+                      <div
+                        key={group.seriesName}
+                        ref={(node) => {
+                          if (node) groupRefs.current.set(group.seriesName, node)
+                          else groupRefs.current.delete(group.seriesName)
+                        }}
+                        className={`space-y-3 rounded-2xl border bg-gray-50/70 p-3 transition-all ${highlightedGroupName === group.seriesName ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-gray-200'}`}
+                      >
                         <div className="flex items-start justify-between gap-3 flex-wrap">
                           <div className="min-w-0">
                             <p className="text-xs uppercase tracking-wide text-gray-500">{group.seriesName}</p>
