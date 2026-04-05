@@ -178,15 +178,23 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
   const openDate = useCallback((dateKey) => {
     setSelectedDateKey(dateKey)
     setShowDayModal(true)
-  }, [])
+    onOpenListDate?.(dateKey)
+  }, [onOpenListDate])
+
+  const closeDayModal = useCallback(() => {
+    setShowDayModal(false)
+    onOpenListDate?.('')
+  }, [onOpenListDate])
 
   const moveSelectedDay = useCallback((deltaDays) => {
     const nextDate = parseDateKey(selectedDateKey)
     nextDate.setDate(nextDate.getDate() + deltaDays)
-    setSelectedDateKey(formatKey(nextDate))
+    const nextKey = formatKey(nextDate)
+    setSelectedDateKey(nextKey)
     setActiveMonth(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1))
     setShowDayModal(true)
-  }, [selectedDateKey])
+    onOpenListDate?.(nextKey)
+  }, [onOpenListDate, selectedDateKey])
 
   const weekLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -201,7 +209,10 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
   }, [DATE_FILTER_KEY, selectedDateKey])
 
   useEffect(() => {
-    if (!routeDateKey) return
+    if (!routeDateKey) {
+      setShowDayModal(false)
+      return
+    }
     const routeDate = parseDateKey(routeDateKey)
     setSelectedDateKey(routeDateKey)
     setActiveMonth(new Date(routeDate.getFullYear(), routeDate.getMonth(), 1))
@@ -275,7 +286,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
         {/* Day modal: groups by practice thread and lists sessions */}
         {showDayModal ? (
           <div className="fixed inset-0 z-50">
-            <div className="absolute inset-0 bg-black/30" onClick={() => setShowDayModal(false)} />
+            <div className="absolute inset-0 bg-black/30" onClick={closeDayModal} />
             <div className="absolute inset-x-4 sm:inset-x-auto sm:right-6 sm:w-[520px] top-10 bottom-10 rounded-2xl bg-white shadow-xl border border-gray-200 flex flex-col">
               <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                 <div>
@@ -305,7 +316,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                   >
                     {newestFirst ? 'Newest first' : 'Oldest first'}
                   </button>
-                  <button type="button" onClick={() => setShowDayModal(false)} className="text-xs text-gray-500 hover:text-gray-900 rounded-lg border border-gray-200 px-2 py-1">Close</button>
+                  <button type="button" onClick={closeDayModal} className="text-xs text-gray-500 hover:text-gray-900 rounded-lg border border-gray-200 px-2 py-1">Close</button>
                 </div>
               </div>
               <div className="p-4 overflow-y-auto">
