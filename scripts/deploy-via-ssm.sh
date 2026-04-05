@@ -70,6 +70,7 @@ printf '%s' "__ENV_B64__" | base64 -d > .env.production
 MEDIA_CONVERT_ROLE_ARN=$(printf '%s' "__MEDIA_CONVERT_ROLE_ARN_B64__" | base64 -d)
 MEDIA_CONVERT_ENDPOINT_URL=$(printf '%s' "__MEDIA_CONVERT_ENDPOINT_URL_B64__" | base64 -d)
 ADMIN_URL=$(printf '%s' "__ADMIN_URL_B64__" | base64 -d)
+export MEDIA_CONVERT_ROLE_ARN MEDIA_CONVERT_ENDPOINT_URL ADMIN_URL
 python3 - <<'PY'
 from pathlib import Path
 import os
