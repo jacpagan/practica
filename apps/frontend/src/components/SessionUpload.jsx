@@ -51,6 +51,32 @@ function SessionUpload({
 
   useEffect(() => () => replaceOwnedPreviewUrl(''), [])
 
+  const defaultPracticeTitle = () => {
+    const now = new Date()
+    const pad2 = (n) => String(n).padStart(2, '0')
+    const yyyy = now.getFullYear()
+    const mm = pad2(now.getMonth() + 1)
+    const dd = pad2(now.getDate())
+    const hh = pad2(now.getHours())
+    const mi = pad2(now.getMinutes())
+    const ss = pad2(now.getSeconds())
+    return `video - ${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
+  }
+
+  const pad2 = (n) => String(n).padStart(2, '0')
+  const seriesBasedTitle = (seriesName = '') => {
+    const normalizedSeries = String(seriesName || '').trim()
+    if (!normalizedSeries) return defaultPracticeTitle()
+    const now = new Date()
+    const yyyy = now.getFullYear()
+    const mm = pad2(now.getMonth() + 1)
+    const dd = pad2(now.getDate())
+    const hh = pad2(now.getHours())
+    const mi = pad2(now.getMinutes())
+    const ss = pad2(now.getSeconds())
+    return `${normalizedSeries} - ${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
+  }
+
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(LAST_SERIES_KEY)
@@ -94,32 +120,6 @@ function SessionUpload({
   useEffect(() => () => {
     onUploadGuardChange?.({ active: false, abort: null })
   }, [onUploadGuardChange])
-
-  const defaultPracticeTitle = () => {
-    const now = new Date()
-    const pad2 = (n) => String(n).padStart(2, '0')
-    const yyyy = now.getFullYear()
-    const mm = pad2(now.getMonth() + 1)
-    const dd = pad2(now.getDate())
-    const hh = pad2(now.getHours())
-    const mi = pad2(now.getMinutes())
-    const ss = pad2(now.getSeconds())
-    return `video - ${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
-  }
-
-  const pad2 = (n) => String(n).padStart(2, '0')
-  const seriesBasedTitle = (seriesName = '') => {
-    const normalizedSeries = String(seriesName || '').trim()
-    if (!normalizedSeries) return defaultPracticeTitle()
-    const now = new Date()
-    const yyyy = now.getFullYear()
-    const mm = pad2(now.getMonth() + 1)
-    const dd = pad2(now.getDate())
-    const hh = pad2(now.getHours())
-    const mi = pad2(now.getMinutes())
-    const ss = pad2(now.getSeconds())
-    return `${normalizedSeries} - ${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
-  }
 
   useEffect(() => {
     if (titleManuallyEdited || videoFile) return

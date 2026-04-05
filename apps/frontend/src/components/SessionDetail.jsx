@@ -570,6 +570,10 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
         session_id: session.id,
         reviewer_id: selectedReviewer.id,
         parent_request_id: initialReviewRequestDraft?.parent_request_id || null,
+        instrument: String(requestInstrument || '').trim() || 'drums',
+        goal: String(requestGoal || '').trim() || defaultRequestGoal,
+        exercise_or_song: String(requestExerciseOrSong || '').trim(),
+        notes: String(requestNotes || '').trim(),
       }
       const res = await fetch('/api/review-requests/', {
         method: 'POST',

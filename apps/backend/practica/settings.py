@@ -189,7 +189,10 @@ CORS_ALLOW_HEADERS = [
 ]
 
 # CSRF
-CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://localhost:3000,http://localhost:5173').split(',')
+CSRF_TRUSTED_ORIGINS = os.environ.get(
+    'CSRF_TRUSTED_ORIGINS',
+    'http://localhost:3000,http://localhost:5173,https://practica.jpagan.com',
+).split(',')
 CSRF_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = 'Lax'
@@ -220,6 +223,8 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    USE_X_FORWARDED_HOST = True
     SESSION_COOKIE_SECURE = True
     X_FRAME_OPTIONS = 'DENY'
 
