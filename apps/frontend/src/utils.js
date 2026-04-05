@@ -481,7 +481,7 @@ const buildPartsPayload = (partsByNumber) =>
     .sort((a, b) => a[0] - b[0])
     .map(([partNumber, etag]) => ({ part_number: partNumber, etag }))
 
-const createSessionViaMultipartAttempt = async ({ token, payload, videoFile, onProgress, signal }) => {
+const createSessionViaMultipartAttempt = async ({ token, payload, videoFile, onProgress, onStatusChange, signal }) => {
   const normalizedContentType = normalizedVideoContentType(videoFile)
   const fingerprint = multipartFingerprint({ payload, videoFile })
   const storageKey = multipartResumeKey(fingerprint)
@@ -565,6 +565,7 @@ const createSessionViaMultipartAttempt = async ({ token, payload, videoFile, onP
     const done = Math.min(videoFile.size, completedBytes + inFlightBytes)
     let percent = Math.round((done / videoFile.size) * 100)
     if (done > 0 && done < videoFile.size) percent = Math.max(1, Math.min(99, percent))
+    onStatusChange?.('saving')
     onProgress(percent, done, videoFile.size)
   }
   reportProgress()
@@ -596,6 +597,7 @@ const createSessionViaMultipartAttempt = async ({ token, payload, videoFile, onP
           signedUrl: signRes.data.signed_url,
           blob: chunk,
           onProgress: (loaded) => {
+            onStatusChange?.('saving')
             inflightLoaded.set(partNumber, loaded)
             reportProgress()
           },
@@ -633,6 +635,7 @@ const createSessionViaMultipartAttempt = async ({ token, payload, videoFile, onP
       }
     }
 
+    onStatusChange?.('saving')
     const completeRes = await retryJsonPost({
       url: '/api/sessions/multipart/complete/',
       token,
@@ -675,7 +678,7 @@ const createSessionViaMultipartAttempt = async ({ token, payload, videoFile, onP
   }
 }
 
-const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress, signal }) => {
+const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress, onStatusChange, signal }) => {
   let lastResult = null
   let lastError = null
 
@@ -683,7 +686,7 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
     throwIfAborted(signal)
 
     try {
-      const result = await createSessionViaMultipartAttempt({ token, payload, videoFile, onProgress, signal })
+      const result = await createSessionViaMultipartAttempt({ token, payload, videoFile, onProgress, onStatusChange, signal })
       if (!shouldRetryMultipartResult(result)) return result
       lastResult = result
     } catch (error) {
@@ -700,6 +703,7 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
 
     if (attempt >= MULTIPART_RECOVERY_ATTEMPTS) break
 
+    onStatusChange?.('resuming')
     if (onProgress) {
       onProgress(null, null, videoFile.size)
     }
@@ -711,10 +715,10 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
   throw lastError || new Error('Multipart upload failed')
 }
 
-export const createSessionUpload = async ({ token, payload, videoFile, onProgress, signal }) => {
+export const createSessionUpload = async ({ token, payload, videoFile, onProgress, onStatusChange, signal }) => {
   try {
     if (videoFile && videoFile.size >= MULTIPART_THRESHOLD_BYTES) {
-      const multipartRes = await createSessionViaMultipart({ token, payload, videoFile, onProgress, signal })
+      const multipartRes = await createSessionViaMultipart({ token, payload, videoFile, onProgress, onStatusChange, signal })
       if (multipartRes.ok || ![400, 404, 405].includes(multipartRes.status)) return multipartRes
     }
 

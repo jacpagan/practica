@@ -30,6 +30,7 @@ function SessionUpload({
   const [previewUrl, setPreviewUrl] = useState('')
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(null)
+  const [uploadPhase, setUploadPhase] = useState('saving')
   const [showNotes, setShowNotes] = useState(false)
   const [showVideoDetails, setShowVideoDetails] = useState(false)
   const [showRecorder, setShowRecorder] = useState(false)
@@ -263,6 +264,7 @@ function SessionUpload({
 
     setIsUploading(true)
     setUploadProgress(0)
+    setUploadPhase('saving')
     abortRequestedRef.current = false
     abortControllerRef.current = new AbortController()
     let success = false
@@ -276,6 +278,7 @@ function SessionUpload({
         },
         videoFile,
         onProgress: (percent) => setUploadProgress(percent),
+        onStatusChange: (phase) => setUploadPhase(phase === 'resuming' ? 'resuming' : 'saving'),
         signal: abortControllerRef.current.signal,
       })
       if (!res.ok) {
@@ -297,6 +300,7 @@ function SessionUpload({
     } finally {
       abortControllerRef.current = null
       setIsUploading(false)
+      setUploadPhase('saving')
       if (!success) setUploadProgress(null)
     }
   }
@@ -513,7 +517,7 @@ function SessionUpload({
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={handleCancel} className="flex-1 text-sm text-gray-600 border border-gray-200 rounded-lg py-2.5 hover:bg-gray-50 transition-colors">{isUploading ? 'Abort upload' : 'Cancel'}</button>
             <button type="submit" disabled={isUploading} className="flex-1 text-sm font-medium text-white bg-gray-900 rounded-lg py-2.5 hover:bg-gray-800 disabled:opacity-40 transition-colors">
-              {isUploading ? `Saving${uploadProgress !== null ? ` ${uploadProgress}%` : '...'}` : 'Save to library'}
+              {isUploading ? (uploadPhase === 'resuming' ? 'Resuming upload…' : `Saving${uploadProgress !== null ? ` ${uploadProgress}%` : '...'}`) : 'Save to library'}
             </button>
           </div>
 
@@ -522,8 +526,16 @@ function SessionUpload({
               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div className="h-full bg-gray-900 transition-all" style={{ width: `${Math.max(uploadProgress ?? 5, 5)}%` }} />
               </div>
-              <p className="text-xs text-gray-500 mt-1">Saving video{uploadProgress !== null ? ` (${uploadProgress}%)` : ''}. Keep this tab open until it finishes.</p>
-              <p className="text-xs text-amber-700">Stay on this page until the upload finishes.</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {uploadPhase === 'resuming'
+                  ? 'Resuming your upload automatically. Keep this tab open while we reconnect and continue.'
+                  : `Saving video${uploadProgress !== null ? ` (${uploadProgress}%)` : ''}. Keep this tab open until it finishes.`}
+              </p>
+              <p className="text-xs text-amber-700">
+                {uploadPhase === 'resuming'
+                  ? 'No extra click needed unless the upload fully expires.'
+                  : 'Stay on this page until the upload finishes.'}
+              </p>
             </div>
           ) : null}
         </form>
