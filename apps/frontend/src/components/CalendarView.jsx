@@ -163,6 +163,26 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
     return groupArray
   }, [newestFirst, selectedSessions])
 
+  const monthStats = useMemo(() => {
+    const totalTakes = sessions.length
+    const activeDays = Array.from(daySummaries.values()).filter((item) => item.count > 0).length
+    const seriesCounts = new Map()
+    sessions.forEach((session) => {
+      const seriesName = String(session.practice_series || '').trim()
+      if (!seriesName) return
+      seriesCounts.set(seriesName, (seriesCounts.get(seriesName) || 0) + 1)
+    })
+    const topThread = Array.from(seriesCounts.entries()).sort((left, right) => right[1] - left[1])[0] || null
+    return {
+      totalTakes,
+      activeDays,
+      topThreadName: topThread?.[0] || '',
+      topThreadCount: topThread?.[1] || 0,
+    }
+  }, [daySummaries, sessions])
+
+  const selectedThreadCount = sessionsByThread.length
+
   const gotoPrevMonth = useCallback(() => {
     setActiveMonth((cur) => new Date(cur.getFullYear(), cur.getMonth() - 1, 1))
   }, [])
@@ -222,21 +242,34 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
   return (
     <div className="px-4 sm:px-6 py-6">
       <div className="max-w-4xl mx-auto space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-2">
             <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Calendar</h2>
             <p className="text-sm text-gray-500 mt-1">View your takes by day.</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
+                {monthStats.totalTakes} {monthStats.totalTakes === 1 ? 'take' : 'takes'} this month
+              </span>
+              <span className="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
+                {monthStats.activeDays} active {monthStats.activeDays === 1 ? 'day' : 'days'}
+              </span>
+              {monthStats.topThreadName ? (
+                <span className="inline-flex items-center rounded-full bg-white border border-gray-200 px-3 py-1 text-xs font-medium text-gray-700">
+                  Top thread: {monthStats.topThreadName} · {monthStats.topThreadCount}
+                </span>
+              ) : null}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={gotoPrevMonth} className="rounded-full border border-gray-200 bg-white text-gray-900 px-3 py-1.5 text-sm hover:bg-gray-50">Prev</button>
-            <button type="button" onClick={gotoToday} className="rounded-full border border-gray-200 bg-white text-gray-900 px-3 py-1.5 text-sm hover:bg-gray-50">Today</button>
-            <div className="text-sm font-medium text-gray-900">{monthLabel(activeMonth)}</div>
-            <button type="button" onClick={gotoNextMonth} className="rounded-full border border-gray-200 bg-white text-gray-900 px-3 py-1.5 text-sm hover:bg-gray-50">Next</button>
+          <div className="flex items-center gap-2 self-start rounded-2xl border border-gray-200 bg-white p-1 shadow-sm">
+            <button type="button" onClick={gotoPrevMonth} className="rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Prev</button>
+            <div className="min-w-[140px] text-center text-sm font-medium text-gray-900">{monthLabel(activeMonth)}</div>
+            <button type="button" onClick={gotoNextMonth} className="rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">Next</button>
+            <button type="button" onClick={gotoToday} className="rounded-xl bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800">Today</button>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="grid grid-cols-7 gap-2 text-[11px] text-gray-500 mb-2">
+        <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+          <div className="grid grid-cols-7 gap-2 text-[11px] text-gray-500 mb-3">
             {weekLabels.map((w) => (<div key={w} className="text-center uppercase tracking-wide">{w}</div>))}
           </div>
           <div className="grid grid-cols-7 gap-2">
@@ -245,33 +278,53 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
               const isSelected = d.key === selectedDateKey
               const has = d.count > 0
               const topSeriesNames = d.summary.topSeriesNames || []
+              const intensityClass = d.count >= 4
+                ? 'bg-gray-900/10'
+                : d.count >= 2
+                  ? 'bg-gray-900/5'
+                  : 'bg-transparent'
               return (
                 <button
                   key={d.key}
                   type="button"
                   onClick={() => openDate(d.key)}
-                  className={`h-20 rounded-xl border text-left p-2 transition-colors ${
-                    isSelected ? 'border-gray-900 bg-gray-900/5' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
-                  } ${d.inMonth ? '' : 'opacity-50'}`}
+                  aria-pressed={isSelected}
+                  className={`relative h-24 rounded-2xl border text-left p-2.5 transition-all ${
+                    isSelected
+                      ? 'border-gray-900 bg-gray-900 text-white shadow-md'
+                      : has
+                        ? 'border-gray-300 bg-white hover:border-gray-400 hover:shadow-sm'
+                        : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                  } ${d.inMonth ? '' : 'opacity-50'} overflow-hidden`}
                 >
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-700">{d.date.getDate()}</span>
-                    {isToday ? <span className="text-[10px] text-gray-500">Today</span> : null}
+                  {!isSelected && has ? <div className={`absolute inset-x-0 top-0 h-1 ${intensityClass}`} /> : null}
+                  <div className="flex items-center justify-between text-xs relative z-10">
+                    <span className={isSelected ? 'text-white' : 'text-gray-700'}>{d.date.getDate()}</span>
+                    {isToday ? (
+                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${isSelected ? 'bg-white/15 text-white' : 'bg-gray-900/5 text-gray-600'}`}>
+                        Today
+                      </span>
+                    ) : null}
                   </div>
                   {has ? (
-                    <div className="mt-2 space-y-1">
-                      <span className="inline-flex text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
+                    <div className="mt-2 space-y-1.5 relative z-10">
+                      <span className={`inline-flex text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${isSelected ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-700'}`}>
                         {d.count} {d.count === 1 ? 'take' : 'takes'}
                       </span>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.min(4, d.count) }).map((_, index) => (
+                          <span key={`${d.key}-dot-${index}`} className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-white/80' : 'bg-gray-400'}`} />
+                        ))}
+                      </div>
                       {topSeriesNames.length ? (
                         <div className="space-y-0.5">
                           {topSeriesNames.map((seriesName) => (
-                            <p key={seriesName} className="text-[10px] leading-tight text-gray-500 truncate">
+                            <p key={seriesName} className={`text-[10px] leading-tight truncate ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>
                               {seriesName}
                             </p>
                           ))}
                           {d.summary.extraSeriesCount > 0 ? (
-                            <p className="text-[10px] leading-tight text-gray-400">+{d.summary.extraSeriesCount} more</p>
+                            <p className={`text-[10px] leading-tight ${isSelected ? 'text-white/60' : 'text-gray-400'}`}>+{d.summary.extraSeriesCount} more</p>
                           ) : null}
                         </div>
                       ) : null}
@@ -287,13 +340,20 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
         {showDayModal ? (
           <div className="fixed inset-0 z-50">
             <div className="absolute inset-0 bg-black/30" onClick={closeDayModal} />
-            <div className="absolute inset-x-4 sm:inset-x-auto sm:right-6 sm:w-[520px] top-10 bottom-10 rounded-2xl bg-white shadow-xl border border-gray-200 flex flex-col">
-              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                <div>
+            <div className="absolute inset-x-4 sm:inset-x-auto sm:right-6 sm:w-[560px] top-10 bottom-10 rounded-3xl bg-white shadow-2xl border border-gray-200 flex flex-col overflow-hidden">
+              <div className="px-4 py-4 border-b border-gray-100 flex items-start justify-between gap-3 bg-white/95 backdrop-blur">
+                <div className="space-y-2">
                   <p className="text-sm font-semibold text-gray-900">{dayLabel(selectedDate)}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{selectedSessions.length} {selectedSessions.length === 1 ? 'take' : 'takes'}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-700">
+                      {selectedSessions.length} {selectedSessions.length === 1 ? 'take' : 'takes'}
+                    </span>
+                    <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-700">
+                      {selectedThreadCount} {selectedThreadCount === 1 ? 'thread' : 'threads'}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
                   <button
                     type="button"
                     onClick={() => moveSelectedDay(-1)}
@@ -321,35 +381,41 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
               </div>
               <div className="p-4 overflow-y-auto">
                 {sessionsLoading ? (
-                  <div className="rounded-xl bg-gray-50 px-4 py-4 text-sm text-gray-500">Loading…</div>
+                  <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-500">Loading…</div>
                 ) : sessionsByThread.length === 0 ? (
-                  <p className="text-sm text-gray-500">No takes on this day.</p>
+                  <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-8 text-center">
+                    <p className="text-sm font-medium text-gray-700">No takes on this day.</p>
+                    <p className="text-xs text-gray-500 mt-1">Pick another day or jump back to today.</p>
+                  </div>
                 ) : (
                   <div className="space-y-4">
                     {sessionsByThread.map((group) => (
-                      <div key={group.seriesName} className="space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs uppercase tracking-wide text-gray-500">{group.seriesName}</p>
+                      <div key={group.seriesName} className="space-y-3 rounded-2xl border border-gray-200 bg-gray-50/70 p-3">
+                        <div className="flex items-start justify-between gap-3 flex-wrap">
+                          <div className="min-w-0">
+                            <p className="text-xs uppercase tracking-wide text-gray-500">{group.seriesName}</p>
+                            <p className="text-xs text-gray-500 mt-1">{group.items.length} {group.items.length === 1 ? 'take' : 'takes'} in this thread</p>
+                          </div>
                           {group.seriesName !== '(no thread)' && (
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <button
                                 type="button"
                                 onClick={() => onContinueThread?.(group.seriesName, selectedDateKey)}
-                                className="text-xs text-gray-600 hover:text-gray-900"
+                                className="rounded-xl bg-gray-900 px-3 py-2 text-xs font-medium text-white hover:bg-gray-800"
                               >
                                 Continue thread
                               </button>
                               <button
                                 type="button"
                                 onClick={() => onOpenSeries?.(group.seriesName)}
-                                className="text-xs text-gray-600 hover:text-gray-900"
+                                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
                               >
                                 Open thread
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setRenamingThread(group.seriesName)}
-                                className="text-xs text-gray-600 hover:text-gray-900"
+                                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
                               >
                                 Rename thread
                               </button>
@@ -358,7 +424,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                         </div>
                         <div className="space-y-2">
                           {group.items.map((session) => (
-                            <SessionListItem key={session.id} session={session} onOpen={() => onOpenSession?.(session, { view: 'calendar' })} onChangeThread={() => setEditing(session)} />
+                            <SessionListItem key={session.id} session={session} onOpen={() => onOpenSession?.(session, { view: 'calendar', date: selectedDateKey })} onChangeThread={() => setEditing(session)} />
                           ))}
                         </div>
                       </div>
