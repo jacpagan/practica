@@ -6,6 +6,8 @@ const MAX_PART_RETRIES = 3
 const MULTIPART_CONCURRENCY = 4
 const RETRY_BASE_DELAY_MS = 500
 const RETRY_MAX_DELAY_MS = 4000
+const MULTIPART_RECOVERY_ATTEMPTS = 4
+const MULTIPART_RECOVERY_DELAY_MS = 1500
 const MULTIPART_RESUME_PREFIX = 'practica.multipart.resume.v1'
 const CLIENT_TRACE_ID_KEY = 'practica.client_trace_id.v1'
 export const MAX_RECORDER_DURATION_SECONDS = 300
@@ -442,6 +444,12 @@ const isRetriableApiResponse = (res) => {
   return status === 408 || status === 425 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504
 }
 
+const shouldRetryMultipartResult = (res) => {
+  if (!res || res.ok) return false
+  if (res?.data?.code === 'upload_aborted') return false
+  return isRetriableApiResponse(res)
+}
+
 const retryJsonPost = async ({ url, token, body, signal, maxAttempts = MAX_PART_RETRIES }) => {
   return retry(async () => {
     const res = await authedJsonPost({ url, token, body, signal })
@@ -473,7 +481,7 @@ const buildPartsPayload = (partsByNumber) =>
     .sort((a, b) => a[0] - b[0])
     .map(([partNumber, etag]) => ({ part_number: partNumber, etag }))
 
-const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress, signal }) => {
+const createSessionViaMultipartAttempt = async ({ token, payload, videoFile, onProgress, signal }) => {
   const normalizedContentType = normalizedVideoContentType(videoFile)
   const fingerprint = multipartFingerprint({ payload, videoFile })
   const storageKey = multipartResumeKey(fingerprint)
@@ -665,6 +673,42 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
     }
     throw error
   }
+}
+
+const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress, signal }) => {
+  let lastResult = null
+  let lastError = null
+
+  for (let attempt = 1; attempt <= MULTIPART_RECOVERY_ATTEMPTS; attempt += 1) {
+    throwIfAborted(signal)
+
+    try {
+      const result = await createSessionViaMultipartAttempt({ token, payload, videoFile, onProgress, signal })
+      if (!shouldRetryMultipartResult(result)) return result
+      lastResult = result
+    } catch (error) {
+      if (isAbortError(error)) {
+        return {
+          ok: false,
+          status: 499,
+          data: { error: 'Upload aborted', code: 'upload_aborted' },
+          text: '',
+        }
+      }
+      lastError = error
+    }
+
+    if (attempt >= MULTIPART_RECOVERY_ATTEMPTS) break
+
+    if (onProgress) {
+      onProgress(null, null, videoFile.size)
+    }
+
+    await abortableSleep(MULTIPART_RECOVERY_DELAY_MS * attempt, signal)
+  }
+
+  if (lastResult) return lastResult
+  throw lastError || new Error('Multipart upload failed')
 }
 
 export const createSessionUpload = async ({ token, payload, videoFile, onProgress, signal }) => {
