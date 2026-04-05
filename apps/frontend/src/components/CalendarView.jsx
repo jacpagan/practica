@@ -418,79 +418,38 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
               const isToday = formatKey(d.date) === formatKey(new Date())
               const isSelected = d.key === selectedDateKey
               const has = d.count > 0
-              const topSeriesNames = d.summary.topSeriesNames || []
               const followUpMeta = requestSignalMeta[d.summary.followUpSignal]
-              const intensityClass = d.count >= 4
-                ? 'bg-gray-900/10'
-                : d.count >= 2
-                  ? 'bg-gray-900/5'
-                  : 'bg-transparent'
               return (
-                <div key={d.key} className={`relative h-[78px] sm:h-24 rounded-2xl overflow-hidden ${d.inMonth ? '' : 'opacity-50'}`}>
+                <div key={d.key} className={`relative h-[58px] sm:h-[70px] rounded-xl overflow-hidden ${d.inMonth ? '' : 'opacity-35'}`}>
                   <button
                     type="button"
                     onClick={() => openDate(d.key)}
                     aria-pressed={isSelected}
                     aria-label={`${dayLabel(d.date)}${has ? `, ${d.count} ${d.count === 1 ? 'take' : 'takes'}` : ''}`}
-                    className={`absolute inset-0 rounded-2xl border text-left p-1.5 sm:p-2.5 transition-all ${
+                    className={`absolute inset-0 rounded-xl border text-left p-2 sm:p-2.5 transition-all ${
                       isSelected
-                        ? 'border-gray-900 bg-gray-900 text-white shadow-md'
+                        ? 'border-gray-300 bg-gray-100 text-gray-900 shadow-sm'
                         : has
-                          ? 'border-gray-300 bg-white hover:border-gray-400 hover:shadow-sm'
-                          : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                          ? 'border-gray-150 bg-white hover:border-gray-200 hover:bg-gray-50'
+                          : 'border-gray-100 bg-white hover:bg-gray-50'
                     }`}
-                  >
-                    {!isSelected && has ? <div className={`absolute inset-x-0 top-0 h-1 ${intensityClass}`} /> : null}
-                  </button>
-                  <div className="pointer-events-none relative z-10 p-1.5 sm:p-2.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className={`text-xs sm:text-sm ${isSelected ? 'text-white' : 'text-gray-700'}`}>{d.date.getDate()}</span>
+                  />
+                  <div className="pointer-events-none relative z-10 flex h-full flex-col justify-between p-2 sm:p-2.5">
+                    <div className="flex items-start justify-between text-xs">
+                      <span className={`text-xs sm:text-sm font-medium ${isSelected ? 'text-gray-900' : 'text-gray-800'}`}>{d.date.getDate()}</span>
                       {isToday ? (
-                        <span className={`rounded-full px-1 py-0.5 text-[9px] sm:px-1.5 sm:text-[10px] ${isSelected ? 'bg-white/15 text-white' : 'bg-gray-900/5 text-gray-600'}`}>
-                          Today
-                        </span>
+                        <span className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-gray-900' : 'bg-gray-900'}`} />
                       ) : null}
                     </div>
-                    {has ? (
-                      <div className="mt-1.5 sm:mt-2 space-y-1 sm:space-y-1.5">
-                        <span className={`inline-flex text-[10px] sm:text-[11px] uppercase tracking-wide px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${isSelected ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-700'}`}>
-                          {d.count} {d.count === 1 ? 'take' : 'takes'}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          {Array.from({ length: Math.min(4, d.count) }).map((_, index) => (
-                            <span key={`${d.key}-dot-${index}`} className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-white/80' : 'bg-gray-400'}`} />
-                          ))}
-                        </div>
-                        {topSeriesNames.length ? (
-                          <div className="hidden sm:block space-y-0.5">
-                            {topSeriesNames.map((seriesName) => (
-                              <p key={seriesName} className={`text-[10px] leading-tight truncate ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>
-                                {seriesName}
-                              </p>
-                            ))}
-                            {d.summary.extraSeriesCount > 0 ? (
-                              <p className={`text-[10px] leading-tight ${isSelected ? 'text-white/60' : 'text-gray-400'}`}>+{d.summary.extraSeriesCount} more</p>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
+                    <div className="flex items-center gap-1.5">
+                      {has ? (
+                        <span className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-gray-500' : 'bg-gray-300'}`} />
+                      ) : null}
+                      {followUpMeta ? (
+                        <span className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-gray-900' : 'bg-gray-900'}`} title={followUpMeta.label} />
+                      ) : null}
+                    </div>
                   </div>
-                  {followUpMeta ? (
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        openDate(d.key, {
-                          signal: d.summary.followUpSignal,
-                          seriesName: d.summary.followUpSeriesName || '',
-                        })
-                      }}
-                      className={`absolute bottom-1.5 left-1.5 z-20 inline-flex rounded-full px-1.5 py-0.5 text-[10px] sm:bottom-2 sm:left-2 sm:px-2 sm:py-1 sm:text-[11px] ${followUpMeta.dayTone}`}
-                    >
-                      {followUpMeta.label}
-                    </button>
-                  ) : null}
                 </div>
               )
             })}
