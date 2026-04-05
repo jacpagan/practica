@@ -702,6 +702,7 @@ function AppContent() {
           <CalendarView
             sessions={sessions}
             sessionsLoading={sessionsLoading}
+            routeDateKey={routeDate}
             onOpenSession={(session, returnRoute) => openSession(session, returnRoute || { view: 'calendar', sessionId: null, seriesName: '' })}
             onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
             onContinueThread={(seriesName, dateKey) => handleRecordAnother({

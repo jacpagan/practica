@@ -37,11 +37,12 @@ const formatKey = (d) => {
   return `${yyyy}-${mm}-${dd}`
 }
 
-function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, onOpenSeries, onMonthChange, onOpenListDate, onContinueThread }) {
+function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '', onOpenSession, onOpenSeries, onMonthChange, onOpenListDate, onContinueThread }) {
   const today = startOfDay(new Date())
   const [activeMonth, setActiveMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
   const DATE_FILTER_KEY = 'practica.filter.date.v1'
   const initialSelected = (() => {
+    if (routeDateKey) return routeDateKey
     try { return window.localStorage.getItem(DATE_FILTER_KEY) || formatKey(today) } catch { return formatKey(today) }
   })()
   const [selectedDateKey, setSelectedDateKey] = useState(initialSelected)
@@ -198,6 +199,14 @@ function CalendarView({ sessions = [], sessionsLoading = false, onOpenSession, o
   useEffect(() => {
     try { window.localStorage.setItem(DATE_FILTER_KEY, selectedDateKey) } catch {}
   }, [DATE_FILTER_KEY, selectedDateKey])
+
+  useEffect(() => {
+    if (!routeDateKey) return
+    const routeDate = parseDateKey(routeDateKey)
+    setSelectedDateKey(routeDateKey)
+    setActiveMonth(new Date(routeDate.getFullYear(), routeDate.getMonth(), 1))
+    setShowDayModal(true)
+  }, [routeDateKey])
 
   return (
     <div className="px-4 sm:px-6 py-6">
