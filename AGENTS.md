@@ -55,6 +55,16 @@ For product terminology and naming in new code or docs:
 
 Backend tests use Django’s test runner and live in `apps/backend/videos/tests/` with names like `test_auth_onboarding.py`. Add tests near the feature you change and name test methods by behavior. For frontend changes, at minimum run `npm run build` to catch integration issues, since no dedicated frontend test suite is configured here.
 
+## TDD Expectations
+
+- Protect the core product loop first: `upload -> playback-ready -> trusted feedback request -> reviewer inbox -> response -> follow-up take`.
+- Treat the following as protected flows: upload reliability, playback, private-link access, formal review requests, reviewer inbox, feedback submission, follow-up continuation, and permissions.
+- For bugs in protected flows, write or update a focused regression test before or alongside the fix.
+- Before refactoring a protected area, add characterization coverage for the current behavior you intend to preserve.
+- Do not mix unrelated refactors with bug fixes in protected flows.
+- If a production hotfix is applied outside normal git flow, backport it into the repository immediately.
+- Use `scripts/test-core-loop.sh` as the default local gate for core-loop work.
+
 ## Commit & Pull Request Guidelines
 
 Recent history favors short, imperative subjects with prefixes like `Fix:`, `Feature:`, `Perf:`, and `UI:`. Keep commit messages focused on one change, for example: `Fix: guard review page for missing session`. PRs should include a concise summary, note migrations or env changes, link relevant issues, and attach screenshots for visible UI updates.

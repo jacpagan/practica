@@ -8,6 +8,7 @@ Practica is a private video practice mirror where learners lead their own progre
 - `docs/platform-effects-mvp-playbook.md`: shipped v1 baseline
 - `docs/flow-audit.md`: current flow audit and gaps
 - `docs/platform-revolution-audit.md`: interaction and platform analysis
+- `docs/tdd-strategy.md`: core-loop testing and stabilization strategy
 
 ## Product Framing
 
