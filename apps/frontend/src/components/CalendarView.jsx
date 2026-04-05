@@ -37,7 +37,44 @@ const formatKey = (d) => {
   return `${yyyy}-${mm}-${dd}`
 }
 
-function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '', onOpenSession, onOpenSeries, onMonthChange, onOpenListDate, onContinueThread }) {
+const ACTIVE_REQUEST_STATUSES = new Set([
+  'requested',
+  'opened',
+  'responded',
+  'viewed',
+  'needs_resubmission',
+  'declined_unrelated',
+  'resubmitted',
+])
+
+const requestSignalMeta = {
+  feedback_ready: {
+    label: 'Feedback ready',
+    dayTone: 'bg-emerald-100 text-emerald-800',
+    panelTone: 'bg-emerald-100 text-emerald-800',
+  },
+  awaiting_review: {
+    label: 'Awaiting review',
+    dayTone: 'bg-amber-100 text-amber-800',
+    panelTone: 'bg-amber-100 text-amber-800',
+  },
+}
+
+const requestSignalKey = (status = '') => {
+  const normalized = String(status || '').trim().toLowerCase()
+  if (['responded', 'viewed', 'needs_resubmission', 'declined_unrelated'].includes(normalized)) return 'feedback_ready'
+  if (['requested', 'opened', 'resubmitted'].includes(normalized)) return 'awaiting_review'
+  return ''
+}
+
+const requestSignalPriority = (status = '') => {
+  const signal = requestSignalKey(status)
+  if (signal === 'feedback_ready') return 2
+  if (signal === 'awaiting_review') return 1
+  return 0
+}
+
+function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '', reviewRequests = [], onOpenSession, onOpenSeries, onMonthChange, onOpenListDate, onContinueThread }) {
   const today = startOfDay(new Date())
   const initialMonthDate = routeDateKey ? parseDateKey(routeDateKey) : today
   const [activeMonth, setActiveMonth] = useState(new Date(initialMonthDate.getFullYear(), initialMonthDate.getMonth(), 1))
@@ -87,13 +124,27 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
     return map
   }, [sessions])
 
+  const activeRequestBySessionId = useMemo(() => {
+    const requestMap = new Map()
+    ;[...reviewRequests]
+      .sort((left, right) => new Date(right.updated_at || right.created_at) - new Date(left.updated_at || left.created_at))
+      .forEach((requestItem) => {
+        const status = String(requestItem?.status || '').trim().toLowerCase()
+        if (!ACTIVE_REQUEST_STATUSES.has(status)) return
+        const sessionId = Number(requestItem?.session?.id || requestItem?.session_id || 0)
+        if (!sessionId || requestMap.has(sessionId)) return
+        requestMap.set(sessionId, requestItem)
+      })
+    return requestMap
+  }, [reviewRequests])
+
   const daySummaries = useMemo(() => {
     const map = new Map()
     sessions.forEach((session) => {
       const when = new Date(session.recorded_at || session.created_at)
       const key = formatKey(startOfDay(when))
       if (!map.has(key)) {
-        map.set(key, { count: 0, seriesMap: new Map() })
+        map.set(key, { count: 0, seriesMap: new Map(), followUpSignal: '' })
       }
       const entry = map.get(key)
       entry.count += 1
@@ -103,6 +154,11 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
         count: current.count + 1,
         latestAt: Math.max(current.latestAt, when.getTime() || 0),
       })
+
+      const requestStatus = String(activeRequestBySessionId.get(Number(session.id))?.status || '').trim().toLowerCase()
+      if (requestSignalPriority(requestStatus) > requestSignalPriority(entry.followUpSignal)) {
+        entry.followUpSignal = requestStatus
+      }
     })
 
     return new Map(Array.from(map.entries()).map(([key, value]) => {
@@ -116,9 +172,10 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
         count: value.count,
         topSeriesNames: rankedSeries.slice(0, 2),
         extraSeriesCount: Math.max(0, rankedSeries.length - 2),
+        followUpSignal: requestSignalKey(value.followUpSignal),
       }]
     }))
-  }, [sessions])
+  }, [activeRequestBySessionId, sessions])
 
   const days = useMemo(() => {
     const items = []
@@ -151,7 +208,10 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
           const tb = new Date(b.recorded_at || b.created_at)
           return newestFirst ? (tb - ta) : (ta - tb)
         })
-      return { seriesName, items: sortedItems }
+      const activeRequest = sortedItems
+        .map((item) => activeRequestBySessionId.get(Number(item.id)) || null)
+        .find(Boolean) || null
+      return { seriesName, items: sortedItems, activeRequest }
     })
     // Sort groups by their first item's timestamp
     groupArray.sort((ga, gb) => {
@@ -162,7 +222,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
       return newestFirst ? (tb - ta) : (ta - tb)
     })
     return groupArray
-  }, [newestFirst, selectedSessions])
+  }, [activeRequestBySessionId, newestFirst, selectedSessions])
 
   const monthStats = useMemo(() => {
     const totalTakes = sessions.length
@@ -179,6 +239,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
       activeDays,
       topThreadName: topThread?.[0] || '',
       topThreadCount: topThread?.[1] || 0,
+      followUpDays: Array.from(daySummaries.values()).filter((item) => item.followUpSignal === 'feedback_ready').length,
     }
   }, [daySummaries, sessions])
 
@@ -262,6 +323,11 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
               <span className="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
                 {monthStats.activeDays} active {monthStats.activeDays === 1 ? 'day' : 'days'}
               </span>
+              {monthStats.followUpDays > 0 ? (
+                <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">
+                  {monthStats.followUpDays} follow-up {monthStats.followUpDays === 1 ? 'day' : 'days'}
+                </span>
+              ) : null}
               {monthStats.topThreadName ? (
                 <span className="hidden sm:inline-flex items-center rounded-full bg-white border border-gray-200 px-3 py-1 text-xs font-medium text-gray-700">
                   Top thread: {monthStats.topThreadName} · {monthStats.topThreadCount}
@@ -300,6 +366,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
               const isSelected = d.key === selectedDateKey
               const has = d.count > 0
               const topSeriesNames = d.summary.topSeriesNames || []
+              const followUpMeta = requestSignalMeta[d.summary.followUpSignal]
               const intensityClass = d.count >= 4
                 ? 'bg-gray-900/10'
                 : d.count >= 2
@@ -333,6 +400,11 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                       <span className={`inline-flex text-[10px] sm:text-[11px] uppercase tracking-wide px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${isSelected ? 'bg-white/15 text-white' : 'bg-gray-100 text-gray-700'}`}>
                         {d.count} {d.count === 1 ? 'take' : 'takes'}
                       </span>
+                      {followUpMeta ? (
+                        <span className={`inline-flex text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full ${isSelected ? 'bg-white/15 text-white' : followUpMeta.dayTone}`}>
+                          {followUpMeta.label}
+                        </span>
+                      ) : null}
                       <div className="flex items-center gap-1">
                         {Array.from({ length: Math.min(4, d.count) }).map((_, index) => (
                           <span key={`${d.key}-dot-${index}`} className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-white/80' : 'bg-gray-400'}`} />
@@ -417,6 +489,11 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                           <div className="min-w-0">
                             <p className="text-xs uppercase tracking-wide text-gray-500">{group.seriesName}</p>
                             <p className="text-xs text-gray-500 mt-1">{group.items.length} {group.items.length === 1 ? 'take' : 'takes'} in this thread</p>
+                            {requestSignalMeta[requestSignalKey(group.activeRequest?.status)] ? (
+                              <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${requestSignalMeta[requestSignalKey(group.activeRequest?.status)].panelTone}`}>
+                                {requestSignalMeta[requestSignalKey(group.activeRequest?.status)].label}
+                              </span>
+                            ) : null}
                           </div>
                           {group.seriesName !== '(no thread)' && (
                             <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center sm:flex-wrap">

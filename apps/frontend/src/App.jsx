@@ -745,6 +745,7 @@ function AppContent() {
             sessions={sessions}
             sessionsLoading={sessionsLoading}
             routeDateKey={routeDate}
+            reviewRequests={studentReviewRequests}
             onOpenSession={(session, returnRoute) => openSession(session, returnRoute || { view: 'calendar', sessionId: null, seriesName: '' })}
             onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
             onContinueThread={(seriesName, dateKey) => handleRecordAnother({
