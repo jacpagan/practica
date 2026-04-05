@@ -242,25 +242,10 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
     return groupArray
   }, [activeRequestBySessionId, newestFirst, selectedSessions])
 
-  const monthStats = useMemo(() => {
-    const totalTakes = sessions.length
-    const activeDays = Array.from(daySummaries.values()).filter((item) => item.count > 0).length
-    const seriesCounts = new Map()
-    sessions.forEach((session) => {
-      const seriesName = String(session.practice_series || '').trim()
-      if (!seriesName) return
-      seriesCounts.set(seriesName, (seriesCounts.get(seriesName) || 0) + 1)
-    })
-    const topThread = Array.from(seriesCounts.entries()).sort((left, right) => right[1] - left[1])[0] || null
-    return {
-      totalTakes,
-      activeDays,
-      topThreadName: topThread?.[0] || '',
-      topThreadCount: topThread?.[1] || 0,
-      feedbackReadyDays: Array.from(daySummaries.values()).filter((item) => item.followUpSignal === 'feedback_ready').length,
-      awaitingReviewDays: Array.from(daySummaries.values()).filter((item) => item.followUpSignal === 'awaiting_review').length,
-    }
-  }, [daySummaries, sessions])
+  const monthStats = useMemo(() => ({
+    feedbackReadyDays: Array.from(daySummaries.values()).filter((item) => item.followUpSignal === 'feedback_ready').length,
+    awaitingReviewDays: Array.from(daySummaries.values()).filter((item) => item.followUpSignal === 'awaiting_review').length,
+  }), [daySummaries])
 
   const smartFollowUpTarget = useMemo(() => {
     let best = null
@@ -387,14 +372,8 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
           <div className="space-y-2">
             <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Calendar</h2>
             <p className="text-sm text-gray-500 mt-1">View your takes by day.</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
-                {monthStats.totalTakes} {monthStats.totalTakes === 1 ? 'take' : 'takes'} this month
-              </span>
-              <span className="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
-                {monthStats.activeDays} active {monthStats.activeDays === 1 ? 'day' : 'days'}
-              </span>
-              {smartFollowUpTarget ? (
+            {smartFollowUpTarget ? (
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => openDate(smartFollowUpTarget.dateKey, smartFollowUpTarget)}
@@ -406,13 +385,8 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                     {smartFollowUpTarget.signal === 'feedback_ready' ? monthStats.feedbackReadyDays : monthStats.awaitingReviewDays}
                   </span>
                 </button>
-              ) : null}
-              {monthStats.topThreadName ? (
-                <span className="hidden sm:inline-flex items-center rounded-full bg-white border border-gray-200 px-3 py-1 text-xs font-medium text-gray-700">
-                  Top thread: {monthStats.topThreadName} · {monthStats.topThreadCount}
-                </span>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
           </div>
           <div className="w-full sm:w-auto">
             <div className="flex items-center gap-1 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm sm:gap-2">
