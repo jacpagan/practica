@@ -39,7 +39,8 @@ const formatKey = (d) => {
 
 function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '', onOpenSession, onOpenSeries, onMonthChange, onOpenListDate, onContinueThread }) {
   const today = startOfDay(new Date())
-  const [activeMonth, setActiveMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
+  const initialMonthDate = routeDateKey ? parseDateKey(routeDateKey) : today
+  const [activeMonth, setActiveMonth] = useState(new Date(initialMonthDate.getFullYear(), initialMonthDate.getMonth(), 1))
   const DATE_FILTER_KEY = 'practica.filter.date.v1'
   const initialSelected = (() => {
     if (routeDateKey) return routeDateKey
@@ -278,7 +279,13 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
           </div>
         </div>
 
-        <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="relative rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5" aria-busy={sessionsLoading ? 'true' : 'false'}>
+          {sessionsLoading ? (
+            <div className="absolute right-4 top-4 z-20 inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/95 px-3 py-1.5 text-[11px] text-gray-600 shadow-sm backdrop-blur">
+              <span className="h-2 w-2 rounded-full bg-gray-900 animate-pulse" />
+              Loading month…
+            </div>
+          ) : null}
           <div className="grid grid-cols-7 gap-2 text-[11px] text-gray-500 mb-3">
             {weekLabels.map((w) => (
               <div key={w.full} className="text-center uppercase tracking-wide">
@@ -287,7 +294,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-2">
+          <div className={`grid grid-cols-7 gap-2 transition-opacity ${sessionsLoading ? 'opacity-75' : 'opacity-100'}`}>
             {days.map((d) => {
               const isToday = formatKey(d.date) === formatKey(new Date())
               const isSelected = d.key === selectedDateKey

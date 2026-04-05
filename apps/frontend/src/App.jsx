@@ -81,6 +81,8 @@ function AppContent() {
     seriesName: initialRoute.view === 'series' ? (initialRoute.seriesName || '') : '',
     date: initialRoute.view === 'calendar' ? (initialRoute.date || '') : '',
   })
+  const calendarMonthCacheRef = useRef(new Map())
+  const calendarMonthRequestRef = useRef('')
   const uploadGuardRef = useRef({ active: false, abort: null })
   const currentPathRef = useRef(routePath(initialRoute))
   const autoQuickRecordCheckedRef = useRef(false)
@@ -297,6 +299,43 @@ function AppContent() {
     }
   }, [fetchPaginated, token, toast])
 
+  const monthCacheKey = useCallback((monthDate) => {
+    const year = monthDate.getFullYear()
+    const month = String(monthDate.getMonth() + 1).padStart(2, '0')
+    return `${year}-${month}`
+  }, [])
+
+  const loadCalendarMonth = useCallback(async (monthDate, { preferCache = true } = {}) => {
+    if (!token) return
+    const cacheKey = monthCacheKey(monthDate)
+    const cached = calendarMonthCacheRef.current.get(cacheKey)
+    if (preferCache && cached) {
+      setSessions(cached)
+      setSessionsLoading(false)
+      return
+    }
+
+    const year = monthDate.getFullYear()
+    const month = monthDate.getMonth()
+    const start = new Date(year, month, 1)
+    const end = new Date(year, month + 1, 0)
+    const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const requestKey = `${cacheKey}:${Date.now()}`
+    calendarMonthRequestRef.current = requestKey
+    setSessionsLoading(true)
+    try {
+      const items = await fetchPaginated(`/api/sessions/?start_date=${toISO(start)}&end_date=${toISO(end)}`)
+      calendarMonthCacheRef.current.set(cacheKey, items)
+      if (calendarMonthRequestRef.current !== requestKey) return
+      setSessions(items)
+    } catch {
+      if (calendarMonthRequestRef.current !== requestKey) return
+      setSessions([])
+    } finally {
+      if (calendarMonthRequestRef.current === requestKey) setSessionsLoading(false)
+    }
+  }, [fetchPaginated, monthCacheKey, token])
+
   const loadStudentReviewRequests = useCallback(async () => {
     if (!token) return
     setStudentReviewRequestsLoading(true)
@@ -315,6 +354,7 @@ function AppContent() {
     const handler = async (e) => {
       const id = Number(e?.detail?.id || 0)
       if (!id || !token) return
+      calendarMonthCacheRef.current.clear()
       try {
         const res = await fetch(`/api/sessions/${id}/`, { headers: { Authorization: `Token ${token}` } })
         if (!res.ok) return
@@ -330,6 +370,7 @@ function AppContent() {
   useEffect(() => {
     const handler = async (event) => {
       if (!token) return
+      calendarMonthCacheRef.current.clear()
       const oldSeriesName = String(event?.detail?.oldSeriesName || '').trim()
       const newSeriesName = String(event?.detail?.newSeriesName || '').trim()
       try {
@@ -431,6 +472,7 @@ function AppContent() {
   }, [detailReturnRoute, navigate])
 
   const handleUploadComplete = useCallback((session) => {
+    calendarMonthCacheRef.current.clear()
     setSessions((current) => [session, ...current.filter((item) => item.id !== session.id)])
     setSelectedSession(session)
     setJustUploadedSessionId(session.id)
@@ -539,7 +581,7 @@ function AppContent() {
 
   useEffect(() => {
     if (!user) return
-    if (view === 'series' || view === 'calendar') loadSessions()
+    if (view === 'series') loadSessions()
     if (view === 'calendar') loadStudentReviewRequests()
     loadReviewerWorkspaceAvailability()
   }, [user, view, loadSessions, loadStudentReviewRequests, loadReviewerWorkspaceAvailability])
@@ -714,23 +756,7 @@ function AppContent() {
               navigate({ view: 'calendar', sessionId: null, date: String(dateKey || '') })
             }}
             onMonthChange={(monthDate) => {
-              // Compute month bounds and load only that range
-              const y = monthDate.getFullYear()
-              const m = monthDate.getMonth()
-              const start = new Date(y, m, 1)
-              const end = new Date(y, m + 1, 0)
-              const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-              ;(async () => {
-                try {
-                  setSessionsLoading(true)
-                  const items = await fetchPaginated(`/api/sessions/?start_date=${toISO(start)}&end_date=${toISO(end)}`)
-                  setSessions(items)
-                } catch {
-                  setSessions([])
-                } finally {
-                  setSessionsLoading(false)
-                }
-              })()
+              loadCalendarMonth(monthDate)
             }}
           />
         )}
