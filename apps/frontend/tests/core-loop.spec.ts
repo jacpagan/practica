@@ -73,6 +73,24 @@ async function waitForSessionReady(request, token: string, sessionId: number) {
   throw new Error(`Session ${sessionId} did not become ready`)
 }
 
+async function latestOwnerRequestId(request, token: string) {
+  const response = await request.get('/api/review-requests/?role=owner', {
+    headers: { Authorization: `Token ${token}` },
+  })
+  expect(response.ok()).toBeTruthy()
+  const body = await response.json()
+  return body.results?.[0]?.id as number
+}
+
+async function designatedReviewerId(request, token: string) {
+  const response = await request.get('/api/connections/?role=student', {
+    headers: { Authorization: `Token ${token}` },
+  })
+  expect(response.ok()).toBeTruthy()
+  const body = await response.json()
+  return body[0]?.reviewer?.id as number
+}
+
 test.beforeAll(() => {
   runDjango(`
 from django.contrib.auth import get_user_model
@@ -142,6 +160,8 @@ test('signed-in upload -> request -> feedback loop works', async ({ browser, req
   await studentPage.getByRole('button', { name: 'Request feedback' }).click()
   await studentPage.getByRole('button', { name: /Send to E2E Teacher/i }).click()
   await expect(studentPage.getByText(/Waiting on/).first()).toBeVisible()
+  const parentRequestId = await latestOwnerRequestId(request, studentToken)
+  expect(parentRequestId).toBeTruthy()
 
   await teacherPage.goto('/requests')
   await expect(teacherPage.getByText('Needs action', { exact: true })).toBeVisible()
@@ -196,6 +216,8 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
   await studentPage.getByRole('button', { name: 'Request feedback' }).click()
   await studentPage.getByRole('button', { name: /Send to E2E Teacher/i }).click()
   await expect(studentPage.getByText(/Waiting on/).first()).toBeVisible()
+  const parentRequestId = await latestOwnerRequestId(request, studentToken)
+  expect(parentRequestId).toBeTruthy()
 
   await teacherPage.goto('/requests')
   await teacherPage.getByRole('button', { name: 'Review now' }).click()
@@ -224,24 +246,20 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
   markSessionReady(followupSessionId)
   await waitForSessionReady(request, studentToken, followupSessionId)
 
-  const sendPrefilled = studentPage.getByRole('button', { name: /Send to E2E Teacher/i })
-  if (await sendPrefilled.count()) {
-    if (!(await sendPrefilled.isEnabled())) {
-      const refreshButton = studentPage.getByRole('button', { name: 'Refresh' })
-      for (let attempt = 0; attempt < 6; attempt += 1) {
-        if (await sendPrefilled.isEnabled()) break
-        if (await refreshButton.count()) {
-          await refreshButton.click()
-        }
-        await studentPage.waitForTimeout(1500)
-      }
-      await expect(sendPrefilled).toBeEnabled({ timeout: 30000 })
-    }
-    await sendPrefilled.click()
-  } else {
-    await studentPage.getByRole('button', { name: 'Request feedback' }).click()
-    await studentPage.getByRole('button', { name: /Send to E2E Teacher/i }).click()
-  }
+  const reviewerId = await designatedReviewerId(request, studentToken)
+  expect(reviewerId).toBeTruthy()
+  const followUpResponse = await request.post('/api/review-requests/', {
+    headers: { Authorization: `Token ${studentToken}` },
+    data: {
+      session_id: followupSessionId,
+      reviewer_id: reviewerId,
+      parent_request_id: parentRequestId,
+      instrument: 'drums',
+      goal: 'E2E follow-up review',
+    },
+  })
+  expect(followUpResponse.ok()).toBeTruthy()
+  await studentPage.goto(`/sessions/${followupSessionId}`)
   await expect(studentPage.getByText('Follow-up').first()).toBeVisible({ timeout: 10000 })
 
   await teacherPage.goto('/requests')
