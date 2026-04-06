@@ -1,7 +1,7 @@
 {
   "name": "practica-frontend",
   "version": "1.0.0",
-  "description": "Your personal practice tracking system",
+  "description": "Private video practice mirror with trusted feedback",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
