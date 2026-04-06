@@ -2,8 +2,16 @@ name: CI
 
 on:
   pull_request:
+    paths-ignore:
+      - 'apps/frontend/**'
+      - 'docs/**'
+      - '*.md'
   push:
     branches: [ main ]
+    paths-ignore:
+      - 'apps/frontend/**'
+      - 'docs/**'
+      - '*.md'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
@@ -50,64 +58,4 @@ jobs:
       - name: Run core-loop gate
         run: bash scripts/test-core-loop.sh
 
-  frontend-build:
-    needs: [secrets-guard]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: apps/frontend/package-lock.json
-      - name: Install deps
-        working-directory: apps/frontend
-        run: npm ci --no-audit --no-fund
-      - name: Build
-        working-directory: apps/frontend
-        run: npx vite build
-
-  frontend-e2e:
-    needs: [secrets-guard, frontend-build]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-        with:
-          python-version: '3.11'
-      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: apps/frontend/package-lock.json
-      - name: Install Python deps
-        run: pip install -r requirements.txt
-      - name: Install deps
-        working-directory: apps/frontend
-        run: npm ci --no-audit --no-fund
-      - name: Build (for preview)
-        working-directory: apps/frontend
-        run: npm run build
-      - name: Install Playwright browsers (Chromium only)
-        working-directory: apps/frontend
-        run: npx playwright install chromium --with-deps
-      - name: Run Playwright smoke tests
-        working-directory: apps/frontend
-        run: npm run test:e2e
-
-  frontend-cycles:
-    needs: [secrets-guard]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: apps/frontend/package-lock.json
-      - name: Install deps
-        working-directory: apps/frontend
-        run: npm ci --no-audit --no-fund
-      - name: Check import cycles
-        working-directory: apps/frontend
-        run: npm run check:cycles
+  # Frontend checks consolidated under .github/workflows/frontend-ci.yml
