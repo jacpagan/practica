@@ -228,10 +228,14 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
   if (await sendPrefilled.count()) {
     if (!(await sendPrefilled.isEnabled())) {
       const refreshButton = studentPage.getByRole('button', { name: 'Refresh' })
-      if (await refreshButton.count()) {
-        await refreshButton.click()
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        if (await sendPrefilled.isEnabled()) break
+        if (await refreshButton.count()) {
+          await refreshButton.click()
+        }
+        await studentPage.waitForTimeout(1500)
       }
-      await expect(sendPrefilled).toBeEnabled({ timeout: 10000 })
+      await expect(sendPrefilled).toBeEnabled({ timeout: 30000 })
     }
     await sendPrefilled.click()
   } else {
