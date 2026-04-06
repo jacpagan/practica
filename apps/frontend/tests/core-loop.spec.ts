@@ -226,6 +226,13 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
 
   const sendPrefilled = studentPage.getByRole('button', { name: /Send to E2E Teacher/i })
   if (await sendPrefilled.count()) {
+    if (!(await sendPrefilled.isEnabled())) {
+      const refreshButton = studentPage.getByRole('button', { name: 'Refresh' })
+      if (await refreshButton.count()) {
+        await refreshButton.click()
+      }
+      await expect(sendPrefilled).toBeEnabled({ timeout: 10000 })
+    }
     await sendPrefilled.click()
   } else {
     await studentPage.getByRole('button', { name: 'Request feedback' }).click()
