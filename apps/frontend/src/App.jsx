@@ -609,7 +609,14 @@ function AppContent() {
   }, [toast])
 
   if (loading) {
-    return <div className="min-h-screen bg-white flex items-center justify-center"><p className="text-sm text-gray-400">Loading...</p></div>
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-300 animate-pulse" />
+          <span>Loading</span>
+        </div>
+      </div>
+    )
   }
 
   if (!user) {
@@ -735,7 +742,14 @@ function AppContent() {
       </header>
 
       <main className="max-w-4xl mx-auto pb-24">
-        <React.Suspense fallback={<div className="px-4 sm:px-6 py-6 text-sm text-gray-500">Loading…</div>}>
+        <React.Suspense fallback={
+          <div className="px-4 sm:px-6 py-6 text-sm text-gray-500">
+            <div className="flex items-center gap-2">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-300 animate-pulse" />
+              <span>Loading</span>
+            </div>
+          </div>
+        }>
         {/* List view removed. Calendar is primary. */}
 
         {/* Archive view removed. */}
@@ -832,11 +846,7 @@ function AppContent() {
         {view === 'record' && (
           <RecorderPage
             onCancel={() => navigate({ view: 'calendar', sessionId: null })}
-            onComplete={(sessionData) => {
-              setSelectedSession(sessionData)
-              setSessions((current) => [{ ...sessionData }, ...current])
-              navigate({ view: 'detail', sessionId: sessionData.id })
-            }}
+            onComplete={handleUploadComplete}
           />
         )}
 

@@ -4,6 +4,7 @@ const ConfirmContext = createContext(null)
 
 export function ConfirmProvider({ children }) {
   const [dialog, setDialog] = useState(null)
+  const [initialFocus, setInitialFocus] = useState(null)
 
   const confirm = useCallback((options = {}) => (
     new Promise((resolve) => {
@@ -30,8 +31,9 @@ export function ConfirmProvider({ children }) {
       if (event.key === 'Escape') closeDialog(false)
     }
     window.addEventListener('keydown', onKeyDown)
+    try { initialFocus && initialFocus.focus && initialFocus.focus() } catch {}
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [dialog, closeDialog])
+  }, [dialog, closeDialog, initialFocus])
 
   return (
     <ConfirmContext.Provider value={confirm}>
@@ -44,11 +46,13 @@ export function ConfirmProvider({ children }) {
           <div
             role="dialog"
             aria-modal="true"
+            aria-labelledby="confirm-dialog-title"
+            aria-describedby="confirm-dialog-message"
             className="w-full max-w-sm rounded-2xl bg-white shadow-xl p-4"
             onClick={(event) => event.stopPropagation()}
           >
-            <h3 className="text-sm font-semibold text-gray-900">{dialog.title}</h3>
-            <p className="text-sm text-gray-600 mt-2">{dialog.message}</p>
+            <h3 id="confirm-dialog-title" className="text-sm font-semibold text-gray-900">{dialog.title}</h3>
+            <p id="confirm-dialog-message" className="text-sm text-gray-600 mt-2">{dialog.message}</p>
             <div className="flex items-center justify-end gap-2 mt-4">
               <button
                 onClick={() => closeDialog(false)}
@@ -57,6 +61,7 @@ export function ConfirmProvider({ children }) {
                 {dialog.cancelLabel}
               </button>
               <button
+                ref={setInitialFocus}
                 onClick={() => closeDialog(true)}
                 className={`text-xs font-medium text-white px-3 py-2 rounded-lg transition-colors ${
                   dialog.tone === 'danger'

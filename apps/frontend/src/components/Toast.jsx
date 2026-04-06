@@ -6,6 +6,17 @@ let toastId = 0
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
+  const [reducedMotion, setReducedMotion] = useState(false)
+
+  useEffect(() => {
+    try {
+      const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+      const set = () => setReducedMotion(!!mq.matches)
+      set()
+      mq.addEventListener ? mq.addEventListener('change', set) : mq.addListener(set)
+      return () => { mq.removeEventListener ? mq.removeEventListener('change', set) : mq.removeListener(set) }
+    } catch {}
+  }, [])
 
   const addToast = useCallback((message, type = 'info', duration = 3000, action = null) => {
     const id = ++toastId
@@ -14,11 +25,11 @@ export function ToastProvider({ children }) {
     const remove = () => setToasts(prev => prev.filter(t => t.id !== id))
     const exitTimer = setTimeout(() => {
       startExit()
-      setTimeout(remove, 200)
+      setTimeout(remove, reducedMotion ? 0 : 200)
     }, duration)
     return {
       id,
-      dismiss: () => { clearTimeout(exitTimer); startExit(); setTimeout(remove, 200) },
+      dismiss: () => { clearTimeout(exitTimer); startExit(); setTimeout(remove, reducedMotion ? 0 : 200) },
     }
   }, [])
 
@@ -43,8 +54,8 @@ export function ToastProvider({ children }) {
             key={t.id}
             role={t.type === 'error' ? 'alert' : 'status'}
             aria-live={t.type === 'error' ? 'assertive' : 'polite'}
-            className={`pointer-events-auto px-4 py-3 rounded-xl shadow-lg text-sm font-medium transition-all duration-200 ${
-              t.exiting ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'
+            className={`pointer-events-auto px-4 py-3 rounded-xl shadow-lg text-sm font-medium ${reducedMotion ? '' : 'transition-all duration-200'} ${
+              t.exiting ? (reducedMotion ? 'opacity-0' : 'opacity-0 translate-y-2') : (reducedMotion ? 'opacity-100' : 'opacity-100 translate-y-0')
             } ${
               t.type === 'success' ? 'bg-gray-900 text-white' :
               t.type === 'error' ? 'bg-red-600 text-white' :

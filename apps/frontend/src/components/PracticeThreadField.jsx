@@ -6,8 +6,10 @@ function PracticeThreadField({
   options = [],
   disabled = false,
   placeholder = 'Choose a thread or make a new one',
+  inputRef = null,
 }) {
   const wrapperRef = useRef(null)
+  const internalInputRef = useRef(null)
   const [open, setOpen] = useState(false)
 
   const normalizedValue = String(value || '').trim()
@@ -47,6 +49,10 @@ function PracticeThreadField({
       <input
         type="text"
         value={value}
+        ref={(el) => {
+          internalInputRef.current = el
+          if (typeof inputRef === 'function') inputRef(el)
+        }}
         onFocus={() => setOpen(true)}
         onChange={(event) => {
           onChange?.(event.target.value)
