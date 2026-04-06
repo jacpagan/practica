@@ -91,6 +91,182 @@ async function designatedReviewerId(request, token: string) {
   return body[0]?.reviewer?.id as number
 }
 
+async function installSignedInUploadMocks(page) {
+  let completeAttempts = 0
+
+  await page.route('**/api/auth/me/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 101, username: 'multipart_student', email: '', display_name: 'Multipart Student' }),
+    })
+  })
+
+  await page.route('**/api/review-requests/**', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      })
+      return
+    }
+    await route.continue()
+  })
+
+  await page.route('**/api/sessions/multipart/initiate/', async (route) => {
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        multipart_upload_id: 999,
+        part_size: 5242880,
+        total_parts: 2,
+        expires_at: '2099-01-01T00:00:00Z',
+      }),
+    })
+  })
+
+  await page.route('**/api/sessions/multipart/status/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        multipart_upload_id: 999,
+        status: 'initiated',
+        expires_at: '2099-01-01T00:00:00Z',
+        size_bytes: 9 * 1024 * 1024,
+        part_size: 5242880,
+        total_parts: 2,
+        uploaded_parts: [
+          { part_number: 1, etag: '"etag-1"', size: 5242880 },
+          { part_number: 2, etag: '"etag-2"', size: 4194304 },
+        ],
+      }),
+    })
+  })
+
+  await page.route('**/api/sessions/multipart/sign-part/', async (route) => {
+    const body = route.request().postDataJSON()
+    const partNumber = Number(body?.part_number || 1)
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        signed_url: `http://127.0.0.1:4173/mock-s3/upload-part/${partNumber}`,
+      }),
+    })
+  })
+
+  await page.route('**/mock-s3/upload-part/*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      headers: { ETag: '"mock-etag"' },
+      body: '',
+    })
+  })
+
+  await page.route('**/api/sessions/multipart/complete/', async (route) => {
+    completeAttempts += 1
+    if (completeAttempts === 1) {
+      await route.fulfill({
+        status: 502,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Could not finalize multipart upload' }),
+      })
+      return
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 2500))
+
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 999,
+        title: 'Mock long take',
+        practice_series: '',
+        description: '',
+        video_file: '/media/sessions/mock-long.mp4',
+        duration_seconds: null,
+        recorded_at: '2099-01-01T00:00:00Z',
+        created_at: '2099-01-01T00:00:00Z',
+        updated_at: '2099-01-01T00:00:00Z',
+        processing_status: 'ready',
+        processing_job_id: '',
+        processing_error: '',
+        tag_names: [],
+        assets: [],
+        chapters: [],
+        video_feedback: [],
+        active_review_link: null,
+        chapter_count: 0,
+        video_feedback_count: 0,
+        owner: { id: 101, display_name: 'Multipart Student' },
+        can_edit: true,
+      }),
+    })
+  })
+
+  await page.route('**/api/sessions/999/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 999,
+        title: 'Mock long take',
+        practice_series: '',
+        description: '',
+        video_file: '/media/sessions/mock-long.mp4',
+        duration_seconds: null,
+        recorded_at: '2099-01-01T00:00:00Z',
+        created_at: '2099-01-01T00:00:00Z',
+        updated_at: '2099-01-01T00:00:00Z',
+        processing_status: 'ready',
+        processing_job_id: '',
+        processing_error: '',
+        tag_names: [],
+        assets: [],
+        chapters: [],
+        video_feedback: [],
+        active_review_link: null,
+        chapter_count: 0,
+        video_feedback_count: 0,
+        owner: { id: 101, display_name: 'Multipart Student' },
+        can_edit: true,
+      }),
+    })
+  })
+
+  await page.route('**/media/sessions/mock-long.mp4', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'video/mp4',
+      body: Buffer.from(tinyMp4Base64, 'base64'),
+    })
+  })
+
+  await page.route('**/api/connections/?role=student', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    })
+  })
+
+  await page.route('**/api/review-requests/?session_id=999&role=student', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    })
+  })
+
+  return {
+    getCompleteAttempts: () => completeAttempts,
+  }
+}
+
 test.beforeAll(() => {
   runDjango(`
 from django.contrib.auth import get_user_model
@@ -267,4 +443,27 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
 
   await studentContext.close()
   await teacherContext.close()
+})
+
+test('long upload interruption auto-resumes and saves successfully', async ({ browser }) => {
+  test.setTimeout(90000)
+  const longFilePath = path.join(os.tmpdir(), `practica-e2e-long-${Date.now()}.mp4`)
+  fs.writeFileSync(longFilePath, Buffer.alloc(9 * 1024 * 1024, 1))
+
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
+  await context.addInitScript(() => window.localStorage.setItem('token', 'mock-token'))
+  const page = await context.newPage()
+  const mocks = await installSignedInUploadMocks(page)
+
+  await page.goto('/upload')
+  await expect(page.getByRole('heading', { name: 'New take' })).toBeVisible({ timeout: 10000 })
+  await page.locator('[aria-label="Drop a video or browse files"] input[type=file]').first().setInputFiles(longFilePath)
+  await page.locator('input[type=text]').nth(0).fill('Mock long take')
+  await page.getByRole('button', { name: 'Save to library' }).click()
+
+  await expect(page).toHaveURL(/\/sessions\/999$/, { timeout: 30000 })
+  await expect(page.getByText('Mock long take')).toBeVisible({ timeout: 10000 })
+  expect(mocks.getCompleteAttempts()).toBeGreaterThan(1)
+
+  await context.close()
 })
