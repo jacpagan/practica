@@ -33,6 +33,17 @@ function runDjango(code: string) {
   })
 }
 
+function markSessionReady(sessionId: number) {
+  runDjango(`
+from videos.models import Session
+session = Session.objects.get(pk=${sessionId})
+session.processing_status = Session.STATUS_READY
+session.processing_job_id = ''
+session.processing_error = ''
+session.save(update_fields=['processing_status', 'processing_job_id', 'processing_error', 'updated_at'])
+  `)
+}
+
 function writeFixtureVideo(name: string) {
   const filePath = path.join(os.tmpdir(), name)
   const buffer = Buffer.from(tinyMp4Base64, 'base64')
@@ -124,14 +135,7 @@ test('signed-in upload -> request -> feedback loop works', async ({ browser, req
   const sessionId = Number(studentPage.url().match(/\/sessions\/(\d+)/)?.[1])
   expect(sessionId).toBeTruthy()
 
-  runDjango(`
-from videos.models import Session
-session = Session.objects.get(pk=${sessionId})
-session.processing_status = Session.STATUS_READY
-session.processing_job_id = ''
-session.processing_error = ''
-session.save(update_fields=['processing_status', 'processing_job_id', 'processing_error', 'updated_at'])
-  `)
+  markSessionReady(sessionId)
 
   await waitForSessionReady(request, studentToken, sessionId)
   await studentPage.reload()
@@ -142,7 +146,7 @@ session.save(update_fields=['processing_status', 'processing_job_id', 'processin
   await teacherPage.goto('/requests')
   await expect(teacherPage.getByText('Needs action', { exact: true })).toBeVisible()
   await teacherPage.getByRole('button', { name: 'Review now' }).click()
-  await expect(teacherPage.locator('video').first()).toBeVisible()
+  await expect(teacherPage.getByText('Add your response')).toBeVisible()
 
   const chooser = teacherPage.waitForEvent('filechooser')
   await teacherPage.getByRole('button', { name: 'Upload response' }).click()
@@ -154,6 +158,83 @@ session.save(update_fields=['processing_status', 'processing_job_id', 'processin
   await studentPage.goto(`/sessions/${sessionId}`)
   await expect(studentPage.getByRole('button', { name: 'Review feedback' })).toBeVisible()
   await expect(studentPage.getByText('E2E Teacher')).toBeVisible()
+
+  await studentContext.close()
+  await teacherContext.close()
+})
+
+test('continue loop creates a follow-up take and follow-up request', async ({ browser, request }) => {
+  test.setTimeout(150000)
+  const firstTakeVideo = writeFixtureVideo('practica-e2e-followup-start.mp4')
+  const teacherVideo = writeFixtureVideo('practica-e2e-followup-teacher.mp4')
+  const secondTakeVideo = writeFixtureVideo('practica-e2e-followup-next.mp4')
+  const studentToken = await apiToken(request, studentUsername, studentPassword)
+  const teacherToken = await apiToken(request, teacherUsername, teacherPassword)
+  const initialTitle = `E2E follow-up start ${Date.now()}`
+  const followupTitle = `E2E follow-up next ${Date.now()}`
+
+  const studentContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
+  const teacherContext = await browser.newContext({ viewport: { width: 1280, height: 900 } })
+  await studentContext.addInitScript((token) => window.localStorage.setItem('token', token), studentToken)
+  await teacherContext.addInitScript((token) => window.localStorage.setItem('token', token), teacherToken)
+  const studentPage = await studentContext.newPage()
+  const teacherPage = await teacherContext.newPage()
+
+  await studentPage.goto('/upload')
+  await expect(studentPage.getByRole('heading', { name: 'New take' })).toBeVisible({ timeout: 10000 })
+  await studentPage.locator('[aria-label="Drop a video or browse files"] input[type=file]').first().setInputFiles(firstTakeVideo)
+  await studentPage.locator('input[type=text]').nth(0).fill(initialTitle)
+  await studentPage.getByRole('button', { name: 'Save to library' }).click()
+  await studentPage.waitForURL(/\/sessions\/\d+/, { timeout: 30000 })
+
+  const initialSessionId = Number(studentPage.url().match(/\/sessions\/(\d+)/)?.[1])
+  expect(initialSessionId).toBeTruthy()
+  markSessionReady(initialSessionId)
+  await waitForSessionReady(request, studentToken, initialSessionId)
+  await studentPage.reload()
+
+  await studentPage.getByRole('button', { name: 'Request feedback' }).click()
+  await studentPage.getByRole('button', { name: /Send to E2E Teacher/i }).click()
+  await expect(studentPage.getByText(/Waiting on/).first()).toBeVisible()
+
+  await teacherPage.goto('/requests')
+  await teacherPage.getByRole('button', { name: 'Review now' }).click()
+  const chooser = teacherPage.waitForEvent('filechooser')
+  await teacherPage.getByRole('button', { name: 'Upload response' }).click()
+  const fileChooser = await chooser
+  await fileChooser.setFiles(teacherVideo)
+  await teacherPage.getByRole('button', { name: 'Send response' }).click()
+  await expect(teacherPage.getByRole('button', { name: 'Edit' })).toBeVisible()
+
+  await studentPage.goto(`/sessions/${initialSessionId}`)
+  await studentPage.getByRole('button', { name: 'Review feedback' }).click()
+  await expect(studentPage.getByRole('button', { name: 'Continue loop' })).toBeVisible()
+  await studentPage.getByRole('button', { name: 'Continue loop' }).click()
+  await expect(studentPage).toHaveURL(/\/upload$/)
+  await expect(studentPage.getByRole('heading', { name: 'New take' })).toBeVisible()
+
+  await studentPage.locator('[aria-label="Drop a video or browse files"] input[type=file]').first().setInputFiles(secondTakeVideo)
+  await studentPage.locator('input[type=text]').nth(0).fill(followupTitle)
+  await studentPage.getByRole('button', { name: 'Save to library' }).click()
+  await studentPage.waitForURL(/\/sessions\/\d+/, { timeout: 30000 })
+
+  const followupSessionId = Number(studentPage.url().match(/\/sessions\/(\d+)/)?.[1])
+  expect(followupSessionId).toBeTruthy()
+  expect(followupSessionId).not.toBe(initialSessionId)
+  markSessionReady(followupSessionId)
+  await waitForSessionReady(request, studentToken, followupSessionId)
+
+  const sendPrefilled = studentPage.getByRole('button', { name: /Send to E2E Teacher/i })
+  if (await sendPrefilled.count()) {
+    await sendPrefilled.click()
+  } else {
+    await studentPage.getByRole('button', { name: 'Request feedback' }).click()
+    await studentPage.getByRole('button', { name: /Send to E2E Teacher/i }).click()
+  }
+  await expect(studentPage.getByText('Follow-up').first()).toBeVisible({ timeout: 10000 })
+
+  await teacherPage.goto('/requests')
+  await expect(teacherPage.getByText('Follow-up').first()).toBeVisible({ timeout: 10000 })
 
   await studentContext.close()
   await teacherContext.close()
