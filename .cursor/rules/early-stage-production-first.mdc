@@ -2,32 +2,15 @@
 alwaysApply: true
 ---
 
-## Early-Stage Production-First Policy
+## Shipping (early-stage)
 
-This repository runs in early-stage shipping mode. Follow these rules unless explicitly superseded in `AGENTS.md`.
+Canonical detail: **`AGENTS.md`**. This file is the Cursor-sized summary.
 
-1. Completed changes must be pushed directly to `main` in the same work session.
-2. Do not batch completed work into deferred release branches.
-3. Production deploy path is `.github/workflows/deploy-ssm.yml` only.
-4. After push to `main`, verify deploy workflow success and production health endpoint returns 200:
-   - `https://practica.jpagan.com/health/`
-5. If deployment fails, apply fix-forward immediately with a new commit to `main`.
+1. Finish work on **`main`** in the same session; no parking completed work on side branches.
+2. Production deploy path: **`.github/workflows/deploy-ssm.yml`** only.
+3. After each push to `main`: confirm the deploy workflow succeeded and **`https://practica.jpagan.com/health/`** returns **200**.
+4. Failed deploy: **fix-forward** on `main` immediately.
 
-## Required Agent Behavior
+**Local minimum before push:** ruff + core-loop when backend behavior changes; `npm run build` when the frontend changes (see `.github/workflows/`).
 
-- Default delivery branch for completed work: `main`.
-- Default release strategy: continuous direct-to-production.
-- Verification is mandatory, not optional:
-  - local minimum validation (frontend build and backend check when environment exists),
-  - deploy workflow success,
-  - production health success.
-
-## Policy Change Protocol
-
-If release strategy changes (for example PR-only, staging gates, release branches), update:
-
-- `AGENTS.md` (policy + runbook),
-- `.cursor/rules.yaml`,
-- this file.
-
-All three must change in the same commit.
+**If release strategy changes** (e.g. staging gates, PR-only): update **`AGENTS.md`**, **`.cursor/rules.yaml`**, and **this file** in **one** commit.

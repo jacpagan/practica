@@ -1,24 +1,7 @@
-# Production Workflow Implementation (Deprecated Staging Guidance)
+# Release workflow
 
-This document was previously staging-oriented and is now superseded for active deployment policy.
+**Canonical:** `AGENTS.md` and `.cursor/rules/early-stage-production-first.mdc`.
 
-## Canonical Release Strategy
+Strategy is **`main` → production** via `.github/workflows/deploy-ssm.yml`. No active staging promotion path.
 
-- Official strategy: `main -> production` only.
-- No active staging promotion path in CI/CD.
-- Source of truth for release behavior: `AGENTS.md` (Release Strategy section) and production workflows in `.github/workflows/`.
-
-## Operational Guardrails
-
-- Keep production deploy triggers restricted to `push` on `main`.
-- Run `scripts/check-release-strategy.sh` in CI to prevent drift.
-- Maintain post-deploy smoke checks (`/health/`, login, upload/playback).
-
-## If Strategy Changes Later
-
-If the team intentionally reintroduces staging, update all of the following in one change:
-
-1. `AGENTS.md` release strategy section.
-2. `.github/workflows/*` deploy triggers.
-3. `.cursor/rules.yaml` deployment rules.
-4. This document.
+Drift check: `scripts/check-release-strategy.sh` (see `.github/workflows/release-strategy-guardrail.yml`).

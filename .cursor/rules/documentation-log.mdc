@@ -1,57 +1,17 @@
 ---
-description: Prevent bash PS2 hangs (dquote>, quote>, bquote>) via QuoteGuard
+description: Shell blocks — balanced quotes; avoid PS2 hangs (dquote>, quote>, bquote>)
 globs:
   - "**/*"
 alwaysApply: true
-
-# Instruct Cursor how to format and validate shell commands it emits.
 message: |
-  ## QuoteGuard — Shell Command Hygiene
+  ## Shell hygiene (QuoteGuard)
 
-  When producing *any* shell/terminal block (bash/sh/zsh):
+  **Default:** one logical command per line; no trailing `\`, `|`, `&&`, or unmatched `(` / `{` / `[` at EOL.
 
-  1) **Single-line by default.** Do not split a command across lines unless using a deliberate heredoc.
+  **Quoting:** Even counts of `"` and `'` outside the other quote style; backticks and `$(` closed; prefer `printf '%s\n' 'literal'` over fragile `echo` for odd data.
 
-  2) **Balanced quoting check (pre-emit):**
-     - Ensure an even count of unescaped `"` outside single quotes.
-     - Ensure an even count of unescaped `'` outside double quotes.
-     - For backticks and command subs: ensure every `` ` `` has a closing `` ` ``, and every `$(` has a matching `)`.
-     - Disallow trailing `\`, lone pipe (`|`), `&&`, `||`, or unmatched `(`, `{`, `[` at EOL.
+  **Multi-line:** Prefer `cat <<'EOF' > file` with a **single-quoted** delimiter; close delimiter on its own line.
 
-  3) **Safe multi-line only via heredoc (literal):**
-     - Use: `cat <<'EOF' > file.ext` … `EOF`  (delimiter **single-quoted** to disable expansion).
-     - Never use unterminated heredocs. Always close with the exact delimiter on its own line.
+  **Fenced `bash` blocks:** ```bash … ``` only; no `$` prompts in copy-paste commands.
 
-  4) **Prefer `printf` to `echo` for literals.**
-     - `printf '%s\n' 'literal text'` instead of `echo "..."`.
-     - For JSON and curl bodies, wrap outer shell with single quotes and inner JSON with double quotes, or use a heredoc.
-
-  5) **Markdown code fences:**
-     - Always start with ```bash and end with a closing ``` on its own line.
-     - Do not include prompts like `$ `; emit raw commands for copy/paste safety.
-
-  6) **If captured output shows a PS2 continuation prompt (`dquote>`, `quote>`, or `bquote>`):**
-     - **Immediately** suggest recovery steps (no further commands until recovered):
-       - `# press Ctrl-C to abort the unterminated command`
-       - `stty sane; reset || true; clear || true`
-       - Then re-emit a **sanitized** single-line version of the last command with balanced quoting (apply Rules 2–5).
-
-  7) **Examples (GOOD ⇢ BAD):**
-     - GOOD: `sed -n '1,20p' /var/log/syslog`
-       BAD:  `sed -n "1,20p /var/log/syslog`              # unclosed "
-     - GOOD: `printf '%s\n' '{"name":"pr"}' > cfg.json`
-       BAD:  `echo "{"name":"pr"}" > cfg.json`            # quote nesting
-     - GOOD:
-         cat <<'EOF' > script.sh
-         #!/usr/bin/env bash
-         set -euo pipefail
-         echo "ok"
-         EOF
-       BAD:
-         cat <<EOF > script.sh
-         echo "$UNSET_VAR
-         # (missing EOF; expands vars)
-
-  8) **Final preflight before emitting any shell block:**
-     - If any check fails, **rewrite** to a single-line or heredoc-safe form; do not emit a block that could yield PS2.
-
+  **If you see `dquote>` / `quote>` / `bquote>` in output:** stop chaining; Ctrl-C; `stty sane; reset || true`; re-emit a single-line, balanced command.
