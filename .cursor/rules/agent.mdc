@@ -1,0 +1,48 @@
+---
+alwaysApply: true
+---
+
+## Phase 0 — Read-only reconnaissance
+
+Do not edit files until you understand the repo: layout, manifests, config, how tests/CI run, and patterns in the code you touch. **Code wins over docs** when they disagree.
+
+**Digest:** Short mental model or brief chat summary; skip multi-hundred-line “syntheses” unless the task is huge.
+
+---
+
+## Constraints
+
+**Cost:** Fewer agent turns, local tools, free paths; no paid services or heavy APIs without explicit approval.
+
+**Ask the user only when:** sources conflict irrecoverably; required secrets/files missing after a real search; irreversible or unacceptable production risk; blocked after exhaustive search.
+
+**Autonomy:** After Phase 0, execute without narration theater. Verify with files and command output.
+
+**Scope:** Fix what you touch and direct consumers; no unrelated refactors or unsolicited docs.
+
+---
+
+## Communication
+
+**Default:** quiet, factual, dense. Outcome and evidence first; no preambles or filler.
+
+**Shape:** what changed → how verified → blockers. Lists for scans; prose only when it saves a round trip.
+
+**Anti-pattern:** long narrative before action. **Pattern:** one acknowledgment line, then tools/commands or the answer.
+
+---
+
+## Workflow
+
+`Reconnaissance → Plan → Execute → Verify → Report`
+
+- Read before write; re-read diffs after.
+- Gates: backend `ruff` + `scripts/test-core-loop.sh` when behavior changes; `npm run build` when UI changes.
+- Plans/logs stay in chat; no throwaway analysis `.md` unless the user asks.
+- Status: `✅` · `⚠️` · `🚧`
+
+**Shell:** bounded, non-interactive commands; see `shell.mdc` for quoting / PS2.
+
+**Feedback:** User corrections = full stop; re-diagnose from evidence.
+
+**Retro:** Only if the user asks (`retro`).

@@ -1,6 +1,5 @@
-# Cursor rules — Practica. Detail lives in AGENTS.md and .cursor/rules/*.mdc
-description: >
-  Cost discipline, repo anchors, quality gates, and early-stage shipping policy.
+# Practica — see AGENTS.md and .cursor/rules/{agent,ship,shell}.mdc
+description: Cost, repo anchors, gates, shipping.
 globs:
   - "**/*"
 alwaysApply: true
@@ -12,4 +11,4 @@ rules:
   - "Migrations: for risky columns, prefer nullable → backfill → NOT NULL over big-bang constraints."
   - "Quality gates: ruff on apps/backend/practica/ and apps/backend/videos/; bash scripts/test-core-loop.sh for protected flows; frontend npm run build (see .github/workflows/frontend-ci.yml)."
   - "Ship to main in-session; deploy only via .github/workflows/deploy-ssm.yml; after push verify Actions green and https://practica.jpagan.com/health/ returns 200; fix-forward on failure."
-  - "Changing release strategy: update AGENTS.md, this file, and .cursor/rules/early-stage-production-first.mdc together."
+  - "Changing release strategy: update AGENTS.md, this file, and .cursor/rules/ship.mdc together."

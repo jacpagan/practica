@@ -1,0 +1,16 @@
+---
+alwaysApply: true
+---
+
+## Ship
+
+Detail: **`AGENTS.md`**.
+
+1. Land work on **`main`** in the same session; no parking finished work on side branches.
+2. Deploy: **`.github/workflows/deploy-ssm.yml`** only.
+3. After each push to `main`: deploy workflow green + **`https://practica.jpagan.com/health/`** → **200**.
+4. Failed deploy: **fix-forward** on `main` immediately.
+
+**Before push:** ruff + core-loop when backend changes; `npm run build` when frontend changes (see `.github/workflows/`).
+
+**If release strategy changes:** update **`AGENTS.md`**, **`.cursor/rules.yaml`**, and **`ship.mdc`** in one commit.

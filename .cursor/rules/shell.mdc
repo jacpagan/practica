@@ -1,0 +1,17 @@
+---
+description: Shell — balanced quotes; avoid PS2 (dquote>, quote>, bquote>)
+globs:
+  - "**/*"
+alwaysApply: true
+message: |
+  ## Shell
+
+  **Default:** one logical command per line; no trailing `\`, `|`, `&&`, or unmatched `(` / `{` / `[` at EOL.
+
+  **Quoting:** Even `"` and `'` counts outside the other style; close backticks and `$(`; prefer `printf '%s\n' 'literal'` over fragile `echo`.
+
+  **Multi-line:** `cat <<'EOF' > file` with single-quoted delimiter; close delimiter on its own line.
+
+  **Fenced blocks:** ```bash … ```; no `$` prompts in paste commands.
+
+  **PS2 (`dquote>` / `quote>` / `bquote>`):** Ctrl-C; `stty sane; reset || true`; re-emit one balanced line.
