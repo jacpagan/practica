@@ -14,6 +14,7 @@ const MAX_BPM = 240
 const BPM_PRESETS = [60, 72, 84, 96, 108, 120, 132, 144, 152, 160, 172, 184, 192, 200]
 
 const METRONOME_SYNC_KEY = 'practica.metronome.syncOffsetMs.v1'
+const CLICK_GAIN_STORAGE_KEY = 'practica.metronome.clickGain.v1'
 const AUDIO_INPUT_STORAGE_KEY = 'practica.recorder.audioInputId.v1'
 
 const readSyncOffsetMs = () => {
@@ -50,6 +51,14 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   const [isMetronomeRunning, setIsMetronomeRunning] = useState(false)
   const [beatsPerBar, setBeatsPerBar] = useState(4)
   const [syncOffsetMs, setSyncOffsetMs] = useState(readSyncOffsetMs)
+  const [clickGain, setClickGain] = useState(() => {
+    try {
+      const raw = window.localStorage.getItem(CLICK_GAIN_STORAGE_KEY)
+      const parsed = Number(raw)
+      if (Number.isFinite(parsed)) return Math.max(0, Math.min(2, parsed))
+    } catch {}
+    return 1
+  })
   const [showTimingTools, setShowTimingTools] = useState(false)
   const [showPipControls, setShowPipControls] = useState(false)
   const [musicMode, setMusicMode] = useState(true)
@@ -224,6 +233,10 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     } catch {}
   }, [syncOffsetMs])
 
+  useEffect(() => {
+    try { window.localStorage.setItem(CLICK_GAIN_STORAGE_KEY, String(clickGain)) } catch {}
+  }, [clickGain])
+
   // Attach stream to video element whenever the ref or stream changes
   const attachStream = useCallback(() => {
     if (liveRef.current && streamRef.current) {
@@ -396,7 +409,9 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     const recordDelay = audioContext.createDelay(1)
     oscillator.type = 'square'
     oscillator.frequency.value = isAccent ? 1568 : 988
-    gain.gain.setValueAtTime(isAccent ? 0.16 : 0.11, audioContext.currentTime)
+    const base = isAccent ? 0.16 : 0.11
+    const mult = Math.max(0, Math.min(2, Number(clickGain) || 0))
+    gain.gain.setValueAtTime(base * mult, audioContext.currentTime)
     gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.05)
     recordDelay.delayTime.value = metronomeRecordDelaySeconds()
     oscillator.connect(gain)
@@ -405,7 +420,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     recordDelay.connect(destination)
     oscillator.start(audioContext.currentTime)
     oscillator.stop(audioContext.currentTime + 0.055)
-  }, [beatsPerBar, metronomeRecordDelaySeconds])
+  }, [beatsPerBar, metronomeRecordDelaySeconds, clickGain])
 
   const startMetronome = useCallback(async () => {
     if (!streamRef.current) return
@@ -992,18 +1007,36 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                   </div>
                 </div>
 
-                <div className="rounded-2xl bg-white/5 px-3 py-3 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-white/60">Metronome</p>
-                    <p className="text-sm font-medium text-white">{metronomeEnabled ? 'On' : 'Off'}</p>
+                <div className="rounded-2xl bg-white/5 px-3 py-3 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-white/60">Metronome</p>
+                      <p className="text-sm font-medium text-white">{metronomeEnabled ? 'On' : 'Off'}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={toggleMetronome}
+                      className={`rounded-xl px-4 py-2 text-sm transition-colors ${metronomeEnabled ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
+                    >
+                      {metronomeEnabled ? 'Turn off' : 'Turn on'}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={toggleMetronome}
-                    className={`rounded-xl px-4 py-2 text-sm transition-colors ${metronomeEnabled ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
-                  >
-                    {metronomeEnabled ? 'Turn off' : 'Turn on'}
-                  </button>
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="text-[11px] uppercase tracking-wide text-white/60">Click volume</label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min="0"
+                        max="2"
+                        step="0.01"
+                        value={clickGain}
+                        onChange={(e) => setClickGain(Number(e.target.value))}
+                        className="w-40"
+                        aria-label="Click volume"
+                      />
+                      <span className="text-xs text-white/70 w-10 text-right">{Math.round(clickGain * 100)}%</span>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="rounded-2xl bg-white/5 px-3 py-3 space-y-2">
