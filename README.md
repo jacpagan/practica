@@ -103,8 +103,8 @@ cd apps/frontend && npm run build
 
 ### Backend
 
-- Django 4.2 + Django REST Framework
-- SQLite in development and PostgreSQL in production
+- Django 6.x + Django REST Framework (versions unpinned in `requirements.txt`; resolve with your venv)
+- SQLite when running the API outside Docker without `DATABASE_URL`; PostgreSQL via Docker Compose locally and in production
 - S3-backed uploads when `AWS_STORAGE_BUCKET_NAME` is set
 - Media processing pipeline for playback-ready sessions
 
@@ -122,10 +122,9 @@ cd apps/frontend && npm run build
 
 ## Deployment Notes
 
-- `main` is the production branch.
-- Deploy contract is `feature branch -> PR -> main -> production`.
-- Production deploys happen through `.github/workflows/deploy-ssm.yml`.
-- Read-only production commands can run through `.github/workflows/debug-ssm-prod.yml`.
+- **`main`** is the production branch; completed work is integrated there (see **`AGENTS.md`** for release policy).
+- Production deploys run through **`.github/workflows/deploy-ssm.yml`** (GitHub Actions → AWS SSM → EC2).
+- Optional diagnostics: **`.github/workflows/debug-ssm-prod.yml`** (SSM shell on the prod instance; production environment).
 
 ## Security Notes
 

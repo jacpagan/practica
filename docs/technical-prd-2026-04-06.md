@@ -2,7 +2,7 @@
 
 **Date:** April 6, 2026  
 **Status:** Current-state technical PRD  
-**Version:** Reflects the app as implemented on production commit `6206fad`
+**Version:** Reflects the app as implemented as of commit `dc3984c` (update this line when the snapshot meaningfully drifts).
 
 ## 1. Purpose
 
@@ -330,10 +330,10 @@ The current product supports these functional goals:
 
 ### 7.2 Current routes
 
-- `/` -> calendar/archive
+- `/`, `/archive`, `/calendar`, `/library` -> calendar / archive (query `?date=` supported on `/`)
 - `/privacy` -> privacy page
 - `/upload` -> upload flow
-- `/record` -> dedicated recording flow
+- `/record`, `/recording` -> dedicated recording flow (aliases)
 - `/requests` -> reviewer inbox
 - `/series/:seriesName` -> practice thread view
 - `/sessions/:id` -> session detail
@@ -363,7 +363,7 @@ The current product supports these functional goals:
 
 ### 8.1 Stack
 
-- Django 4.2
+- Django 6.x (unpinned in `requirements.txt`; CI and production use compatible 6.x)
 - Django REST Framework
 - Django token auth
 - SQLite by default in local development

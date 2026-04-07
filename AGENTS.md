@@ -24,9 +24,11 @@ Important product context:
 
 ## Documentation Source Of Truth
 
+- `docs/README.md`: index of product and technical docs.
 - `docs/practica-v2-prd.md`: v2 product requirements and roadmap direction.
 - `docs/platform-effects-mvp-playbook.md`: shipped v1 baseline.
 - `docs/flow-audit.md`: implementation and foundation gaps.
+- `docs/technical-prd-2026-04-06.md`: current-state technical snapshot (update the version line when it diverges).
 
 ## Project Structure & Module Organization
 
@@ -53,7 +55,7 @@ For product terminology and naming in new code or docs:
 
 ## Testing Guidelines
 
-Backend tests use Django’s test runner and live in `apps/backend/videos/tests/` with names like `test_auth_onboarding.py`. Add tests near the feature you change and name test methods by behavior. For frontend changes, at minimum run `npm run build` to catch integration issues, since no dedicated frontend test suite is configured here.
+Backend tests use Django’s test runner and live in `apps/backend/videos/tests/` with names like `test_auth_onboarding.py`. Add tests near the feature you change and name test methods by behavior. For frontend changes, run `npm run build`; **Playwright** end-to-end tests (`npm run test:e2e` in `apps/frontend/`) also run in **`.github/workflows/frontend-ci.yml`** when frontend files change.
 
 ## TDD Expectations
 

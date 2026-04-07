@@ -4,6 +4,7 @@ Practica is a private video practice mirror where learners lead their own progre
 
 ## Source Of Truth
 
+- `AGENTS.md` (repo root): engineering commands, structure, tests, and release expectations
 - `docs/practica-v2-prd.md`: strategic product direction and roadmap
 - `docs/platform-effects-mvp-playbook.md`: shipped v1 baseline
 - `docs/flow-audit.md`: current flow audit and gaps
