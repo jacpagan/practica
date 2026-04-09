@@ -33,3 +33,70 @@ test('Review route handles missing backend gracefully', async ({ page }) => {
   // Should show the private feedback header or a friendly error, not a crash
   await expect(page.locator('text=Private feedback link').first()).toBeVisible()
 })
+
+test('Record route shows camera and microphone selectors for signed-in members', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('token', 'smoke-token')
+
+    const originalFetch = window.fetch.bind(window)
+    window.fetch = async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input)
+
+      if (url.includes('/api/auth/me/')) {
+        return new Response(JSON.stringify({ id: 1, username: 'smoke_member', display_name: 'Smoke Member' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (url.includes('/api/review-requests/')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      return originalFetch(input, init)
+    }
+
+    const mediaDevices = navigator.mediaDevices
+    if (!mediaDevices) return
+
+    mediaDevices.enumerateDevices = async () => ([
+      {
+        deviceId: 'video-device-1',
+        kind: 'videoinput',
+        label: 'Built-in Camera',
+        groupId: 'group-video',
+        toJSON() { return this },
+      },
+      {
+        deviceId: 'audio-device-1',
+        kind: 'audioinput',
+        label: 'Built-in Microphone',
+        groupId: 'group-audio',
+        toJSON() { return this },
+      },
+    ])
+
+    mediaDevices.getUserMedia = async () => {
+      const error = new Error('No real media in smoke test')
+      error.name = 'NotAllowedError'
+      throw error
+    }
+
+    mediaDevices.getDisplayMedia = async () => {
+      const error = new Error('No real display media in smoke test')
+      error.name = 'NotAllowedError'
+      throw error
+    }
+  })
+
+  await page.goto('/record')
+
+  await expect(page.getByRole('heading', { name: 'Record' })).toBeVisible()
+  await expect(page.locator('text=Camera input').first()).toBeVisible()
+  await expect(page.locator('text=Microphone input').first()).toBeVisible()
+  await expect(page.locator('select').nth(0)).toContainText('Built-in Camera')
+  await expect(page.locator('select').nth(1)).toContainText('Built-in Microphone')
+})
