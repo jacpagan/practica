@@ -102,6 +102,7 @@ test('Record route shows camera and microphone selectors for signed-in members',
 })
 
 test('Session detail separates private link from structured feedback', async ({ page }) => {
+  // Keep the lightweight private-link access path separate from the structured feedback request flow.
   await page.addInitScript(() => {
     window.localStorage.setItem('token', 'smoke-token')
   })
