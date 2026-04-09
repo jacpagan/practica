@@ -1196,14 +1196,14 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                               <p className="text-xs text-gray-500 mt-1">{requestItem.instrument}</p>
                             </div>
                             <div className="text-right">
-                              <p className="text-xs text-gray-500">Requested {new Date(requestItem.created_at).toLocaleString(undefined, { hour12: undefined })}</p>
-                              <p className="text-xs text-gray-400 mt-1">Responses: {requestItem.response_count || 0}</p>
+                              <p className="text-xs text-gray-500">Sent {new Date(requestItem.created_at).toLocaleString(undefined, { hour12: undefined })}</p>
+                              <p className="text-xs text-gray-400 mt-1">Replies: {requestItem.response_count || 0}</p>
                             </div>
                           </div>
                           <div>
                             <p className="text-sm text-gray-800">{requestItem.goal}</p>
-                            {requestItem.exercise_or_song ? <p className="text-xs text-gray-500 mt-1">Focus: {requestItem.exercise_or_song}</p> : null}
-                            {requestItem.status_reason ? <p className="text-xs text-gray-600 mt-2">Reason: {requestReasonLabel(requestItem.status_reason)}</p> : null}
+                            {requestItem.exercise_or_song ? <p className="text-xs text-gray-500 mt-1">Focus {requestItem.exercise_or_song}</p> : null}
+                            {requestItem.status_reason ? <p className="text-xs text-gray-600 mt-2">Why {requestReasonLabel(requestItem.status_reason)}</p> : null}
                             {requestItem.status_note ? <p className="text-xs text-gray-600 mt-1">Note: {requestItem.status_note}</p> : null}
                             {/* Notes removed from display */}
                             {requestItem.feedback_category_counts && Object.keys(requestItem.feedback_category_counts).length > 0 ? (
@@ -1218,7 +1218,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           </div>
                           {Array.isArray(requestItem.feedback_items) && requestItem.feedback_items.length > 0 ? (
                             <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-3">
-                              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Request thread</p>
+                              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Thread</p>
                               {requestItem.feedback_items.map((feedbackItem) => (
                                 <div key={feedbackItem.id} className="rounded-xl bg-gray-50 px-3 py-3 space-y-3">
                                   <div className="flex items-start justify-between gap-3">
@@ -1310,12 +1310,12 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           <div className="flex flex-wrap gap-2">
                             {(requestItem.feedback_link?.url || requestItem.review_link?.url) ? (
                               <button type="button" onClick={() => copyReviewRequestLink(requestItem)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
-                                Copy feedback request link
+                                Copy link
                               </button>
                             ) : null}
                             {(requestItem.feedback_link?.token || requestItem.review_link?.token) ? (
                               <button type="button" onClick={() => onOpenReviewRequest?.(requestItem)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
-                                Open request thread
+                                Open thread
                               </button>
                             ) : null}
                             {['responded', 'viewed', 'needs_resubmission', 'declined_unrelated'].includes(requestItem.status) && requestItem.reviewer ? (
@@ -1324,27 +1324,27 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                 onClick={() => startFollowUp(requestItem)}
                                 className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
                               >
-                                Record follow-up
+                                Record next take
                               </button>
                             ) : null}
                             {requestItem.status === 'responded' ? (
                               <button type="button" onClick={() => markReviewRequestViewed(requestItem)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
-                                Mark viewed
+                                Mark seen
                               </button>
                             ) : null}
                             {['viewed', 'responded', 'needs_resubmission', 'declined_unrelated'].includes(requestItem.status) ? (
                               <button type="button" onClick={() => patchReviewRequestStatus(requestItem, 'resubmitted', 'Marked as retried')} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
-                                Mark retried
+                                Mark continued
                               </button>
                             ) : null}
                             {['requested', 'opened'].includes(requestItem.status) ? (
                               <button type="button" onClick={() => patchReviewRequestStatus(requestItem, 'revoked', 'Feedback request turned off')} className="text-xs text-red-600 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-50 transition-colors">
-                                Turn off request
+                                Turn off
                               </button>
                             ) : null}
                             {['viewed', 'resubmitted', 'needs_resubmission', 'declined_unrelated', 'flagged'].includes(requestItem.status) ? (
                               <button type="button" onClick={() => patchReviewRequestStatus(requestItem, 'closed', 'Feedback request closed')} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
-                                Close request
+                                Close
                               </button>
                             ) : null}
                           </div>
