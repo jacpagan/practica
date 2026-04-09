@@ -1073,7 +1073,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
                       <p className="text-sm font-semibold text-gray-900">Request</p>
-                      <p className="text-xs text-gray-500 mt-1">{reviewRequests.length > 0 ? `${reviewRequests.length} request${reviewRequests.length === 1 ? '' : 's'} on this take.` : 'Choose a designated reviewer to open a private thread.'}</p>
+                      <p className="text-xs text-gray-500 mt-1">{reviewRequests.length > 0 ? `${reviewRequests.length} request${reviewRequests.length === 1 ? '' : 's'} on this take.` : 'Choose one person to open a private thread.'}</p>
                     </div>
                     <div className="flex items-center gap-2" />
                   </div>
@@ -1089,28 +1089,28 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
 
                       {selectedReviewerName ? (
                         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3">
-                          <p className="text-xs font-medium uppercase tracking-wide text-emerald-800">Ready</p>
-                          <p className="text-sm text-emerald-900 mt-1">This will open a private thread with {selectedReviewerName}. Only the two of you can see it.</p>
+                          <p className="text-xs font-medium uppercase tracking-wide text-emerald-800">Selected</p>
+                          <p className="text-sm text-emerald-900 mt-1">This will open a private thread with {selectedReviewerName}.</p>
                         </div>
                       ) : null}
 
                       <div className="space-y-2">
-                        <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">Reviewer</label>
+                        <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">With</label>
                         {selectedReviewer ? (
                           <div className="rounded-lg border border-gray-200 bg-white px-3 py-3 flex items-center justify-between gap-3">
                             <div>
                               <p className="text-sm font-medium text-gray-900">{selectedReviewer.display_name || selectedReviewer.username}</p>
                               <p className="text-xs text-gray-500">@{selectedReviewer.username}</p>
                             </div>
-                            <button type="button" onClick={() => { setSelectedReviewer(null); setReviewerQuery('') }} className="text-xs text-red-600 hover:text-red-700 transition-colors">Change</button>
+                            <button type="button" onClick={() => { setSelectedReviewer(null); setReviewerQuery('') }} className="text-xs text-red-600 hover:text-red-700 transition-colors">Choose another</button>
                           </div>
                         ) : (
                           <div className="space-y-2">
-                            {recentReviewersLoading ? <p className="text-xs text-gray-500">Loading designated reviewers…</p> : null}
+                            {recentReviewersLoading ? <p className="text-xs text-gray-500">Loading people…</p> : null}
                             {!recentReviewersLoading && designatedReviewers.length === 0 ? (
                               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
-                                <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Designated reviewer required</p>
-                                <p className="text-sm text-amber-900 mt-1">Requests only work with designated reviewers. Use Access for simple sharing, or add a reviewer first.</p>
+                                <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Add someone first</p>
+                                <p className="text-sm text-amber-900 mt-1">Requests only work with people already on your list. Use Access for simple sharing, or add someone first.</p>
                               </div>
                             ) : null}
                             {recentReviewers.length > 0 ? (
@@ -1133,10 +1133,10 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                   type="text"
                                   value={reviewerQuery}
                                   onChange={(event) => setReviewerQuery(event.target.value)}
-                                  placeholder="Search reviewers"
+                                  placeholder="Search people"
                                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
                                 />
-                                <p className="text-xs text-gray-500">Only designated reviewers can receive a request.</p>
+                                <p className="text-xs text-gray-500">Only people already on your list can receive a request.</p>
                                 {reviewerSearchLoading ? <p className="text-xs text-gray-500">Searching…</p> : null}
                                 {reviewerResults.length > 0 ? (
                                   <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
@@ -1152,7 +1152,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                       </button>
                                     ))}
                                   </div>
-                                ) : reviewerQuery.trim().length >= 2 && !reviewerSearchLoading ? <p className="text-xs text-gray-500">No matching designated reviewers found yet.</p> : null}
+                                ) : reviewerQuery.trim().length >= 2 && !reviewerSearchLoading ? <p className="text-xs text-gray-500">No matching people found yet.</p> : null}
                               </>
                             ) : null}
                           </div>
@@ -1165,7 +1165,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           Cancel
                         </button>
                         <button type="button" disabled={creatingRequest || !canCreateShareLink || !selectedReviewer?.id} onClick={createReviewRequest} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                          {creatingRequest ? 'Sending…' : (selectedReviewerName ? `Send to ${selectedReviewerName}` : 'Choose reviewer')}
+                          {creatingRequest ? 'Sending…' : (selectedReviewerName ? 'Send' : 'Choose someone')}
                         </button>
                       </div>
                     </div>
@@ -1176,9 +1176,9 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                   ) : reviewRequests.length > 0 ? (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-xs text-gray-500">Thread history</p>
+                        <p className="text-xs text-gray-500">History</p>
                         <button type="button" onClick={() => setShowRequestHistory((current) => !current)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
-                          {showRequestHistory ? 'Hide request history' : 'Show request history'}
+                          {showRequestHistory ? 'Hide history' : 'Show history'}
                         </button>
                       </div>
                       {!showRequestHistory ? null : (
