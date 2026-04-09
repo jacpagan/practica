@@ -7,6 +7,7 @@ Kept scripts are the ones that match the current local + production workflow.
 - `scripts/audit-practica-iam.sh`: read-only inventory of Practica/Practika/GitHub/ECS/MediaConvert IAM roles, users, and policies.
 - `scripts/delete-iam-role-safe.sh`: guarded helper that detaches policies and deletes a confirmed unused IAM role.
 - `scripts/deploy-via-ssm.sh`: production deploy to EC2 via AWS SSM.
+- `scripts/deploy-validation-gate.cjs`: shared GitHub Actions helper that decides which validation workflow(s) a deploy must wait for based on changed files.
 - `scripts/prod-host-maintenance.sh`: production disk/backup health report plus safe Docker cleanup.
 - `scripts/prod-backup-verify.sh`: production backup creation and restore verification on the host.
 - `scripts/branch-audit.sh`: inspect remote branches and compare them to a base branch (defaults to `origin/main`).
