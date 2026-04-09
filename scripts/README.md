@@ -10,7 +10,7 @@ Kept scripts are the ones that match the current local + production workflow.
 - `scripts/prod-host-maintenance.sh`: production disk/backup health report plus safe Docker cleanup.
 - `scripts/prod-backup-verify.sh`: production backup creation and restore verification on the host.
 - `scripts/branch-audit.sh`: inspect remote branches and compare them to a base branch (defaults to `origin/main`).
-- `scripts/test-core-loop.sh`: focused regression gate for upload, review, feedback, and multipart recovery.
+- `scripts/test-core-loop.sh`: focused regression gate for upload, review, feedback, and multipart recovery; use this as the default local gate for protected core-loop work.
 - `scripts/run-e2e-backend.sh`: ephemeral SQLite backend on a local port for Playwright (used with frontend E2E).
 - `scripts/audit-db-usage.py`: read-only database audit for row counts, current-vs-live schema drift, and relationship usage; pass `--username jac` to inspect a member’s session count.
 
