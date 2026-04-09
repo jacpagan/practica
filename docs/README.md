@@ -13,6 +13,11 @@ Practica is a private video practice mirror where learners lead their own progre
 - `docs/tdd-strategy.md`: core-loop testing and stabilization strategy
 - `docs/technical-prd-2026-04-06.md`: current-state technical product snapshot
 
+## Working Docs
+
+- `docs/local-dev-playbook.md`: cheapest safe local workflow for Django + Vite, tmux layout, and small commit loop
+- `docs/release-checklist.md`: step-by-step checklist for local testing, push-to-main, deploy, and production verification
+
 ## Product Framing
 
 Use this order of truth when talking about Practica:

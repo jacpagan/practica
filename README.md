@@ -18,6 +18,8 @@ The product is strongest when it helps someone:
 - `docs/platform-effects-mvp-playbook.md`: shipped v1 baseline
 - `docs/flow-audit.md`: current flow audit and product gaps
 - `docs/platform-revolution-audit.md`: platform and interaction analysis
+- `docs/local-dev-playbook.md`: cheapest safe day-to-day local development workflow
+- `docs/release-checklist.md`: step-by-step release checklist from local change to production verification
 - `docs/README.md`: documentation index
 
 ## Product Positioning
@@ -49,6 +51,10 @@ That wedge does not change the broader product truth.
 
 ### Local Development
 
+For routine Django work, prefer the local Python + Vite loop in `docs/local-dev-playbook.md`.
+
+Use Docker when you specifically need container, PostgreSQL, Redis, or deploy-path behavior.
+
 1. Clone the repo and set up environment variables:
 
    ```bash
@@ -72,6 +78,12 @@ That wedge does not change the broader product truth.
 ### Local Commands
 
 ```bash
+# Recommended daily loop
+source .venv/bin/activate && cd apps/backend && env -u DATABASE_URL -u DB_NAME -u DB_USER -u DB_PASSWORD -u DB_HOST -u DB_PORT python manage.py runserver 127.0.0.1:8000
+cd apps/frontend && npm run dev -- --host 127.0.0.1 --port 3000
+source .venv/bin/activate && cd apps/backend && python manage.py check
+curl -fsS http://127.0.0.1:8000/health/
+
 # Docker workflow
 make up
 make down
