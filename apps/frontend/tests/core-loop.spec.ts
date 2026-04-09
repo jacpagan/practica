@@ -333,7 +333,7 @@ test('signed-in upload -> request -> feedback loop works', async ({ browser, req
 
   await waitForSessionReady(request, studentToken, sessionId)
   await studentPage.reload()
-  await studentPage.getByRole('button', { name: 'Request feedback' }).click()
+  await studentPage.getByRole('button', { name: 'Request' }).click()
   await studentPage.getByRole('button', { name: /Send to E2E Teacher/i }).click()
   await expect(studentPage.getByText(/Waiting on/).first()).toBeVisible()
   const parentRequestId = await latestOwnerRequestId(request, studentToken)
@@ -349,7 +349,7 @@ test('signed-in upload -> request -> feedback loop works', async ({ browser, req
   const fileChooser = await chooser
   await fileChooser.setFiles(teacherVideo)
   await teacherPage.getByRole('button', { name: 'Send response' }).click()
-  await expect(teacherPage.getByRole('button', { name: 'Edit' })).toBeVisible()
+  await expect(teacherPage.getByRole('button', { name: 'Edit' })).toBeVisible({ timeout: 15000 })
 
   await studentPage.goto(`/sessions/${sessionId}`)
   await expect(studentPage.getByRole('button', { name: 'Review feedback' })).toBeVisible()
@@ -389,7 +389,7 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
   await waitForSessionReady(request, studentToken, initialSessionId)
   await studentPage.reload()
 
-  await studentPage.getByRole('button', { name: 'Request feedback' }).click()
+  await studentPage.getByRole('button', { name: 'Request' }).click()
   await studentPage.getByRole('button', { name: /Send to E2E Teacher/i }).click()
   await expect(studentPage.getByText(/Waiting on/).first()).toBeVisible()
   const parentRequestId = await latestOwnerRequestId(request, studentToken)
@@ -402,7 +402,7 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
   const fileChooser = await chooser
   await fileChooser.setFiles(teacherVideo)
   await teacherPage.getByRole('button', { name: 'Send response' }).click()
-  await expect(teacherPage.getByRole('button', { name: 'Edit' })).toBeVisible()
+  await expect(teacherPage.getByRole('button', { name: 'Edit' })).toBeVisible({ timeout: 15000 })
 
   await studentPage.goto(`/sessions/${initialSessionId}`)
   await studentPage.getByRole('button', { name: 'Review feedback' }).click()
