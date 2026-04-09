@@ -1019,7 +1019,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                     ) : null}
                     {!waitingOnReviewer && !feedbackReadyToReview && !readyForFollowUp && currentLoopStatus !== 'flagged' ? (
                       <button type="button" onClick={openRequestComposer} disabled={!canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                        Request feedback
+                        Request
                       </button>
                     ) : null}
                   </div>
@@ -1029,19 +1029,19 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               {canEdit ? (
                 <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 space-y-4">
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">Private link</p>
-                    <p className="text-xs text-gray-500 mt-1">Use this when you want simple private access without a named feedback thread.</p>
+                    <p className="text-sm font-semibold text-gray-900">Access</p>
+                    <p className="text-xs text-gray-500 mt-1">Create a simple private link without a named reviewer.</p>
                   </div>
                   {activeReviewLink?.url ? (
                     <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
-                      <p className="text-sm text-gray-800">Private link ready.</p>
+                      <p className="text-sm text-gray-800">Access link ready.</p>
                       <p className="text-xs text-gray-500">Signed-in access only • expires {new Date(activeReviewLink.expires_at).toLocaleString(undefined, { hour12: undefined })}</p>
                       <div className="flex flex-wrap gap-2">
                         <button type="button" onClick={copyShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
-                          Copy private link
+                          Copy access link
                         </button>
                         <button type="button" onClick={revokeShareLink} disabled={revokingShare} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white disabled:opacity-50 transition-colors">
-                          {revokingShare ? 'Turning off…' : 'Turn off link'}
+                          {revokingShare ? 'Turning off…' : 'Turn off access'}
                         </button>
                       </div>
                     </div>
@@ -1060,7 +1060,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       {!canCreateShareLink ? null : <p className="text-sm text-gray-800">Create one signed-in private link you can send anywhere.</p>}
                       <div className="flex flex-wrap gap-2">
                         <button type="button" onClick={createShare} disabled={sharing || !canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                          {sharing ? 'Creating…' : 'Create private link'}
+                          {sharing ? 'Creating…' : 'Create access link'}
                         </button>
                       </div>
                     </div>
@@ -1072,8 +1072,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 <div ref={loopDetailsRef} className="rounded-xl border border-gray-200 bg-white px-4 py-3 space-y-4">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">{reviewRequests.length > 0 ? 'Request feedback' : 'Request feedback'}</p>
-                      <p className="text-xs text-gray-500 mt-1">{reviewRequests.length > 0 ? `${reviewRequests.length} private feedback request${reviewRequests.length === 1 ? '' : 's'} on this take.` : 'Choose a designated reviewer to open a private feedback thread when you want one.'}</p>
+                      <p className="text-sm font-semibold text-gray-900">Request</p>
+                      <p className="text-xs text-gray-500 mt-1">{reviewRequests.length > 0 ? `${reviewRequests.length} request${reviewRequests.length === 1 ? '' : 's'} on this take.` : 'Choose a designated reviewer to open a private thread.'}</p>
                     </div>
                     <div className="flex items-center gap-2" />
                   </div>
@@ -1083,7 +1083,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       {!canCreateShareLink ? (
                         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
                           <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Playback ready required</p>
-                          <p className="text-sm text-amber-900 mt-1">Wait until this session is playback ready before sending a feedback request.</p>
+                          <p className="text-sm text-amber-900 mt-1">Wait until this take is ready before sending a request.</p>
                         </div>
                       ) : null}
 
@@ -1110,7 +1110,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                             {!recentReviewersLoading && designatedReviewers.length === 0 ? (
                               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
                                 <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Designated reviewer required</p>
-                                <p className="text-sm text-amber-900 mt-1">Structured feedback requests only work with reviewers already assigned to your roster. Use a private link for lightweight sharing, or add a reviewer first.</p>
+                                <p className="text-sm text-amber-900 mt-1">Requests only work with designated reviewers. Use Access for simple sharing, or add a reviewer first.</p>
                               </div>
                             ) : null}
                             {recentReviewers.length > 0 ? (
@@ -1133,10 +1133,10 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                   type="text"
                                   value={reviewerQuery}
                                   onChange={(event) => setReviewerQuery(event.target.value)}
-                                  placeholder="Search designated reviewers"
+                                  placeholder="Search reviewers"
                                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
                                 />
-                                <p className="text-xs text-gray-500">Only reviewers already on your roster can receive a structured feedback request.</p>
+                                <p className="text-xs text-gray-500">Only designated reviewers can receive a request.</p>
                                 {reviewerSearchLoading ? <p className="text-xs text-gray-500">Searching…</p> : null}
                                 {reviewerResults.length > 0 ? (
                                   <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
@@ -1172,7 +1172,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                   ) : null}
 
                   {requestsLoading ? (
-                    <div className="rounded-xl border border-gray-200 px-4 py-5 text-center text-sm text-gray-500">Loading feedback requests…</div>
+                    <div className="rounded-xl border border-gray-200 px-4 py-5 text-center text-sm text-gray-500">Loading requests…</div>
                   ) : reviewRequests.length > 0 ? (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-3">

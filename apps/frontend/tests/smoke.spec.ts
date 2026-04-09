@@ -101,7 +101,7 @@ test('Record route shows camera and microphone selectors for signed-in members',
   await expect(page.locator('select').nth(1)).toContainText('Built-in Microphone')
 })
 
-test('Session detail separates private link from structured feedback', async ({ page }) => {
+test('Session detail separates access from request flow', async ({ page }) => {
   // Keep the lightweight private-link access path separate from the structured feedback request flow.
   await page.addInitScript(() => {
     window.localStorage.setItem('token', 'smoke-token')
@@ -181,8 +181,8 @@ test('Session detail separates private link from structured feedback', async ({ 
 
   await page.goto('/sessions/123')
 
-  await expect(page.locator('text=Private link').first()).toBeVisible()
-  await expect(page.locator('text=Request feedback').first()).toBeVisible()
+  await expect(page.locator('text=Access').first()).toBeVisible()
+  await expect(page.locator('text=Request').first()).toBeVisible()
   await expect(page.locator('text=Invite with private link')).toHaveCount(0)
-  await expect(page.locator('text=Use this when you want simple private access without a named feedback thread.')).toBeVisible()
+  await expect(page.locator('text=Create a simple private link without a named reviewer.')).toBeVisible()
 })
