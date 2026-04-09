@@ -131,10 +131,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const [selectedReviewer, setSelectedReviewer] = useState(null)
   const [recentReviewers, setRecentReviewers] = useState([])
   const [recentReviewersLoading, setRecentReviewersLoading] = useState(false)
-  const [creatingInvite, setCreatingInvite] = useState(false)
   const [showRequestDetails, setShowRequestDetails] = useState(false)
   const [showRequestHistory, setShowRequestHistory] = useState(false)
-  const [showLegacyLinkTools, setShowLegacyLinkTools] = useState(false)
   const [requestInstrument, setRequestInstrument] = useState('drums')
   const [requestGoal, setRequestGoal] = useState('')
   const [requestExerciseOrSong, setRequestExerciseOrSong] = useState('')
@@ -253,7 +251,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     setShowLoopDetails(false)
     setShowRequestDetails(false)
     setShowRequestHistory(false)
-    setShowLegacyLinkTools(false)
     setRequestInstrument('drums')
     setRequestGoal('')
     setRequestExerciseOrSong('')
@@ -631,36 +628,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       toast.error(error?.message || 'Could not create private feedback link')
     } finally {
       setSharing(false)
-    }
-  }
-
-  const inviteNewReviewer = async () => {
-    if (!token || !session?.id) return
-    setCreatingInvite(true)
-    try {
-      const linkData = await ensurePrivateLink()
-      const inviteRes = await fetch('/api/invite-codes/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders,
-        },
-        body: JSON.stringify({ label: `Review ${session.title}` }),
-      })
-      const inviteData = await inviteRes.json().catch(() => ({}))
-      if (!inviteRes.ok) throw new Error(inviteData?.error || 'Could not create invite code')
-      const bundledUrl = `${linkData.url}${linkData.url.includes('?') ? '&' : '?'}claim=${encodeURIComponent(inviteData.code)}`
-      const message = [
-        'You have been invited to join Practica and review a private video.',
-        '',
-        `Open this private invite link: ${bundledUrl}`,
-      ].join('\n')
-      await navigator.clipboard.writeText(message)
-      toast.success('Invite message copied')
-    } catch (error) {
-      toast.error(error?.message || 'Could not create invite message')
-    } finally {
-      setCreatingInvite(false)
     }
   }
 
@@ -1060,15 +1027,11 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               ) : null}
 
               {canEdit ? (
-                <details className="rounded-xl border border-gray-200 bg-white px-4 py-3" open={showLegacyLinkTools}>
-                  <summary onClick={() => setShowLegacyLinkTools((current) => !current)} className="cursor-pointer list-none flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">Need a simple private link instead?</p>
-                      <p className="text-xs text-gray-500 mt-1">Use this when you want a lighter private share instead of a named review thread.</p>
-                    </div>
-                    <span className="text-xs text-gray-500">{showLegacyLinkTools ? 'Hide option' : 'Use simple link instead'}</span>
-                  </summary>
-                  <div className="space-y-3 pt-4">
+                <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 space-y-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Private link</p>
+                    <p className="text-xs text-gray-500 mt-1">Use this when you want simple private access without a named feedback thread.</p>
+                  </div>
                   {activeReviewLink?.url ? (
                     <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
                       <p className="text-sm text-gray-800">Private link ready.</p>
@@ -1089,8 +1052,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Not shareable yet</p>
                           <p className="text-sm text-amber-900 mt-1">
                             {session.processing_status === 'failed'
-                              ? 'Fix playback processing before sharing this feedback link.'
-                              : 'Wait until playback is ready before sharing this feedback link.'}
+                              ? 'Fix playback processing before sharing this private link.'
+                              : 'Wait until playback is ready before sharing this private link.'}
                           </p>
                         </div>
                       ) : null}
@@ -1102,16 +1065,15 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       </div>
                     </div>
                   )}
-                  </div>
-                </details>
+                </div>
               ) : null}
 
               {canEdit ? (
                 <div ref={loopDetailsRef} className="rounded-xl border border-gray-200 bg-white px-4 py-3 space-y-4">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">{reviewRequests.length > 0 ? 'Trusted feedback' : 'Bring in feedback'}</p>
-                      <p className="text-xs text-gray-500 mt-1">{reviewRequests.length > 0 ? `${reviewRequests.length} trusted feedback request${reviewRequests.length === 1 ? '' : 's'} on this take.` : 'Bring trusted feedback into this take only when you want it.'}</p>
+                      <p className="text-sm font-semibold text-gray-900">{reviewRequests.length > 0 ? 'Request feedback' : 'Request feedback'}</p>
+                      <p className="text-xs text-gray-500 mt-1">{reviewRequests.length > 0 ? `${reviewRequests.length} private feedback request${reviewRequests.length === 1 ? '' : 's'} on this take.` : 'Choose a designated reviewer to open a private feedback thread when you want one.'}</p>
                     </div>
                     <div className="flex items-center gap-2" />
                   </div>
@@ -1148,7 +1110,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                             {!recentReviewersLoading && designatedReviewers.length === 0 ? (
                               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
                                 <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Designated reviewer required</p>
-                                <p className="text-sm text-amber-900 mt-1">Structured feedback requests only work with reviewers already assigned to your roster. Ask an admin to add one, or use a lighter private link below.</p>
+                                <p className="text-sm text-amber-900 mt-1">Structured feedback requests only work with reviewers already assigned to your roster. Use a private link for lightweight sharing, or add a reviewer first.</p>
                               </div>
                             ) : null}
                             {recentReviewers.length > 0 ? (
@@ -1196,17 +1158,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           </div>
                         )}
                       </div>
-
-                      <div className="rounded-lg border border-gray-200 bg-white px-3 py-3 space-y-2">
-                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Other ways</p>
-                        <div className="flex flex-wrap gap-2">
-                          <button type="button" onClick={inviteNewReviewer} disabled={creatingInvite || !canCreateShareLink} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2 hover:bg-gray-50 disabled:opacity-50 transition-colors">
-                            {creatingInvite ? 'Creating invite…' : 'Invite with private link'}
-                          </button>
-                        </div>
-                        <p className="text-xs text-gray-500">This sends a private invitation link for trusted feedback. It does not add someone as a designated reviewer for structured requests.</p>
-                      </div>
-
                       {/* Title of the practice thread is sufficient context; no extra request fields */}
 
                       <div className="flex justify-end gap-2">

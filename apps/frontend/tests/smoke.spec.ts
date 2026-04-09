@@ -100,3 +100,88 @@ test('Record route shows camera and microphone selectors for signed-in members',
   await expect(page.locator('select').nth(0)).toContainText('Built-in Camera')
   await expect(page.locator('select').nth(1)).toContainText('Built-in Microphone')
 })
+
+test('Session detail separates private link from structured feedback', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('token', 'smoke-token')
+  })
+
+  const sessionPayload = {
+    id: 123,
+    title: 'Smoke session',
+    practice_series: '',
+    description: '',
+    video_file: '',
+    duration_seconds: null,
+    recorded_at: '2099-01-01T00:00:00Z',
+    created_at: '2099-01-01T00:00:00Z',
+    updated_at: '2099-01-01T00:00:00Z',
+    processing_status: 'ready',
+    processing_job_id: '',
+    processing_error: '',
+    tag_names: [],
+    assets: [],
+    chapters: [],
+    video_feedback: [],
+    active_review_link: null,
+    chapter_count: 0,
+    video_feedback_count: 0,
+    owner: { id: 1, display_name: 'Smoke Member' },
+    can_edit: true,
+  }
+
+  await page.route('**/api/auth/me/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 1, username: 'smoke_member', display_name: 'Smoke Member' }),
+    })
+  })
+
+  await page.route('**/api/sessions/123/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(sessionPayload),
+    })
+  })
+
+  await page.route('**/api/review-requests/?session_id=123&role=student', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    })
+  })
+
+  await page.route('**/api/review-requests/?role=reviewer', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    })
+  })
+
+  await page.route('**/api/review-requests/?role=owner', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    })
+  })
+
+  await page.route('**/api/connections/?role=student', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    })
+  })
+
+  await page.goto('/sessions/123')
+
+  await expect(page.locator('text=Private link').first()).toBeVisible()
+  await expect(page.locator('text=Request feedback').first()).toBeVisible()
+  await expect(page.locator('text=Invite with private link')).toHaveCount(0)
+  await expect(page.locator('text=Use this when you want simple private access without a named feedback thread.')).toBeVisible()
+})
