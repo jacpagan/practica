@@ -50,6 +50,7 @@ jobs:
           echo "ref=$REF" >> $GITHUB_OUTPUT
 
       - name: Wait for required validation workflows to succeed
+        id: validation_gate
         uses: actions/github-script@v7
         env:
           TARGET_REF: ${{ steps.ref.outputs.ref }}
@@ -164,6 +165,12 @@ jobs:
               workflowsToWaitFor.push({ file: '.github/workflows/frontend-ci.yml', label: 'Frontend CI workflow' });
             }
 
+            core.setOutput('target_ref', targetRef);
+            core.setOutput('target_sha', targetSha);
+            core.setOutput('changed_files_count', String(changedFiles.length));
+            core.setOutput('changed_files', changedFiles.join('\n'));
+            core.setOutput('required_workflows', workflowsToWaitFor.map((item) => item.label).join(', ') || 'none');
+
             core.info(`Target ref: ${targetRef}`);
             core.info(`Target sha: ${targetSha}`);
             core.info(`Changed files (${changedFiles.length}): ${changedFiles.join(', ') || 'none detected'}`);
@@ -175,6 +182,29 @@ jobs:
                 return;
               }
             }
+
+      - name: Validation gate summary
+        if: always()
+        env:
+          TARGET_REF: ${{ steps.validation_gate.outputs.target_ref }}
+          TARGET_SHA: ${{ steps.validation_gate.outputs.target_sha }}
+          CHANGED_FILES_COUNT: ${{ steps.validation_gate.outputs.changed_files_count }}
+          CHANGED_FILES: ${{ steps.validation_gate.outputs.changed_files }}
+          REQUIRED_WORKFLOWS: ${{ steps.validation_gate.outputs.required_workflows }}
+        run: |
+          {
+            echo "### Validation Gate"
+            echo "- Target ref: \`${TARGET_REF:-unknown}\`"
+            echo "- Target SHA: \`${TARGET_SHA:-unknown}\`"
+            echo "- Changed files: \`${CHANGED_FILES_COUNT:-0}\`"
+            echo "- Required workflows: \`${REQUIRED_WORKFLOWS:-none}\`"
+            if [ -n "${CHANGED_FILES:-}" ]; then
+              echo "- Files:"
+              printf '%s\n' "$CHANGED_FILES" | while IFS= read -r line; do
+                [ -n "$line" ] && echo "  - \`$line\`"
+              done
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
