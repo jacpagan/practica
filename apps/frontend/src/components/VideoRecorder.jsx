@@ -1023,28 +1023,43 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
             </>
           ) : (
             <>
-              <div className="flex items-center gap-3">
+              <div className="w-full max-w-md space-y-3">
                 <button
                   onClick={openCamera}
-                  className="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
+                  className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-4 hover:bg-white/15 transition-all duration-200"
                 >
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
-                  </svg>
+                  <div className="flex items-center gap-3 text-left">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-white">Camera</p>
+                      <p className="mt-1 text-xs text-white/55">Record with camera and microphone.</p>
+                    </div>
+                  </div>
                 </button>
                 <button
                   onClick={openScreenCam}
-                  className="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95"
+                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-4 hover:bg-white/10 transition-all duration-200"
                   title="Record screen + camera"
                 >
-                  <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <rect x="3" y="5" width="14" height="10" rx="2" ry="2" strokeWidth="1.5"/>
-                    <path d="M21 7l-4 3 4 3V7z" strokeWidth="1.5"/>
-                    <circle cx="9" cy="15.5" r="2.5" fill="currentColor" />
-                  </svg>
+                  <div className="flex items-center gap-3 text-left">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10">
+                      <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <rect x="3" y="5" width="14" height="10" rx="2" ry="2" strokeWidth="1.5"/>
+                        <path d="M21 7l-4 3 4 3V7z" strokeWidth="1.5"/>
+                        <circle cx="9" cy="15.5" r="2.5" fill="currentColor" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-white">Screen + Cam</p>
+                      <p className="mt-1 text-xs text-white/55">Share your screen and keep yourself in frame.</p>
+                    </div>
+                  </div>
                 </button>
               </div>
-              <p className="text-xs text-white/40">Tap to open camera or screen + cam</p>
               <div className="w-full max-w-3xl pt-2">
                 <button
                   type="button"

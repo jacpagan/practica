@@ -56,6 +56,13 @@ test('Record route shows camera and microphone selectors for signed-in members',
         })
       }
 
+      if (url.includes('/api/sessions/')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
       return originalFetch(input, init)
     }
 
@@ -109,8 +116,8 @@ test('Record route shows camera and microphone selectors for signed-in members',
   await page.goto('/record')
 
   await expect(page.getByRole('heading', { name: 'Record' })).toBeVisible()
-  await expect(page.getByRole('button', { name: /Options/i })).toBeVisible()
   await expect(page.getByText('Camera ready')).toBeVisible({ timeout: 10000 })
+  await expect(page.getByRole('button', { name: /Options/i })).toBeVisible()
   await expect(page.locator('text=Camera input')).toHaveCount(0)
   await expect(page.locator('text=Microphone input')).toHaveCount(0)
 
