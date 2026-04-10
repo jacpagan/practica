@@ -183,6 +183,82 @@ test('Record route falls back when selected camera fails', async ({ browser }) =
   await context.close()
 })
 
+test('Record route still opens preview when microphone fails', async ({ browser }) => {
+  const context = await browser.newContext()
+  const page = await context.newPage()
+
+  await context.addInitScript(() => {
+    window.localStorage.setItem('token', 'smoke-token')
+
+    const originalFetch = window.fetch.bind(window)
+    window.fetch = async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input)
+
+      if (url.includes('/api/auth/me/')) {
+        return new Response(JSON.stringify({ id: 1, username: 'smoke_member', display_name: 'Smoke Member' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (url.includes('/api/review-requests/')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      return originalFetch(input, init)
+    }
+
+    const mediaDevices = navigator.mediaDevices
+    if (!mediaDevices) return
+
+    mediaDevices.enumerateDevices = async () => ([
+      {
+        deviceId: 'video-device-1',
+        kind: 'videoinput',
+        label: 'Built-in Camera',
+        groupId: 'group-video',
+        toJSON() { return this },
+      },
+      {
+        deviceId: 'audio-device-1',
+        kind: 'audioinput',
+        label: 'Built-in Microphone',
+        groupId: 'group-audio',
+        toJSON() { return this },
+      },
+    ])
+
+    mediaDevices.getUserMedia = async (constraints) => {
+      const wantsVideo = Boolean(constraints?.video)
+      const wantsAudio = Boolean(constraints?.audio)
+
+      if (wantsAudio && !wantsVideo) {
+        const error = new Error('Microphone is busy')
+        error.name = 'NotReadableError'
+        throw error
+      }
+
+      const canvas = document.createElement('canvas')
+      canvas.width = 640
+      canvas.height = 360
+      const context2d = canvas.getContext('2d')
+      context2d.fillStyle = '#111827'
+      context2d.fillRect(0, 0, canvas.width, canvas.height)
+      return canvas.captureStream(1)
+    }
+  })
+
+  await page.goto('/record')
+
+  await expect(page.getByText('Camera ready')).toBeVisible({ timeout: 10000 })
+  await expect(page.getByText('Microphone warning')).toBeVisible()
+
+  await context.close()
+})
+
 test('Session detail separates access from request flow', async ({ page }) => {
   // Keep the lightweight private-link access path separate from the structured feedback request flow.
   await page.addInitScript(() => {

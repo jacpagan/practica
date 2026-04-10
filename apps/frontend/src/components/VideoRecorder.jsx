@@ -55,6 +55,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   const [mode, setMode] = useState('camera') // 'camera' | 'screen_cam'
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState(null)
+  const [warning, setWarning] = useState(null)
   const [bpm, setBpm] = useState(80)
   const [metronomeEnabled, setMetronomeEnabled] = useState(false)
   const [isMetronomeRunning, setIsMetronomeRunning] = useState(false)
@@ -330,6 +331,42 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     return 'Could not access camera. Please check your device.'
   }, [selectedAudioInputId, selectedVideoInputId])
 
+  const getAudioErrorMessage = useCallback((e) => {
+    if (!e?.name) return 'Microphone unavailable. Video preview is ready; choose another microphone if needed.'
+    if (e.name === 'NotAllowedError') return 'Microphone permission denied. Video preview is ready; allow microphone access if you want audio.'
+    if (e.name === 'NotReadableError' || e.name === 'AbortError') return 'Microphone is busy. Video preview is ready; close other apps using the mic and try again.'
+    if ((e.name === 'NotFoundError' || e.name === 'OverconstrainedError') && selectedAudioInputId) {
+      return 'Selected microphone is unavailable. Video preview is ready; choose another microphone if needed.'
+    }
+    return 'Microphone unavailable. Video preview is ready; choose another microphone if needed.'
+  }, [selectedAudioInputId])
+
+  const getUserMediaWithTimeout = useCallback((constraints, timeoutMs = 8000) => {
+    let timeoutId = null
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = window.setTimeout(() => {
+        const timeoutError = new Error('Timed out waiting for media device')
+        timeoutError.name = 'AbortError'
+        reject(timeoutError)
+      }, timeoutMs)
+    })
+
+    return Promise.race([
+      navigator.mediaDevices.getUserMedia(constraints),
+      timeoutPromise,
+    ]).finally(() => {
+      if (timeoutId) window.clearTimeout(timeoutId)
+    })
+  }, [])
+
+  const mergeStreams = useCallback((videoStream, audioStream = null) => {
+    const tracks = [
+      ...(videoStream?.getVideoTracks?.() || []),
+      ...(audioStream?.getAudioTracks?.() || []),
+    ]
+    return new MediaStream(tracks)
+  }, [])
+
   const openUserMediaWithFallback = useCallback(async ({ size = 'default' } = {}) => {
     const devices = await refreshMediaDevices()
 
@@ -364,10 +401,23 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
 
     for (const attempt of attempts) {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
+        const videoStream = await getUserMediaWithTimeout({
           video: getVideoConstraints(size, attempt.videoInputId),
-          audio: getAudioConstraints(attempt.audioInputId),
-        })
+          audio: false,
+        }, 8000)
+
+        let audioStream = null
+        let audioWarning = ''
+        try {
+          audioStream = await getUserMediaWithTimeout({
+            video: false,
+            audio: getAudioConstraints(attempt.audioInputId),
+          }, 5000)
+        } catch (audioError) {
+          audioWarning = getAudioErrorMessage(audioError)
+        }
+
+        const stream = mergeStreams(videoStream, audioStream)
 
         if (attempt.videoInputId !== selectedVideoInputId) {
           setSelectedVideoInputId(attempt.videoInputId)
@@ -375,6 +425,8 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
         if (attempt.audioInputId !== selectedAudioInputId) {
           setSelectedAudioInputId(attempt.audioInputId)
         }
+
+        setWarning(audioWarning || null)
 
         return stream
       } catch (error) {
@@ -437,7 +489,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     }
 
     if (audioContext.state === 'suspended') {
-      try { await audioContext.resume() } catch {}
+      try { audioContext.resume().catch(() => {}) } catch {}
     }
 
     const tracks = [...(stream?.getVideoTracks?.() || [])]
@@ -463,7 +515,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     }
 
     if (audioContext.state === 'suspended') {
-      try { await audioContext.resume() } catch {}
+      try { audioContext.resume().catch(() => {}) } catch {}
     }
 
     streams.forEach((s, idx) => {
@@ -577,6 +629,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     setError(null)
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera not supported')
+      setWarning(null)
       const stream = await openUserMediaWithFallback({ size: 'default' })
       camStreamRef.current = stream
       streamRef.current = stream
@@ -598,6 +651,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     setError(null)
     try {
       if (!navigator.mediaDevices?.getDisplayMedia) throw new Error('Screen capture not supported in this browser')
+      setWarning(null)
       const display = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: { ideal: 30 } },
         audio: true,
@@ -845,6 +899,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     setState(STATES.IDLE)
     setRecordedFile(null)
     setElapsed(0)
+    setWarning(null)
     onCancel()
   }
 
@@ -1055,6 +1110,13 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
               {renderVideoInputPicker('rounded-2xl bg-white/5 px-3 py-3')}
               {renderAudioInputPicker('rounded-2xl bg-white/5 px-3 py-3')}
             </div>
+
+            {warning ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Microphone warning</p>
+                <p className="mt-1 text-sm text-amber-900">{warning}</p>
+              </div>
+            ) : null}
 
             {showTimingTools ? (
               <div className="space-y-3">
