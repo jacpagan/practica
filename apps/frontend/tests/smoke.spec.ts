@@ -364,15 +364,23 @@ test('Session detail separates access from request flow', async ({ page }) => {
     })
   })
 
+  await page.route('**/api/invite-codes/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    })
+  })
+
   await page.goto('/sessions/123')
 
-  await expect(page.locator('text=Access').first()).toBeVisible()
+  await expect(page.locator('text=Share').first()).toBeVisible()
   await expect(page.locator('text=Request').first()).toBeVisible()
   await expect(page.locator('text=Invite with private link')).toHaveCount(0)
-  await expect(page.locator('text=Create a simple private link without a named reviewer.')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Send to someone new' })).toBeVisible()
-  await page.getByRole('button', { name: 'Send to someone new' }).click()
-  await expect(page.getByRole('button', { name: 'Copy invite link' })).toBeVisible()
+  await expect(page.locator('text=Copy one private link. Members sign in. New people create an account first.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Manage invites' })).toBeVisible()
+  await page.getByRole('button', { name: 'Manage invites' }).click()
+  await expect(page.locator('text=No active invites.')).toBeVisible()
 })
 
 test('Calendar day view shows review state per video', async ({ page }) => {

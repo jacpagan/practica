@@ -131,8 +131,9 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const [selectedReviewer, setSelectedReviewer] = useState(null)
   const [recentReviewers, setRecentReviewers] = useState([])
   const [recentReviewersLoading, setRecentReviewersLoading] = useState(false)
-  const [showAccessInviteHelper, setShowAccessInviteHelper] = useState(false)
-  const [creatingInviteLink, setCreatingInviteLink] = useState(false)
+  const [showInviteManager, setShowInviteManager] = useState(false)
+  const [inviteManagerLoading, setInviteManagerLoading] = useState(false)
+  const [activeInviteCodes, setActiveInviteCodes] = useState([])
   const [showRequestDetails, setShowRequestDetails] = useState(false)
   const [showRequestHistory, setShowRequestHistory] = useState(false)
   const [requestInstrument, setRequestInstrument] = useState('drums')
@@ -245,7 +246,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   useEffect(() => {
     setReviewRequests([])
     setShowRequestComposer(false)
-    setShowAccessInviteHelper(false)
+    setShowInviteManager(false)
+    setActiveInviteCodes([])
     setReviewerQuery('')
     setDesignatedReviewers([])
     setReviewerResults([])
@@ -620,23 +622,36 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     return data
   }
 
-  const createShare = async () => {
-    if (!token || !session?.id) return
-    setSharing(true)
+  const loadInviteCodes = async () => {
+    if (!token) return
+    setInviteManagerLoading(true)
     try {
-      const data = await ensurePrivateLink()
-      await navigator.clipboard.writeText(data.url)
-      toast.success('Access link copied')
+      const res = await fetch('/api/invite-codes/', { headers: authHeaders })
+      const data = await res.json().catch(() => ([]))
+      if (!res.ok) throw new Error('Could not load invites')
+      const activeCodes = Array.isArray(data)
+        ? data.filter((item) => Boolean(item?.is_active) && Boolean(item?.redeemable))
+        : []
+      setActiveInviteCodes(activeCodes)
     } catch (error) {
-      toast.error(error?.message || 'Could not create access link')
+      toast.error(error?.message || 'Could not load invites')
     } finally {
-      setSharing(false)
+      setInviteManagerLoading(false)
     }
   }
 
-  const copyInviteLink = async () => {
+  const toggleInviteManager = async () => {
+    if (showInviteManager) {
+      setShowInviteManager(false)
+      return
+    }
+    setShowInviteManager(true)
+    await loadInviteCodes()
+  }
+
+  const copyShareLink = async () => {
     if (!token || !session?.id) return
-    setCreatingInviteLink(true)
+    setSharing(true)
     try {
       const linkData = await ensurePrivateLink()
       const inviteRes = await fetch('/api/invite-codes/', {
@@ -648,24 +663,37 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
         body: JSON.stringify({ label: `Access ${session.title}` }),
       })
       const inviteData = await inviteRes.json().catch(() => ({}))
-      if (!inviteRes.ok) throw new Error(inviteData?.error || 'Could not create invite link')
+      if (!inviteRes.ok) {
+        const message = inviteData?.error || 'Could not create invite link'
+        if (message.includes('too many active invite codes')) {
+          setShowInviteManager(true)
+          await loadInviteCodes()
+          throw new Error('You already have too many active invites. Turn off an unused one below, then try again.')
+        }
+        throw new Error(message)
+      }
       const bundledUrl = `${linkData.url}${linkData.url.includes('?') ? '&' : '?'}claim=${encodeURIComponent(inviteData.code)}`
       await navigator.clipboard.writeText(bundledUrl)
-      toast.success('Invite link copied')
+      toast.success('Share link copied')
     } catch (error) {
-      toast.error(error?.message || 'Could not create invite link')
+      toast.error(error?.message || 'Could not create share link')
     } finally {
-      setCreatingInviteLink(false)
+      setSharing(false)
     }
   }
 
-  const copyShareLink = async () => {
-    if (!activeReviewLink?.url) return
+  const turnOffInviteCode = async (inviteId) => {
+    if (!token || !inviteId) return
     try {
-      await navigator.clipboard.writeText(activeReviewLink.url)
-      toast.success('Access link copied')
-    } catch {
-      toast.error('Could not copy link')
+      const res = await fetch(`/api/invite-codes/${inviteId}/`, {
+        method: 'DELETE',
+        headers: authHeaders,
+      })
+      if (!res.ok) throw new Error('Could not turn off invite')
+      setActiveInviteCodes((current) => current.filter((item) => item.id !== inviteId))
+      toast.success('Invite turned off')
+    } catch (error) {
+      toast.error(error?.message || 'Could not turn off invite')
     }
   }
 
@@ -1057,37 +1085,41 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               {canEdit ? (
                 <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 space-y-4">
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">Access</p>
-                    <p className="text-xs text-gray-500 mt-1">Create a simple private link without a named reviewer.</p>
+                    <p className="text-sm font-semibold text-gray-900">Share</p>
+                    <p className="text-xs text-gray-500 mt-1">Copy one private link. Members sign in. New people create an account first.</p>
                   </div>
                   {activeReviewLink?.url ? (
                     <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
-                      <p className="text-sm text-gray-800">Access link ready.</p>
-                      <p className="text-xs text-gray-500">Signed-in access only • expires {new Date(activeReviewLink.expires_at).toLocaleString(undefined, { hour12: undefined })}</p>
+                      <p className="text-sm text-gray-800">Share link ready.</p>
+                      <p className="text-xs text-gray-500">Private access • expires {new Date(activeReviewLink.expires_at).toLocaleString(undefined, { hour12: undefined })}</p>
                       <div className="flex flex-wrap gap-2">
                         <button type="button" onClick={copyShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
-                          Copy access link
+                          {sharing ? 'Copying…' : 'Copy share link'}
                         </button>
                         <button type="button" onClick={revokeShareLink} disabled={revokingShare} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white disabled:opacity-50 transition-colors">
-                          {revokingShare ? 'Turning off…' : 'Turn off access'}
+                          {revokingShare ? 'Turning off…' : 'Turn off'}
                         </button>
                       </div>
                       <div className="pt-1">
-                        <button type="button" onClick={() => setShowAccessInviteHelper((current) => !current)} className="text-xs text-gray-600 hover:text-gray-900 transition-colors">
-                          Send to someone new
+                        <button type="button" onClick={toggleInviteManager} className="text-xs text-gray-600 hover:text-gray-900 transition-colors">
+                          {showInviteManager ? 'Hide invites' : 'Manage invites'}
                         </button>
                       </div>
-                      {showAccessInviteHelper ? (
+                      {showInviteManager ? (
                         <div className="rounded-lg border border-gray-200 bg-white px-3 py-3 space-y-3">
-                          <p className="text-xs text-gray-600">They’ll create an account first, then open this link.</p>
-                          <button
-                            type="button"
-                            onClick={copyInviteLink}
-                            disabled={creatingInviteLink}
-                            className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                          >
-                            {creatingInviteLink ? 'Creating…' : 'Copy invite link'}
-                          </button>
+                          {inviteManagerLoading ? <p className="text-xs text-gray-500">Loading invites…</p> : null}
+                          {!inviteManagerLoading && activeInviteCodes.length === 0 ? <p className="text-xs text-gray-600">No active invites.</p> : null}
+                          {activeInviteCodes.map((invite) => (
+                            <div key={invite.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-3">
+                              <div className="min-w-0">
+                                <p className="text-sm text-gray-900 truncate">{invite.label || 'Invite'}</p>
+                                <p className="text-xs text-gray-500 mt-1">Unused • created {new Date(invite.created_at).toLocaleString(undefined, { hour12: undefined })}</p>
+                              </div>
+                              <button type="button" onClick={() => turnOffInviteCode(invite.id)} className="text-xs text-red-600 hover:text-red-700 transition-colors">
+                                Turn off
+                              </button>
+                            </div>
+                          ))}
                         </div>
                       ) : null}
                     </div>
@@ -1103,30 +1135,34 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           </p>
                         </div>
                       ) : null}
-                      {!canCreateShareLink ? null : <p className="text-sm text-gray-800">Create one signed-in private link you can send anywhere.</p>}
+                      {!canCreateShareLink ? null : <p className="text-sm text-gray-800">Create one private link you can send anywhere.</p>}
                       <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={createShare} disabled={sharing || !canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                          {sharing ? 'Creating…' : 'Create access link'}
+                        <button type="button" onClick={copyShareLink} disabled={sharing || !canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
+                          {sharing ? 'Copying…' : 'Copy share link'}
                         </button>
                       </div>
                       {!canCreateShareLink ? null : (
                         <div className="pt-1">
-                          <button type="button" onClick={() => setShowAccessInviteHelper((current) => !current)} className="text-xs text-gray-600 hover:text-gray-900 transition-colors">
-                            Send to someone new
+                          <button type="button" onClick={toggleInviteManager} className="text-xs text-gray-600 hover:text-gray-900 transition-colors">
+                            {showInviteManager ? 'Hide invites' : 'Manage invites'}
                           </button>
                         </div>
                       )}
-                      {showAccessInviteHelper ? (
+                      {showInviteManager ? (
                         <div className="rounded-lg border border-gray-200 bg-white px-3 py-3 space-y-3">
-                          <p className="text-xs text-gray-600">They’ll create an account first, then open this link.</p>
-                          <button
-                            type="button"
-                            onClick={copyInviteLink}
-                            disabled={creatingInviteLink || !canCreateShareLink}
-                            className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                          >
-                            {creatingInviteLink ? 'Creating…' : 'Copy invite link'}
-                          </button>
+                          {inviteManagerLoading ? <p className="text-xs text-gray-500">Loading invites…</p> : null}
+                          {!inviteManagerLoading && activeInviteCodes.length === 0 ? <p className="text-xs text-gray-600">No active invites.</p> : null}
+                          {activeInviteCodes.map((invite) => (
+                            <div key={invite.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-3">
+                              <div className="min-w-0">
+                                <p className="text-sm text-gray-900 truncate">{invite.label || 'Invite'}</p>
+                                <p className="text-xs text-gray-500 mt-1">Unused • created {new Date(invite.created_at).toLocaleString(undefined, { hour12: undefined })}</p>
+                              </div>
+                              <button type="button" onClick={() => turnOffInviteCode(invite.id)} className="text-xs text-red-600 hover:text-red-700 transition-colors">
+                                Turn off
+                              </button>
+                            </div>
+                          ))}
                         </div>
                       ) : null}
                     </div>
