@@ -1026,74 +1026,11 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 </div>
               ) : null}
 
-              {canEdit && !showRequestComposer ? (
-                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 space-y-3">
-                  {currentLoopSummary ? (
-                    <div className={`rounded-lg border px-3 py-3 ${currentLoopSummary.tone}`}>
-                      <div className="flex items-center justify-between gap-3 flex-wrap">
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">{currentLoopSummary.title}</p>
-                          <p className="text-sm text-gray-700 mt-1">{currentLoopSummary.message}</p>
-                        </div>
-                        {currentLoopRequest ? (
-                          <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${requestStatusTone[currentLoopRequest.status] || 'bg-gray-100 text-gray-700'}`}>
-                            {requestStatusLabel(currentLoopRequest.status)}
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  ) : null}
-                  <div className="flex flex-wrap gap-2">
-                    {waitingOnReviewer && currentLoopRequest ? (
-                      <>
-                        <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
-                          Check request
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => patchReviewRequestStatus(currentLoopRequest, 'revoked', 'Feedback request turned off')}
-                          className="text-sm text-red-600 border border-red-200 rounded-lg px-4 py-2.5 hover:bg-red-50 transition-colors"
-                        >
-                          Turn off
-                        </button>
-                      </>
-                    ) : null}
-                    {feedbackReadyToReview && currentLoopRequest ? (
-                      <>
-                        <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
-                          Review feedback
-                        </button>
-                      </>
-                    ) : null}
-                    {readyForFollowUp && currentLoopRequest ? (
-                      <>
-                        <button type="button" onClick={() => startFollowUp(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
-                          {currentLoopStatus === 'needs_resubmission' ? 'Record new take' : currentLoopStatus === 'declined_unrelated' ? 'Record matching take' : 'Record next take'}
-                        </button>
-                        <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
-                          Open private thread
-                        </button>
-                      </>
-                    ) : null}
-                    {currentLoopStatus === 'flagged' && currentLoopRequest ? (
-                      <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
-                        Open private thread
-                      </button>
-                    ) : null}
-                    {!waitingOnReviewer && !feedbackReadyToReview && !readyForFollowUp && currentLoopStatus !== 'flagged' ? (
-                      <button type="button" onClick={openRequestComposer} disabled={!canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                        Request
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-
               {canEdit ? (
                 <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 space-y-4">
                   <div>
                     <p className="text-sm font-semibold text-gray-900">Share</p>
-                    <p className="text-xs text-gray-500 mt-1">One private link for everyone.</p>
+                    <p className="text-xs text-gray-500 mt-1">Choose one person or copy one private link.</p>
                   </div>
                   <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
                     {!canCreateShareLink ? (
@@ -1112,6 +1049,11 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                     ) : null}
 
                     <div className="flex flex-wrap gap-2">
+                      {!waitingOnReviewer && !feedbackReadyToReview && !readyForFollowUp && currentLoopStatus !== 'flagged' ? (
+                        <button type="button" onClick={openRequestComposer} disabled={!canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
+                          Share with person
+                        </button>
+                      ) : null}
                       <button type="button" onClick={copyShareLink} disabled={sharing || !canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
                         {sharing ? 'Copying…' : 'Copy share link'}
                       </button>
@@ -1151,15 +1093,59 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 </div>
               ) : null}
 
-              {canEdit ? (
-                <div ref={loopDetailsRef} className="rounded-xl border border-gray-200 bg-white px-4 py-3 space-y-4">
-                  <div className="flex items-start justify-between gap-4 flex-wrap">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">Request</p>
-                      <p className="text-xs text-gray-500 mt-1">{reviewRequests.length > 0 ? `${reviewRequests.length} request${reviewRequests.length === 1 ? '' : 's'} on this take.` : 'Choose one person to open a private thread.'}</p>
+              {canEdit && (showRequestComposer || currentLoopSummary || reviewRequests.length > 0) ? (
+                <div ref={loopDetailsRef} className="space-y-4">
+                  {currentLoopSummary ? (
+                    <div className={`rounded-lg border px-3 py-3 space-y-3 ${currentLoopSummary.tone}`}>
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{currentLoopSummary.title}</p>
+                          <p className="text-sm text-gray-700 mt-1">{currentLoopSummary.message}</p>
+                        </div>
+                        {currentLoopRequest ? (
+                          <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${requestStatusTone[currentLoopRequest.status] || 'bg-gray-100 text-gray-700'}`}>
+                            {requestStatusLabel(currentLoopRequest.status)}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {waitingOnReviewer && currentLoopRequest ? (
+                          <>
+                            <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
+                              Check request
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => patchReviewRequestStatus(currentLoopRequest, 'revoked', 'Feedback request turned off')}
+                              className="text-sm text-red-600 border border-red-200 rounded-lg px-4 py-2.5 hover:bg-red-50 transition-colors"
+                            >
+                              Turn off
+                            </button>
+                          </>
+                        ) : null}
+                        {feedbackReadyToReview && currentLoopRequest ? (
+                          <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
+                            Review feedback
+                          </button>
+                        ) : null}
+                        {readyForFollowUp && currentLoopRequest ? (
+                          <>
+                            <button type="button" onClick={() => startFollowUp(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
+                              {currentLoopStatus === 'needs_resubmission' ? 'Record new take' : currentLoopStatus === 'declined_unrelated' ? 'Record matching take' : 'Record next take'}
+                            </button>
+                            <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
+                              Open private thread
+                            </button>
+                          </>
+                        ) : null}
+                        {currentLoopStatus === 'flagged' && currentLoopRequest ? (
+                          <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
+                            Open private thread
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2" />
-                  </div>
+                  ) : null}
 
                   {showRequestComposer ? (
                     <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-4">
@@ -1193,7 +1179,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                             {!recentReviewersLoading && designatedReviewers.length === 0 ? (
                               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
                                 <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Add someone first</p>
-                                <p className="text-sm text-amber-900 mt-1">Requests only work with people already on your list. Use Access for simple sharing, or add someone first.</p>
+                                <p className="text-sm text-amber-900 mt-1">No one yet. Copy a share link or add someone first.</p>
                               </div>
                             ) : null}
                             {recentReviewers.length > 0 ? (
@@ -1219,7 +1205,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                   placeholder="Search people"
                                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
                                 />
-                                <p className="text-xs text-gray-500">Only people already on your list can receive a request.</p>
+                                <p className="text-xs text-gray-500">Only people already on your list appear here.</p>
                                 {reviewerSearchLoading ? <p className="text-xs text-gray-500">Searching…</p> : null}
                                 {reviewerResults.length > 0 ? (
                                   <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
