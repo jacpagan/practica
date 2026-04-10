@@ -79,10 +79,24 @@ test('Record route shows camera and microphone selectors for signed-in members',
       },
     ])
 
-    mediaDevices.getUserMedia = async () => {
-      const error = new Error('No real media in smoke test')
-      error.name = 'NotAllowedError'
-      throw error
+    mediaDevices.getUserMedia = async (constraints) => {
+      const wantsVideo = Boolean(constraints?.video)
+      const wantsAudio = Boolean(constraints?.audio)
+
+      if (wantsAudio && !wantsVideo) {
+        const canvas = document.createElement('canvas')
+        canvas.width = 1
+        canvas.height = 1
+        return canvas.captureStream(1)
+      }
+
+      const canvas = document.createElement('canvas')
+      canvas.width = 640
+      canvas.height = 360
+      const context = canvas.getContext('2d')
+      context.fillStyle = '#111827'
+      context.fillRect(0, 0, canvas.width, canvas.height)
+      return canvas.captureStream(1)
     }
 
     mediaDevices.getDisplayMedia = async () => {
@@ -95,6 +109,12 @@ test('Record route shows camera and microphone selectors for signed-in members',
   await page.goto('/record')
 
   await expect(page.getByRole('heading', { name: 'Record' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Options/i })).toBeVisible()
+  await expect(page.getByText('Camera ready')).toBeVisible({ timeout: 10000 })
+  await expect(page.locator('text=Camera input')).toHaveCount(0)
+  await expect(page.locator('text=Microphone input')).toHaveCount(0)
+
+  await page.getByRole('button', { name: /Options/i }).click()
   await expect(page.locator('text=Camera input').first()).toBeVisible()
   await expect(page.locator('text=Microphone input').first()).toBeVisible()
   await expect(page.locator('select').nth(0)).toContainText('Built-in Camera')

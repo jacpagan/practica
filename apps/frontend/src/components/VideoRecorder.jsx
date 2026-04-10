@@ -76,6 +76,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   const [micLevel, setMicLevel] = useState(0)
   const [countInRemaining, setCountInRemaining] = useState(null)
   const [bpmInput, setBpmInput] = useState('80')
+  const [showOptions, setShowOptions] = useState(false)
   const [audioInputs, setAudioInputs] = useState([])
   const [selectedAudioInputId, setSelectedAudioInputId] = useState(readStoredAudioInputId)
   const [videoInputs, setVideoInputs] = useState([])
@@ -876,6 +877,12 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     applyMicProcessing(Boolean(musicMode))
   }, [applyMicProcessing, musicMode])
 
+  useEffect(() => {
+    if (error || warning) {
+      setShowOptions(true)
+    }
+  }, [error, warning])
+
   // ── Actions ──
 
   const handleUse = () => {
@@ -914,6 +921,9 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   const timerProgress = maxDuration > 0 ? Math.min(elapsed / maxDuration, 1) : 0
   const hasNamedAudioInputs = audioInputs.some((device) => device.label)
   const hasNamedVideoInputs = videoInputs.some((device) => device.label)
+  const selectedVideoLabel = videoInputs.find((device) => device.deviceId === selectedVideoInputId)?.label || ''
+  const selectedAudioLabel = audioInputs.find((device) => device.deviceId === selectedAudioInputId)?.label || ''
+  const optionsSummary = `${selectedVideoLabel || 'Default camera'} · ${selectedAudioLabel || 'Default mic'}`
 
   const renderVideoInputPicker = (extraClassName = '') => (
     <div className={extraClassName}>
@@ -989,9 +999,26 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
               <button onClick={openCamera} className="text-xs text-white/60 hover:text-white underline transition-colors">
                 Try again
               </button>
-              <div className="grid w-full max-w-3xl gap-3 pt-2 md:grid-cols-2">
-                {renderVideoInputPicker()}
-                {renderAudioInputPicker()}
+              <div className="w-full max-w-3xl pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowOptions((current) => !current)}
+                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-left hover:bg-white/10 transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-white/60">Options</p>
+                      <p className="mt-1 text-sm text-white/85">{optionsSummary}</p>
+                    </div>
+                    <span className="text-xs text-white/55">{showOptions ? 'Hide' : 'Show'}</span>
+                  </div>
+                </button>
+                {showOptions ? (
+                  <div className="grid gap-3 pt-3 md:grid-cols-2">
+                    {renderVideoInputPicker()}
+                    {renderAudioInputPicker()}
+                  </div>
+                ) : null}
               </div>
             </>
           ) : (
@@ -1018,9 +1045,26 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                 </button>
               </div>
               <p className="text-xs text-white/40">Tap to open camera or screen + cam</p>
-              <div className="grid w-full max-w-3xl gap-3 pt-2 md:grid-cols-2">
-                {renderVideoInputPicker()}
-                {renderAudioInputPicker()}
+              <div className="w-full max-w-3xl pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowOptions((current) => !current)}
+                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-left hover:bg-white/10 transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-white/60">Options</p>
+                      <p className="mt-1 text-sm text-white/85">{optionsSummary}</p>
+                    </div>
+                    <span className="text-xs text-white/55">{showOptions ? 'Hide' : 'Show'}</span>
+                  </div>
+                </button>
+                {showOptions ? (
+                  <div className="grid gap-3 pt-3 md:grid-cols-2">
+                    {renderVideoInputPicker()}
+                    {renderAudioInputPicker()}
+                  </div>
+                ) : null}
               </div>
             </>
           )}
@@ -1106,9 +1150,27 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                 </div>
               </div>
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              {renderVideoInputPicker('rounded-2xl bg-white/5 px-3 py-3')}
-              {renderAudioInputPicker('rounded-2xl bg-white/5 px-3 py-3')}
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => setShowOptions((current) => !current)}
+                className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-left hover:bg-white/10 transition-colors"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-white/60">Options</p>
+                    <p className="mt-1 text-sm text-white/85">{optionsSummary}</p>
+                  </div>
+                  <span className="text-xs text-white/55">{showOptions ? 'Hide' : 'Show'}</span>
+                </div>
+              </button>
+
+              {showOptions ? (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {renderVideoInputPicker('rounded-2xl bg-white/5 px-3 py-3')}
+                  {renderAudioInputPicker('rounded-2xl bg-white/5 px-3 py-3')}
+                </div>
+              ) : null}
             </div>
 
             {warning ? (
