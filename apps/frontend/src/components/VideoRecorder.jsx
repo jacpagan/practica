@@ -1106,48 +1106,8 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
               <div className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/90">
                   {countInRemaining ? `Starting in ${countInRemaining}` : state === STATES.RECORDING ? 'Recording' : 'Camera ready'}
               </div>
-              <div className="flex items-center gap-2">
-                {/* Minimal audio controls */}
-                <button
-                  type="button"
-                  onClick={() => setMusicMode(m => !m)}
-                  title="Music mode (disables noise suppression/AGC/echo cancel)"
-                  className={`rounded-full px-2.5 py-1 text-[11px] transition-colors ${musicMode ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
-                >
-                  Music
-                </button>
-                <div title="Mic level" className="w-16 h-1 rounded bg-white/10 overflow-hidden">
-                  <div className="h-full bg-white/80" style={{ width: `${Math.min(100, Math.round((micLevel*3)*100))}%` }} />
-                </div>
-                <input
-                  title="Mic gain"
-                  type="range"
-                  min="0.5"
-                  max="2"
-                  step="0.01"
-                  value={micGain}
-                  onChange={(e) => setMicGain(Number(e.target.value))}
-                  className="w-20 accent-white/90"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowTimingTools((current) => !current)}
-                  className="rounded-full px-3 py-1.5 text-xs transition-colors bg-white/10 text-white/80 hover:bg-white/20"
-                >
-                  Timing tools
-                </button>
-                {mode === 'screen_cam' && (
-                  <button
-                    type="button"
-                    onClick={() => setShowPipControls((c) => !c)}
-                    className="rounded-full px-3 py-1.5 text-xs transition-colors bg-white/10 text-white/80 hover:bg-white/20"
-                  >
-                    PiP controls
-                  </button>
-                )}
-                <div className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/70">
-                  {state === STATES.RECORDING ? fmtTimer(elapsed) : `Max ${fmtTimer(maxDuration)}`}
-                </div>
+              <div className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/70">
+                {state === STATES.RECORDING ? fmtTimer(elapsed) : `Max ${fmtTimer(maxDuration)}`}
               </div>
             </div>
             <div className="space-y-3">
@@ -1166,9 +1126,74 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
               </button>
 
               {showOptions ? (
-                <div className="grid gap-3 md:grid-cols-2">
-                  {renderVideoInputPicker('rounded-2xl bg-white/5 px-3 py-3')}
-                  {renderAudioInputPicker('rounded-2xl bg-white/5 px-3 py-3')}
+                <div className="space-y-3">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {renderVideoInputPicker('rounded-2xl bg-white/5 px-3 py-3')}
+                    {renderAudioInputPicker('rounded-2xl bg-white/5 px-3 py-3')}
+                  </div>
+
+                  <div className="rounded-2xl bg-white/5 px-3 py-3 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-white/60">Audio</p>
+                        <p className="text-sm text-white/85">{musicMode ? 'Music mode on' : 'Standard mode'}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setMusicMode((current) => !current)}
+                        title="Music mode (disables noise suppression/AGC/echo cancel)"
+                        className={`rounded-full px-3 py-1.5 text-xs transition-colors ${musicMode ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
+                      >
+                        {musicMode ? 'Music' : 'Standard'}
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-[11px] text-white/55">
+                        <span>Mic level</span>
+                        <span>{Math.min(100, Math.round((micLevel * 3) * 100))}%</span>
+                      </div>
+                      <div title="Mic level" className="h-1.5 rounded bg-white/10 overflow-hidden">
+                        <div className="h-full bg-white/80" style={{ width: `${Math.min(100, Math.round((micLevel * 3) * 100))}%` }} />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-[11px] text-white/55">
+                        <span>Mic gain</span>
+                        <span>{Math.round(micGain * 100)}%</span>
+                      </div>
+                      <input
+                        title="Mic gain"
+                        type="range"
+                        min="0.5"
+                        max="2"
+                        step="0.01"
+                        value={micGain}
+                        onChange={(e) => setMicGain(Number(e.target.value))}
+                        className="w-full accent-white/90"
+                      />
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowTimingTools((current) => !current)}
+                        className="rounded-full px-3 py-1.5 text-xs transition-colors bg-white/10 text-white/80 hover:bg-white/20"
+                      >
+                        {showTimingTools ? 'Hide timing' : 'Timing'}
+                      </button>
+                      {mode === 'screen_cam' && (
+                        <button
+                          type="button"
+                          onClick={() => setShowPipControls((current) => !current)}
+                          className="rounded-full px-3 py-1.5 text-xs transition-colors bg-white/10 text-white/80 hover:bg-white/20"
+                        >
+                          {showPipControls ? 'Hide PiP' : 'PiP'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ) : null}
             </div>
