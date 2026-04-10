@@ -370,6 +370,9 @@ test('Session detail separates access from request flow', async ({ page }) => {
   await expect(page.locator('text=Request').first()).toBeVisible()
   await expect(page.locator('text=Invite with private link')).toHaveCount(0)
   await expect(page.locator('text=Create a simple private link without a named reviewer.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Send to someone new' })).toBeVisible()
+  await page.getByRole('button', { name: 'Send to someone new' }).click()
+  await expect(page.getByRole('button', { name: 'Copy invite link' })).toBeVisible()
 })
 
 test('Calendar day view shows review state per video', async ({ page }) => {

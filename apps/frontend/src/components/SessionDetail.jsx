@@ -131,6 +131,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const [selectedReviewer, setSelectedReviewer] = useState(null)
   const [recentReviewers, setRecentReviewers] = useState([])
   const [recentReviewersLoading, setRecentReviewersLoading] = useState(false)
+  const [showAccessInviteHelper, setShowAccessInviteHelper] = useState(false)
+  const [creatingInviteLink, setCreatingInviteLink] = useState(false)
   const [showRequestDetails, setShowRequestDetails] = useState(false)
   const [showRequestHistory, setShowRequestHistory] = useState(false)
   const [requestInstrument, setRequestInstrument] = useState('drums')
@@ -243,6 +245,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   useEffect(() => {
     setReviewRequests([])
     setShowRequestComposer(false)
+    setShowAccessInviteHelper(false)
     setReviewerQuery('')
     setDesignatedReviewers([])
     setReviewerResults([])
@@ -623,11 +626,36 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     try {
       const data = await ensurePrivateLink()
       await navigator.clipboard.writeText(data.url)
-      toast.success('Private feedback link copied')
+      toast.success('Access link copied')
     } catch (error) {
-      toast.error(error?.message || 'Could not create private feedback link')
+      toast.error(error?.message || 'Could not create access link')
     } finally {
       setSharing(false)
+    }
+  }
+
+  const copyInviteLink = async () => {
+    if (!token || !session?.id) return
+    setCreatingInviteLink(true)
+    try {
+      const linkData = await ensurePrivateLink()
+      const inviteRes = await fetch('/api/invite-codes/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
+        body: JSON.stringify({ label: `Access ${session.title}` }),
+      })
+      const inviteData = await inviteRes.json().catch(() => ({}))
+      if (!inviteRes.ok) throw new Error(inviteData?.error || 'Could not create invite link')
+      const bundledUrl = `${linkData.url}${linkData.url.includes('?') ? '&' : '?'}claim=${encodeURIComponent(inviteData.code)}`
+      await navigator.clipboard.writeText(bundledUrl)
+      toast.success('Invite link copied')
+    } catch (error) {
+      toast.error(error?.message || 'Could not create invite link')
+    } finally {
+      setCreatingInviteLink(false)
     }
   }
 
@@ -635,7 +663,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     if (!activeReviewLink?.url) return
     try {
       await navigator.clipboard.writeText(activeReviewLink.url)
-      toast.success('Private feedback link copied')
+      toast.success('Access link copied')
     } catch {
       toast.error('Could not copy link')
     }
@@ -1044,6 +1072,24 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           {revokingShare ? 'Turning off…' : 'Turn off access'}
                         </button>
                       </div>
+                      <div className="pt-1">
+                        <button type="button" onClick={() => setShowAccessInviteHelper((current) => !current)} className="text-xs text-gray-600 hover:text-gray-900 transition-colors">
+                          Send to someone new
+                        </button>
+                      </div>
+                      {showAccessInviteHelper ? (
+                        <div className="rounded-lg border border-gray-200 bg-white px-3 py-3 space-y-3">
+                          <p className="text-xs text-gray-600">They’ll create an account first, then open this link.</p>
+                          <button
+                            type="button"
+                            onClick={copyInviteLink}
+                            disabled={creatingInviteLink}
+                            className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                          >
+                            {creatingInviteLink ? 'Creating…' : 'Copy invite link'}
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                   ) : (
                     <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
@@ -1063,6 +1109,26 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           {sharing ? 'Creating…' : 'Create access link'}
                         </button>
                       </div>
+                      {!canCreateShareLink ? null : (
+                        <div className="pt-1">
+                          <button type="button" onClick={() => setShowAccessInviteHelper((current) => !current)} className="text-xs text-gray-600 hover:text-gray-900 transition-colors">
+                            Send to someone new
+                          </button>
+                        </div>
+                      )}
+                      {showAccessInviteHelper ? (
+                        <div className="rounded-lg border border-gray-200 bg-white px-3 py-3 space-y-3">
+                          <p className="text-xs text-gray-600">They’ll create an account first, then open this link.</p>
+                          <button
+                            type="button"
+                            onClick={copyInviteLink}
+                            disabled={creatingInviteLink || !canCreateShareLink}
+                            className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                          >
+                            {creatingInviteLink ? 'Creating…' : 'Copy invite link'}
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                   )}
                 </div>
