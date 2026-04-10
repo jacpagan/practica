@@ -1049,6 +1049,13 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                         <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
                           Check request
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => patchReviewRequestStatus(currentLoopRequest, 'revoked', 'Feedback request turned off')}
+                          className="text-sm text-red-600 border border-red-200 rounded-lg px-4 py-2.5 hover:bg-red-50 transition-colors"
+                        >
+                          Turn off
+                        </button>
                       </>
                     ) : null}
                     {feedbackReadyToReview && currentLoopRequest ? (
