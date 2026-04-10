@@ -50,25 +50,42 @@ const ACTIVE_REQUEST_STATUSES = new Set([
 const requestSignalMeta = {
   feedback_ready: {
     label: 'Feedback ready',
+    summaryLabel: 'ready',
     dayTone: 'bg-emerald-100 text-emerald-800',
     panelTone: 'bg-emerald-100 text-emerald-800',
   },
   awaiting_review: {
     label: 'Awaiting review',
+    summaryLabel: 'awaiting review',
     dayTone: 'bg-amber-100 text-amber-800',
     panelTone: 'bg-amber-100 text-amber-800',
+  },
+  needs_new_take: {
+    label: 'Needs new take',
+    summaryLabel: 'need a new take',
+    dayTone: 'bg-orange-100 text-orange-800',
+    panelTone: 'bg-orange-100 text-orange-800',
+  },
+  wrong_take: {
+    label: 'Wrong take',
+    summaryLabel: 'need the right take',
+    dayTone: 'bg-rose-100 text-rose-800',
+    panelTone: 'bg-rose-100 text-rose-800',
   },
 }
 
 const requestSignalKey = (status = '') => {
   const normalized = String(status || '').trim().toLowerCase()
-  if (['responded', 'viewed', 'needs_resubmission', 'declined_unrelated'].includes(normalized)) return 'feedback_ready'
+  if (normalized === 'needs_resubmission') return 'needs_new_take'
+  if (normalized === 'declined_unrelated') return 'wrong_take'
+  if (['responded', 'viewed'].includes(normalized)) return 'feedback_ready'
   if (['requested', 'opened', 'resubmitted'].includes(normalized)) return 'awaiting_review'
   return ''
 }
 
 const requestSignalPriority = (status = '') => {
   const signal = requestSignalKey(status)
+  if (signal === 'needs_new_take' || signal === 'wrong_take') return 3
   if (signal === 'feedback_ready') return 2
   if (signal === 'awaiting_review') return 1
   return 0
@@ -81,6 +98,11 @@ const requestStatusRank = (status = '') => {
   if (normalized === 'resubmitted') return 2
   if (['requested', 'opened'].includes(normalized)) return 1
   return 0
+}
+
+const sessionReviewChipStatus = (status = '') => {
+  const signal = requestSignalKey(status)
+  return signal || ''
 }
 
 function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '', reviewRequests = [], onOpenSession, onOpenSeries, onMonthChange, onOpenListDate, onContinueThread }) {
@@ -226,10 +248,23 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
           const tb = new Date(b.recorded_at || b.created_at)
           return newestFirst ? (tb - ta) : (ta - tb)
         })
+      const signalCounts = {
+        awaiting_review: 0,
+        feedback_ready: 0,
+        needs_new_take: 0,
+        wrong_take: 0,
+      }
+      sortedItems.forEach((item) => {
+        const status = String(activeRequestBySessionId.get(Number(item.id))?.status || '').trim().toLowerCase()
+        const signal = requestSignalKey(status)
+        if (signal && Object.prototype.hasOwnProperty.call(signalCounts, signal)) {
+          signalCounts[signal] += 1
+        }
+      })
       const activeRequest = sortedItems
         .map((item) => activeRequestBySessionId.get(Number(item.id)) || null)
         .find(Boolean) || null
-      return { seriesName, items: sortedItems, activeRequest }
+      return { seriesName, items: sortedItems, activeRequest, signalCounts }
     })
     // Sort groups by their first item's timestamp
     groupArray.sort((ga, gb) => {
@@ -370,7 +405,6 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
       <div className="max-w-4xl mx-auto space-y-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-2">
-            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Practice mirror</h2>
             <p className="text-sm text-gray-500 mt-1">Review your private takes day by day.</p>
             {smartFollowUpTarget ? (
               <div className="flex flex-wrap items-center gap-2">
@@ -530,11 +564,16 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                           <div className="min-w-0">
                             <p className="text-xs uppercase tracking-wide text-gray-500">{group.seriesName}</p>
                             <p className="text-xs text-gray-500 mt-1">{group.items.length} {group.items.length === 1 ? 'take' : 'takes'} in this thread</p>
-                            {requestSignalMeta[requestSignalKey(group.activeRequest?.status)] ? (
-                              <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${requestSignalMeta[requestSignalKey(group.activeRequest?.status)].panelTone}`}>
-                                {requestSignalMeta[requestSignalKey(group.activeRequest?.status)].label}
-                              </span>
-                            ) : null}
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {Object.entries(group.signalCounts || {}).map(([signal, count]) => {
+                                if (!count || !requestSignalMeta[signal]) return null
+                                return (
+                                  <span key={signal} className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${requestSignalMeta[signal].panelTone}`}>
+                                    {count} {requestSignalMeta[signal].summaryLabel}
+                                  </span>
+                                )
+                              })}
+                            </div>
                           </div>
                           {group.seriesName !== '(no thread)' && (
                             <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center sm:flex-wrap">
@@ -564,7 +603,13 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                         </div>
                         <div className="space-y-2">
                           {group.items.map((session) => (
-                            <SessionListItem key={session.id} session={session} onOpen={() => onOpenSession?.(session, { view: 'calendar', date: selectedDateKey })} onChangeThread={() => setEditing(session)} />
+                            <SessionListItem
+                              key={session.id}
+                              session={session}
+                              status={sessionReviewChipStatus(activeRequestBySessionId.get(Number(session.id))?.status)}
+                              onOpen={() => onOpenSession?.(session, { view: 'calendar', date: selectedDateKey })}
+                              onChangeThread={() => setEditing(session)}
+                            />
                           ))}
                         </div>
                       </div>

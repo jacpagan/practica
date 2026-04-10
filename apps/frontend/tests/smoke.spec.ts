@@ -101,8 +101,11 @@ test('Record route shows camera and microphone selectors for signed-in members',
   await expect(page.locator('select').nth(1)).toContainText('Built-in Microphone')
 })
 
-test('Record route falls back when selected camera fails', async ({ page }) => {
-  await page.addInitScript(() => {
+test('Record route falls back when selected camera fails', async ({ browser }) => {
+  const context = await browser.newContext()
+  const page = await context.newPage()
+
+  await context.addInitScript(() => {
     window.localStorage.setItem('token', 'smoke-token')
     window.localStorage.setItem('practica.recorder.videoInputId.v1', 'video-device-1')
 
@@ -176,6 +179,8 @@ test('Record route falls back when selected camera fails', async ({ page }) => {
 
   await expect(page.getByText('Camera ready')).toBeVisible({ timeout: 10000 })
   await expect(page.locator('text=Could not access camera. Please check your device.')).toHaveCount(0)
+
+  await context.close()
 })
 
 test('Session detail separates access from request flow', async ({ page }) => {
@@ -262,4 +267,110 @@ test('Session detail separates access from request flow', async ({ page }) => {
   await expect(page.locator('text=Request').first()).toBeVisible()
   await expect(page.locator('text=Invite with private link')).toHaveCount(0)
   await expect(page.locator('text=Create a simple private link without a named reviewer.')).toBeVisible()
+})
+
+test('Calendar day view shows review state per video', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('token', 'smoke-token')
+  })
+
+  const sessions = [
+    {
+      id: 201,
+      title: 'Take awaiting review',
+      practice_series: '',
+      description: '',
+      video_file: '',
+      duration_seconds: null,
+      recorded_at: '2026-04-09T09:00:00Z',
+      created_at: '2026-04-09T09:00:00Z',
+      updated_at: '2026-04-09T09:00:00Z',
+      processing_status: 'ready',
+      processing_job_id: '',
+      processing_error: '',
+      tag_names: [],
+      assets: [],
+      chapters: [],
+      video_feedback: [],
+      active_review_link: null,
+      chapter_count: 0,
+      video_feedback_count: 0,
+      owner: { id: 1, display_name: 'Smoke Member' },
+      can_edit: true,
+    },
+    {
+      id: 202,
+      title: 'Take without request',
+      practice_series: '',
+      description: '',
+      video_file: '',
+      duration_seconds: null,
+      recorded_at: '2026-04-09T13:00:00Z',
+      created_at: '2026-04-09T13:00:00Z',
+      updated_at: '2026-04-09T13:00:00Z',
+      processing_status: 'ready',
+      processing_job_id: '',
+      processing_error: '',
+      tag_names: [],
+      assets: [],
+      chapters: [],
+      video_feedback: [],
+      active_review_link: null,
+      chapter_count: 0,
+      video_feedback_count: 0,
+      owner: { id: 1, display_name: 'Smoke Member' },
+      can_edit: true,
+    },
+  ]
+
+  const reviewRequests = [
+    {
+      id: 301,
+      session_id: 201,
+      session: { id: 201 },
+      status: 'requested',
+      created_at: '2026-04-09T10:00:00Z',
+      updated_at: '2026-04-09T10:00:00Z',
+    },
+  ]
+
+  await page.route('**/api/auth/me/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 1, username: 'smoke_member', display_name: 'Smoke Member' }),
+    })
+  })
+
+  await page.route('**/api/review-requests/?role=owner', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(reviewRequests),
+    })
+  })
+
+  await page.route('**/api/review-requests/?role=reviewer', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    })
+  })
+
+  await page.route(/.*\/api\/sessions\/\?start_date=2026-04-01&end_date=2026-04-30.*/, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(sessions),
+    })
+  })
+
+  await page.goto('/?date=2026-04-09')
+
+  await expect(page.locator('text=1 awaiting review')).toBeVisible()
+  const awaitingRow = page.getByRole('button').filter({ hasText: 'Take awaiting review' })
+  const plainRow = page.getByRole('button').filter({ hasText: 'Take without request' })
+  await expect(awaitingRow.locator('span').filter({ hasText: 'Awaiting review' })).toHaveCount(1)
+  await expect(plainRow.locator('span').filter({ hasText: 'Awaiting review' })).toHaveCount(0)
 })
