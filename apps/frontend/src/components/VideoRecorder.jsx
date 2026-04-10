@@ -132,7 +132,15 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
           ? current
           : ''
       ))
+      return {
+        audioInputs: nextAudioInputs,
+        videoInputs: nextVideoInputs,
+      }
     } catch {}
+    return {
+      audioInputs: [],
+      videoInputs: [],
+    }
   }, [])
 
   useEffect(() => {
@@ -282,23 +290,23 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     }
   }, [])
 
-  const getAudioConstraints = useCallback(() => {
+  const getAudioConstraints = useCallback((audioInputId = selectedAudioInputId) => {
     const constraints = musicMode
       ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
       : {}
-    if (selectedAudioInputId) {
-      constraints.deviceId = { exact: selectedAudioInputId }
+    if (audioInputId) {
+      constraints.deviceId = { exact: audioInputId }
     }
     return Object.keys(constraints).length ? constraints : true
   }, [musicMode, selectedAudioInputId])
 
-  const getVideoConstraints = useCallback((size = 'default') => {
+  const getVideoConstraints = useCallback((size = 'default', videoInputId = selectedVideoInputId) => {
     const constraints = size === 'pip'
       ? { width: { ideal: 640 }, height: { ideal: 360 } }
       : { width: { ideal: 1280 }, height: { ideal: 720 } }
 
-    if (selectedVideoInputId) {
-      constraints.deviceId = { exact: selectedVideoInputId }
+    if (videoInputId) {
+      constraints.deviceId = { exact: videoInputId }
     } else {
       constraints.facingMode = 'user'
     }
@@ -310,6 +318,9 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     if (e?.name === 'NotAllowedError') {
       return 'Camera permission denied. Please allow access in your browser settings.'
     }
+    if (e?.name === 'NotReadableError' || e?.name === 'AbortError') {
+      return 'Camera is busy or unavailable. Close other apps using it and try again.'
+    }
     if ((e?.name === 'NotFoundError' || e?.name === 'OverconstrainedError') && selectedVideoInputId) {
       return 'Selected camera is unavailable. Reconnect it or choose another camera.'
     }
@@ -318,6 +329,67 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     }
     return 'Could not access camera. Please check your device.'
   }, [selectedAudioInputId, selectedVideoInputId])
+
+  const openUserMediaWithFallback = useCallback(async ({ size = 'default' } = {}) => {
+    const devices = await refreshMediaDevices()
+
+    let videoInputId = selectedVideoInputId
+    let audioInputId = selectedAudioInputId
+
+    if (videoInputId && !devices?.videoInputs?.some((device) => device.deviceId === videoInputId)) {
+      videoInputId = ''
+      setSelectedVideoInputId('')
+    }
+
+    if (audioInputId && !devices?.audioInputs?.some((device) => device.deviceId === audioInputId)) {
+      audioInputId = ''
+      setSelectedAudioInputId('')
+    }
+
+    const attempts = []
+    const seen = new Set()
+    const pushAttempt = (nextVideoInputId, nextAudioInputId) => {
+      const key = `${nextVideoInputId || 'default-video'}::${nextAudioInputId || 'default-audio'}`
+      if (seen.has(key)) return
+      seen.add(key)
+      attempts.push({ videoInputId: nextVideoInputId, audioInputId: nextAudioInputId })
+    }
+
+    pushAttempt(videoInputId, audioInputId)
+    if (videoInputId) pushAttempt('', audioInputId)
+    if (audioInputId) pushAttempt(videoInputId, '')
+    if (videoInputId || audioInputId) pushAttempt('', '')
+
+    let lastError = null
+
+    for (const attempt of attempts) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: getVideoConstraints(size, attempt.videoInputId),
+          audio: getAudioConstraints(attempt.audioInputId),
+        })
+
+        if (attempt.videoInputId !== selectedVideoInputId) {
+          setSelectedVideoInputId(attempt.videoInputId)
+        }
+        if (attempt.audioInputId !== selectedAudioInputId) {
+          setSelectedAudioInputId(attempt.audioInputId)
+        }
+
+        return stream
+      } catch (error) {
+        lastError = error
+        if (error?.name === 'NotAllowedError') {
+          throw error
+        }
+        if (!['NotReadableError', 'AbortError', 'NotFoundError', 'OverconstrainedError'].includes(String(error?.name || ''))) {
+          throw error
+        }
+      }
+    }
+
+    throw lastError || new Error('Could not access camera.')
+  }, [getAudioConstraints, getVideoConstraints, refreshMediaDevices, selectedAudioInputId, selectedVideoInputId])
 
   const ensureAudioMix = useCallback(async (stream) => {
     if (typeof window === 'undefined') return null
@@ -505,10 +577,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     setError(null)
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera not supported')
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: getVideoConstraints('default'),
-        audio: getAudioConstraints(),
-      })
+      const stream = await openUserMediaWithFallback({ size: 'default' })
       camStreamRef.current = stream
       streamRef.current = stream
       await ensureAudioMix(stream)
@@ -535,10 +604,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       })
       displayStreamRef.current = display
 
-      const cam = await navigator.mediaDevices.getUserMedia({
-        video: getVideoConstraints('pip'),
-        audio: getAudioConstraints(),
-      })
+      const cam = await openUserMediaWithFallback({ size: 'pip' })
       camStreamRef.current = cam
       await refreshMediaDevices()
 

@@ -101,6 +101,83 @@ test('Record route shows camera and microphone selectors for signed-in members',
   await expect(page.locator('select').nth(1)).toContainText('Built-in Microphone')
 })
 
+test('Record route falls back when selected camera fails', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('token', 'smoke-token')
+    window.localStorage.setItem('practica.recorder.videoInputId.v1', 'video-device-1')
+
+    const originalFetch = window.fetch.bind(window)
+    window.fetch = async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input)
+
+      if (url.includes('/api/auth/me/')) {
+        return new Response(JSON.stringify({ id: 1, username: 'smoke_member', display_name: 'Smoke Member' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (url.includes('/api/review-requests/')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      return originalFetch(input, init)
+    }
+
+    const mediaDevices = navigator.mediaDevices
+    if (!mediaDevices) return
+
+    mediaDevices.enumerateDevices = async () => ([
+      {
+        deviceId: 'video-device-1',
+        kind: 'videoinput',
+        label: 'Built-in Camera',
+        groupId: 'group-video',
+        toJSON() { return this },
+      },
+      {
+        deviceId: 'audio-device-1',
+        kind: 'audioinput',
+        label: 'Built-in Microphone',
+        groupId: 'group-audio',
+        toJSON() { return this },
+      },
+    ])
+
+    let selectedAttemptFailed = false
+    mediaDevices.getUserMedia = async (constraints) => {
+      const selectedCameraId = constraints?.video && typeof constraints.video === 'object'
+        ? constraints.video?.deviceId?.exact
+        : ''
+
+      if (selectedCameraId === 'video-device-1' && !selectedAttemptFailed) {
+        selectedAttemptFailed = true
+        const error = new Error('Selected camera is busy')
+        error.name = 'NotReadableError'
+        throw error
+      }
+
+      const canvas = document.createElement('canvas')
+      canvas.width = 640
+      canvas.height = 360
+      const context = canvas.getContext('2d')
+      context.fillStyle = '#111827'
+      context.fillRect(0, 0, canvas.width, canvas.height)
+      return canvas.captureStream(1)
+    }
+
+    mediaDevices.getDisplayMedia = async () => new MediaStream()
+  })
+
+  await page.goto('/record')
+
+  await expect(page.getByText('Camera ready')).toBeVisible({ timeout: 10000 })
+  await expect(page.locator('text=Could not access camera. Please check your device.')).toHaveCount(0)
+})
+
 test('Session detail separates access from request flow', async ({ page }) => {
   // Keep the lightweight private-link access path separate from the structured feedback request flow.
   await page.addInitScript(() => {
