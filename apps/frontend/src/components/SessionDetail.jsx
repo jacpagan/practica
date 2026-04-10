@@ -1086,87 +1086,61 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 space-y-4">
                   <div>
                     <p className="text-sm font-semibold text-gray-900">Share</p>
-                    <p className="text-xs text-gray-500 mt-1">Copy one private link. Members sign in. New people create an account first.</p>
+                    <p className="text-xs text-gray-500 mt-1">One private link for everyone.</p>
                   </div>
-                  {activeReviewLink?.url ? (
-                    <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
-                      <p className="text-sm text-gray-800">Share link ready.</p>
+                  <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
+                    {!canCreateShareLink ? (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
+                        <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Not shareable yet</p>
+                        <p className="text-sm text-amber-900 mt-1">
+                          {session.processing_status === 'failed'
+                            ? 'Fix playback processing before sharing this private link.'
+                            : 'Wait until playback is ready before sharing this private link.'}
+                        </p>
+                      </div>
+                    ) : null}
+
+                    {activeReviewLink?.url ? (
                       <p className="text-xs text-gray-500">Private access • expires {new Date(activeReviewLink.expires_at).toLocaleString(undefined, { hour12: undefined })}</p>
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={copyShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
-                          {sharing ? 'Copying…' : 'Copy share link'}
-                        </button>
+                    ) : null}
+
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={copyShareLink} disabled={sharing || !canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
+                        {sharing ? 'Copying…' : 'Copy share link'}
+                      </button>
+                      {activeReviewLink?.url ? (
                         <button type="button" onClick={revokeShareLink} disabled={revokingShare} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white disabled:opacity-50 transition-colors">
                           {revokingShare ? 'Turning off…' : 'Turn off'}
                         </button>
-                      </div>
+                      ) : null}
+                    </div>
+
+                    {!canCreateShareLink ? null : (
                       <div className="pt-1">
                         <button type="button" onClick={toggleInviteManager} className="text-xs text-gray-600 hover:text-gray-900 transition-colors">
                           {showInviteManager ? 'Hide invites' : 'Manage invites'}
                         </button>
                       </div>
-                      {showInviteManager ? (
-                        <div className="rounded-lg border border-gray-200 bg-white px-3 py-3 space-y-3">
-                          {inviteManagerLoading ? <p className="text-xs text-gray-500">Loading invites…</p> : null}
-                          {!inviteManagerLoading && activeInviteCodes.length === 0 ? <p className="text-xs text-gray-600">No active invites.</p> : null}
-                          {activeInviteCodes.map((invite) => (
-                            <div key={invite.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-3">
-                              <div className="min-w-0">
-                                <p className="text-sm text-gray-900 truncate">{invite.label || 'Invite'}</p>
-                                <p className="text-xs text-gray-500 mt-1">Unused • created {new Date(invite.created_at).toLocaleString(undefined, { hour12: undefined })}</p>
-                              </div>
-                              <button type="button" onClick={() => turnOffInviteCode(invite.id)} className="text-xs text-red-600 hover:text-red-700 transition-colors">
-                                Turn off
-                              </button>
+                    )}
+
+                    {showInviteManager ? (
+                      <div className="rounded-lg border border-gray-200 bg-white px-3 py-3 space-y-3">
+                        {inviteManagerLoading ? <p className="text-xs text-gray-500">Loading invites…</p> : null}
+                        {!inviteManagerLoading && activeInviteCodes.length === 0 ? <p className="text-xs text-gray-600">No active invites.</p> : null}
+                        {activeInviteCodes.map((invite) => (
+                          <div key={invite.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-3">
+                            <div className="min-w-0">
+                              <p className="text-sm text-gray-900 truncate">{invite.label || 'Invite'}</p>
+                              <p className="text-xs text-gray-500 mt-1">Unused • created {new Date(invite.created_at).toLocaleString(undefined, { hour12: undefined })}</p>
                             </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
-                      {!canCreateShareLink ? (
-                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
-                          <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Not shareable yet</p>
-                          <p className="text-sm text-amber-900 mt-1">
-                            {session.processing_status === 'failed'
-                              ? 'Fix playback processing before sharing this private link.'
-                              : 'Wait until playback is ready before sharing this private link.'}
-                          </p>
-                        </div>
-                      ) : null}
-                      {!canCreateShareLink ? null : <p className="text-sm text-gray-800">Create one private link you can send anywhere.</p>}
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={copyShareLink} disabled={sharing || !canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                          {sharing ? 'Copying…' : 'Copy share link'}
-                        </button>
+                            <button type="button" onClick={() => turnOffInviteCode(invite.id)} className="text-xs text-red-600 hover:text-red-700 transition-colors">
+                              Turn off
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                      {!canCreateShareLink ? null : (
-                        <div className="pt-1">
-                          <button type="button" onClick={toggleInviteManager} className="text-xs text-gray-600 hover:text-gray-900 transition-colors">
-                            {showInviteManager ? 'Hide invites' : 'Manage invites'}
-                          </button>
-                        </div>
-                      )}
-                      {showInviteManager ? (
-                        <div className="rounded-lg border border-gray-200 bg-white px-3 py-3 space-y-3">
-                          {inviteManagerLoading ? <p className="text-xs text-gray-500">Loading invites…</p> : null}
-                          {!inviteManagerLoading && activeInviteCodes.length === 0 ? <p className="text-xs text-gray-600">No active invites.</p> : null}
-                          {activeInviteCodes.map((invite) => (
-                            <div key={invite.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-3">
-                              <div className="min-w-0">
-                                <p className="text-sm text-gray-900 truncate">{invite.label || 'Invite'}</p>
-                                <p className="text-xs text-gray-500 mt-1">Unused • created {new Date(invite.created_at).toLocaleString(undefined, { hour12: undefined })}</p>
-                              </div>
-                              <button type="button" onClick={() => turnOffInviteCode(invite.id)} className="text-xs text-red-600 hover:text-red-700 transition-colors">
-                                Turn off
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
 
