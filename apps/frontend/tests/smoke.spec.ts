@@ -368,9 +368,9 @@ test('Calendar day view shows review state per video', async ({ page }) => {
 
   await page.goto('/?date=2026-04-09')
 
-  await expect(page.locator('text=1 awaiting review')).toBeVisible()
   const awaitingRow = page.getByRole('button').filter({ hasText: 'Take awaiting review' })
   const plainRow = page.getByRole('button').filter({ hasText: 'Take without request' })
   await expect(awaitingRow.locator('span').filter({ hasText: 'Awaiting review' })).toHaveCount(1)
   await expect(plainRow.locator('span').filter({ hasText: 'Awaiting review' })).toHaveCount(0)
+  await expect(page.locator('text=1 awaiting review')).toHaveCount(0)
 })

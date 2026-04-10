@@ -50,25 +50,21 @@ const ACTIVE_REQUEST_STATUSES = new Set([
 const requestSignalMeta = {
   feedback_ready: {
     label: 'Feedback ready',
-    summaryLabel: 'ready',
     dayTone: 'bg-emerald-100 text-emerald-800',
     panelTone: 'bg-emerald-100 text-emerald-800',
   },
   awaiting_review: {
     label: 'Awaiting review',
-    summaryLabel: 'awaiting review',
     dayTone: 'bg-amber-100 text-amber-800',
     panelTone: 'bg-amber-100 text-amber-800',
   },
   needs_new_take: {
     label: 'Needs new take',
-    summaryLabel: 'need a new take',
     dayTone: 'bg-orange-100 text-orange-800',
     panelTone: 'bg-orange-100 text-orange-800',
   },
   wrong_take: {
     label: 'Wrong take',
-    summaryLabel: 'need the right take',
     dayTone: 'bg-rose-100 text-rose-800',
     panelTone: 'bg-rose-100 text-rose-800',
   },
@@ -248,23 +244,10 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
           const tb = new Date(b.recorded_at || b.created_at)
           return newestFirst ? (tb - ta) : (ta - tb)
         })
-      const signalCounts = {
-        awaiting_review: 0,
-        feedback_ready: 0,
-        needs_new_take: 0,
-        wrong_take: 0,
-      }
-      sortedItems.forEach((item) => {
-        const status = String(activeRequestBySessionId.get(Number(item.id))?.status || '').trim().toLowerCase()
-        const signal = requestSignalKey(status)
-        if (signal && Object.prototype.hasOwnProperty.call(signalCounts, signal)) {
-          signalCounts[signal] += 1
-        }
-      })
       const activeRequest = sortedItems
         .map((item) => activeRequestBySessionId.get(Number(item.id)) || null)
         .find(Boolean) || null
-      return { seriesName, items: sortedItems, activeRequest, signalCounts }
+      return { seriesName, items: sortedItems, activeRequest }
     })
     // Sort groups by their first item's timestamp
     groupArray.sort((ga, gb) => {
@@ -564,16 +547,6 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                           <div className="min-w-0">
                             <p className="text-xs uppercase tracking-wide text-gray-500">{group.seriesName}</p>
                             <p className="text-xs text-gray-500 mt-1">{group.items.length} {group.items.length === 1 ? 'take' : 'takes'} in this thread</p>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {Object.entries(group.signalCounts || {}).map(([signal, count]) => {
-                                if (!count || !requestSignalMeta[signal]) return null
-                                return (
-                                  <span key={signal} className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ${requestSignalMeta[signal].panelTone}`}>
-                                    {count} {requestSignalMeta[signal].summaryLabel}
-                                  </span>
-                                )
-                              })}
-                            </div>
                           </div>
                           {group.seriesName !== '(no thread)' && (
                             <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center sm:flex-wrap">
