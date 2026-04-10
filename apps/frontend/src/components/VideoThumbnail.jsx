@@ -1,7 +1,26 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { sessionVideoSources } from '../utils'
 
-function VideoThumbnail({ session, className = '' }) {
+function PosterThumbnail({ className = '' }) {
+  return (
+    <div className={`relative bg-gray-950 overflow-hidden ${className}`}>
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-950 to-black" />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/10">
+          <svg className="h-4 w-4 text-white/80" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M8 6.82v10.36c0 .79.87 1.27 1.54.84l8.14-5.18a1 1 0 000-1.68L9.54 5.98A1 1 0 008 6.82z" />
+          </svg>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function VideoThumbnail({ session, className = '', variant = 'video' }) {
+  if (variant === 'poster') {
+    return <PosterThumbnail className={className} />
+  }
+
   const videoRef = useRef(null)
   const wrapperRef = useRef(null)
   const [frameReady, setFrameReady] = useState(false)

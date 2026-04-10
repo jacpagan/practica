@@ -17,7 +17,7 @@ export default function SessionListItem({ session, onOpen, status = '', showSeri
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3 min-w-0">
-          <VideoThumbnail session={session} className="relative w-24 h-16 rounded-xl shrink-0" />
+          <VideoThumbnail session={session} variant="poster" className="relative w-24 h-16 rounded-xl shrink-0" />
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               {status ? <StatusChip status={status} /> : null}
