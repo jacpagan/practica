@@ -15,6 +15,7 @@ const TODAY_KEY = (() => {
   return `${yyyy}-${mm}-${dd}`
 })()
 const UNTHREADED_LABEL = 'Unthreaded'
+const UNTHREADED_KEY = '__unthreaded__'
 
 const startOfDay = (d) => {
   const nd = new Date(d)
@@ -232,7 +233,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
   const sessionsByThread = useMemo(() => {
     const groups = new Map()
     selectedSessions.forEach((s) => {
-      const key = String(s.practice_series || '').trim() || '(no thread)'
+      const key = String(s.practice_series || '').trim() || UNTHREADED_KEY
       if (!groups.has(key)) groups.set(key, [])
       groups.get(key).push(s)
     })
@@ -276,7 +277,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
       const candidate = {
         dateKey: formatKey(startOfDay(new Date(session.recorded_at || session.created_at))),
         signal: requestSignalKey(status),
-        seriesName: String(session.practice_series || '').trim() || '(no thread)',
+        seriesName: String(session.practice_series || '').trim() || UNTHREADED_KEY,
         status,
         rank,
         updatedAt,
@@ -295,7 +296,8 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
     return 'Check latest review'
   }, [smartFollowUpTarget])
 
-  const selectedThreadCount = sessionsByThread.length
+  const selectedThreadCount = sessionsByThread.filter((group) => group.seriesName !== UNTHREADED_KEY).length
+  const hasUnthreadedGroup = sessionsByThread.some((group) => group.seriesName === UNTHREADED_KEY)
 
   const gotoPrevMonth = useCallback(() => {
     setActiveMonth((cur) => new Date(cur.getFullYear(), cur.getMonth() - 1, 1))
@@ -485,9 +487,16 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                     <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-700">
                       {selectedSessions.length} {selectedSessions.length === 1 ? 'take' : 'takes'}
                     </span>
-                    <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-700">
-                      {selectedThreadCount} {selectedThreadCount === 1 ? 'thread' : 'threads'}
-                    </span>
+                    {selectedThreadCount > 0 ? (
+                      <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-700">
+                        {selectedThreadCount} {selectedThreadCount === 1 ? 'thread' : 'threads'}
+                      </span>
+                    ) : null}
+                    {hasUnthreadedGroup ? (
+                      <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-700">
+                        {UNTHREADED_LABEL}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-wrap sm:justify-end">
@@ -545,10 +554,10 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                       >
                         <div className="flex items-start justify-between gap-3 flex-wrap">
                           <div className="min-w-0">
-                            <p className="text-xs uppercase tracking-wide text-gray-500">{group.seriesName}</p>
-                            <p className="text-xs text-gray-500 mt-1">{group.items.length} {group.items.length === 1 ? 'take' : 'takes'} in this thread</p>
+                            <p className="text-xs uppercase tracking-wide text-gray-500">{group.seriesName === UNTHREADED_KEY ? UNTHREADED_LABEL : group.seriesName}</p>
+                            <p className="text-xs text-gray-500 mt-1">{group.items.length} {group.items.length === 1 ? 'take' : 'takes'}{group.seriesName === UNTHREADED_KEY ? '' : ' in this thread'}</p>
                           </div>
-                          {group.seriesName !== '(no thread)' && (
+                          {group.seriesName !== UNTHREADED_KEY && (
                             <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center sm:flex-wrap">
                               <button
                                 type="button"
