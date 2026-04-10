@@ -375,9 +375,11 @@ test('Session detail separates access from request flow', async ({ page }) => {
   await page.goto('/sessions/123')
 
   await expect(page.locator('text=Share').first()).toBeVisible()
-  await expect(page.locator('text=Request').first()).toBeVisible()
+  await expect(page.locator('text=Request')).toHaveCount(0)
   await expect(page.locator('text=Invite with private link')).toHaveCount(0)
-  await expect(page.locator('text=One private link for everyone.')).toBeVisible()
+  await expect(page.locator('text=Choose one person or copy one private link.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Share with person' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Copy share link' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Manage invites' })).toBeVisible()
   await page.getByRole('button', { name: 'Manage invites' }).click()
   await expect(page.locator('text=No active invites.')).toBeVisible()
