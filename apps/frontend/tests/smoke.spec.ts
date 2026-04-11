@@ -364,7 +364,7 @@ test('Session detail separates access from request flow', async ({ page }) => {
     })
   })
 
-  await page.route('**/api/invite-codes/', async (route) => {
+  await page.route('**/api/reviewer-invites/**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -375,15 +375,14 @@ test('Session detail separates access from request flow', async ({ page }) => {
   await page.goto('/sessions/123')
 
   await expect(page.locator('text=Share').first()).toBeVisible()
-  await expect(page.locator('text=Request')).toHaveCount(0)
-  await expect(page.locator('text=Invite with private link')).toHaveCount(0)
-  await expect(page.locator('text=Choose a person or copy a link.')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Choose person' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Copy share link' })).toBeVisible()
+  await expect(page.locator('text=Request review').first()).toBeVisible()
+  await expect(page.locator('text=Request structured review or share a private link.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Request review' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Share private link' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Open test view' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Manage invites' })).toBeVisible()
   await page.getByRole('button', { name: 'Manage invites' }).click()
-  await expect(page.locator('text=No active invites.')).toBeVisible()
+  await expect(page.locator('text=No reviewer invites yet.')).toBeVisible()
 })
 
 test('Session detail shows turn-off action for active outgoing request', async ({ page }) => {
