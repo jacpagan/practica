@@ -13,6 +13,7 @@ from .models import (
     ReviewerRosterMembership,
     FeedbackTemplate,
     SignupInviteCode,
+    ReviewerInvite,
 )
 from .services.feedback_video_processing import feedback_video_playback_url
 from .video_uploads import is_allowed_video_upload
@@ -109,6 +110,14 @@ class RegisterSerializer(serializers.Serializer):
     def validate(self, attrs):
         invite_code = attrs.get('invite_code', '')
         invite = SignupInviteCode.objects.filter(code__iexact=invite_code).order_by('-created_at').first()
+        reviewer_invite = None
+        if invite:
+            try:
+                reviewer_invite = invite.reviewer_invite
+            except ReviewerInvite.DoesNotExist:
+                reviewer_invite = None
+        if reviewer_invite:
+            reviewer_invite.mark_expired_if_needed(save=True)
         if not invite or not invite.can_redeem():
             raise serializers.ValidationError({'invite_code': 'Invalid or exhausted invite code.'})
         attrs['invite_record_id'] = invite.id
@@ -135,6 +144,15 @@ class RegisterSerializer(serializers.Serializer):
             invite.use_count += 1
             invite.last_used_at = timezone.now()
             invite.save(update_fields=['use_count', 'last_used_at', 'updated_at'])
+
+            try:
+                reviewer_invite = invite.reviewer_invite
+            except ReviewerInvite.DoesNotExist:
+                reviewer_invite = None
+            if reviewer_invite:
+                from videos.reviews.services import claim_reviewer_invite
+
+                claim_reviewer_invite(reviewer_invite=reviewer_invite, actor=user, deactivate_signup_code=False)
 
         return user
 
@@ -651,3 +669,42 @@ class SignupInviteCodeSerializer(serializers.ModelSerializer):
 
     def get_redeemable(self, obj):
         return obj.can_redeem()
+
+
+class ReviewerInviteSerializer(serializers.ModelSerializer):
+    student = UserSummarySerializer(read_only=True)
+    claimed_by = UserSummarySerializer(read_only=True)
+    review_link = ReviewLinkSerializer(read_only=True)
+    session = SessionListSerializer(read_only=True)
+    claim_code = serializers.CharField(source='invite_code.code', read_only=True)
+    invite_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ReviewerInvite
+        fields = [
+            'id', 'label', 'intent', 'status', 'claim_code', 'invite_url',
+            'student', 'claimed_by', 'claimed_at', 'expires_at',
+            'session', 'review_link', 'created_at', 'updated_at',
+        ]
+        read_only_fields = fields
+
+    def get_status(self, obj):
+        return obj.mark_expired_if_needed(save=True)
+
+    def to_representation(self, instance):
+        instance.mark_expired_if_needed(save=True)
+        payload = super().to_representation(instance)
+        payload['status'] = instance.status
+        return payload
+
+    def get_invite_url(self, obj):
+        link = obj.review_link
+        if not link:
+            return ''
+        request = self.context.get('request')
+        base = ReviewLinkSerializer(link, context={'request': request}).data.get('url', '')
+        claim_code = str(getattr(obj.invite_code, 'code', '') or '').strip()
+        if not base or not claim_code:
+            return base
+        separator = '&' if '?' in base else '?'
+        return f'{base}{separator}claim={claim_code}'

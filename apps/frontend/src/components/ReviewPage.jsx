@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { fmtTimer, MAX_RECORDER_DURATION_SECONDS, MAX_VIDEO_UPLOAD_BYTES, sessionVideoSources, videoUrl, isLikelyVideoFile, videoFileAccept, uploadMultipartRequest } from '../utils'
+import { feedbackCategoryLabel, feedbackCategoryOptions, feedbackCategoryTone, fmtTimer, MAX_RECORDER_DURATION_SECONDS, MAX_VIDEO_UPLOAD_BYTES, reportClientEvent, sessionVideoSources, videoUrl, isLikelyVideoFile, videoFileAccept, uploadMultipartRequest } from '../utils'
 import { useAuth } from '../auth'
 import AuthForm from './AuthForm'
 import VideoRecorder from './VideoRecorder'
@@ -51,6 +51,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
   const autoOpenRecorderRef = useRef(false)
   const [session, setSession] = useState(null)
   const [link, setLink] = useState(null)
+  const [reviewerInvite, setReviewerInvite] = useState(null)
   const [reviewRequest, setReviewRequest] = useState(null)
   const [feedback, setFeedback] = useState([])
   const [loading, setLoading] = useState(true)
@@ -60,6 +61,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
   const [responseFile, setResponseFile] = useState(null)
   const [responsePreviewUrl, setResponsePreviewUrl] = useState('')
   const [responseNotes, setResponseNotes] = useState('')
+  const [responseCategory, setResponseCategory] = useState('')
   const [selectedTimestampSeconds, setSelectedTimestampSeconds] = useState(null)
   const [durationSeconds, setDurationSeconds] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
@@ -67,6 +69,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
   const [showResponseDetails, setShowResponseDetails] = useState(false)
   const [editingFeedbackId, setEditingFeedbackId] = useState(null)
   const [editingText, setEditingText] = useState('')
+  const [editingCategory, setEditingCategory] = useState('')
   const [editingTimestampSeconds, setEditingTimestampSeconds] = useState('')
   const [editingVideoFile, setEditingVideoFile] = useState(null)
   const [editingVideoPreviewUrl, setEditingVideoPreviewUrl] = useState('')
@@ -88,6 +91,8 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
   const [uploadProgressTotal, setUploadProgressTotal] = useState(0)
   const [editUploadProgressPercent, setEditUploadProgressPercent] = useState(null)
   const [closing, setClosing] = useState(false)
+  const categoryOptions = useMemo(() => feedbackCategoryOptions(), [])
+  const claimTelemetrySentRef = useRef(false)
 
   const createClientUploadId = () => {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
@@ -141,11 +146,12 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
       setLoadError(null)
       try {
         const infoHeaders = authToken ? { Authorization: `Token ${authToken}` } : {}
+        const reviewInfoUrl = `/api/review/${token}/${claimCode ? `?claim=${encodeURIComponent(claimCode)}` : ''}`
         let infoRes
         let attempt = 0
         while (true) {
           try {
-            infoRes = await fetch(`/api/review/${token}/`, { headers: infoHeaders })
+            infoRes = await fetch(reviewInfoUrl, { headers: infoHeaders })
             if (infoRes.ok || infoRes.status < 500 || attempt >= 2) break
           } catch (e) {
             if (attempt >= 2) throw e
@@ -180,8 +186,25 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
         if (cancelled) return
         setSession(infoData.session)
         setLink(infoData.link)
+        setReviewerInvite(infoData.reviewer_invite || null)
         setReviewRequest(infoData.feedback_request || infoData.review_request || null)
         setFeedback(authToken && Array.isArray(feedbackData) ? feedbackData : [])
+        if (infoData?.claim_error) setError(infoData.claim_error)
+        if (!claimTelemetrySentRef.current && claimCode) {
+          if (infoData?.reviewer_invite?.status === 'claimed') {
+            reportClientEvent('reviewer_invite_claimed', {
+              review_token_present: Boolean(token),
+              invite_id: infoData?.reviewer_invite?.id || null,
+            })
+            claimTelemetrySentRef.current = true
+          } else if (infoData?.claim_error) {
+            reportClientEvent('reviewer_invite_claim_failed', {
+              review_token_present: Boolean(token),
+              reason: String(infoData.claim_error || '').slice(0, 160),
+            })
+            claimTelemetrySentRef.current = true
+          }
+        }
       } catch (loadFailure) {
         if (!cancelled) setLoadError(reviewLinkLoadErrorState(loadFailure || {}))
       } finally {
@@ -551,6 +574,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
   const beginEditingFeedback = (item) => {
     setEditingFeedbackId(item.id)
     setEditingText(item.text || '')
+    setEditingCategory(item.feedback_category || '')
     setEditingTimestampSeconds(typeof item.timestamp_seconds === 'number' ? String(item.timestamp_seconds) : '')
     setEditingVideoFile(null)
     replaceEditPreviewUrl('')
@@ -559,7 +583,8 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
 
   const cancelEditingFeedback = () => {
     setEditingFeedbackId(null)
-    // Video-only feedback: no text editing state
+    setEditingText('')
+    setEditingCategory('')
     setEditingTimestampSeconds('')
     setEditingVideoFile(null)
     editUploadIdRef.current = ''
@@ -585,6 +610,8 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
     try {
       const payload = new FormData()
       payload.append('feedback_id', String(feedbackId))
+      payload.append('text', editingText)
+      payload.append('feedback_category', editingCategory)
       payload.append('timestamp_seconds', editingTimestampSeconds)
       if (editingVideoFile) payload.append('feedback_video', editingVideoFile)
       if (editingVideoFile) {
@@ -668,6 +695,8 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
     try {
       const formData = new FormData()
       formData.append('feedback_video', responseFile)
+      formData.append('text', responseNotes.trim())
+      formData.append('feedback_category', responseCategory)
       if (typeof selectedTimestampSeconds === 'number') formData.append('timestamp_seconds', selectedTimestampSeconds)
       if (!submitUploadIdRef.current) submitUploadIdRef.current = createClientUploadId()
       formData.append('client_upload_id', submitUploadIdRef.current)
@@ -694,17 +723,28 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
 
       const data = res.data || {}
       if (!res.ok) throw new Error(reviewLinkSubmitErrorMessage({ status: res.status, data }))
+      const isFirstResponse = !hasCurrentUserFeedback
       setFeedback((current) => [...current, data].sort((left, right) => {
         const leftTs = typeof left.timestamp_seconds === 'number' ? left.timestamp_seconds : Number.MAX_SAFE_INTEGER
         const rightTs = typeof right.timestamp_seconds === 'number' ? right.timestamp_seconds : Number.MAX_SAFE_INTEGER
         if (leftTs !== rightTs) return leftTs - rightTs
         return new Date(left.created_at) - new Date(right.created_at)
       }))
+      if (isFirstResponse) {
+        reportClientEvent('reviewer_first_response_submitted', {
+          review_request_id: reviewRequest?.id || null,
+          via_claim_link: Boolean(claimCode),
+          category: responseCategory || '',
+          has_note: Boolean(responseNotes.trim()),
+        })
+      }
       setResponseFile(null)
       submitUploadIdRef.current = ''
       setUploadProgressLoaded(0)
       setUploadProgressTotal(0)
       replaceOwnedPreviewUrl('')
+      setResponseNotes('')
+      setResponseCategory('')
       setSelectedTimestampSeconds(null)
     } catch (submitError) {
       setError(submitError.message || 'Could not send feedback.')
@@ -733,9 +773,9 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
   if (!user) {
     const reviewerName = reviewRequest?.reviewer?.display_name || reviewRequest?.reviewer?.username || ''
     const ownerName = reviewRequest?.owner?.display_name || reviewRequest?.owner?.username || reviewRequest?.student?.display_name || reviewRequest?.student?.username || ''
-    const authTitle = claimCode ? 'Continue this private review' : 'Sign in to continue'
+    const authTitle = claimCode ? 'You were invited to review privately' : 'Sign in to continue'
     const authSubtitle = claimCode
-      ? 'Create your account once to watch the take, leave trusted feedback, and keep everything in one private thread.'
+      ? 'Create your account once or log in to join this private feedback thread as a trusted reviewer.'
       : 'This trusted feedback thread stays private and opens right where you left off.'
 
     return (
@@ -774,6 +814,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
             initialMode={claimCode ? 'register' : 'login'}
             prefilledInviteCode={claimCode}
             inviteCodeLocked={Boolean(claimCode)}
+            inviteContext={claimCode ? 'reviewer' : ''}
             contextTitle={authTitle}
             contextSubtitle={authSubtitle}
             embedded
@@ -796,6 +837,9 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
             {reviewRequest ? <StatusChip status={reviewRequest.status} /> : null}
           </div>
           <p className="text-xs text-gray-500 mt-2">Signed in as {user.display_name || user.username}.</p>
+          {reviewerInvite?.status === 'claimed' ? (
+            <p className="text-xs text-emerald-700 mt-1">Reviewer invite connected. You can respond here and appear in this member's reviewer roster.</p>
+          ) : null}
           {link?.expires_at ? <p className="text-xs text-gray-500 mt-1">Private access • sign-in required • expires {new Date(link.expires_at).toLocaleString(undefined, { hour12: undefined })}</p> : null}
         </div>
 
@@ -867,7 +911,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
               </div>
             ) : null}
 
-            {false ? (
+            {memberRole === 'reviewer' ? (
               <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-3 space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Saved templates</p>
@@ -893,6 +937,31 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
                 ) : null}
               </div>
             ) : null}
+
+            <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <div>
+                <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">Note</label>
+                <textarea
+                  value={responseNotes}
+                  onChange={(event) => setResponseNotes(event.target.value)}
+                  rows={3}
+                  placeholder="Optional context for the learner"
+                  className="mt-2 w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none bg-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">Category</label>
+                <select
+                  value={responseCategory}
+                  onChange={(event) => setResponseCategory(event.target.value)}
+                  className="mt-2 w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white"
+                >
+                  {categoryOptions.map((option) => (
+                    <option key={option.value || 'uncategorized'} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button type="button" onClick={() => setShowRecorder(true)} className="rounded-2xl bg-gray-900 text-white px-4 py-3 text-sm font-medium hover:bg-gray-800 transition-colors">
@@ -1050,10 +1119,32 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
                       <video src={videoUrl(item.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
                     </div>
                   ) : null}
-                  {/* Video-only feedback: no text display */}
+                  {item.feedback_category ? (
+                    <div>
+                      <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${feedbackCategoryTone(item.feedback_category)}`}>
+                        {feedbackCategoryLabel(item.feedback_category)}
+                      </span>
+                    </div>
+                  ) : null}
+                  {item.text ? <p className="text-sm text-gray-700 whitespace-pre-wrap">{item.text}</p> : null}
                   {editingFeedbackId === item.id ? (
                     <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-3">
-                      {/* Video-only feedback: no text editing */}
+                      <textarea
+                        value={editingText}
+                        onChange={(event) => setEditingText(event.target.value)}
+                        rows={3}
+                        placeholder="Optional note"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
+                      />
+                      <select
+                        value={editingCategory}
+                        onChange={(event) => setEditingCategory(event.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 bg-white"
+                      >
+                        {categoryOptions.map((option) => (
+                          <option key={option.value || 'uncategorized'} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
                       <input
                         type="number"
                         min="0"

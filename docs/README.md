@@ -12,6 +12,8 @@ Practica is a private video practice mirror where learners lead their own progre
 - `docs/platform-engineering-charter-2026-04-06.md`: shared platform engineering mission, scope, and operating agreement
 - `docs/tdd-strategy.md`: core-loop testing and stabilization strategy
 - `docs/technical-prd-2026-04-06.md`: current-state technical product snapshot
+- `docs/technical-prd-trusted-feedback-flow-2026-04-11.md`: implementation PRD for trusted feedback onboarding and loop-friction reduction
+- `docs/trusted-feedback-implementation-checklist-2026-04-11.md`: phased implementation checklist and ticket plan for the trusted feedback flow
 
 ## Working Docs
 

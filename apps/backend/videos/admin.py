@@ -3,6 +3,7 @@ from .models import (
     Profile, Session, Chapter, VideoFeedback, MultipartSessionUpload, SessionAsset,
     SessionLastSeen,
     SignupInviteCode,
+    ReviewerInvite,
     ReviewRequest, ReviewRequestEvent, ReviewerRosterMembership, FeedbackTemplate,
 )
 
@@ -30,6 +31,14 @@ class SignupInviteCodeAdmin(admin.ModelAdmin):
     list_filter = ['is_active', 'created_at']
     search_fields = ['code', 'label']
     raw_id_fields = ['created_by']
+
+
+@admin.register(ReviewerInvite)
+class ReviewerInviteAdmin(admin.ModelAdmin):
+    list_display = ['id', 'label', 'student', 'status', 'intent', 'claimed_by', 'expires_at', 'created_at']
+    list_filter = ['status', 'intent', 'created_at']
+    search_fields = ['label', 'student__username', 'created_by__username', 'claimed_by__username', 'invite_code__code']
+    raw_id_fields = ['created_by', 'student', 'invite_code', 'review_link', 'session', 'review_request', 'claimed_by']
 
 
 @admin.register(Session)

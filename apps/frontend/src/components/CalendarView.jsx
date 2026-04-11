@@ -293,7 +293,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
     if (!smartFollowUpTarget) return ''
     if (['needs_resubmission', 'declined_unrelated'].includes(smartFollowUpTarget.status)) return 'Record next take'
     if (smartFollowUpTarget.signal === 'feedback_ready') return 'Review feedback'
-    return 'Check latest review'
+    return 'Open latest thread'
   }, [smartFollowUpTarget])
 
   const selectedThreadCount = sessionsByThread.filter((group) => group.seriesName !== UNTHREADED_KEY).length

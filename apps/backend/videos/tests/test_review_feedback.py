@@ -67,6 +67,7 @@ class ReviewFeedbackApiTests(APITestCase):
             session=self.session,
             user=self.reviewer,
             text='Original note',
+            feedback_category='timing',
             timestamp_seconds=12,
             feedback_video=self._video_file('original.mp4'),
             is_legacy_text_feedback=False,
@@ -78,6 +79,7 @@ class ReviewFeedbackApiTests(APITestCase):
             {
                 'feedback_id': feedback.id,
                 'text': 'Updated note',
+                'feedback_category': 'technique',
                 'timestamp_seconds': 30,
                 'feedback_video': self._video_file('updated.mp4'),
             },
@@ -87,6 +89,7 @@ class ReviewFeedbackApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         feedback.refresh_from_db()
         self.assertEqual(feedback.text, 'Updated note')
+        self.assertEqual(feedback.feedback_category, 'technique')
         self.assertEqual(feedback.timestamp_seconds, 30)
         self.assertTrue(bool(feedback.feedback_video))
 
@@ -136,6 +139,7 @@ class ReviewFeedbackApiTests(APITestCase):
             f'/api/review/{self.link.token}/feedback/',
             {
                 'text': 'Watch the shoulder alignment here.',
+                'feedback_category': 'posture',
                 'timestamp_seconds': 25,
                 'feedback_video': self._video_file(),
             },
@@ -145,12 +149,14 @@ class ReviewFeedbackApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['author_display_name'], 'Helpful Reviewer')
         self.assertEqual(response.data['text'], 'Watch the shoulder alignment here.')
+        self.assertEqual(response.data['feedback_category'], 'posture')
         self.assertEqual(response.data['timestamp_seconds'], 25)
         self.assertTrue(bool(response.data['feedback_video']))
 
         feedback = VideoFeedback.objects.get(session=self.session)
         self.assertEqual(feedback.user, self.reviewer)
         self.assertEqual(feedback.text, 'Watch the shoulder alignment here.')
+        self.assertEqual(feedback.feedback_category, 'posture')
         self.assertEqual(feedback.timestamp_seconds, 25)
         self.assertFalse(feedback.is_legacy_text_feedback)
 

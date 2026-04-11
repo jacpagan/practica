@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { feedbackCategoryLabel, feedbackCategoryTone, fmtTimer, isLikelyVideoFile, sessionVideoSources, uploadMultipartRequest, videoFileAccept, videoUrl } from '../utils'
+import { feedbackCategoryLabel, feedbackCategoryTone, fmtTimer, isLikelyVideoFile, reportClientEvent, sessionVideoSources, uploadMultipartRequest, videoFileAccept, videoUrl } from '../utils'
 import { useConfirm } from './ConfirmDialog'
 import { useToast } from './Toast'
 import PracticeThreadField from './PracticeThreadField'
@@ -134,6 +134,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const [showInviteManager, setShowInviteManager] = useState(false)
   const [inviteManagerLoading, setInviteManagerLoading] = useState(false)
   const [activeInviteCodes, setActiveInviteCodes] = useState([])
+  const [pendingShareIntent, setPendingShareIntent] = useState('')
   const [showRequestDetails, setShowRequestDetails] = useState(false)
   const [showRequestHistory, setShowRequestHistory] = useState(false)
   const [requestInstrument, setRequestInstrument] = useState('drums')
@@ -167,6 +168,13 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const readyForFollowUp = ['viewed', 'needs_resubmission', 'declined_unrelated'].includes(currentLoopStatus)
   const canStartNewRequest = canEdit && canCreateShareLink && !waitingOnReviewer
   const currentLoopReviewerName = currentLoopRequest?.reviewer?.display_name || currentLoopRequest?.reviewer?.username || 'your reviewer'
+  const pendingShareIntentLabel = pendingShareIntent === 'request_review'
+    ? 'review request'
+    : pendingShareIntent === 'share_private_link'
+      ? 'private link'
+      : pendingShareIntent === 'invite_reviewer'
+        ? 'reviewer invite'
+        : ''
   const currentLoopSummary = useMemo(() => {
     if (!currentLoopRequest) return null
     if (currentLoopStatus === 'requested') {
@@ -248,6 +256,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     setShowRequestComposer(false)
     setShowInviteManager(false)
     setActiveInviteCodes([])
+    setPendingShareIntent('')
     setReviewerQuery('')
     setDesignatedReviewers([])
     setReviewerResults([])
@@ -511,6 +520,31 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     }
   }, [authHeaders, loadReviewRequests, onSessionUpdate, session?.id, session?.processing_status, token])
 
+  useEffect(() => {
+    if (!canCreateShareLink || !pendingShareIntent) return
+
+    const activatePendingIntent = async () => {
+      const intent = pendingShareIntent
+      setPendingShareIntent('')
+      if (intent === 'request_review') {
+        setShowLoopDetails(true)
+        setShowRequestComposer(true)
+        try { loopDetailsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }) } catch {}
+        toast.success('Playback is ready. You can request review now.')
+        return
+      }
+      if (intent === 'share_private_link') {
+        await copyShareLink({ skipReadyIntent: true })
+        return
+      }
+      if (intent === 'invite_reviewer') {
+        await inviteReviewerFromComposer({ skipReadyIntent: true })
+      }
+    }
+
+    activatePendingIntent()
+  }, [canCreateShareLink, pendingShareIntent])
+
   const copyReviewRequestLink = async (requestItem) => {
     const url = requestItem?.feedback_link?.url || requestItem?.review_link?.url
     if (!url) return
@@ -526,8 +560,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     setReviewRequests((current) => current.map((item) => (item.id === nextRequest.id ? nextRequest : item)))
   }
 
-  const markReviewRequestViewed = async (requestItem) => {
-    if (!token || !requestItem?.id) return
+  const markReviewRequestViewed = async (requestItem, { silent = false } = {}) => {
+    if (!token || !requestItem?.id) return null
     try {
       const res = await fetch(`/api/review-requests/${requestItem.id}/mark-viewed/`, {
         method: 'POST',
@@ -536,10 +570,22 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       if (!res.ok) throw new Error('mark-viewed')
       const data = await res.json()
       updateRequestInState(data)
-      toast.success('Marked as viewed')
+      if (!silent) toast.success('Marked as viewed')
+      return data
     } catch {
-      toast.error('Could not update request status')
+      if (!silent) toast.error('Could not update request status')
+      return null
     }
+  }
+
+  const openReviewRequestThread = async (requestItem) => {
+    if (!requestItem) return
+    const statusValue = String(requestItem.status || '').trim().toLowerCase()
+    let nextRequest = requestItem
+    if (statusValue === 'responded') {
+      nextRequest = await markReviewRequestViewed(requestItem, { silent: true }) || requestItem
+    }
+    onOpenReviewRequest?.(nextRequest)
   }
 
   const patchReviewRequestStatus = async (requestItem, statusValue, successMessage) => {
@@ -610,28 +656,15 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     }
   }
 
-  const ensurePrivateLink = async () => {
-    if (activeReviewLink?.url) return activeReviewLink
-    const res = await fetch(`/api/sessions/${session.id}/share/`, {
-      method: 'POST',
-      headers: authHeaders,
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(data?.error || 'Could not create private feedback link')
-    setActiveReviewLink(data)
-    return data
-  }
-
   const loadInviteCodes = async () => {
     if (!token) return
     setInviteManagerLoading(true)
     try {
-      const res = await fetch('/api/invite-codes/', { headers: authHeaders })
+      const query = session?.id ? `?session_id=${session.id}` : ''
+      const res = await fetch(`/api/reviewer-invites/${query}`, { headers: authHeaders })
       const data = await res.json().catch(() => ([]))
       if (!res.ok) throw new Error('Could not load invites')
-      const activeCodes = Array.isArray(data)
-        ? data.filter((item) => Boolean(item?.is_active) && Boolean(item?.redeemable))
-        : []
+      const activeCodes = Array.isArray(data) ? data : []
       setActiveInviteCodes(activeCodes)
     } catch (error) {
       toast.error(error?.message || 'Could not load invites')
@@ -649,36 +682,47 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     await loadInviteCodes()
   }
 
-  const createBundledShareLink = async () => {
+  const createBundledShareLink = async ({ intent = 'lightweight_review', label = `Access ${session.title}` } = {}) => {
     if (!token || !session?.id) return
-    const linkData = await ensurePrivateLink()
-    const inviteRes = await fetch('/api/invite-codes/', {
+    const inviteRes = await fetch('/api/reviewer-invites/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...authHeaders,
       },
-      body: JSON.stringify({ label: `Access ${session.title}` }),
+      body: JSON.stringify({ session_id: session.id, label, intent }),
     })
     const inviteData = await inviteRes.json().catch(() => ({}))
     if (!inviteRes.ok) {
-      const message = inviteData?.error || 'Could not create invite link'
-      if (message.includes('too many active invite codes')) {
-        setShowInviteManager(true)
-        await loadInviteCodes()
-        throw new Error('You already have too many active invites. Turn off an unused one below, then try again.')
-      }
-      throw new Error(message)
+      throw new Error(inviteData?.session_id?.[0] || inviteData?.error || 'Could not create reviewer invite')
     }
-    return `${linkData.url}${linkData.url.includes('?') ? '&' : '?'}claim=${encodeURIComponent(inviteData.code)}`
+    if (inviteData?.review_link) setActiveReviewLink(inviteData.review_link)
+    try {
+      if (showInviteManager) await loadInviteCodes()
+    } catch {}
+    return inviteData.invite_url || ''
   }
 
-  const copyShareLink = async () => {
+  const copyShareLink = async ({ skipReadyIntent = false } = {}) => {
     if (!token || !session?.id) return
+    if (!canCreateShareLink && !skipReadyIntent) {
+      setPendingShareIntent('share_private_link')
+      reportClientEvent('share_blocked_session_not_ready', {
+        action: 'share_private_link',
+        session_id: session.id,
+        processing_status: session?.processing_status || '',
+      })
+      toast.success('We will finish creating the private link once playback is ready.')
+      return
+    }
     setSharing(true)
     try {
       const bundledUrl = await createBundledShareLink()
       await navigator.clipboard.writeText(bundledUrl)
+      reportClientEvent('reviewer_invite_created', {
+        action: 'share_private_link',
+        session_id: session.id,
+      })
       toast.success('Share link copied')
     } catch (error) {
       toast.error(error?.message || 'Could not create share link')
@@ -704,7 +748,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const turnOffInviteCode = async (inviteId) => {
     if (!token || !inviteId) return
     try {
-      const res = await fetch(`/api/invite-codes/${inviteId}/`, {
+      const res = await fetch(`/api/reviewer-invites/${inviteId}/`, {
         method: 'DELETE',
         headers: authHeaders,
       })
@@ -713,6 +757,40 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       toast.success('Invite turned off')
     } catch (error) {
       toast.error(error?.message || 'Could not turn off invite')
+    }
+  }
+
+  const inviteReviewerFromComposer = async ({ skipReadyIntent = false } = {}) => {
+    if (!token || !session?.id) return
+    if (!canCreateShareLink && !skipReadyIntent) {
+      setPendingShareIntent('invite_reviewer')
+      setShowLoopDetails(true)
+      reportClientEvent('share_blocked_session_not_ready', {
+        action: 'invite_reviewer',
+        session_id: session.id,
+        processing_status: session?.processing_status || '',
+      })
+      toast.success('We will create the reviewer invite as soon as playback is ready.')
+      return
+    }
+    setSharing(true)
+    try {
+      const bundledUrl = await createBundledShareLink({
+        intent: 'roster_join',
+        label: `Review ${session.title}`,
+      })
+      await navigator.clipboard.writeText(bundledUrl)
+      reportClientEvent('reviewer_invite_created', {
+        action: 'invite_reviewer',
+        session_id: session.id,
+      })
+      setShowInviteManager(true)
+      await loadInviteCodes()
+      toast.success('Reviewer invite copied')
+    } catch (error) {
+      toast.error(error?.message || 'Could not invite reviewer')
+    } finally {
+      setSharing(false)
     }
   }
 
@@ -907,7 +985,17 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   }
 
   const openRequestComposer = () => {
-    if (!canCreateShareLink) return
+    if (!canCreateShareLink) {
+      setPendingShareIntent('request_review')
+      setShowLoopDetails(true)
+      reportClientEvent('share_blocked_session_not_ready', {
+        action: 'request_review',
+        session_id: session.id,
+        processing_status: session?.processing_status || '',
+      })
+      toast.success('We will reopen review request as soon as playback is ready.')
+      return
+    }
     setShowLoopDetails(true)
     setShowRequestComposer(true)
   }
@@ -926,6 +1014,11 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const startFollowUp = (requestItem = currentLoopRequest) => {
     const reviewer = requestItem?.reviewer
     if (!reviewer) return
+    reportClientEvent('follow_up_take_launched', {
+      review_request_id: requestItem?.id || null,
+      prior_status: String(requestItem?.status || '').trim().toLowerCase(),
+      session_id: session?.id || null,
+    })
     onRecordAnother?.({
       parent_request_id: requestItem.id,
       reviewer,
@@ -1049,7 +1142,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 space-y-4">
                   <div>
                     <p className="text-sm font-semibold text-gray-900">Share</p>
-                    <p className="text-xs text-gray-500 mt-1">Choose a person or copy a link.</p>
+                    <p className="text-xs text-gray-500 mt-1">Request structured review or share a private link.</p>
                   </div>
                   <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
                     {!canCreateShareLink ? (
@@ -1060,6 +1153,9 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                             ? 'Fix playback processing before sharing this private link.'
                             : 'Wait until playback is ready before sharing this private link.'}
                         </p>
+                        {pendingShareIntentLabel ? (
+                          <p className="text-xs text-amber-900 mt-2">Queued next step: {pendingShareIntentLabel}. Practica will reopen it once playback is ready.</p>
+                        ) : null}
                       </div>
                     ) : null}
 
@@ -1069,12 +1165,12 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
 
                     <div className="flex flex-wrap gap-2">
                       {!waitingOnReviewer && !feedbackReadyToReview && !readyForFollowUp && currentLoopStatus !== 'flagged' ? (
-                        <button type="button" onClick={openRequestComposer} disabled={!canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                          Choose person
+                        <button type="button" onClick={openRequestComposer} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
+                          Request review
                         </button>
                       ) : null}
-                      <button type="button" onClick={copyShareLink} disabled={sharing || !canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                        {sharing ? 'Copying…' : 'Copy share link'}
+                      <button type="button" onClick={() => copyShareLink()} disabled={sharing} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
+                        {sharing ? 'Copying…' : 'Share private link'}
                       </button>
                       <button type="button" onClick={openTestView} disabled={sharing || !canCreateShareLink} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white disabled:opacity-50 transition-colors">
                         Open test view
@@ -1099,16 +1195,27 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                     {showInviteManager ? (
                       <div className="rounded-lg border border-gray-200 bg-white px-3 py-3 space-y-3">
                         {inviteManagerLoading ? <p className="text-xs text-gray-500">Loading invites…</p> : null}
-                        {!inviteManagerLoading && activeInviteCodes.length === 0 ? <p className="text-xs text-gray-600">No active invites.</p> : null}
+                        {!inviteManagerLoading && activeInviteCodes.length === 0 ? <p className="text-xs text-gray-600">No reviewer invites yet.</p> : null}
                         {activeInviteCodes.map((invite) => (
                           <div key={invite.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-3">
                             <div className="min-w-0">
                               <p className="text-sm text-gray-900 truncate">{invite.label || 'Invite'}</p>
-                              <p className="text-xs text-gray-500 mt-1">Unused • created {new Date(invite.created_at).toLocaleString(undefined, { hour12: undefined })}</p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                {String(invite.status || 'pending').replace('_', ' ')} • created {new Date(invite.created_at).toLocaleString(undefined, { hour12: undefined })}
+                              </p>
+                              {invite.status === 'claimed' && invite.claimed_by ? (
+                                <p className="text-xs text-emerald-700 mt-1">Claimed by {invite.claimed_by.display_name || invite.claimed_by.username}{invite.claimed_at ? ` • ${new Date(invite.claimed_at).toLocaleString(undefined, { hour12: undefined })}` : ''}</p>
+                              ) : null}
                             </div>
-                            <button type="button" onClick={() => turnOffInviteCode(invite.id)} className="text-xs text-red-600 hover:text-red-700 transition-colors">
-                              Turn off
-                            </button>
+                            {invite.status === 'pending' ? (
+                              <button type="button" onClick={() => turnOffInviteCode(invite.id)} className="text-xs text-red-600 hover:text-red-700 transition-colors">
+                                Turn off
+                              </button>
+                            ) : (
+                              <span className="text-[11px] uppercase tracking-wide px-2 py-1 rounded-full bg-emerald-100 text-emerald-800">
+                                Claimed
+                              </span>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -1135,8 +1242,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       <div className="flex flex-wrap gap-2">
                         {waitingOnReviewer && currentLoopRequest ? (
                           <>
-                            <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
-                              Check request
+                            <button type="button" onClick={() => openReviewRequestThread(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
+                              Open thread
                             </button>
                             <button
                               type="button"
@@ -1148,7 +1255,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           </>
                         ) : null}
                         {feedbackReadyToReview && currentLoopRequest ? (
-                          <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
+                          <button type="button" onClick={() => openReviewRequestThread(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
                             Review feedback
                           </button>
                         ) : null}
@@ -1157,13 +1264,13 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                             <button type="button" onClick={() => startFollowUp(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
                               {currentLoopStatus === 'needs_resubmission' ? 'Record new take' : currentLoopStatus === 'declined_unrelated' ? 'Record matching take' : 'Record next take'}
                             </button>
-                            <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
+                            <button type="button" onClick={() => openReviewRequestThread(currentLoopRequest)} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
                               Open private thread
                             </button>
                           </>
                         ) : null}
                         {currentLoopStatus === 'flagged' && currentLoopRequest ? (
-                          <button type="button" onClick={() => onOpenReviewRequest?.(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
+                          <button type="button" onClick={() => openReviewRequestThread(currentLoopRequest)} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
                             Open private thread
                           </button>
                         ) : null}
@@ -1202,8 +1309,11 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                             {recentReviewersLoading ? <p className="text-xs text-gray-500">Loading…</p> : null}
                             {!recentReviewersLoading && designatedReviewers.length === 0 ? (
                               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
-                                <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Add someone first</p>
-                                <p className="text-sm text-amber-900 mt-1">No one yet. Copy a link or add someone first.</p>
+                                <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Invite a reviewer first</p>
+                                <p className="text-sm text-amber-900 mt-1">No reviewers are on your roster yet. Send a private reviewer invite, then come back here to request structured review.</p>
+                                <button type="button" onClick={() => inviteReviewerFromComposer()} disabled={sharing} className="mt-3 text-sm font-medium text-amber-950 border border-amber-300 rounded-lg px-4 py-2 hover:bg-amber-100 disabled:opacity-50 transition-colors">
+                                  {sharing ? 'Copying…' : 'Invite reviewer'}
+                                </button>
                               </div>
                             ) : null}
                             {recentReviewers.length > 0 ? (
@@ -1345,6 +1455,9 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                   <div className="rounded-xl overflow-hidden bg-black">
                                     <video src={videoUrl(feedbackItem.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
                                   </div>
+                                  {feedbackItem.text ? (
+                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{feedbackItem.text}</p>
+                                  ) : null}
                                   {editingFeedbackId === feedbackItem.id ? (
                                     <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-3">
                                       <input
@@ -1395,7 +1508,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                       </div>
                                     </div>
                                   ) : null}
-                                  {/* Video-only feedback: no text rendering */}
                                 </div>
                               ))}
                             </div>
@@ -1407,8 +1519,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                               </button>
                             ) : null}
                             {(requestItem.feedback_link?.token || requestItem.review_link?.token) ? (
-                              <button type="button" onClick={() => onOpenReviewRequest?.(requestItem)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
-                                Open thread
+                              <button type="button" onClick={() => openReviewRequestThread(requestItem)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
+                                {requestItem.status === 'responded' ? 'Review feedback' : 'Open thread'}
                               </button>
                             ) : null}
                             {['responded', 'viewed', 'needs_resubmission', 'declined_unrelated'].includes(requestItem.status) && requestItem.reviewer ? (
@@ -1418,11 +1530,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                 className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
                               >
                                 Record next take
-                              </button>
-                            ) : null}
-                            {requestItem.status === 'responded' ? (
-                              <button type="button" onClick={() => markReviewRequestViewed(requestItem)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
-                                Mark seen
                               </button>
                             ) : null}
                             {['viewed', 'responded', 'needs_resubmission', 'declined_unrelated'].includes(requestItem.status) ? (
@@ -1493,6 +1600,11 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="text-sm font-medium text-gray-900">{item.display_name || item.username || 'Viewer'}</p>
+                              {item.feedback_category ? (
+                                <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${feedbackCategoryTone(item.feedback_category)}`}>
+                                  {feedbackCategoryLabel(item.feedback_category)}
+                                </span>
+                              ) : null}
                             </div>
                               <p className="text-xs text-gray-400 mt-1">{new Date(item.created_at).toLocaleString(undefined, { hour12: undefined })}</p>
                           </div>
@@ -1516,6 +1628,9 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           <div className="rounded-xl overflow-hidden bg-black">
                             <video src={videoUrl(item.feedback_video)} controls playsInline className="w-full aspect-video bg-black" />
                           </div>
+                        ) : null}
+                        {item.text ? (
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{item.text}</p>
                         ) : null}
                         {!item.review_request_id && editingFeedbackId === item.id ? (
                           <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-3">
@@ -1567,7 +1682,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                             </div>
                           </div>
                         ) : null}
-                        {/* Video-only feedback: no text rendering */}
                       </div>
                     ))}
                   </div>

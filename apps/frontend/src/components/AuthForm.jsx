@@ -9,6 +9,7 @@ function AuthForm({
   contextTitle = '',
   contextSubtitle = '',
   inviteCodeLocked = false,
+  inviteContext = '',
   embedded = false,
 }) {
   const { login, register } = useAuth()
@@ -60,6 +61,20 @@ function AuthForm({
         <h1 className="text-2xl font-semibold text-gray-900 text-center mb-1">{title}</h1>
 
         <p className="text-sm text-gray-400 text-center mb-8">{subtitle}</p>
+        {inviteCodeLocked && inviteCode ? (
+          <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left">
+            <p className="text-xs font-medium uppercase tracking-wide text-emerald-800">
+              {inviteContext === 'reviewer'
+                ? 'Trusted reviewer invite'
+                : 'Private invite'}
+            </p>
+            <p className="text-sm text-emerald-900 mt-1">
+              {mode === 'register'
+                ? 'Create your account once and this invite will connect you to the private feedback thread automatically.'
+                : 'Already have an account? Log in and we will connect this invite to your account automatically.'}
+            </p>
+          </div>
+        ) : null}
         <div className="flex items-center justify-center gap-3 mb-6">
           <a href="/privacy" className="text-xs text-gray-500 hover:text-gray-900 transition-colors">Privacy</a>
           <button type="button" onClick={reportProblem} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">Report a problem</button>

@@ -210,6 +210,16 @@ export const reportClientError = ({ message = '', stack = '', source = 'ui', ext
   }
 }
 
+export const reportClientEvent = (eventName = '', extra = {}) => {
+  const normalizedName = String(eventName || '').trim()
+  if (!normalizedName) return
+  reportClientError({
+    source: 'ProductEvent',
+    message: normalizedName,
+    extra,
+  })
+}
+
 const multipartFingerprint = ({ payload, videoFile }) => {
   const tags = Array.isArray(payload?.tags) ? [...payload.tags].map((t) => String(t)).sort().join(',') : ''
   return [

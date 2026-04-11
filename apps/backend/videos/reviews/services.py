@@ -5,7 +5,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
-from videos.models import ReviewLink, ReviewRequest, ReviewRequestEvent, ReviewerRosterMembership, SessionLastSeen
+from videos.models import ReviewLink, ReviewRequest, ReviewRequestEvent, ReviewerInvite, ReviewerRosterMembership, Session, SessionLastSeen, SignupInviteCode
 
 
 REVIEW_REQUEST_ALLOWED_TRANSITIONS = {
@@ -53,6 +53,97 @@ REVIEW_REQUEST_ALLOWED_TRANSITIONS = {
         ReviewRequest.STATUS_CLOSED,
     },
 }
+
+
+def _ensure_active_review_link(*, actor, session):
+    existing_link = session.review_links.filter(is_active=True, expires_at__gt=timezone.now()).order_by('-created_at').first()
+    if existing_link:
+        return existing_link
+    return ReviewLink.objects.create(
+        session=session,
+        token=secrets.token_urlsafe(16),
+        created_by=actor,
+        expires_at=timezone.now() + timedelta(days=7),
+        is_active=True,
+        allow_video_feedback=True,
+    )
+
+
+@transaction.atomic
+def create_reviewer_invite(*, actor, session, label='', intent=ReviewerInvite.INTENT_LIGHTWEIGHT_REVIEW, review_request=None):
+    if session.user_id != actor.id and not actor.is_staff:
+        raise PermissionDenied('You can only invite reviewers for your own sessions.')
+    if session.processing_status != Session.STATUS_READY:
+        raise ValidationError({'session_id': 'This session must be playback ready before inviting a reviewer.'})
+
+    review_link = review_request.review_link if review_request and review_request.review_link_id else _ensure_active_review_link(actor=actor, session=session)
+    invite_code = SignupInviteCode.objects.create(
+        label=str(label or '').strip() or f'Access {session.title}',
+        created_by=actor,
+        max_uses=1,
+    )
+    return ReviewerInvite.objects.create(
+        created_by=actor,
+        student=session.user,
+        invite_code=invite_code,
+        review_link=review_link,
+        session=session,
+        review_request=review_request,
+        intent=intent if intent in {ReviewerInvite.INTENT_LIGHTWEIGHT_REVIEW, ReviewerInvite.INTENT_ROSTER_JOIN} else ReviewerInvite.INTENT_LIGHTWEIGHT_REVIEW,
+        label=str(label or '').strip(),
+        expires_at=review_link.expires_at,
+    )
+
+
+@transaction.atomic
+def revoke_reviewer_invite(*, reviewer_invite, actor):
+    if actor.id not in {reviewer_invite.created_by_id, reviewer_invite.student_id} and not actor.is_staff:
+        raise PermissionDenied('You do not have access to this reviewer invite.')
+    reviewer_invite.mark_expired_if_needed(save=True)
+    if reviewer_invite.status == ReviewerInvite.STATUS_CLAIMED:
+        raise ValidationError({'error': 'Claimed reviewer invites cannot be revoked.'})
+    if reviewer_invite.status == ReviewerInvite.STATUS_REVOKED:
+        return reviewer_invite
+    reviewer_invite.status = ReviewerInvite.STATUS_REVOKED
+    reviewer_invite.save(update_fields=['status', 'updated_at'])
+    if reviewer_invite.invite_code_id and reviewer_invite.invite_code.is_active:
+        reviewer_invite.invite_code.is_active = False
+        reviewer_invite.invite_code.save(update_fields=['is_active', 'updated_at'])
+    return reviewer_invite
+
+
+def claim_reviewer_invite(*, reviewer_invite, actor, deactivate_signup_code=False):
+    reviewer_invite.mark_expired_if_needed(save=True)
+    if reviewer_invite.status == ReviewerInvite.STATUS_REVOKED:
+        raise ValidationError({'claim_code': 'This reviewer invite has been turned off.'})
+    if reviewer_invite.status == ReviewerInvite.STATUS_EXPIRED:
+        raise ValidationError({'claim_code': 'This reviewer invite has expired.'})
+    if reviewer_invite.status == ReviewerInvite.STATUS_CLAIMED:
+        if reviewer_invite.claimed_by_id != actor.id and not actor.is_staff:
+            raise ValidationError({'claim_code': 'This reviewer invite has already been claimed.'})
+        ensure_member_connection(reviewer=actor, student=reviewer_invite.student, created_by=reviewer_invite.created_by)
+        return reviewer_invite
+
+    with transaction.atomic():
+        reviewer_invite.status = ReviewerInvite.STATUS_CLAIMED
+        reviewer_invite.claimed_by = actor
+        reviewer_invite.claimed_at = timezone.now()
+        reviewer_invite.save(update_fields=['status', 'claimed_by', 'claimed_at', 'updated_at'])
+        if deactivate_signup_code and reviewer_invite.invite_code_id and reviewer_invite.invite_code.is_active:
+            reviewer_invite.invite_code.is_active = False
+            reviewer_invite.invite_code.save(update_fields=['is_active', 'updated_at'])
+        ensure_member_connection(reviewer=actor, student=reviewer_invite.student, created_by=reviewer_invite.created_by)
+    return reviewer_invite
+
+
+def claim_reviewer_invite_by_code(*, code, actor, deactivate_signup_code=False):
+    normalized_code = str(code or '').strip().upper()
+    if not normalized_code:
+        raise ValidationError({'claim_code': 'Claim code is required.'})
+    reviewer_invite = ReviewerInvite.objects.select_related('invite_code', 'student', 'created_by').filter(invite_code__code__iexact=normalized_code).order_by('-created_at').first()
+    if not reviewer_invite:
+        raise ValidationError({'claim_code': 'This reviewer invite is not available.'})
+    return claim_reviewer_invite(reviewer_invite=reviewer_invite, actor=actor, deactivate_signup_code=deactivate_signup_code)
 
 
 def _record_review_request_event(*, review_request, actor, event_type, from_status='', to_status='', reason_code='', note=''):

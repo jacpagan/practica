@@ -870,7 +870,7 @@ function AppContent() {
               navigate({ view: 'review', token: requestItem.review_link.token, sessionId: null })
             }}
             justUploaded={selectedSession.id === justUploadedSessionId}
-            onRecordAnother={() => handleRecordAnother({ practiceSeries: selectedSession.practice_series || '' })}
+            onRecordAnother={(draft = null) => handleRecordAnother(draft || { practiceSeries: selectedSession.practice_series || '' })}
             onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
             onSessionUpdate={(sessionData) => {
               setSelectedSession(sessionData)

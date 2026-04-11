@@ -4,16 +4,16 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from videos.models import FeedbackTemplate, ReviewLink, ReviewRequest, ReviewerRosterMembership, VideoFeedback
+from videos.models import FeedbackTemplate, ReviewLink, ReviewRequest, ReviewerInvite, ReviewerRosterMembership, Session, VideoFeedback
 from videos.reviews.presentation import public_review_request_preview, review_request_forbidden_response
 from videos.reviews.queries import filter_review_requests_for_role, review_request_visible_to_user, reviewer_can_respond, visible_review_requests_qs
-from videos.reviews.services import create_review_request, mark_review_request_viewed, transition_review_request_status
+from videos.reviews.services import claim_reviewer_invite_by_code, create_review_request, create_reviewer_invite, mark_review_request_viewed, revoke_reviewer_invite, transition_review_request_status
 from videos.reviews.services import mark_review_request_opened, mark_review_request_responded
-from videos.serializers import FeedbackTemplateSerializer, MemberConnectionSerializer, PublicSessionSerializer, ReviewLinkSerializer, ReviewRequestSerializer, ReviewVideoFeedbackSerializer, UserSummarySerializer
+from videos.serializers import FeedbackTemplateSerializer, MemberConnectionSerializer, PublicSessionSerializer, ReviewerInviteSerializer, ReviewLinkSerializer, ReviewRequestSerializer, ReviewVideoFeedbackSerializer, UserSummarySerializer
 from videos.services.feedback_video_processing import prepare_feedback_video_upload
 from videos.video_uploads import is_allowed_video_upload
 
@@ -93,17 +93,34 @@ def review_link_info(request, token):
         if review_request.status == ReviewRequest.STATUS_RESPONDED:
             mark_review_request_viewed(review_request=review_request, actor=request.user)
             review_request.refresh_from_db()
+    claimed_invite = None
+    claim_error = ''
+    claim_code = str(request.query_params.get('claim', '') or '').strip()
+    if request.user.is_authenticated and claim_code:
+        try:
+            claimed_invite = claim_reviewer_invite_by_code(code=claim_code, actor=request.user, deactivate_signup_code=True)
+        except ValidationError as exc:
+            detail = getattr(exc, 'detail', {})
+            if isinstance(detail, dict):
+                claim_error = ', '.join(str(item) for value in detail.values() for item in (value if isinstance(value, list) else [value]))
+            else:
+                claim_error = str(detail)
     if request.user.is_authenticated:
         request_payload = ReviewRequestSerializer(review_request, context={'request': request}).data if review_request else None
     else:
         request_payload = public_review_request_preview(review_request)
-    return Response({
+    payload = {
         'session': PublicSessionSerializer(link.session, context={'request': request}).data,
         'link': ReviewLinkSerializer(link, context={'request': request}).data,
         'auth_required': True,
         'review_request': request_payload,
         'feedback_request': request_payload,
-    })
+    }
+    if claimed_invite:
+        payload['reviewer_invite'] = ReviewerInviteSerializer(claimed_invite, context={'request': request}).data
+    if claim_error:
+        payload['claim_error'] = claim_error
+    return Response(payload)
 
 
 @csrf_exempt
@@ -257,6 +274,49 @@ def feedback_inbox(request):
     if status_filter:
         qs = qs.filter(status=status_filter)
     return Response(ReviewRequestSerializer(qs, many=True, context={'request': request}).data)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def reviewer_invites(request):
+    if request.method == 'GET':
+        invites = ReviewerInvite.objects.select_related(
+            'student', 'student__profile',
+            'claimed_by', 'claimed_by__profile',
+            'session', 'session__user', 'session__user__profile',
+            'review_link', 'invite_code',
+        ).filter(student=request.user).order_by('-created_at')
+        session_id = str(request.query_params.get('session_id', '')).strip()
+        if session_id:
+            invites = invites.filter(session_id=session_id)
+        return Response(ReviewerInviteSerializer(invites, many=True, context={'request': request}).data)
+
+    raw_session_id = request.data.get('session_id')
+    try:
+        session_id = int(raw_session_id)
+    except (TypeError, ValueError):
+        return Response({'session_id': ['Session is required.']}, status=status.HTTP_400_BAD_REQUEST)
+    session = get_object_or_404(Session, pk=session_id)
+    label = str(request.data.get('label', '') or '').strip()
+    intent = str(request.data.get('intent', '') or ReviewerInvite.INTENT_LIGHTWEIGHT_REVIEW).strip().lower()
+    invite = create_reviewer_invite(actor=request.user, session=session, label=label, intent=intent)
+    return Response(ReviewerInviteSerializer(invite, context={'request': request}).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def reviewer_invite_detail(request, invite_id):
+    invite = get_object_or_404(ReviewerInvite.objects.select_related('invite_code'), pk=invite_id)
+    invite = revoke_reviewer_invite(reviewer_invite=invite, actor=request.user)
+    return Response(ReviewerInviteSerializer(invite, context={'request': request}).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def reviewer_invite_claim(request):
+    claim_code = str(request.data.get('claim_code', '') or '').strip()
+    invite = claim_reviewer_invite_by_code(code=claim_code, actor=request.user, deactivate_signup_code=True)
+    return Response(ReviewerInviteSerializer(invite, context={'request': request}).data)
 
 
 @api_view(['GET'])

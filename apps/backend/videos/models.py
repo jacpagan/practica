@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 import secrets
+from django.utils import timezone
 
 
 class Profile(models.Model):
@@ -40,6 +41,62 @@ class SignupInviteCode(models.Model):
 
     def __str__(self):
         return f"SignupInviteCode {self.code} uses={self.use_count}/{self.max_uses} active={self.is_active}"
+
+
+class ReviewerInvite(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_CLAIMED = 'claimed'
+    STATUS_REVOKED = 'revoked'
+    STATUS_EXPIRED = 'expired'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_CLAIMED, 'Claimed'),
+        (STATUS_REVOKED, 'Revoked'),
+        (STATUS_EXPIRED, 'Expired'),
+    ]
+
+    INTENT_LIGHTWEIGHT_REVIEW = 'lightweight_review'
+    INTENT_ROSTER_JOIN = 'roster_join'
+    INTENT_CHOICES = [
+        (INTENT_LIGHTWEIGHT_REVIEW, 'Lightweight Review'),
+        (INTENT_ROSTER_JOIN, 'Roster Join'),
+    ]
+
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_reviewer_invites')
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviewer_invites')
+    invite_code = models.OneToOneField(SignupInviteCode, on_delete=models.CASCADE, related_name='reviewer_invite')
+    review_link = models.ForeignKey('ReviewLink', on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewer_invites')
+    session = models.ForeignKey('Session', on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewer_invites')
+    review_request = models.ForeignKey('ReviewRequest', on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewer_invites')
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    intent = models.CharField(max_length=24, choices=INTENT_CHOICES, default=INTENT_LIGHTWEIGHT_REVIEW)
+    claimed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='claimed_reviewer_invites')
+    claimed_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField()
+    label = models.CharField(max_length=120, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def mark_expired_if_needed(self, *, save=True):
+        if self.status == self.STATUS_PENDING and self.expires_at <= timezone.now():
+            self.status = self.STATUS_EXPIRED
+            if self.invite_code_id and self.invite_code.is_active:
+                self.invite_code.is_active = False
+                if save:
+                    self.invite_code.save(update_fields=['is_active', 'updated_at'])
+            if save:
+                self.save(update_fields=['status', 'updated_at'])
+        return self.status
+
+    def can_claim(self):
+        self.mark_expired_if_needed(save=True)
+        return self.status == self.STATUS_PENDING and self.invite_code.can_redeem()
+
+    def __str__(self):
+        return f"ReviewerInvite {self.id} student={self.student_id} status={self.status} intent={self.intent}"
 
 class Exercise(models.Model):
     """A named exercise in the library."""
