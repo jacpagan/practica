@@ -380,6 +380,7 @@ test('Session detail separates access from request flow', async ({ page }) => {
   await expect(page.locator('text=Choose a person or copy a link.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Choose person' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Copy share link' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Open test view' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Manage invites' })).toBeVisible()
   await page.getByRole('button', { name: 'Manage invites' }).click()
   await expect(page.locator('text=No active invites.')).toBeVisible()

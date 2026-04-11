@@ -649,34 +649,53 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     await loadInviteCodes()
   }
 
+  const createBundledShareLink = async () => {
+    if (!token || !session?.id) return
+    const linkData = await ensurePrivateLink()
+    const inviteRes = await fetch('/api/invite-codes/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders,
+      },
+      body: JSON.stringify({ label: `Access ${session.title}` }),
+    })
+    const inviteData = await inviteRes.json().catch(() => ({}))
+    if (!inviteRes.ok) {
+      const message = inviteData?.error || 'Could not create invite link'
+      if (message.includes('too many active invite codes')) {
+        setShowInviteManager(true)
+        await loadInviteCodes()
+        throw new Error('You already have too many active invites. Turn off an unused one below, then try again.')
+      }
+      throw new Error(message)
+    }
+    return `${linkData.url}${linkData.url.includes('?') ? '&' : '?'}claim=${encodeURIComponent(inviteData.code)}`
+  }
+
   const copyShareLink = async () => {
     if (!token || !session?.id) return
     setSharing(true)
     try {
-      const linkData = await ensurePrivateLink()
-      const inviteRes = await fetch('/api/invite-codes/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders,
-        },
-        body: JSON.stringify({ label: `Access ${session.title}` }),
-      })
-      const inviteData = await inviteRes.json().catch(() => ({}))
-      if (!inviteRes.ok) {
-        const message = inviteData?.error || 'Could not create invite link'
-        if (message.includes('too many active invite codes')) {
-          setShowInviteManager(true)
-          await loadInviteCodes()
-          throw new Error('You already have too many active invites. Turn off an unused one below, then try again.')
-        }
-        throw new Error(message)
-      }
-      const bundledUrl = `${linkData.url}${linkData.url.includes('?') ? '&' : '?'}claim=${encodeURIComponent(inviteData.code)}`
+      const bundledUrl = await createBundledShareLink()
       await navigator.clipboard.writeText(bundledUrl)
       toast.success('Share link copied')
     } catch (error) {
       toast.error(error?.message || 'Could not create share link')
+    } finally {
+      setSharing(false)
+    }
+  }
+
+  const openTestView = async () => {
+    if (!token || !session?.id) return
+    setSharing(true)
+    try {
+      const bundledUrl = await createBundledShareLink()
+      window.open(bundledUrl, '_blank', 'noopener,noreferrer')
+      toast.success('Recipient view opened in a new tab')
+    } catch (error) {
+      toast.error(error?.message || 'Could not open recipient view')
     } finally {
       setSharing(false)
     }
@@ -1057,12 +1076,17 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       <button type="button" onClick={copyShareLink} disabled={sharing || !canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
                         {sharing ? 'Copying…' : 'Copy share link'}
                       </button>
+                      <button type="button" onClick={openTestView} disabled={sharing || !canCreateShareLink} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white disabled:opacity-50 transition-colors">
+                        Open test view
+                      </button>
                       {activeReviewLink?.url ? (
                         <button type="button" onClick={revokeShareLink} disabled={revokingShare} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white disabled:opacity-50 transition-colors">
                           {revokingShare ? 'Turning off…' : 'Turn off'}
                         </button>
                       ) : null}
                     </div>
+
+                    {!canCreateShareLink ? null : <p className="text-[11px] text-gray-500">Best checked in a private window before sending.</p>}
 
                     {!canCreateShareLink ? null : (
                       <div className="pt-1">
