@@ -731,20 +731,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     }
   }
 
-  const openTestView = async () => {
-    if (!token || !session?.id) return
-    setSharing(true)
-    try {
-      const bundledUrl = await createBundledShareLink()
-      window.open(bundledUrl, '_blank', 'noopener,noreferrer')
-      toast.success('Recipient view opened in a new tab')
-    } catch (error) {
-      toast.error(error?.message || 'Could not open recipient view')
-    } finally {
-      setSharing(false)
-    }
-  }
-
   const turnOffInviteCode = async (inviteId) => {
     if (!token || !inviteId) return
     try {
@@ -1172,17 +1158,12 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       <button type="button" onClick={() => copyShareLink()} disabled={sharing} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
                         {sharing ? 'Copying…' : 'Share private link'}
                       </button>
-                      <button type="button" onClick={openTestView} disabled={sharing || !canCreateShareLink} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white disabled:opacity-50 transition-colors">
-                        Open test view
-                      </button>
                       {activeReviewLink?.url ? (
                         <button type="button" onClick={revokeShareLink} disabled={revokingShare} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white disabled:opacity-50 transition-colors">
                           {revokingShare ? 'Turning off…' : 'Turn off'}
                         </button>
                       ) : null}
                     </div>
-
-                    {!canCreateShareLink ? null : <p className="text-[11px] text-gray-500">Best checked in a private window before sending.</p>}
 
                     {!canCreateShareLink ? null : (
                       <div className="pt-1">

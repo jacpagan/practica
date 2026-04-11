@@ -244,7 +244,6 @@ Frontend
 - split current share module into:
   - `Share private link`
   - `Request review`
-- preserve `Open test view`
 - show plain-language help text explaining the difference
 - keep processing-state guard visible when the session is not ready
 

@@ -308,7 +308,6 @@ Notes:
 Update the share module to:
 
 - separate `Share private link` from `Request review`
-- keep `Open test view`
 - show pending reviewer invites
 - offer `Invite reviewer` when roster is empty
 - preserve selected reviewer and request draft context across processing-state refreshes
