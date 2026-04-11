@@ -173,42 +173,42 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       return {
         tone: 'border-amber-200 bg-amber-50',
         title: `Waiting on ${currentLoopReviewerName}`,
-        message: 'Your review request is live. Open the private thread to check the request and any updates.',
+        message: 'Open the thread or turn it off.',
       }
     }
     if (currentLoopStatus === 'opened') {
       return {
         tone: 'border-blue-200 bg-blue-50',
         title: `${currentLoopReviewerName} opened this request`,
-        message: 'Your reviewer has seen the take. Open the private thread to follow the feedback conversation.',
+        message: 'Open the thread to continue.',
       }
     }
     if (currentLoopStatus === 'responded') {
       return {
         tone: 'border-emerald-200 bg-emerald-50',
         title: 'Feedback is ready',
-        message: 'Open the private thread to watch the response before you decide on the next take.',
+        message: 'Open the thread to review it.',
       }
     }
     if (currentLoopStatus === 'viewed') {
       return {
         tone: 'border-violet-200 bg-violet-50',
         title: 'Ready for the next take',
-        message: 'You have seen the feedback. Record the next take when you are ready, or reopen the private thread.',
+        message: 'Record the next take or reopen the thread.',
       }
     }
     if (currentLoopStatus === 'needs_resubmission') {
       return {
         tone: 'border-orange-200 bg-orange-50',
         title: 'New take requested',
-        message: 'Your reviewer asked for a cleaner or more complete take. Record a new take to continue this loop.',
+        message: 'Record a new take to continue.',
       }
     }
     if (currentLoopStatus === 'declined_unrelated') {
       return {
         tone: 'border-rose-200 bg-rose-50',
         title: 'Matching take needed',
-        message: 'Your reviewer said this take does not match the requested thread. Record the right take to continue.',
+        message: 'Record the right take to continue.',
       }
     }
     if (currentLoopStatus === 'flagged') {
@@ -1030,7 +1030,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 space-y-4">
                   <div>
                     <p className="text-sm font-semibold text-gray-900">Share</p>
-                    <p className="text-xs text-gray-500 mt-1">Choose one person or copy one private link.</p>
+                    <p className="text-xs text-gray-500 mt-1">Choose a person or copy a link.</p>
                   </div>
                   <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
                     {!canCreateShareLink ? (
@@ -1051,7 +1051,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                     <div className="flex flex-wrap gap-2">
                       {!waitingOnReviewer && !feedbackReadyToReview && !readyForFollowUp && currentLoopStatus !== 'flagged' ? (
                         <button type="button" onClick={openRequestComposer} disabled={!canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                          Share with person
+                          Choose person
                         </button>
                       ) : null}
                       <button type="button" onClick={copyShareLink} disabled={sharing || !canCreateShareLink} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
@@ -1158,28 +1158,28 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
 
                       {selectedReviewerName ? (
                         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3">
-                          <p className="text-xs font-medium uppercase tracking-wide text-emerald-800">Selected</p>
+                          <p className="text-xs font-medium uppercase tracking-wide text-emerald-800">Ready</p>
                           <p className="text-sm text-emerald-900 mt-1">This will open a private thread with {selectedReviewerName}.</p>
                         </div>
                       ) : null}
 
                       <div className="space-y-2">
-                        <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">With</label>
+                        <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">Person</label>
                         {selectedReviewer ? (
                           <div className="rounded-lg border border-gray-200 bg-white px-3 py-3 flex items-center justify-between gap-3">
                             <div>
                               <p className="text-sm font-medium text-gray-900">{selectedReviewer.display_name || selectedReviewer.username}</p>
                               <p className="text-xs text-gray-500">@{selectedReviewer.username}</p>
                             </div>
-                            <button type="button" onClick={() => { setSelectedReviewer(null); setReviewerQuery('') }} className="text-xs text-red-600 hover:text-red-700 transition-colors">Choose another</button>
+                            <button type="button" onClick={() => { setSelectedReviewer(null); setReviewerQuery('') }} className="text-xs text-red-600 hover:text-red-700 transition-colors">Change</button>
                           </div>
                         ) : (
                           <div className="space-y-2">
-                            {recentReviewersLoading ? <p className="text-xs text-gray-500">Loading people…</p> : null}
+                            {recentReviewersLoading ? <p className="text-xs text-gray-500">Loading…</p> : null}
                             {!recentReviewersLoading && designatedReviewers.length === 0 ? (
                               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
                                 <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Add someone first</p>
-                                <p className="text-sm text-amber-900 mt-1">No one yet. Copy a share link or add someone first.</p>
+                                <p className="text-sm text-amber-900 mt-1">No one yet. Copy a link or add someone first.</p>
                               </div>
                             ) : null}
                             {recentReviewers.length > 0 ? (
@@ -1234,7 +1234,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           Cancel
                         </button>
                         <button type="button" disabled={creatingRequest || !canCreateShareLink || !selectedReviewer?.id} onClick={createReviewRequest} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                          {creatingRequest ? 'Sending…' : (selectedReviewerName ? 'Send' : 'Choose someone')}
+                          {creatingRequest ? 'Sending…' : (selectedReviewerName ? 'Send' : 'Choose person')}
                         </button>
                       </div>
                     </div>
