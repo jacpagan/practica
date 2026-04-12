@@ -383,6 +383,14 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     setReviewerResults([])
   }
 
+  const submitFeedbackChoice = async () => {
+    if (selectedReviewer?.id) {
+      await createReviewRequest()
+      return
+    }
+    await inviteReviewerFromComposer({ sourceAction: 'ask_for_feedback' })
+  }
+
   const saveEdits = async () => {
     if (!editTitle.trim()) {
       toast.error('Title is required')
@@ -1187,7 +1195,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       ) : null}
 
                       <div className="space-y-2">
-                        <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">Who do you want feedback from?</label>
+                        <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">Who is this for?</label>
                         {selectedReviewer ? (
                           <div className="rounded-lg border border-gray-200 bg-white px-3 py-3 flex items-center justify-between gap-3">
                             <div>
@@ -1201,11 +1209,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                             {recentReviewersLoading ? <p className="text-xs text-gray-500">Loading…</p> : null}
                             {!recentReviewersLoading && designatedReviewers.length === 0 ? (
                               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
-                                <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Invite a reviewer first</p>
-                                <p className="text-sm text-amber-900 mt-1">No reviewers are on your roster yet. Send a private reviewer invite, then come back here to request structured review.</p>
-                                <button type="button" onClick={() => inviteReviewerFromComposer()} disabled={sharing} className="mt-3 text-sm font-medium text-amber-950 border border-amber-300 rounded-lg px-4 py-2 hover:bg-amber-100 disabled:opacity-50 transition-colors">
-                                  {sharing ? 'Copying…' : 'Invite reviewer'}
-                                </button>
+                                <p className="text-xs font-medium uppercase tracking-wide text-amber-800">No reviewers yet</p>
+                                <p className="text-sm text-amber-900 mt-1">Keep going and Practica will copy an invite link for the person you want feedback from.</p>
                               </div>
                             ) : null}
                             {recentReviewers.length > 0 ? (
@@ -1231,7 +1236,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                   placeholder="Search reviewers"
                                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
                                 />
-                                <p className="text-xs text-gray-500">Choose someone already on your list, or invite someone new.</p>
+                                <p className="text-xs text-gray-500">Choose someone from your list, or keep going to copy an invite link for someone new.</p>
                                 {reviewerSearchLoading ? <p className="text-xs text-gray-500">Searching…</p> : null}
                                 {reviewerResults.length > 0 ? (
                                   <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
@@ -1248,9 +1253,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                     ))}
                                   </div>
                                 ) : reviewerQuery.trim().length >= 2 && !reviewerSearchLoading ? <p className="text-xs text-gray-500">No matching people found yet.</p> : null}
-                                <button type="button" onClick={() => inviteReviewerFromComposer()} disabled={sharing} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2 hover:bg-white disabled:opacity-50 transition-colors">
-                                  {sharing ? 'Copying…' : 'Invite someone new'}
-                                </button>
                               </>
                             ) : null}
                           </div>
@@ -1262,8 +1264,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                         <button type="button" onClick={() => setShowRequestComposer(false)} className="text-sm text-gray-600 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white transition-colors">
                           Cancel
                         </button>
-                        <button type="button" disabled={creatingRequest || !canCreateShareLink || !selectedReviewer?.id} onClick={createReviewRequest} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                          {creatingRequest ? 'Sending…' : 'Send request'}
+                        <button type="button" disabled={creatingRequest || sharing || !canCreateShareLink} onClick={submitFeedbackChoice} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
+                          {creatingRequest ? 'Sending…' : sharing ? 'Copying…' : selectedReviewer?.id ? 'Send request' : 'Copy invite link'}
                         </button>
                       </div>
                     </div>

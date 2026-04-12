@@ -545,10 +545,10 @@ test('Ask for feedback starts with no reviewer selected on a fresh request', asy
   await page.goto('/sessions/125')
   await page.getByRole('button', { name: 'Ask for feedback' }).click()
 
-  await expect(page.getByText('Who do you want feedback from?')).toBeVisible()
+  await expect(page.getByText('Who is this for?')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Change' })).toHaveCount(0)
   await expect(page.getByText('This will ask Ryan for private feedback.')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Send request' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Copy invite link' })).toBeVisible()
 })
 
 test('Calendar day view shows review state per video', async ({ page }) => {
