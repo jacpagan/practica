@@ -64,6 +64,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
   const [responseCategory, setResponseCategory] = useState('')
   const [selectedTimestampSeconds, setSelectedTimestampSeconds] = useState(null)
   const [durationSeconds, setDurationSeconds] = useState(0)
+  const [showPreciseTimestampControls, setShowPreciseTimestampControls] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [showResponseDetails, setShowResponseDetails] = useState(false)
@@ -523,7 +524,23 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
     setSelectedTimestampSeconds(Math.max(0, Math.round(video.currentTime || 0)))
   }
 
-  const clearTimestamp = () => setSelectedTimestampSeconds(null)
+  const clampTimestamp = (value) => {
+    const normalizedValue = Math.max(0, Math.round(Number(value) || 0))
+    if (durationSeconds > 0) return Math.min(normalizedValue, durationSeconds)
+    return normalizedValue
+  }
+
+  const nudgeTimestamp = (deltaSeconds) => {
+    setSelectedTimestampSeconds((current) => {
+      const base = typeof current === 'number' ? current : Math.round(currentTime || 0)
+      return clampTimestamp(base + deltaSeconds)
+    })
+  }
+
+  const clearTimestamp = () => {
+    setSelectedTimestampSeconds(null)
+    setShowPreciseTimestampControls(false)
+  }
 
   const handlePlaybackError = async () => {
     if (playbackSourceIndex < playbackSources.length - 1) {
@@ -1023,7 +1040,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
                   </div>
                   <div className="flex items-center gap-2">
                     <button type="button" onClick={useCurrentVideoTime} className="text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-white transition-colors">
-                      Use current time
+                      Use current moment
                     </button>
                     <button type="button" onClick={clearTimestamp} className="text-xs text-gray-500 hover:text-gray-700 transition-colors">
                       Clear
@@ -1031,22 +1048,51 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
                   </div>
                 </div>
 
-                {durationSeconds > 0 ? (
-                  <div>
-                    <input
-                      type="range"
-                      min="0"
-                      max={durationSeconds}
-                      step="1"
-                      value={typeof selectedTimestampSeconds === 'number' ? selectedTimestampSeconds : 0}
-                      onChange={(event) => setSelectedTimestampSeconds(Number(event.target.value))}
-                      className="w-full"
-                    />
-                    <div className="flex items-center justify-between text-[11px] text-gray-400 mt-1">
-                      <span>0:00</span>
-                      <span>Now: {fmtTimer(currentTime)}</span>
-                      <span>{fmtTimer(durationSeconds)}</span>
+                {typeof selectedTimestampSeconds === 'number' ? (
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      {[-5, -1, 1, 5].map((delta) => (
+                        <button
+                          key={delta}
+                          type="button"
+                          onClick={() => nudgeTimestamp(delta)}
+                          className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors"
+                        >
+                          {delta > 0 ? `+${delta}s` : `${delta}s`}
+                        </button>
+                      ))}
                     </div>
+
+                    {durationSeconds > 0 ? (
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => setShowPreciseTimestampControls((current) => !current)}
+                          className="text-xs text-gray-600 hover:text-gray-900 transition-colors"
+                        >
+                          {showPreciseTimestampControls ? 'Hide precise adjustment' : 'Adjust precisely'}
+                        </button>
+
+                        {showPreciseTimestampControls ? (
+                          <div className="mt-3">
+                            <input
+                              type="range"
+                              min="0"
+                              max={durationSeconds}
+                              step="1"
+                              value={selectedTimestampSeconds}
+                              onChange={(event) => setSelectedTimestampSeconds(clampTimestamp(event.target.value))}
+                              className="w-full"
+                            />
+                            <div className="flex items-center justify-between text-[11px] text-gray-400 mt-1">
+                              <span>0:00</span>
+                              <span>Now: {fmtTimer(currentTime)}</span>
+                              <span>{fmtTimer(durationSeconds)}</span>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
