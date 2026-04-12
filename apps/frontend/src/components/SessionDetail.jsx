@@ -168,8 +168,10 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const readyForFollowUp = ['viewed', 'needs_resubmission', 'declined_unrelated'].includes(currentLoopStatus)
   const canStartNewRequest = canEdit && canCreateShareLink && !waitingOnReviewer
   const currentLoopReviewerName = currentLoopRequest?.reviewer?.display_name || currentLoopRequest?.reviewer?.username || 'your reviewer'
-  const pendingShareIntentLabel = pendingShareIntent === 'request_review'
-    ? 'review request'
+  const pendingShareIntentLabel = pendingShareIntent === 'ask_for_feedback'
+    ? 'feedback request'
+    : pendingShareIntent === 'request_review'
+      ? 'review request'
     : pendingShareIntent === 'share_private_link'
       ? 'private link'
       : pendingShareIntent === 'invite_reviewer'
@@ -525,7 +527,19 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
 
     const activatePendingIntent = async () => {
       const intent = pendingShareIntent
+      if (intent === 'ask_for_feedback' && recentReviewersLoading) return
       setPendingShareIntent('')
+      if (intent === 'ask_for_feedback') {
+        if (designatedReviewers.length > 0) {
+          setShowLoopDetails(true)
+          setShowRequestComposer(true)
+          try { loopDetailsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }) } catch {}
+          toast.success('Playback is ready. Choose who should review this take.')
+          return
+        }
+        await inviteReviewerFromComposer({ skipReadyIntent: true, sourceAction: 'ask_for_feedback' })
+        return
+      }
       if (intent === 'request_review') {
         setShowLoopDetails(true)
         setShowRequestComposer(true)
@@ -543,7 +557,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     }
 
     activatePendingIntent()
-  }, [canCreateShareLink, pendingShareIntent])
+  }, [canCreateShareLink, designatedReviewers.length, pendingShareIntent, recentReviewersLoading])
 
   const copyReviewRequestLink = async (requestItem) => {
     const url = requestItem?.feedback_link?.url || requestItem?.review_link?.url
@@ -746,13 +760,13 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     }
   }
 
-  const inviteReviewerFromComposer = async ({ skipReadyIntent = false } = {}) => {
+  const inviteReviewerFromComposer = async ({ skipReadyIntent = false, sourceAction = 'invite_reviewer' } = {}) => {
     if (!token || !session?.id) return
     if (!canCreateShareLink && !skipReadyIntent) {
       setPendingShareIntent('invite_reviewer')
       setShowLoopDetails(true)
       reportClientEvent('share_blocked_session_not_ready', {
-        action: 'invite_reviewer',
+        action: sourceAction,
         session_id: session.id,
         processing_status: session?.processing_status || '',
       })
@@ -767,12 +781,12 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       })
       await navigator.clipboard.writeText(bundledUrl)
       reportClientEvent('reviewer_invite_created', {
-        action: 'invite_reviewer',
+        action: sourceAction,
         session_id: session.id,
       })
       setShowInviteManager(true)
       await loadInviteCodes()
-      toast.success('Reviewer invite copied')
+      toast.success('Invite link copied. Send it to the person you want feedback from.')
     } catch (error) {
       toast.error(error?.message || 'Could not invite reviewer')
     } finally {
@@ -971,19 +985,26 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   }
 
   const openRequestComposer = () => {
+    setShowLoopDetails(true)
     if (!canCreateShareLink) {
-      setPendingShareIntent('request_review')
-      setShowLoopDetails(true)
+      setPendingShareIntent('ask_for_feedback')
       reportClientEvent('share_blocked_session_not_ready', {
-        action: 'request_review',
+        action: 'ask_for_feedback',
         session_id: session.id,
         processing_status: session?.processing_status || '',
       })
-      toast.success('We will reopen review request as soon as playback is ready.')
+      toast.success('We will reopen feedback as soon as playback is ready.')
       return
     }
-    setShowLoopDetails(true)
-    setShowRequestComposer(true)
+    if (recentReviewersLoading) {
+      setShowRequestComposer(true)
+      return
+    }
+    if (designatedReviewers.length > 0) {
+      setShowRequestComposer(true)
+      return
+    }
+    inviteReviewerFromComposer({ skipReadyIntent: true, sourceAction: 'ask_for_feedback' })
   }
 
   const toggleLoopDetails = () => {
@@ -1127,8 +1148,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
               {canEdit ? (
                 <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 space-y-4">
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">Share</p>
-                    <p className="text-xs text-gray-500 mt-1">Request structured review or share a private link.</p>
+                    <p className="text-sm font-semibold text-gray-900">Feedback</p>
+                    <p className="text-xs text-gray-500 mt-1">Ask one trusted person for feedback. If they are new, Practica creates the invite for you.</p>
                   </div>
                   <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
                     {!canCreateShareLink ? (
@@ -1152,12 +1173,9 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                     <div className="flex flex-wrap gap-2">
                       {!waitingOnReviewer && !feedbackReadyToReview && !readyForFollowUp && currentLoopStatus !== 'flagged' ? (
                         <button type="button" onClick={openRequestComposer} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
-                          Request review
+                          Ask for feedback
                         </button>
                       ) : null}
-                      <button type="button" onClick={() => copyShareLink()} disabled={sharing} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                        {sharing ? 'Copying…' : 'Share private link'}
-                      </button>
                       {activeReviewLink?.url ? (
                         <button type="button" onClick={revokeShareLink} disabled={revokingShare} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-white disabled:opacity-50 transition-colors">
                           {revokingShare ? 'Turning off…' : 'Turn off'}
@@ -1271,12 +1289,12 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                       {selectedReviewerName ? (
                         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3">
                           <p className="text-xs font-medium uppercase tracking-wide text-emerald-800">Ready</p>
-                          <p className="text-sm text-emerald-900 mt-1">This will open a private thread with {selectedReviewerName}.</p>
+                          <p className="text-sm text-emerald-900 mt-1">This will ask {selectedReviewerName} for private feedback.</p>
                         </div>
                       ) : null}
 
                       <div className="space-y-2">
-                        <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">Person</label>
+                        <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">Who do you want feedback from?</label>
                         {selectedReviewer ? (
                           <div className="rounded-lg border border-gray-200 bg-white px-3 py-3 flex items-center justify-between gap-3">
                             <div>
@@ -1317,10 +1335,10 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                   type="text"
                                   value={reviewerQuery}
                                   onChange={(event) => setReviewerQuery(event.target.value)}
-                                  placeholder="Search people"
+                                  placeholder="Search reviewers"
                                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
                                 />
-                                <p className="text-xs text-gray-500">Only people already on your list appear here.</p>
+                                <p className="text-xs text-gray-500">Choose someone already on your list, or invite someone new.</p>
                                 {reviewerSearchLoading ? <p className="text-xs text-gray-500">Searching…</p> : null}
                                 {reviewerResults.length > 0 ? (
                                   <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
@@ -1337,6 +1355,9 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                     ))}
                                   </div>
                                 ) : reviewerQuery.trim().length >= 2 && !reviewerSearchLoading ? <p className="text-xs text-gray-500">No matching people found yet.</p> : null}
+                                <button type="button" onClick={() => inviteReviewerFromComposer()} disabled={sharing} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2 hover:bg-white disabled:opacity-50 transition-colors">
+                                  {sharing ? 'Copying…' : 'Invite someone new'}
+                                </button>
                               </>
                             ) : null}
                           </div>
@@ -1349,7 +1370,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                           Cancel
                         </button>
                         <button type="button" disabled={creatingRequest || !canCreateShareLink || !selectedReviewer?.id} onClick={createReviewRequest} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 transition-colors">
-                          {creatingRequest ? 'Sending…' : (selectedReviewerName ? 'Send' : 'Choose person')}
+                          {creatingRequest ? 'Sending…' : 'Send request'}
                         </button>
                       </div>
                     </div>

@@ -109,35 +109,25 @@ Implement the solution in four coordinated parts:
 
 ## 6. User Experience Changes
 
-### 6.1 Session detail sharing model
+### 6.1 Session detail feedback entry model
 
-Replace the current ambiguous share area with two explicit actions:
+Replace parallel primary actions with one primary action:
 
-#### A. `Share private link`
+#### `Ask for feedback`
 
-Use when the learner wants lightweight trusted feedback without a formal assigned request.
-
-Behavior:
-
-- creates or reuses a `ReviewLink`
-- optionally bundles a join claim for a first-time reviewer
-- opens the same private thread at `/r/:token`
-- does not create a `ReviewRequest`
-
-#### B. `Request review`
-
-Use when the learner wants a formal async feedback loop with an assigned reviewer.
+Use when the learner wants trusted feedback and should not have to choose an implementation mode first.
 
 Behavior:
 
-- requires a reviewer already in the learner's roster
-- creates `ReviewRequest`
-- creates associated `ReviewLink`
-- surfaces the request in reviewer inbox `/requests`
+- if the learner already has reviewers on their roster, open the reviewer chooser and create a structured `ReviewRequest`
+- if the learner has no available reviewers yet, create and copy an invite-aware private link for a new reviewer automatically
+- keep `Manage invites` as a secondary management surface, not a primary decision
+
+This preserves both underlying product paths while making the user choose only one intention: ask someone for feedback.
 
 ### 6.2 Empty-state improvement for no reviewers
 
-When the learner opens `Request review` and has no available reviewers:
+When the learner starts `Ask for feedback` and has no available reviewers:
 
 - show `Invite a reviewer first`
 - allow the learner to create a reviewer invite directly from the same panel
@@ -265,7 +255,7 @@ This allows both new and existing members to accept reviewer invites cleanly.
 
 Do not remove roster validation from `ReviewRequestSerializer`.
 
-Instead, ensure the invite flow creates the roster relationship before the learner needs to use `Request review`.
+Instead, ensure the invite flow creates the roster relationship before the learner needs to use the structured reviewer chooser.
 
 ### 8.3 Response composer support
 
@@ -305,9 +295,9 @@ Notes:
 
 ### 9.1 `SessionDetail.jsx`
 
-Update the share module to:
+Update the feedback module to:
 
-- separate `Share private link` from `Request review`
+- use one primary `Ask for feedback` action
 - show pending reviewer invites
 - offer `Invite reviewer` when roster is empty
 - preserve selected reviewer and request draft context across processing-state refreshes

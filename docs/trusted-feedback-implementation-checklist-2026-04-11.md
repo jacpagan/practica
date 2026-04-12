@@ -120,7 +120,7 @@ Smallest shippable outcome:
 - learner can create a reviewer invite from session detail
 - recipient can sign up or sign in from that bundled link
 - claiming that invite creates roster membership automatically
-- learner can later use `Request review` with that reviewer
+- learner can later use the structured reviewer chooser with that reviewer
 
 ### P1.1 Add `ReviewerInvite` model and migration
 
@@ -235,16 +235,15 @@ Suggested files:
 
 Acceptance:
 
-- `Share private link` can produce an invite-aware bundled URL through the new backend API
+- the `Ask for feedback` flow can produce an invite-aware bundled URL for a new reviewer through the new backend API
 
-### P1.6 Clarify share UI in `SessionDetail`
+### P1.6 Simplify feedback entry in `SessionDetail`
 
 Frontend
 
-- split current share module into:
-  - `Share private link`
-  - `Request review`
-- show plain-language help text explaining the difference
+- replace parallel primary actions with one `Ask for feedback` entry point
+- branch internally to structured request or invite flow based on reviewer availability
+- show plain-language help text explaining the outcome, not the implementation mode
 - keep processing-state guard visible when the session is not ready
 
 Suggested files:

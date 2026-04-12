@@ -374,11 +374,9 @@ test('Session detail separates access from request flow', async ({ page }) => {
 
   await page.goto('/sessions/123')
 
-  await expect(page.locator('text=Share').first()).toBeVisible()
-  await expect(page.locator('text=Request review').first()).toBeVisible()
-  await expect(page.locator('text=Request structured review or share a private link.')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Request review' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Share private link' })).toBeVisible()
+  await expect(page.locator('text=Feedback').first()).toBeVisible()
+  await expect(page.locator('text=Ask one trusted person for feedback. If they are new, Practica creates the invite for you.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Ask for feedback' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Manage invites' })).toBeVisible()
   await page.getByRole('button', { name: 'Manage invites' }).click()
   await expect(page.locator('text=No reviewer invites yet.')).toBeVisible()

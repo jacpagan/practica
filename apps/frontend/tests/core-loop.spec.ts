@@ -333,8 +333,8 @@ test('signed-in upload -> request -> feedback loop works', async ({ browser, req
 
   await waitForSessionReady(request, studentToken, sessionId)
   await studentPage.reload()
-  await studentPage.getByRole('button', { name: 'Request review' }).click()
-  await studentPage.getByRole('button', { name: 'Send', exact: true }).click()
+  await studentPage.getByRole('button', { name: 'Ask for feedback' }).click()
+  await studentPage.getByRole('button', { name: 'Send request' }).click()
   await expect(studentPage.getByText(/Waiting on/).first()).toBeVisible()
   const parentRequestId = await latestOwnerRequestId(request, studentToken)
   expect(parentRequestId).toBeTruthy()
@@ -389,8 +389,8 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
   await waitForSessionReady(request, studentToken, initialSessionId)
   await studentPage.reload()
 
-  await studentPage.getByRole('button', { name: 'Request review' }).click()
-  await studentPage.getByRole('button', { name: 'Send', exact: true }).click()
+  await studentPage.getByRole('button', { name: 'Ask for feedback' }).click()
+  await studentPage.getByRole('button', { name: 'Send request' }).click()
   await expect(studentPage.getByText(/Waiting on/).first()).toBeVisible()
   const parentRequestId = await latestOwnerRequestId(request, studentToken)
   expect(parentRequestId).toBeTruthy()
