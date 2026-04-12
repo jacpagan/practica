@@ -476,6 +476,81 @@ test('Session detail shows turn-off action for active outgoing request', async (
   await expect(page.getByRole('button', { name: 'Turn off' }).first()).toBeVisible()
 })
 
+test('Ask for feedback starts with no reviewer selected on a fresh request', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('token', 'smoke-token')
+  })
+
+  const sessionPayload = {
+    id: 125,
+    title: 'Fresh feedback session',
+    practice_series: '',
+    description: '',
+    video_file: '',
+    duration_seconds: null,
+    recorded_at: '2099-01-01T00:00:00Z',
+    created_at: '2099-01-01T00:00:00Z',
+    updated_at: '2099-01-01T00:00:00Z',
+    processing_status: 'ready',
+    processing_job_id: '',
+    processing_error: '',
+    tag_names: [],
+    assets: [],
+    chapters: [],
+    video_feedback: [],
+    active_review_link: null,
+    chapter_count: 0,
+    video_feedback_count: 0,
+    owner: { id: 1, display_name: 'Smoke Member' },
+    can_edit: true,
+  }
+
+  const reviewers = [
+    { id: 1, reviewer: { id: 11, username: 'ryan', display_name: 'Ryan' }, student: { id: 1 }, pending_review_count: 0, total_review_count: 2, created_at: '2099-01-01T00:00:00Z' },
+    { id: 2, reviewer: { id: 12, username: 'casey', display_name: 'Casey' }, student: { id: 1 }, pending_review_count: 0, total_review_count: 1, created_at: '2099-01-02T00:00:00Z' },
+  ]
+
+  await page.route('**/api/auth/me/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 1, username: 'smoke_member', display_name: 'Smoke Member' }),
+    })
+  })
+
+  await page.route('**/api/sessions/125/', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(sessionPayload) })
+  })
+
+  await page.route('**/api/review-requests/?session_id=125&role=student', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/review-requests/?role=reviewer', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/review-requests/?role=owner', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/connections/?role=student', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reviewers) })
+  })
+
+  await page.route('**/api/reviewer-invites/**', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.goto('/sessions/125')
+  await page.getByRole('button', { name: 'Ask for feedback' }).click()
+
+  await expect(page.getByText('Who do you want feedback from?')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Change' })).toHaveCount(0)
+  await expect(page.getByText('This will ask Ryan for private feedback.')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Send request' })).toBeDisabled()
+})
+
 test('Calendar day view shows review state per video', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('token', 'smoke-token')
