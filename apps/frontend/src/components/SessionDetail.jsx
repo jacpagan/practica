@@ -34,8 +34,6 @@ const requestReasonLabel = (value = '') => {
   return normalized.replace(/_/g, ' ')
 }
 
-const LAST_REVIEWER_KEY = 'practica.last_reviewer.v1'
-const LEGACY_LAST_REVIEWER_STORAGE_KEY = 'practica.last_teacher.v1'
 const LESSON_GOAL_PRESETS = [
   'Today\'s drum lesson follow-up',
   'Timing and consistency',
@@ -44,61 +42,6 @@ const LESSON_GOAL_PRESETS = [
 ]
 
 const normalizeReviewerText = (value = '') => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
-
-const findReviewerAutoPick = (query, reviewers = []) => {
-  const normalizedQuery = normalizeReviewerText(query)
-  if (!normalizedQuery) return null
-
-  const queryWords = normalizedQuery.split(/\s+/).filter(Boolean)
-  const candidates = reviewers
-    .map((reviewer) => {
-      const display = normalizeReviewerText(reviewer.display_name)
-      const username = normalizeReviewerText(reviewer.username)
-      const haystack = `${display} ${username}`.trim()
-      let score = 0
-
-      if (display === normalizedQuery || username === normalizedQuery) score += 100
-      if (display.startsWith(normalizedQuery) || username.startsWith(normalizedQuery)) score += 80
-      if (queryWords.length > 0 && queryWords.every((word) => haystack.includes(word))) score += 60
-      if (normalizedQuery.includes('jimmy') && haystack.includes('jimmy')) score += 50
-      if (normalizedQuery.includes('sage') && haystack.includes('sage')) score += 50
-      if (haystack.includes('jimmy sage')) score += 25
-
-      return { reviewer, score }
-    })
-    .filter((item) => item.score > 0)
-    .sort((left, right) => right.score - left.score)
-
-  if (candidates.length === 0) return null
-  if (candidates.length === 1) return candidates[0].reviewer
-  if (candidates[0].score >= 130 && candidates[0].score >= candidates[1].score + 20) return candidates[0].reviewer
-  return null
-}
-
-const readLastReviewer = () => {
-  if (typeof window === 'undefined') return null
-  for (const storageKey of [LAST_REVIEWER_KEY, LEGACY_LAST_REVIEWER_STORAGE_KEY]) {
-    try {
-      const raw = window.localStorage.getItem(storageKey)
-      if (!raw) continue
-      const parsed = JSON.parse(raw)
-      if (!parsed || typeof parsed !== 'object' || !parsed.id) continue
-      return parsed
-    } catch {}
-  }
-  return null
-}
-
-const writeLastReviewer = (reviewer) => {
-  if (typeof window === 'undefined' || !reviewer?.id) return
-  try {
-    window.localStorage.setItem(LAST_REVIEWER_KEY, JSON.stringify({
-      id: reviewer.id,
-      username: reviewer.username,
-      display_name: reviewer.display_name,
-    }))
-  } catch {}
-}
 
 function SessionDetail({ session: initialSession, token, onBack, onOpenReviewRequest, initialReviewRequestDraft = null, onReviewRequestDraftCleared, onSessionUpdate, onSessionDelete, justUploaded = false, onRecordAnother, onOpenSeries, practiceThreadOptions = [] }) {
   const toast = useToast()
@@ -393,11 +336,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
           if (current?.id) {
             return reviewers.find((reviewer) => reviewer.id === current.id) || null
           }
-          const storedReviewer = readLastReviewer()
-          if (storedReviewer?.id) {
-            return reviewers.find((reviewer) => reviewer.id === storedReviewer.id) || null
-          }
-          if (reviewers.length === 1) return reviewers[0]
           return null
         })
       } catch {
@@ -429,15 +367,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       const username = normalizeReviewerText(reviewer.username)
       return display.includes(normalizedQuery) || username.includes(normalizedQuery)
     })
-    const autoPick = findReviewerAutoPick(query, results)
-    if (autoPick) {
-      setSelectedReviewer(autoPick)
-      setReviewerQuery('')
-      setReviewerResults([])
-      writeLastReviewer(autoPick)
-      setReviewerSearchLoading(false)
-      return undefined
-    }
     setReviewerResults(results)
     setReviewerSearchLoading(false)
     return undefined
@@ -454,7 +383,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     setSelectedReviewer(reviewer)
     setReviewerQuery('')
     setReviewerResults([])
-    writeLastReviewer(reviewer)
   }
 
   const saveEdits = async () => {
@@ -655,7 +583,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       setRequestGoal('')
       setRequestExerciseOrSong('')
       onReviewRequestDraftCleared?.()
-      writeLastReviewer(selectedReviewer)
       toast.success(`Request sent to ${selectedReviewer.display_name || selectedReviewer.username}`)
       if ((data?.feedback_link?.url || data?.review_link?.url)) {
         try {
