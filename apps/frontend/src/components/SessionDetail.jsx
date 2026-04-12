@@ -115,8 +115,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     ? 'feedback request'
     : pendingShareIntent === 'request_review'
       ? 'review request'
-    : pendingShareIntent === 'share_private_link'
-      ? 'private link'
       : pendingShareIntent === 'invite_reviewer'
         ? 'reviewer invite'
         : ''
@@ -475,10 +473,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
         toast.success('Playback is ready. You can request review now.')
         return
       }
-      if (intent === 'share_private_link') {
-        await copyShareLink({ skipReadyIntent: true })
-        return
-      }
       if (intent === 'invite_reviewer') {
         await inviteReviewerFromComposer({ skipReadyIntent: true })
       }
@@ -642,34 +636,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       if (showInviteManager) await loadInviteCodes()
     } catch {}
     return inviteData.invite_url || ''
-  }
-
-  const copyShareLink = async ({ skipReadyIntent = false } = {}) => {
-    if (!token || !session?.id) return
-    if (!canCreateShareLink && !skipReadyIntent) {
-      setPendingShareIntent('share_private_link')
-      reportClientEvent('share_blocked_session_not_ready', {
-        action: 'share_private_link',
-        session_id: session.id,
-        processing_status: session?.processing_status || '',
-      })
-      toast.success('We will finish creating the private link once playback is ready.')
-      return
-    }
-    setSharing(true)
-    try {
-      const bundledUrl = await createBundledShareLink()
-      await navigator.clipboard.writeText(bundledUrl)
-      reportClientEvent('reviewer_invite_created', {
-        action: 'share_private_link',
-        session_id: session.id,
-      })
-      toast.success('Share link copied')
-    } catch (error) {
-      toast.error(error?.message || 'Could not create share link')
-    } finally {
-      setSharing(false)
-    }
   }
 
   const turnOffInviteCode = async (inviteId) => {
