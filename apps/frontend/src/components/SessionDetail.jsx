@@ -609,7 +609,9 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       const res = await fetch(`/api/reviewer-invites/${query}`, { headers: authHeaders })
       const data = await res.json().catch(() => ([]))
       if (!res.ok) throw new Error('Could not load invites')
-      const activeCodes = Array.isArray(data) ? data : []
+      const activeCodes = Array.isArray(data)
+        ? data.filter((item) => String(item?.status || '').trim().toLowerCase() === 'pending')
+        : []
       setActiveInviteCodes(activeCodes)
     } catch (error) {
       toast.error(error?.message || 'Could not load invites')
@@ -1119,24 +1121,15 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                               <p className="text-xs text-gray-500 mt-1">
                                 {String(invite.status || 'pending').replace('_', ' ')} • created {new Date(invite.created_at).toLocaleString(undefined, { hour12: undefined })}
                               </p>
-                              {invite.status === 'claimed' && invite.claimed_by ? (
-                                <p className="text-xs text-emerald-700 mt-1">Claimed by {invite.claimed_by.display_name || invite.claimed_by.username}{invite.claimed_at ? ` • ${new Date(invite.claimed_at).toLocaleString(undefined, { hour12: undefined })}` : ''}</p>
-                              ) : null}
                             </div>
-                            {invite.status === 'pending' ? (
-                              <div className="flex items-center gap-3">
-                                <button type="button" onClick={() => copyInviteUrl(invite.invite_url, { successMessage: 'Invite link copied again' })} className="text-xs text-gray-700 hover:text-gray-900 transition-colors">
-                                  Copy link
-                                </button>
-                                <button type="button" onClick={() => turnOffInviteCode(invite.id)} className="text-xs text-red-600 hover:text-red-700 transition-colors">
-                                  Turn off
-                                </button>
-                              </div>
-                            ) : (
-                              <span className="text-[11px] uppercase tracking-wide px-2 py-1 rounded-full bg-emerald-100 text-emerald-800">
-                                Claimed
-                              </span>
-                            )}
+                            <div className="flex items-center gap-3">
+                              <button type="button" onClick={() => copyInviteUrl(invite.invite_url, { successMessage: 'Invite link copied again' })} className="text-xs text-gray-700 hover:text-gray-900 transition-colors">
+                                Copy link
+                              </button>
+                              <button type="button" onClick={() => turnOffInviteCode(invite.id)} className="text-xs text-red-600 hover:text-red-700 transition-colors">
+                                Turn off
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
