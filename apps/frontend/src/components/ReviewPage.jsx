@@ -245,6 +245,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
   const canRespondToRequest = !reviewRequest || memberRole === 'reviewer'
   const reviewerShouldRespond = memberRole === 'reviewer' && ['requested', 'opened'].includes(String(reviewRequest?.status || '').trim().toLowerCase())
   const hasCurrentUserFeedback = feedback.some((item) => item.authored_by_current_user)
+  const isAdditionalResponseComposer = !(reviewerShouldRespond && !hasCurrentUserFeedback)
 
   const canStudentClose = memberRole === 'student' || memberRole === 'owner'
   const statusKey = String(reviewRequest?.status || '').trim().toLowerCase()
@@ -695,8 +696,10 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
     try {
       const formData = new FormData()
       formData.append('feedback_video', responseFile)
-      formData.append('text', responseNotes.trim())
-      formData.append('feedback_category', responseCategory)
+      if (!isAdditionalResponseComposer) {
+        formData.append('text', responseNotes.trim())
+        formData.append('feedback_category', responseCategory)
+      }
       if (typeof selectedTimestampSeconds === 'number') formData.append('timestamp_seconds', selectedTimestampSeconds)
       if (!submitUploadIdRef.current) submitUploadIdRef.current = createClientUploadId()
       formData.append('client_upload_id', submitUploadIdRef.current)
@@ -911,7 +914,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
               </div>
             ) : null}
 
-            {memberRole === 'reviewer' ? (
+            {memberRole === 'reviewer' && !isAdditionalResponseComposer ? (
               <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-3 space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Saved templates</p>
@@ -938,7 +941,8 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
               </div>
             ) : null}
 
-            <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+            {!isAdditionalResponseComposer ? (
+              <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
               <div>
                 <label className="block text-xs font-medium uppercase tracking-wide text-gray-500">Note</label>
                 <textarea
@@ -961,7 +965,8 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
                   ))}
                 </select>
               </div>
-            </div>
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button type="button" onClick={() => setShowRecorder(true)} className="rounded-2xl bg-gray-900 text-white px-4 py-3 text-sm font-medium hover:bg-gray-800 transition-colors">
