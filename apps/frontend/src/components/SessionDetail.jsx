@@ -77,6 +77,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
   const [showInviteManager, setShowInviteManager] = useState(false)
   const [inviteManagerLoading, setInviteManagerLoading] = useState(false)
   const [activeInviteCodes, setActiveInviteCodes] = useState([])
+  const [latestInviteUrl, setLatestInviteUrl] = useState('')
   const [pendingShareIntent, setPendingShareIntent] = useState('')
   const [showRequestDetails, setShowRequestDetails] = useState(false)
   const [showRequestHistory, setShowRequestHistory] = useState(false)
@@ -199,6 +200,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     setShowRequestComposer(false)
     setShowInviteManager(false)
     setActiveInviteCodes([])
+    setLatestInviteUrl('')
     setPendingShareIntent('')
     setReviewerQuery('')
     setDesignatedReviewers([])
@@ -646,6 +648,19 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     return inviteData.invite_url || ''
   }
 
+  const copyInviteUrl = async (inviteUrl, { successMessage = 'Invite link copied' } = {}) => {
+    const normalizedUrl = String(inviteUrl || '').trim()
+    if (!normalizedUrl) return false
+    try {
+      await navigator.clipboard.writeText(normalizedUrl)
+      toast.success(successMessage)
+      return true
+    } catch {
+      toast.error('Could not copy automatically. You can copy the link below.')
+      return false
+    }
+  }
+
   const turnOffInviteCode = async (inviteId) => {
     if (!token || !inviteId) return
     try {
@@ -676,18 +691,19 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     }
     setSharing(true)
     try {
+      const inviteLabel = String(reviewerQuery || '').trim() || `Review ${session.title}`
       const bundledUrl = await createBundledShareLink({
         intent: 'roster_join',
-        label: `Review ${session.title}`,
+        label: inviteLabel,
       })
-      await navigator.clipboard.writeText(bundledUrl)
+      setLatestInviteUrl(bundledUrl)
+      await copyInviteUrl(bundledUrl, { successMessage: 'Invite link copied. Send it to the person you want feedback from.' })
       reportClientEvent('reviewer_invite_created', {
         action: sourceAction,
         session_id: session.id,
       })
       setShowInviteManager(true)
       await loadInviteCodes()
-      toast.success('Invite link copied. Send it to the person you want feedback from.')
     } catch (error) {
       toast.error(error?.message || 'Could not invite reviewer')
     } finally {
@@ -1108,9 +1124,14 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                               ) : null}
                             </div>
                             {invite.status === 'pending' ? (
-                              <button type="button" onClick={() => turnOffInviteCode(invite.id)} className="text-xs text-red-600 hover:text-red-700 transition-colors">
-                                Turn off
-                              </button>
+                              <div className="flex items-center gap-3">
+                                <button type="button" onClick={() => copyInviteUrl(invite.invite_url, { successMessage: 'Invite link copied again' })} className="text-xs text-gray-700 hover:text-gray-900 transition-colors">
+                                  Copy link
+                                </button>
+                                <button type="button" onClick={() => turnOffInviteCode(invite.id)} className="text-xs text-red-600 hover:text-red-700 transition-colors">
+                                  Turn off
+                                </button>
+                              </div>
                             ) : (
                               <span className="text-[11px] uppercase tracking-wide px-2 py-1 rounded-full bg-emerald-100 text-emerald-800">
                                 Claimed
@@ -1227,33 +1248,45 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                                 ))}
                               </div>
                             ) : null}
-                            {designatedReviewers.length > 0 ? (
-                              <>
+                            <input
+                              type="text"
+                              value={reviewerQuery}
+                              onChange={(event) => setReviewerQuery(event.target.value)}
+                              placeholder={designatedReviewers.length > 0 ? 'Search existing reviewers or type a new name' : 'Type the name of the person you want feedback from'}
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                            />
+                            <p className="text-xs text-gray-500">Pick someone already on your list, or leave it as a new name and Practica will copy an invite link.</p>
+                            {reviewerSearchLoading ? <p className="text-xs text-gray-500">Searching…</p> : null}
+                            {reviewerResults.length > 0 ? (
+                              <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+                                {reviewerResults.map((reviewer) => (
+                                  <button
+                                    key={reviewer.id}
+                                    type="button"
+                                    onClick={() => chooseReviewer(reviewer)}
+                                    className="w-full text-left px-3 py-3 hover:bg-gray-50 transition-colors border-b last:border-b-0 border-gray-100"
+                                  >
+                                    <p className="text-sm font-medium text-gray-900">{reviewer.display_name || reviewer.username}</p>
+                                    <p className="text-xs text-gray-500 mt-1">@{reviewer.username}</p>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : reviewerQuery.trim().length >= 2 && !reviewerSearchLoading && designatedReviewers.length > 0 ? <p className="text-xs text-gray-500">No match yet. Keep going to copy an invite link for this person.</p> : null}
+                            {latestInviteUrl ? (
+                              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 space-y-2">
+                                <p className="text-xs font-medium uppercase tracking-wide text-emerald-800">Invite link ready</p>
                                 <input
                                   type="text"
-                                  value={reviewerQuery}
-                                  onChange={(event) => setReviewerQuery(event.target.value)}
-                                  placeholder="Search reviewers"
-                                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                                  readOnly
+                                  value={latestInviteUrl}
+                                  className="w-full px-3 py-2 text-xs border border-emerald-200 rounded-lg bg-white text-gray-700"
                                 />
-                                <p className="text-xs text-gray-500">Choose someone from your list, or keep going to copy an invite link for someone new.</p>
-                                {reviewerSearchLoading ? <p className="text-xs text-gray-500">Searching…</p> : null}
-                                {reviewerResults.length > 0 ? (
-                                  <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-                                    {reviewerResults.map((reviewer) => (
-                                      <button
-                                        key={reviewer.id}
-                                        type="button"
-                                        onClick={() => chooseReviewer(reviewer)}
-                                        className="w-full text-left px-3 py-3 hover:bg-gray-50 transition-colors border-b last:border-b-0 border-gray-100"
-                                      >
-                                        <p className="text-sm font-medium text-gray-900">{reviewer.display_name || reviewer.username}</p>
-                                        <p className="text-xs text-gray-500 mt-1">@{reviewer.username}</p>
-                                      </button>
-                                    ))}
-                                  </div>
-                                ) : reviewerQuery.trim().length >= 2 && !reviewerSearchLoading ? <p className="text-xs text-gray-500">No matching people found yet.</p> : null}
-                              </>
+                                <div className="flex justify-end">
+                                  <button type="button" onClick={() => copyInviteUrl(latestInviteUrl, { successMessage: 'Invite link copied again' })} className="text-xs text-emerald-800 border border-emerald-300 rounded-lg px-3 py-2 hover:bg-emerald-100 transition-colors">
+                                    Copy again
+                                  </button>
+                                </div>
+                              </div>
                             ) : null}
                           </div>
                         )}
