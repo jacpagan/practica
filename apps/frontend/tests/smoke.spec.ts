@@ -659,3 +659,72 @@ test('Calendar day view shows review state per video', async ({ page }) => {
   await expect(awaitingRow.locator('video')).toHaveCount(0)
   await expect(page.locator('text=1 awaiting review')).toHaveCount(0)
 })
+
+test('Signed-in claimed reviewer sees a clear join confirmation on the review page', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('token', 'smoke-token')
+  })
+
+  const reviewInfo = {
+    session: {
+      id: 501,
+      title: 'Claimed invite take',
+      practice_series: '',
+      description: 'A short take for claimed reviewer confirmation.',
+      video_file: '',
+      duration_seconds: 120,
+      recorded_at: '2099-01-01T00:00:00Z',
+      assets: [],
+      processing_status: 'ready',
+      processing_job_id: '',
+      processing_error: '',
+    },
+    link: {
+      token: 'CLAIMTOKEN',
+      expires_at: '2099-01-08T00:00:00Z',
+      is_active: true,
+      allow_video_feedback: true,
+      url: 'https://practica.jpagan.com/r/CLAIMTOKEN',
+    },
+    auth_required: true,
+    review_request: null,
+    feedback_request: null,
+    reviewer_invite: {
+      id: 91,
+      status: 'claimed',
+      intent: 'lightweight_review',
+      claim_code: 'CLAIM123',
+      invite_url: 'https://practica.jpagan.com/r/CLAIMTOKEN?claim=CLAIM123',
+    },
+  }
+
+  await page.route('**/api/auth/me/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 2, username: 'claimed_reviewer', display_name: 'Claimed Reviewer' }),
+    })
+  })
+
+  await page.route('**/api/review/CLAIMTOKEN/?claim=CLAIM123', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(reviewInfo),
+    })
+  })
+
+  await page.route('**/api/review/CLAIMTOKEN/feedback/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    })
+  })
+
+  await page.goto('/r/CLAIMTOKEN?claim=CLAIM123')
+
+  await expect(page.getByText('You’re in')).toBeVisible()
+  await expect(page.getByText('You can review this take privately now, and this learner can ask you again later without sending a brand-new invite.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Dismiss' })).toBeVisible()
+})

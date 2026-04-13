@@ -52,6 +52,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
   const [session, setSession] = useState(null)
   const [link, setLink] = useState(null)
   const [reviewerInvite, setReviewerInvite] = useState(null)
+  const [showInviteClaimConfirmation, setShowInviteClaimConfirmation] = useState(false)
   const [reviewRequest, setReviewRequest] = useState(null)
   const [feedback, setFeedback] = useState([])
   const [loading, setLoading] = useState(true)
@@ -241,6 +242,27 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
     loadTemplates()
     return () => { cancelled = true }
   }, [authToken, reviewRequest?.current_member_role, reviewRequest?.current_user_role])
+
+  useEffect(() => {
+    if (!user || reviewerInvite?.status !== 'claimed') {
+      setShowInviteClaimConfirmation(false)
+      return
+    }
+    const storageKey = `practica.reviewer_invite_claim_seen.v1:${reviewerInvite.id}`
+    try {
+      const alreadySeen = window.sessionStorage.getItem(storageKey)
+      setShowInviteClaimConfirmation(!alreadySeen)
+    } catch {
+      setShowInviteClaimConfirmation(true)
+    }
+  }, [reviewerInvite?.id, reviewerInvite?.status, user])
+
+  const dismissInviteClaimConfirmation = () => {
+    if (reviewerInvite?.id) {
+      try { window.sessionStorage.setItem(`practica.reviewer_invite_claim_seen.v1:${reviewerInvite.id}`, '1') } catch {}
+    }
+    setShowInviteClaimConfirmation(false)
+  }
 
   const memberRole = reviewRequest?.current_member_role || reviewRequest?.current_user_role || ''
   const canRespondToRequest = !reviewRequest || memberRole === 'reviewer'
@@ -857,11 +879,22 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
             {reviewRequest ? <StatusChip status={reviewRequest.status} /> : null}
           </div>
           <p className="text-xs text-gray-500 mt-2">Signed in as {user.display_name || user.username}.</p>
-          {reviewerInvite?.status === 'claimed' ? (
-            <p className="text-xs text-emerald-700 mt-1">Reviewer invite connected. You can respond here and appear in this member's reviewer roster.</p>
-          ) : null}
           {link?.expires_at ? <p className="text-xs text-gray-500 mt-1">Private access • sign-in required • expires {new Date(link.expires_at).toLocaleString(undefined, { hour12: undefined })}</p> : null}
         </div>
+
+        {showInviteClaimConfirmation ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-emerald-950">You’re in</p>
+                <p className="text-sm text-emerald-900 mt-1">You can review this take privately now, and this learner can ask you again later without sending a brand-new invite.</p>
+              </div>
+              <button type="button" onClick={dismissInviteClaimConfirmation} className="text-xs text-emerald-800 hover:text-emerald-950 transition-colors">
+                Dismiss
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {statusBanner ? (
           <div className={`rounded-xl border px-4 py-3 ${statusBanner.tone}`}>
