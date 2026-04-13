@@ -19,6 +19,7 @@ const RecorderPage = React.lazy(() => import('./components/RecorderPage'))
 const parseRoute = (pathname, search = '') => {
   const params = new URLSearchParams(search || '')
   const date = (params.get('date') || '').trim()
+  const claim = (params.get('claim') || '').trim().toUpperCase()
   if (pathname === '/') {
     return { view: 'calendar', sessionId: null, date }
   }
@@ -30,7 +31,7 @@ const parseRoute = (pathname, search = '') => {
   if (pathname === '/record' || pathname === '/recording') return { view: 'record', sessionId: null }
   if (pathname === '/requests') return { view: 'requests', sessionId: null }
   const reviewMatch = pathname.match(/^\/r\/(.+)$/)
-  if (reviewMatch) return { view: 'review', token: reviewMatch[1], sessionId: null }
+  if (reviewMatch) return { view: 'review', token: reviewMatch[1], claim, sessionId: null }
   const seriesMatch = pathname.match(/^\/series\/(.+)$/)
   if (seriesMatch) return { view: 'series', sessionId: null, seriesName: decodeURIComponent(seriesMatch[1]) }
   const sessionMatch = pathname.match(/^\/sessions\/(\d+)$/)
@@ -38,14 +39,14 @@ const parseRoute = (pathname, search = '') => {
   return { view: 'calendar', sessionId: null }
 }
 
-const routePath = ({ view, sessionId, token, seriesName, date }) => {
+const routePath = ({ view, sessionId, token, claim, seriesName, date }) => {
   if (view === 'privacy') return '/privacy'
   if (view === 'archive') return '/'
   if (view === 'upload') return '/upload'
   if (view === 'record') return '/record'
   if (view === 'requests') return '/requests'
   if (view === 'series' && seriesName) return `/series/${encodeURIComponent(seriesName)}`
-  if (view === 'review' && token) return `/r/${token}`
+  if (view === 'review' && token) return claim ? `/r/${token}?claim=${encodeURIComponent(claim)}` : `/r/${token}`
   if (view === 'detail' && sessionId) return `/sessions/${sessionId}`
   if (view === 'calendar') return date ? `/?date=${encodeURIComponent(date)}` : '/'
   return '/'
@@ -62,6 +63,7 @@ function AppContent() {
   const [routeSeriesName, setRouteSeriesName] = useState(initialRoute.seriesName || '')
   const [routeDate, setRouteDate] = useState(initialRoute.date || '')
   const [reviewToken, setReviewToken] = useState(initialRoute.token || '')
+  const [reviewClaim, setReviewClaim] = useState(initialRoute.claim || '')
   const [selectedSession, setSelectedSession] = useState(null)
   const [sessions, setSessions] = useState([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
@@ -132,6 +134,7 @@ function AppContent() {
     setRouteSessionId(nextRoute.sessionId ?? null)
     setRouteSeriesName(nextRoute.seriesName || '')
     setReviewToken(nextRoute.token || '')
+    setReviewClaim(nextRoute.claim || '')
     setRouteDate(nextRoute.date || '')
     const path = routePath(nextRoute)
     const current = window.location.pathname + (window.location.search || '')
@@ -143,7 +146,7 @@ function AppContent() {
 
   // Normalize URL on initial mount (e.g., convert /calendar to /), preserving query date if present
   useEffect(() => {
-    const desired = routePath({ view, sessionId: routeSessionId, token: reviewToken, seriesName: routeSeriesName, date: routeDate })
+    const desired = routePath({ view, sessionId: routeSessionId, token: reviewToken, claim: reviewClaim, seriesName: routeSeriesName, date: routeDate })
     const current = window.location.pathname + (window.location.search || '')
     if (desired !== current) {
       try { window.history.replaceState(null, '', desired) } catch {}
@@ -188,9 +191,10 @@ function AppContent() {
     view,
     sessionId: routeSessionId,
     token: reviewToken,
+    claim: reviewClaim,
     seriesName: routeSeriesName,
     date: routeDate,
-  }), [reviewToken, routeDate, routeSessionId, routeSeriesName, view])
+  }), [reviewClaim, reviewToken, routeDate, routeSessionId, routeSeriesName, view])
 
   const resolveUploadReturnRoute = useCallback((draft = null) => {
     const explicit = draft?.returnRoute
@@ -199,6 +203,7 @@ function AppContent() {
         view: explicit.view,
         sessionId: explicit.sessionId ?? null,
         token: explicit.token || '',
+        claim: explicit.claim || '',
         seriesName: explicit.seriesName || '',
         date: explicit.date || '',
       }
@@ -213,8 +218,8 @@ function AppContent() {
   }, [routeDate])
 
   useEffect(() => {
-    currentPathRef.current = routePath({ view, sessionId: routeSessionId, token: reviewToken, seriesName: routeSeriesName, date: routeDate })
-  }, [reviewToken, routeDate, routeSessionId, routeSeriesName, view])
+    currentPathRef.current = routePath({ view, sessionId: routeSessionId, token: reviewToken, claim: reviewClaim, seriesName: routeSeriesName, date: routeDate })
+  }, [reviewClaim, reviewToken, routeDate, routeSessionId, routeSeriesName, view])
 
   useEffect(() => {
     const updateOnline = () => setOffline(typeof navigator !== 'undefined' ? !navigator.onLine : false)
