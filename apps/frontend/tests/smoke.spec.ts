@@ -660,7 +660,7 @@ test('Calendar day view shows review state per video', async ({ page }) => {
   await expect(page.locator('text=1 awaiting review')).toHaveCount(0)
 })
 
-test('Signed-in claimed reviewer sees a clear join confirmation on the review page', async ({ page }) => {
+test('Signed-in claimed reviewer sees a clear review-join confirmation', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('token', 'smoke-token')
   })
