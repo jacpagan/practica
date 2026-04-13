@@ -706,7 +706,7 @@ test('Signed-in claimed reviewer sees a clear review-join confirmation', async (
     })
   })
 
-  await page.route('**/api/review/CLAIMTOKEN/?claim=CLAIM123', async (route) => {
+  await page.route('**/api/review/CLAIMTOKEN/**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -715,6 +715,30 @@ test('Signed-in claimed reviewer sees a clear review-join confirmation', async (
   })
 
   await page.route('**/api/review/CLAIMTOKEN/feedback/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    })
+  })
+
+  await page.route('**/api/review-requests/?role=reviewer', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    })
+  })
+
+  await page.route('**/api/review-requests/?role=owner', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    })
+  })
+
+  await page.route('**/api/feedback-templates/', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
