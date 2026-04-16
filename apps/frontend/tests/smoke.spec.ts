@@ -332,7 +332,7 @@ test('Session detail separates access from request flow', async ({ page }) => {
     })
   })
 
-  await page.route('**/api/review-requests/?session_id=123&role=student', async (route) => {
+  await page.route('**/api/review-requests/?session_id=123&role=creator', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -348,7 +348,7 @@ test('Session detail separates access from request flow', async ({ page }) => {
     })
   })
 
-  await page.route('**/api/review-requests/?role=owner', async (route) => {
+  await page.route('**/api/review-requests/?role=creator', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -356,7 +356,7 @@ test('Session detail separates access from request flow', async ({ page }) => {
     })
   })
 
-  await page.route('**/api/connections/?role=student', async (route) => {
+  await page.route('**/api/connections/?role=creator', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -380,6 +380,191 @@ test('Session detail separates access from request flow', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Manage invites' })).toBeVisible()
   await page.getByRole('button', { name: 'Manage invites' }).click()
   await expect(page.locator('text=No reviewer invites yet.')).toBeVisible()
+})
+
+test('Session detail invite manager shows pending and joined resolution states', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('token', 'smoke-token')
+  })
+
+  const sessionPayload = {
+    id: 126,
+    title: 'Invite state session',
+    practice_series: '',
+    description: '',
+    video_file: '',
+    duration_seconds: null,
+    recorded_at: '2099-01-01T00:00:00Z',
+    created_at: '2099-01-01T00:00:00Z',
+    updated_at: '2099-01-01T00:00:00Z',
+    processing_status: 'ready',
+    processing_job_id: '',
+    processing_error: '',
+    resolution: { code: 'ready_for_review', phase: 'complete', summary: 'Ready for review', detail: 'This take is ready to watch, share, or request feedback.', awaiting_actor: 'owner' },
+    tag_names: [],
+    assets: [],
+    chapters: [],
+    video_feedback: [],
+    active_review_link: null,
+    chapter_count: 0,
+    video_feedback_count: 0,
+    owner: { id: 1, display_name: 'Smoke Member' },
+    can_edit: true,
+  }
+
+  await page.route('**/api/auth/me/', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 1, username: 'smoke_member', display_name: 'Smoke Member' }) })
+  })
+  await page.route('**/api/sessions/126/', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(sessionPayload) })
+  })
+  await page.route('**/api/review-requests/?session_id=126&role=creator', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+  await page.route('**/api/review-requests/?role=reviewer', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+  await page.route('**/api/review-requests/?role=creator', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+  await page.route('**/api/connections/?role=creator', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+  await page.route('**/api/reviewer-invites/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          id: 1,
+          label: 'Pending invite',
+          status: 'pending',
+          created_at: '2099-01-01T00:00:00Z',
+          invite_url: 'https://practica.jpagan.com/r/PENDING?claim=PEND123',
+          resolution: {
+            code: 'invite_pending',
+            phase: 'waiting',
+            summary: 'Waiting for reviewer to join',
+            detail: 'This invite is ready to claim. Share the private link with the person you want feedback from.',
+            awaiting_actor: 'reviewer',
+          },
+        },
+        {
+          id: 2,
+          label: 'Joined invite',
+          status: 'claimed',
+          created_at: '2099-01-01T00:00:00Z',
+          invite_url: 'https://practica.jpagan.com/r/JOINED?claim=JOIN123',
+          resolution: {
+            code: 'reviewer_joined',
+            phase: 'complete',
+            summary: 'Reviewer joined',
+            detail: 'Existing Reviewer claimed this invite and can review privately now.',
+            awaiting_actor: 'owner',
+          },
+        },
+      ]),
+    })
+  })
+
+  await page.goto('/sessions/126')
+  await page.getByRole('button', { name: 'Manage invites' }).click()
+  await expect(page.getByText('Waiting for reviewer to join')).toBeVisible()
+  await expect(page.getByText('Reviewer joined')).toBeVisible()
+})
+
+test('Session detail preserves queued feedback intent across reload while processing', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('token', 'smoke-token')
+  })
+
+  const reviewerOptions = [
+    { id: 7, username: 'ryan', display_name: 'Ryan' },
+  ]
+
+  const sessionPayload = {
+    id: 127,
+    title: 'Processing take',
+    practice_series: '',
+    description: '',
+    video_file: '',
+    duration_seconds: null,
+    recorded_at: '2099-01-01T00:00:00Z',
+    created_at: '2099-01-01T00:00:00Z',
+    updated_at: '2099-01-01T00:00:00Z',
+    processing_status: 'processing',
+    processing_job_id: 'job-123',
+    processing_error: '',
+    resolution: {
+      code: 'processing',
+      phase: 'waiting',
+      summary: 'Preparing playback',
+      detail: 'Your take is saved. You can request feedback once playback is ready.',
+      awaiting_actor: 'system',
+    },
+    tag_names: [],
+    assets: [],
+    chapters: [],
+    video_feedback: [],
+    active_review_link: null,
+    chapter_count: 0,
+    video_feedback_count: 0,
+    owner: { id: 1, display_name: 'Smoke Member' },
+    can_edit: true,
+  }
+
+  await page.route('**/api/auth/me/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 1, username: 'smoke_member', display_name: 'Smoke Member' }),
+    })
+  })
+
+  await page.route('**/api/sessions/127/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(sessionPayload),
+    })
+  })
+
+  await page.route('**/api/review-requests/?session_id=127&role=creator', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/review-requests/?role=reviewer', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/review-requests/?role=creator', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/connections/?role=creator', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reviewerOptions) })
+  })
+
+  await page.route('**/api/reviewer-invites/**', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.goto('/sessions/127')
+  await page.getByRole('button', { name: 'Ask for feedback' }).click()
+  await expect(page.locator('p').filter({ hasText: /^Queued next step: feedback request\./ }).first()).toBeVisible()
+
+  sessionPayload.processing_status = 'ready'
+  sessionPayload.processing_job_id = ''
+  sessionPayload.resolution = {
+    code: 'ready_for_review',
+    phase: 'complete',
+    summary: 'Ready for review',
+    detail: 'This take is ready to watch, share, or request feedback.',
+    awaiting_actor: 'owner',
+  }
+
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Hide invites' })).toBeVisible()
 })
 
 test('Session detail shows turn-off action for active outgoing request', async ({ page }) => {
@@ -439,7 +624,7 @@ test('Session detail shows turn-off action for active outgoing request', async (
     })
   })
 
-  await page.route('**/api/review-requests/?session_id=124&role=student', async (route) => {
+  await page.route('**/api/review-requests/?session_id=124&role=creator', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -447,7 +632,7 @@ test('Session detail shows turn-off action for active outgoing request', async (
     })
   })
 
-  await page.route('**/api/review-requests/?role=owner', async (route) => {
+  await page.route('**/api/review-requests/?role=creator', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -463,7 +648,7 @@ test('Session detail shows turn-off action for active outgoing request', async (
     })
   })
 
-  await page.route('**/api/connections/?role=student', async (route) => {
+  await page.route('**/api/connections/?role=creator', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -474,6 +659,101 @@ test('Session detail shows turn-off action for active outgoing request', async (
   await page.goto('/sessions/124')
 
   await expect(page.getByRole('button', { name: 'Turn off' }).first()).toBeVisible()
+})
+
+test('Session detail history shows resolution summary and timestamp for past requests', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('token', 'smoke-token')
+  })
+
+  const sessionPayload = {
+    id: 128,
+    title: 'History session',
+    practice_series: '',
+    description: '',
+    video_file: '',
+    duration_seconds: null,
+    recorded_at: '2099-01-01T00:00:00Z',
+    created_at: '2099-01-01T00:00:00Z',
+    updated_at: '2099-01-01T00:00:00Z',
+    processing_status: 'ready',
+    processing_job_id: '',
+    processing_error: '',
+    resolution: { code: 'ready_for_review', phase: 'complete', summary: 'Ready for review', detail: 'This take is ready to watch, share, or request feedback.', awaiting_actor: 'owner' },
+    tag_names: [],
+    assets: [],
+    chapters: [],
+    video_feedback: [],
+    active_review_link: null,
+    chapter_count: 0,
+    video_feedback_count: 0,
+    owner: { id: 1, display_name: 'Smoke Member' },
+    can_edit: true,
+  }
+
+  const reviewRequests = [
+    {
+      id: 501,
+      session_id: 128,
+      session: { id: 128 },
+      status: 'opened',
+      created_at: '2099-01-01T00:00:00Z',
+      updated_at: '2099-01-01T00:05:00Z',
+      reviewer: { id: 2, username: 'rym', display_name: 'RyM' },
+      instrument: 'drums',
+      goal: 'Stay relaxed',
+      exercise_or_song: 'Verse groove',
+      response_count: 0,
+      feedback_items: [],
+      feedback_category_counts: {},
+      resolution: {
+        code: 'reviewer_opened',
+        phase: 'waiting',
+        summary: 'RyM opened this request',
+        detail: 'Your reviewer opened the thread and has not responded yet.',
+        awaiting_actor: 'reviewer',
+        occurred_label: 'Opened',
+        occurred_at: '2099-01-01T00:05:00Z',
+      },
+    },
+  ]
+
+  await page.route('**/api/auth/me/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 1, username: 'smoke_member', display_name: 'Smoke Member' }),
+    })
+  })
+
+  await page.route('**/api/sessions/128/', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(sessionPayload) })
+  })
+
+  await page.route('**/api/review-requests/?session_id=128&role=creator', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reviewRequests) })
+  })
+
+  await page.route('**/api/review-requests/?role=creator', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reviewRequests) })
+  })
+
+  await page.route('**/api/review-requests/?role=reviewer', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/connections/?role=creator', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/reviewer-invites/**', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.goto('/sessions/128')
+  await page.getByRole('button', { name: 'Show history' }).click()
+  await expect(page.getByText('RyM opened this request').first()).toBeVisible()
+  await expect(page.getByText(/^Opened /).first()).toBeVisible()
 })
 
 test('Ask for feedback starts with no reviewer selected on a fresh request', async ({ page }) => {
@@ -506,8 +786,8 @@ test('Ask for feedback starts with no reviewer selected on a fresh request', asy
   }
 
   const reviewers = [
-    { id: 1, reviewer: { id: 11, username: 'ryan', display_name: 'Ryan' }, student: { id: 1 }, pending_review_count: 0, total_review_count: 2, created_at: '2099-01-01T00:00:00Z' },
-    { id: 2, reviewer: { id: 12, username: 'casey', display_name: 'Casey' }, student: { id: 1 }, pending_review_count: 0, total_review_count: 1, created_at: '2099-01-02T00:00:00Z' },
+    { id: 1, reviewer: { id: 11, username: 'ryan', display_name: 'Ryan' }, member: { id: 1 }, pending_review_count: 0, total_review_count: 2, created_at: '2099-01-01T00:00:00Z' },
+    { id: 2, reviewer: { id: 12, username: 'casey', display_name: 'Casey' }, member: { id: 1 }, pending_review_count: 0, total_review_count: 1, created_at: '2099-01-02T00:00:00Z' },
   ]
 
   await page.route('**/api/auth/me/', async (route) => {
@@ -522,7 +802,7 @@ test('Ask for feedback starts with no reviewer selected on a fresh request', asy
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(sessionPayload) })
   })
 
-  await page.route('**/api/review-requests/?session_id=125&role=student', async (route) => {
+  await page.route('**/api/review-requests/?session_id=125&role=creator', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
   })
 
@@ -530,11 +810,11 @@ test('Ask for feedback starts with no reviewer selected on a fresh request', asy
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
   })
 
-  await page.route('**/api/review-requests/?role=owner', async (route) => {
+  await page.route('**/api/review-requests/?role=creator', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
   })
 
-  await page.route('**/api/connections/?role=student', async (route) => {
+  await page.route('**/api/connections/?role=creator', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reviewers) })
   })
 
@@ -613,6 +893,15 @@ test('Calendar day view shows review state per video', async ({ page }) => {
       status: 'requested',
       created_at: '2026-04-09T10:00:00Z',
       updated_at: '2026-04-09T10:00:00Z',
+      resolution: {
+        code: 'waiting_on_reviewer',
+        phase: 'waiting',
+        summary: 'Waiting on reviewer',
+        detail: 'Your request is saved. The reviewer has not opened it yet.',
+        awaiting_actor: 'reviewer',
+        occurred_label: 'Requested',
+        occurred_at: '2026-04-09T10:00:00Z',
+      },
     },
   ]
 
@@ -624,7 +913,7 @@ test('Calendar day view shows review state per video', async ({ page }) => {
     })
   })
 
-  await page.route('**/api/review-requests/?role=owner', async (route) => {
+  await page.route('**/api/review-requests/?role=creator', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -654,8 +943,9 @@ test('Calendar day view shows review state per video', async ({ page }) => {
   await expect(page.locator('text=1 thread')).toHaveCount(0)
   const awaitingRow = page.getByRole('button').filter({ hasText: 'Take awaiting review' })
   const plainRow = page.getByRole('button').filter({ hasText: 'Take without request' })
-  await expect(awaitingRow.locator('span').filter({ hasText: 'Awaiting review' })).toHaveCount(1)
-  await expect(plainRow.locator('span').filter({ hasText: 'Awaiting review' })).toHaveCount(0)
+  await expect(awaitingRow.locator('span').filter({ hasText: 'Waiting on reviewer' })).toHaveCount(1)
+  await expect(awaitingRow.getByText('Waiting on reviewer').first()).toBeVisible()
+  await expect(plainRow.locator('span').filter({ hasText: 'Waiting on reviewer' })).toHaveCount(0)
   await expect(awaitingRow.locator('video')).toHaveCount(0)
   await expect(page.locator('text=1 awaiting review')).toHaveCount(0)
 })
@@ -695,6 +985,13 @@ test('Signed-in claimed reviewer sees a clear review-join confirmation', async (
       intent: 'lightweight_review',
       claim_code: 'CLAIM123',
       invite_url: 'https://practica.jpagan.com/r/CLAIMTOKEN?claim=CLAIM123',
+      resolution: {
+        code: 'review_access_ready',
+        phase: 'action_required',
+        summary: 'You’re in',
+        detail: 'You can review this take privately now, and this learner can ask you again later without sending a brand-new invite.',
+        awaiting_actor: 'reviewer',
+      },
     },
   }
 
@@ -730,7 +1027,7 @@ test('Signed-in claimed reviewer sees a clear review-join confirmation', async (
     })
   })
 
-  await page.route('**/api/review-requests/?role=owner', async (route) => {
+  await page.route('**/api/review-requests/?role=creator', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',

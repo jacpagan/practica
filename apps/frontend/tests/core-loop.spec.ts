@@ -74,7 +74,7 @@ async function waitForSessionReady(request, token: string, sessionId: number) {
 }
 
 async function latestOwnerRequestId(request, token: string) {
-  const response = await request.get('/api/review-requests/?role=owner', {
+  const response = await request.get('/api/review-requests/?role=creator', {
     headers: { Authorization: `Token ${token}` },
   })
   expect(response.ok()).toBeTruthy()
@@ -83,7 +83,7 @@ async function latestOwnerRequestId(request, token: string) {
 }
 
 async function designatedReviewerId(request, token: string) {
-  const response = await request.get('/api/connections/?role=student', {
+  const response = await request.get('/api/connections/?role=creator', {
     headers: { Authorization: `Token ${token}` },
   })
   expect(response.ok()).toBeTruthy()
@@ -98,7 +98,7 @@ async function installSignedInUploadMocks(page) {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ id: 101, username: 'multipart_student', email: '', display_name: 'Multipart Student' }),
+      body: JSON.stringify({ id: 101, username: 'multipart_student', email: '', display_name: 'Multipart Member' }),
     })
   })
 
@@ -202,7 +202,7 @@ async function installSignedInUploadMocks(page) {
         active_review_link: null,
         chapter_count: 0,
         video_feedback_count: 0,
-        owner: { id: 101, display_name: 'Multipart Student' },
+        owner: { id: 101, display_name: 'Multipart Member' },
         can_edit: true,
       }),
     })
@@ -232,7 +232,7 @@ async function installSignedInUploadMocks(page) {
         active_review_link: null,
         chapter_count: 0,
         video_feedback_count: 0,
-        owner: { id: 101, display_name: 'Multipart Student' },
+        owner: { id: 101, display_name: 'Multipart Member' },
         can_edit: true,
       }),
     })
@@ -246,7 +246,7 @@ async function installSignedInUploadMocks(page) {
     })
   })
 
-  await page.route('**/api/connections/?role=student', async (route) => {
+  await page.route('**/api/connections/?role=creator', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -254,7 +254,7 @@ async function installSignedInUploadMocks(page) {
     })
   })
 
-  await page.route('**/api/review-requests/?session_id=999&role=student', async (route) => {
+  await page.route('**/api/review-requests/?session_id=999&role=creator', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -286,7 +286,7 @@ teacher.is_staff = False
 teacher.is_superuser = False
 teacher.is_active = True
 teacher.save()
-Profile.objects.update_or_create(user=teacher, defaults={'display_name': 'E2E Teacher'})
+Profile.objects.update_or_create(user=teacher, defaults={'display_name': 'E2E Reviewer'})
 
 student, _ = User.objects.get_or_create(username='${studentUsername}')
 student.set_password('${studentPassword}')
@@ -294,7 +294,7 @@ student.is_staff = False
 student.is_superuser = False
 student.is_active = True
 student.save()
-Profile.objects.update_or_create(user=student, defaults={'display_name': 'E2E Student'})
+Profile.objects.update_or_create(user=student, defaults={'display_name': 'E2E Member'})
 
 ReviewerRosterMembership.objects.update_or_create(
     reviewer=teacher,
@@ -334,7 +334,7 @@ test('signed-in upload -> request -> feedback loop works', async ({ browser, req
   await waitForSessionReady(request, studentToken, sessionId)
   await studentPage.reload()
   await studentPage.getByRole('button', { name: 'Ask for feedback' }).click()
-  await studentPage.getByRole('button', { name: 'E2E Teacher' }).click()
+  await studentPage.getByRole('button', { name: 'E2E Reviewer' }).click()
   await studentPage.getByRole('button', { name: 'Send request' }).click()
   await expect(studentPage.getByText(/Waiting on/).first()).toBeVisible()
   const parentRequestId = await latestOwnerRequestId(request, studentToken)
@@ -343,7 +343,11 @@ test('signed-in upload -> request -> feedback loop works', async ({ browser, req
   await teacherPage.goto('/requests')
   await expect(teacherPage.getByText('Needs action', { exact: true })).toBeVisible()
   await teacherPage.getByRole('button', { name: 'Review now' }).click()
+  await expect(teacherPage.getByText('Your response is next')).toBeVisible()
   await expect(teacherPage.getByText('Add your response')).toBeVisible()
+
+  await studentPage.reload()
+  await expect(studentPage.getByText('opened', { exact: false }).first()).toBeVisible()
 
   const chooser = teacherPage.waitForEvent('filechooser')
   await teacherPage.getByRole('button', { name: 'Upload response' }).click()
@@ -353,8 +357,9 @@ test('signed-in upload -> request -> feedback loop works', async ({ browser, req
   await expect(teacherPage.getByRole('button', { name: 'Edit' })).toBeVisible({ timeout: 15000 })
 
   await studentPage.goto(`/sessions/${sessionId}`)
+  await expect(studentPage.getByText('Feedback is ready')).toBeVisible()
   await expect(studentPage.getByRole('button', { name: 'Review feedback' })).toBeVisible()
-  await expect(studentPage.getByText('E2E Teacher')).toBeVisible()
+  await expect(studentPage.getByText('E2E Reviewer', { exact: true })).toBeVisible()
 
   await studentContext.close()
   await teacherContext.close()
@@ -391,7 +396,7 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
   await studentPage.reload()
 
   await studentPage.getByRole('button', { name: 'Ask for feedback' }).click()
-  await studentPage.getByRole('button', { name: 'E2E Teacher' }).click()
+  await studentPage.getByRole('button', { name: 'E2E Reviewer' }).click()
   await studentPage.getByRole('button', { name: 'Send request' }).click()
   await expect(studentPage.getByText(/Waiting on/).first()).toBeVisible()
   const parentRequestId = await latestOwnerRequestId(request, studentToken)
