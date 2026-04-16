@@ -35,7 +35,7 @@ Goal:
 
 Goal:
 
-- let a learner invite a new trusted reviewer directly from session detail
+- let a member invite a new trusted reviewer directly from session detail
 - make the two sharing paths explicit
 
 ### Phase 2 — Reviewer response composer
@@ -49,12 +49,33 @@ Goal:
 Goal:
 
 - make the next step obvious after feedback and preserve momentum while media is processing
+- add clearer in-app resolution cues before considering outbound notifications
 
 ### Phase 4 — Hardening and measurement
 
 Goal:
 
 - stabilize rollout, measure outcomes, and close edge cases
+
+## Implementation Snapshot (as of April 16, 2026)
+
+Current assessed phase:
+
+- late Phase 3 moving into Phase 4 hardening
+
+Done / largely shipped:
+
+- Phase 0 guardrails are in place with backend coverage in protected auth + review-request flows
+- Phase 1 reviewer-invite plumbing is implemented end-to-end (`ReviewerInvite` model, invite APIs, claim behavior, roster side effects, session-detail invite UX)
+- Phase 2 response-composer capabilities are implemented (video + note + category + timestamp + templates + edit flows)
+- Phase 3 first-pass continuity work is shipped (resolution banners, share-intent persistence during processing, `Opened` / `Responded` / `Viewed` cues)
+
+Remaining / needs completion:
+
+- Phase 3 final continuity polish should be validated against current CTA behavior and follow-up handoff consistency
+- Phase 4.1 instrumentation events are not yet documented as shipped in this checklist
+- Phase 4.2 invite edge-case cleanup needs an explicit completion sweep and sign-off
+- Phase 4.3 docs/support updates are partially done; keep syncing current-state docs as behavior changes
 
 ## Phase 0 — Guardrails and characterization
 
@@ -67,7 +88,7 @@ Scope:
   - private review link resolution
   - structured review request permissions
   - review feedback create/update/delete
-  - owner viewed transition on responded requests
+  - creator viewed transition on responded requests
 
 Files:
 
@@ -117,10 +138,10 @@ Acceptance:
 
 Smallest shippable outcome:
 
-- learner can create a reviewer invite from session detail
+- member can create a reviewer invite from session detail
 - recipient can sign up or sign in from that bundled link
 - claiming that invite creates roster membership automatically
-- learner can later use the structured reviewer chooser with that reviewer
+- member can later use the structured reviewer chooser with that reviewer
 
 ### P1.1 Add `ReviewerInvite` model and migration
 
@@ -194,7 +215,7 @@ Suggested files:
 
 Acceptance:
 
-- learner can create and revoke reviewer invites
+- member can create and revoke reviewer invites
 - claim endpoint is idempotent where practical
 
 ### P1.4 Wire reviewer invite claim into auth flows
@@ -252,7 +273,7 @@ Suggested files:
 
 Acceptance:
 
-- learner can clearly tell which path is lightweight sharing and which path is structured review
+- member can clearly tell which path is lightweight sharing and which path is structured review
 
 ### P1.7 Add reviewer-empty-state flow
 
@@ -269,7 +290,7 @@ Suggested files:
 
 Acceptance:
 
-- empty roster no longer blocks the learner without a next step
+- empty roster no longer blocks the member without a next step
 
 ### P1.8 Show pending reviewer invites in session detail
 
@@ -287,7 +308,7 @@ Suggested files:
 
 Acceptance:
 
-- learner can tell whether a reviewer invite is still pending or already claimed
+- member can tell whether a reviewer invite is still pending or already claimed
 
 ### P1.9 Invite-aware auth copy
 
@@ -473,15 +494,27 @@ Acceptance:
 
 Smallest shippable outcome:
 
-- learner always sees one clear next step after feedback
+- member always sees one clear next step after feedback
 - processing wait state preserves share intent
 - follow-up recording carries forward reviewer and context cleanly
+- waiting states are legible and the next actor is obvious without leaving the app
+
+Current shipped progress:
+
+- first-pass resolution banners are shipped for session processing, request states, and invite states
+- queued share intent is now preserved across reload while processing
+- important thread transitions now show timestamp cues like `Opened`, `Responded`, and `Viewed`
+
+Current status:
+
+- Phase 3 is mostly shipped in first pass
+- run one final UX pass to confirm CTA singularity and context-preserving follow-up behavior on all protected states
 
 ### P3.1 Preserve share intent during processing
 
 Frontend
 
-- if learner tries to share before ready:
+- if member tries to share before ready:
   - preserve requested intent in local component state
   - reopen the same action when processing becomes ready
 - keep auto-refresh while processing is active
@@ -492,7 +525,7 @@ Suggested files:
 
 Acceptance:
 
-- the learner does not have to restart the flow after waiting for readiness
+- the member does not have to restart the flow after waiting for readiness
 
 ### P3.2 Improve readiness and retry messaging
 
@@ -500,6 +533,7 @@ Frontend
 
 - make `processing`, `ready`, and `failed` states clearer in the share module
 - provide stronger retry guidance when playback fails to prepare
+- make `saving`, `processing`, `ready`, and `failed` feel like bounded states rather than silent waiting
 
 Suggested files:
 
@@ -507,7 +541,7 @@ Suggested files:
 
 Acceptance:
 
-- owners understand why a take cannot yet be shared and what to do next
+- creators understand why a take cannot yet be shared and what to do next
 
 ### P3.3 Simplify post-feedback CTA logic
 
@@ -518,6 +552,7 @@ Frontend
   - `Record next take`
   - `Request next review`
 - align CTA labels with current request status
+- make the current waiting state explicit, including who acts next
 
 Suggested files:
 
@@ -543,14 +578,15 @@ Suggested files:
 
 Acceptance:
 
-- learner can move from feedback to next take without re-entering core context
+- member can move from feedback to next take without re-entering core context
 
-### P3.5 Improve owner feedback review state transitions
+### P3.5 Improve creator feedback review state transitions
 
 Backend and frontend
 
 - ensure `responded -> viewed` transition is visible and understandable
 - avoid confusing duplicate controls like `Mark seen` if auto-view behavior already occurred
+- make it clear to the reviewer when the creator has actually seen the response
 
 Suggested files:
 
@@ -566,7 +602,7 @@ Acceptance:
 
 Backend tests:
 
-- responded request becomes viewed when owner opens review thread
+- responded request becomes viewed when creator opens review thread
 - follow-up request preserves reviewer relationship rules
 
 Frontend validation:
@@ -590,6 +626,11 @@ Acceptance:
 Smallest shippable outcome:
 
 - instrumentation is in place, rollout is stable, and edge cases are covered
+
+Current status:
+
+- in progress (hardening not yet complete)
+- instrumentation and explicit edge-case closure remain the primary open items
 
 ### P4.1 Add analytics or event instrumentation
 
@@ -628,15 +669,207 @@ Scope:
 
 - update current-state technical PRD if implementation meaningfully diverges
 - update any internal release notes or support playbooks
+- update the activation-resolution audit if the priority order or shipped resolution cues change
 
 Files:
 
 - `docs/technical-prd-2026-04-06.md`
+- `docs/activation-resolution-audit.md`
 - `docs/release-checklist.md` if rollout steps change
 
 Acceptance:
 
 - docs reflect shipped behavior, not just intended behavior
+
+Current status:
+
+- current-state docs now reflect the shipped resolution layer and timestamp cues
+
+## Phase 4 PR-Sized Delivery Plan
+
+Use this sequence to close remaining hardening work with narrow, reviewable PRs.
+
+### PR4.1 — Core-loop instrumentation baseline
+
+Owner:
+
+- backend + frontend engineer pair
+
+Scope:
+
+- add event hooks for:
+  - reviewer invite created
+  - reviewer invite claimed
+  - reviewer invite claim failed
+  - share blocked while processing
+  - first response submitted
+  - follow-up take launched
+- ensure each event includes enough context to segment by:
+  - session id
+  - request id when present
+  - actor role (`creator` / `reviewer`)
+
+Suggested files:
+
+- `apps/backend/videos/reviews/api.py`
+- `apps/backend/videos/views.py`
+- `apps/frontend/src/components/SessionDetail.jsx`
+- `apps/frontend/src/components/ReviewPage.jsx`
+
+Acceptance criteria:
+
+- every listed event fires exactly once per successful user action where applicable
+- failed invite claim path emits failure event with reason code
+- event payload shape is documented in code or release notes
+- no regression in protected-flow behavior
+
+Out of scope:
+
+- dashboards, retention analytics, and pricing analysis
+
+PR4.1 implementation TODO (concrete):
+
+1. Standardize event names and required fields
+
+- `reviewer_invite_created`
+  - required payload: `session_id`, `action`
+  - optional payload: `review_request_id`, `invite_intent`
+- `reviewer_invite_claimed`
+  - required payload: `invite_id`, `review_token_present`
+  - optional payload: `claim_source`
+- `reviewer_invite_claim_failed`
+  - required payload: `reason`, `review_token_present`
+  - optional payload: `invite_id`, `claim_source`
+- `share_blocked_session_not_ready`
+  - required payload: `session_id`, `processing_status`, `action`
+  - optional payload: `review_request_id`
+- `reviewer_first_response_submitted`
+  - required payload: `review_request_id`, `via_claim_link`
+  - optional payload: `category`, `has_note`, `response_mode`
+- `follow_up_take_launched`
+  - required payload: `session_id`, `review_request_id`, `prior_status`
+  - optional payload: `practice_series`
+
+2. Frontend insertion points by function
+
+- `apps/frontend/src/components/SessionDetail.jsx`
+  - `openRequestComposer`: emit `share_blocked_session_not_ready` when user enters ask-for-feedback while not ready
+  - `inviteReviewerFromComposer`: emit `share_blocked_session_not_ready` on pre-ready invite attempt
+  - `inviteReviewerFromComposer`: emit `reviewer_invite_created` on successful invite creation
+  - `startFollowUp`: emit `follow_up_take_launched` when follow-up recording starts
+- `apps/frontend/src/components/ReviewPage.jsx`
+  - review-link load effect: emit `reviewer_invite_claimed` when claim succeeds via `claim=` context
+  - review-link load effect: emit `reviewer_invite_claim_failed` when claim returns `claim_error`
+  - response submit handler: emit `reviewer_first_response_submitted` only on first authored response
+- `apps/frontend/src/utils.js`
+  - `reportClientEvent`: keep as single event transport wrapper to `/api/client-errors/`
+
+3. Backend ingestion normalization by function
+
+- `apps/backend/videos/views.py`
+  - `client_error_view`: when `source == ProductEvent`, parse `message` as `event_name` and log structured key-value payload for easier querying
+  - include normalized fields in logs: `event_name`, `path`, `is_authenticated`, `client_trace_id`, and whitelisted `extra` keys
+  - keep non-product client errors on existing log path
+
+4. Delivery checks
+
+- smoke-check each event manually in browser devtools + backend logs
+- verify no duplicate fire for single-click actions
+- verify first-response event does not fire for second/subsequent responses
+- verify claim-failed events include a bounded `reason` string
+
+### PR4.2 — Invite edge-case reliability sweep
+
+Owner:
+
+- backend engineer
+
+Scope:
+
+- close and test invite edge cases:
+  - revoked invite claim attempts
+  - expired invite claim attempts
+  - duplicate claim attempts by same user
+  - claim collision attempts by different users
+  - stale pending invites after claim/revoke
+- make claim API outcomes explicit and idempotent where possible
+
+Suggested files:
+
+- `apps/backend/videos/reviews/api.py`
+- `apps/backend/videos/reviews/services.py`
+- `apps/backend/videos/serializers.py`
+- `apps/backend/videos/tests/test_reviewer_invites.py`
+
+Acceptance criteria:
+
+- all edge cases return clear and stable status + message contracts
+- duplicate claims do not corrupt invite or roster state
+- claimed invites no longer appear as pending in creator surfaces
+- targeted invite tests pass for all listed scenarios
+
+Out of scope:
+
+- redesign of invite UX wording
+
+### PR4.3 — CTA/state consistency pass for protected loop
+
+Owner:
+
+- frontend engineer
+
+Scope:
+
+- enforce one primary CTA per loop state on creator and reviewer surfaces
+- align labels with state semantics (`Review feedback`, `Record next take`, `Request next review`)
+- ensure waiting-state language always identifies next actor
+- verify follow-up handoff preserves reviewer/context without re-entry friction
+
+Suggested files:
+
+- `apps/frontend/src/components/SessionDetail.jsx`
+- `apps/frontend/src/components/ReviewPage.jsx`
+- `apps/frontend/src/components/CalendarView.jsx`
+
+Acceptance criteria:
+
+- each protected state renders one clear primary action
+- creator/reviewer waiting states are explicit and non-conflicting
+- follow-up launch preserves expected context fields
+- frontend build succeeds and targeted loop validation passes
+
+Out of scope:
+
+- net-new workflow branches or major UI redesign
+
+### PR4.4 — Docs + release/readiness sync
+
+Owner:
+
+- product/engineering lead
+
+Scope:
+
+- update current-state docs to match shipped hardening behavior
+- capture rollout verification steps for support/release
+- refresh execution checklist statuses after PR4.1–PR4.3 merge
+
+Suggested files:
+
+- `docs/technical-prd-2026-04-06.md`
+- `docs/activation-resolution-audit.md`
+- `docs/release-checklist.md`
+- `docs/practica-now-execution-checklist.md`
+
+Acceptance criteria:
+
+- docs describe shipped behavior, not intended behavior
+- release checklist includes any new verification for instrumentation and invite edge cases
+- no Phase 4 item remains ambiguous about owner or completion signal
+
+Out of scope:
+
+- long-form strategy updates outside current wedge
 
 ## Suggested PR Order
 
@@ -685,7 +918,7 @@ Start implementation when:
 
 This checklist is complete when:
 
-- learner share choices are clear
+- member share choices are clear
 - reviewer onboarding is self-serve inside the session flow
 - reviewer join results in usable roster state
 - response authoring is faster and richer without losing video-first behavior

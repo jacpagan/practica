@@ -160,6 +160,44 @@ Examples:
 - complete one realistic pass
 - confirm no obvious regressions
 
+## 8.5 Verify Telemetry Events (Phase 4)
+
+For trusted-feedback releases, verify server-side `ProductEvent` logs for core-loop instrumentation.
+
+Expected log format:
+
+- `ProductEvent event_name=<name> ... extra={<payload>}`
+
+Check these events during one production walkthrough:
+
+- `reviewer_invite_created`
+  - expected keys: `action`, `session_id`, `invite_id`, `invite_intent`
+- `reviewer_invite_claimed`
+  - expected keys: `action`, `invite_id`, `session_id`, `review_token_present`, `claim_source`
+- `reviewer_invite_claim_failed`
+  - expected keys: `action`, `reason`, `review_token_present`, `claim_source`
+- `share_blocked_session_not_ready`
+  - expected keys: `action`, `session_id`, `processing_status`
+- `reviewer_first_response_submitted`
+  - expected keys: `action`, `session_id`, `review_request_id`, `category`, `has_note`, `response_mode`
+- `follow_up_take_launched`
+  - expected keys: `session_id`, `review_request_id`, `prior_status`
+
+Verification method:
+
+- open the backend runtime logs for the deployed app
+- search for `ProductEvent event_name=`
+- confirm each exercised flow emitted one matching event line with expected keys
+
+Optional pre-release local gate:
+
+```bash
+cd /Users/josepagan/Documents/Code/practica
+scripts/test-telemetry.sh
+```
+
+If an expected event is missing, do not mark release complete for instrumentation work.
+
 ## 9. If Something Fails
 
 ### Local test fails
