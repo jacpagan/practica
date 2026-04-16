@@ -25,21 +25,9 @@ from .services.media_pipeline import (
     local_transcode_enabled,
     media_pipeline_enabled,
 )
+from .telemetry import PRODUCT_EVENT_SOURCE, log_product_event, sanitized_event_path
 
 logger = logging.getLogger(__name__)
-
-def _sanitized_client_path(path):
-    raw = str(path or '').strip()
-    if not raw:
-        return '/'
-    base = raw.split('?', 1)[0]
-    if base.startswith('/r/'):
-        return '/r/:token'
-    if base.startswith('/api/review/') and base.endswith('/feedback/'):
-        return '/api/review/:token/feedback/'
-    if base.startswith('/api/review/'):
-        return '/api/review/:token/'
-    return base
 
 
 # ── Auth views ──────────────────────────────────────────────────────
@@ -141,11 +129,15 @@ def invite_code_detail(request, invite_id):
 def client_error_view(request):
     payload = request.data if isinstance(request.data, dict) else {}
     source = str(payload.get('source', '')).strip()[:64]
-    path = _sanitized_client_path(payload.get('path', ''))[:512]
+    path = sanitized_event_path(payload.get('path', ''))[:512]
     extra = payload.get('extra') if isinstance(payload.get('extra'), dict) else {}
     client_trace_id = str(extra.get('client_trace_id', '')).strip()[:128]
     message = str(payload.get('message', '')).strip()
     stack = str(payload.get('stack', '')).strip()
+
+    if source == PRODUCT_EVENT_SOURCE:
+        log_product_event(logger, request, event_name=message, extra=extra, path_override=path)
+        return Response({'ok': True}, status=status.HTTP_202_ACCEPTED)
 
     request_id = request.META.get('HTTP_X_REQUEST_ID', '')
     logger.warning(

@@ -1,3 +1,5 @@
+import logging
+
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -15,7 +17,11 @@ from videos.reviews.services import claim_reviewer_invite_by_code, create_review
 from videos.reviews.services import mark_review_request_opened, mark_review_request_responded
 from videos.serializers import FeedbackTemplateSerializer, MemberConnectionSerializer, PublicSessionSerializer, ReviewerInviteSerializer, ReviewLinkSerializer, ReviewRequestSerializer, ReviewVideoFeedbackSerializer, UserSummarySerializer
 from videos.services.feedback_video_processing import prepare_feedback_video_upload
+from videos.telemetry import log_product_event
 from videos.video_uploads import is_allowed_video_upload
+
+
+logger = logging.getLogger(__name__)
 
 
 REVIEW_LINK_ERROR_DETAILS = {
@@ -72,6 +78,19 @@ def _normalized_client_upload_id(raw_value):
     return value[:64]
 
 
+def _validation_error_reason(exc):
+    detail = getattr(exc, 'detail', {})
+    if isinstance(detail, dict):
+        messages = []
+        for value in detail.values():
+            if isinstance(value, list):
+                messages.extend(str(item) for item in value)
+            else:
+                messages.append(str(value))
+        return ', '.join(messages)[:160]
+    return str(detail)[:160]
+
+
 @csrf_exempt
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -82,7 +101,7 @@ def review_link_info(request, token):
     review_request = getattr(link, 'review_request', None)
     if request.user.is_authenticated and review_request and not review_request_visible_to_user(review_request, request.user):
         return review_request_forbidden_response(
-            'This review request is only available to the assigned reviewer and owner.'
+            'This review request is only available to the assigned reviewer and creator.'
         )
     ReviewLink.objects.filter(pk=link.pk).update(last_accessed_at=timezone.now())
     link.refresh_from_db(fields=['last_accessed_at'])
@@ -99,12 +118,31 @@ def review_link_info(request, token):
     if request.user.is_authenticated and claim_code:
         try:
             claimed_invite = claim_reviewer_invite_by_code(code=claim_code, actor=request.user, deactivate_signup_code=True)
+            log_product_event(
+                logger,
+                request,
+                event_name='reviewer_invite_claimed',
+                extra={
+                    'action': 'review_link_open',
+                    'invite_id': claimed_invite.id,
+                    'session_id': claimed_invite.session_id,
+                    'review_token_present': True,
+                    'claim_source': 'review_link',
+                },
+            )
         except ValidationError as exc:
-            detail = getattr(exc, 'detail', {})
-            if isinstance(detail, dict):
-                claim_error = ', '.join(str(item) for value in detail.values() for item in (value if isinstance(value, list) else [value]))
-            else:
-                claim_error = str(detail)
+            claim_error = _validation_error_reason(exc)
+            log_product_event(
+                logger,
+                request,
+                event_name='reviewer_invite_claim_failed',
+                extra={
+                    'action': 'review_link_open',
+                    'reason': claim_error,
+                    'review_token_present': True,
+                    'claim_source': 'review_link',
+                },
+            )
     if request.user.is_authenticated:
         request_payload = ReviewRequestSerializer(review_request, context={'request': request}).data if review_request else None
     else:
@@ -133,7 +171,7 @@ def review_link_feedback(request, token):
     review_request = getattr(link, 'review_request', None)
     if review_request and not review_request_visible_to_user(review_request, request.user):
         return review_request_forbidden_response(
-            'This review request is only available to the assigned reviewer and owner.'
+            'This review request is only available to the assigned reviewer and creator.'
         )
 
     if request.method == 'GET':
@@ -242,6 +280,12 @@ def review_link_feedback(request, token):
                 status=status.HTTP_200_OK,
             )
 
+    had_prior_response = VideoFeedback.objects.filter(
+        session=link.session,
+        review_request=review_request,
+        user=request.user,
+    ).exists()
+
     item = VideoFeedback.objects.create(
         session=link.session,
         review_request=review_request,
@@ -255,6 +299,21 @@ def review_link_feedback(request, token):
     )
     if review_request:
         mark_review_request_responded(review_request=review_request, actor=request.user)
+        if not had_prior_response:
+            log_product_event(
+                logger,
+                request,
+                event_name='reviewer_first_response_submitted',
+                extra={
+                    'action': 'api_review_feedback_create',
+                    'session_id': link.session_id,
+                    'review_request_id': review_request.id,
+                    'via_claim_link': False,
+                    'category': item.feedback_category,
+                    'has_note': bool(item.text),
+                    'response_mode': 'video',
+                },
+            )
     return Response(
         ReviewVideoFeedbackSerializer(item, context={'request': request, 'session': link.session}).data,
         status=status.HTTP_201_CREATED,
@@ -300,6 +359,17 @@ def reviewer_invites(request):
     label = str(request.data.get('label', '') or '').strip()
     intent = str(request.data.get('intent', '') or ReviewerInvite.INTENT_LIGHTWEIGHT_REVIEW).strip().lower()
     invite = create_reviewer_invite(actor=request.user, session=session, label=label, intent=intent)
+    log_product_event(
+        logger,
+        request,
+        event_name='reviewer_invite_created',
+        extra={
+            'action': 'api_reviewer_invites_create',
+            'session_id': session.id,
+            'invite_id': invite.id,
+            'invite_intent': invite.intent,
+        },
+    )
     return Response(ReviewerInviteSerializer(invite, context={'request': request}).data, status=status.HTTP_201_CREATED)
 
 
@@ -315,7 +385,33 @@ def reviewer_invite_detail(request, invite_id):
 @permission_classes([IsAuthenticated])
 def reviewer_invite_claim(request):
     claim_code = str(request.data.get('claim_code', '') or '').strip()
-    invite = claim_reviewer_invite_by_code(code=claim_code, actor=request.user, deactivate_signup_code=True)
+    try:
+        invite = claim_reviewer_invite_by_code(code=claim_code, actor=request.user, deactivate_signup_code=True)
+    except ValidationError as exc:
+        log_product_event(
+            logger,
+            request,
+            event_name='reviewer_invite_claim_failed',
+            extra={
+                'action': 'api_reviewer_invite_claim',
+                'reason': _validation_error_reason(exc),
+                'review_token_present': False,
+                'claim_source': 'claim_endpoint',
+            },
+        )
+        raise
+    log_product_event(
+        logger,
+        request,
+        event_name='reviewer_invite_claimed',
+        extra={
+            'action': 'api_reviewer_invite_claim',
+            'invite_id': invite.id,
+            'session_id': invite.session_id,
+            'review_token_present': False,
+            'claim_source': 'claim_endpoint',
+        },
+    )
     return Response(ReviewerInviteSerializer(invite, context={'request': request}).data)
 
 
@@ -323,7 +419,7 @@ def reviewer_invite_claim(request):
 @permission_classes([IsAuthenticated])
 def member_connections(request):
     role = str(request.query_params.get('role', '')).strip().lower()
-    if role in {'student', 'owner'}:
+    if role in {'student', 'owner', 'member', 'creator'}:
         memberships = ReviewerRosterMembership.objects.filter(student=request.user, is_active=True).select_related(
             'reviewer', 'reviewer__profile', 'student', 'student__profile'
         ).order_by('reviewer__username')
@@ -347,12 +443,12 @@ def feedback_insights(request):
             continue
         category_counts[category] = category_counts.get(category, 0) + 1
 
-    top_students = []
-    students = {}
+    top_members = []
+    members = {}
     for review_request in review_requests.order_by('-created_at'):
         student_id = review_request.student_id
-        bucket = students.setdefault(student_id, {
-            'student': review_request.student,
+        bucket = members.setdefault(student_id, {
+            'member': review_request.student,
             'request_count': 0,
             'follow_up_request_count': 0,
             'category_counts': {},
@@ -366,24 +462,24 @@ def feedback_insights(request):
 
     for feedback_item in feedback_items:
         student_id = feedback_item.review_request.student_id if feedback_item.review_request_id else None
-        if not student_id or student_id not in students:
+        if not student_id or student_id not in members:
             continue
         category = str(feedback_item.feedback_category or '').strip().lower()
         if not category:
             continue
-        bucket = students[student_id]['category_counts']
+        bucket = members[student_id]['category_counts']
         bucket[category] = bucket.get(category, 0) + 1
 
-    for student_data in students.values():
-        top_students.append({
-            'student': UserSummarySerializer(student_data['student']).data,
-            'request_count': student_data['request_count'],
-            'follow_up_request_count': student_data['follow_up_request_count'],
-            'category_counts': student_data['category_counts'],
-            'last_request_at': student_data['last_request_at'],
+    for member_data in members.values():
+        top_members.append({
+            'member': UserSummarySerializer(member_data['member']).data,
+            'request_count': member_data['request_count'],
+            'follow_up_request_count': member_data['follow_up_request_count'],
+            'category_counts': member_data['category_counts'],
+            'last_request_at': member_data['last_request_at'],
         })
 
-    top_students.sort(key=lambda item: (-item['request_count'], item['student']['display_name'].lower()))
+    top_members.sort(key=lambda item: (-item['request_count'], item['member']['display_name'].lower()))
 
     return Response({
         'total_review_requests': review_requests.count(),
@@ -391,7 +487,9 @@ def feedback_insights(request):
         'responded_review_requests': review_requests.filter(status__in=[ReviewRequest.STATUS_RESPONDED, ReviewRequest.STATUS_VIEWED, ReviewRequest.STATUS_NEEDS_RESUBMISSION, ReviewRequest.STATUS_DECLINED_UNRELATED, ReviewRequest.STATUS_RESUBMITTED, ReviewRequest.STATUS_CLOSED]).count(),
         'follow_up_review_requests': review_requests.exclude(parent_request__isnull=True).count(),
         'category_counts': category_counts,
-        'top_students': top_students,
+        'top_members': top_members,
+        'top_creators': top_members,
+        'top_students': top_members,
     })
 
 

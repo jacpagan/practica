@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -44,6 +45,11 @@ class ReviewerInviteApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['status'], 'pending')
         self.assertEqual(response.data['intent'], 'lightweight_review')
+        self.assertEqual(response.data['resolution']['code'], 'invite_pending')
+        self.assertEqual(response.data['resolution']['phase'], 'waiting')
+        self.assertEqual(response.data['resolution']['awaiting_actor'], 'reviewer')
+        self.assertEqual(response.data['resolution']['occurred_label'], 'Created')
+        self.assertTrue(bool(response.data['resolution']['occurred_at']))
         self.assertTrue(bool(response.data['claim_code']))
         self.assertIn('/r/', response.data['invite_url'])
         self.assertIn('claim=', response.data['invite_url'])
@@ -55,6 +61,28 @@ class ReviewerInviteApiTests(APITestCase):
         self.assertTrue(bool(invite.review_link))
         self.assertTrue(invite.invite_code.is_active)
         self.assertEqual(invite.invite_code.max_uses, 1)
+
+    @patch('videos.reviews.api.logger')
+    def test_create_reviewer_invite_emits_product_event_log(self, logger_mock):
+        self._auth(self.owner)
+
+        response = self.client.post(
+            '/api/reviewer-invites/',
+            {
+                'session_id': self.session.id,
+                'label': 'Invite trusted reviewer',
+                'intent': 'lightweight_review',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        logger_mock.info.assert_called_once()
+        call_args = logger_mock.info.call_args.args
+        self.assertEqual(call_args[1], 'reviewer_invite_created')
+        self.assertEqual(call_args[-1]['session_id'], self.session.id)
+        self.assertEqual(call_args[-1]['invite_id'], response.data['id'])
+        self.assertEqual(call_args[-1]['action'], 'api_reviewer_invites_create')
 
     def test_registering_with_reviewer_invite_claims_it_and_creates_roster_membership(self):
         link = ReviewLink.objects.create(
@@ -128,6 +156,11 @@ class ReviewerInviteApiTests(APITestCase):
         response = self.client.get(f'/api/review/{link.token}/?claim=CLAIM123')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['reviewer_invite']['resolution']['code'], 'review_access_ready')
+        self.assertEqual(response.data['reviewer_invite']['resolution']['phase'], 'action_required')
+        self.assertEqual(response.data['reviewer_invite']['resolution']['awaiting_actor'], 'reviewer')
+        self.assertEqual(response.data['reviewer_invite']['resolution']['occurred_label'], 'Claimed')
+        self.assertTrue(bool(response.data['reviewer_invite']['resolution']['occurred_at']))
         reviewer_invite.refresh_from_db()
         self.assertEqual(reviewer_invite.status, ReviewerInvite.STATUS_CLAIMED)
         self.assertEqual(reviewer_invite.claimed_by, self.existing_reviewer)
@@ -166,14 +199,51 @@ class ReviewerInviteApiTests(APITestCase):
         self.assertEqual(list_response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(list_response.data), 1)
         self.assertEqual(list_response.data[0]['id'], reviewer_invite.id)
+        self.assertEqual(list_response.data[0]['resolution']['code'], 'invite_pending')
 
         delete_response = self.client.delete(f'/api/reviewer-invites/{reviewer_invite.id}/')
 
         self.assertEqual(delete_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(delete_response.data['resolution']['code'], 'invite_revoked')
+        self.assertEqual(delete_response.data['resolution']['phase'], 'complete')
         reviewer_invite.refresh_from_db()
         invite_code.refresh_from_db()
         self.assertEqual(reviewer_invite.status, ReviewerInvite.STATUS_REVOKED)
         self.assertFalse(invite_code.is_active)
+
+    def test_owner_list_shows_reviewer_joined_resolution_for_claimed_invite(self):
+        link = ReviewLink.objects.create(
+            session=self.session,
+            token='claimed-list-review-link',
+            created_by=self.owner,
+            expires_at=timezone.now() + timedelta(days=7),
+            is_active=True,
+            allow_video_feedback=True,
+        )
+        invite_code = SignupInviteCode.objects.create(code='JOINED123', created_by=self.owner, max_uses=1, is_active=False)
+        ReviewerInvite.objects.create(
+            created_by=self.owner,
+            student=self.owner,
+            invite_code=invite_code,
+            review_link=link,
+            session=self.session,
+            label='Joined invite',
+            intent=ReviewerInvite.INTENT_LIGHTWEIGHT_REVIEW,
+            claimed_by=self.existing_reviewer,
+            claimed_at=timezone.now(),
+            status=ReviewerInvite.STATUS_CLAIMED,
+            expires_at=timezone.now() + timedelta(days=7),
+        )
+
+        self._auth(self.owner)
+        response = self.client.get(f'/api/reviewer-invites/?session_id={self.session.id}')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['resolution']['code'], 'reviewer_joined')
+        self.assertEqual(response.data[0]['resolution']['phase'], 'complete')
+        self.assertEqual(response.data[0]['resolution']['occurred_label'], 'Claimed')
+        self.assertTrue(bool(response.data[0]['resolution']['occurred_at']))
 
     def test_second_member_cannot_take_over_claimed_reviewer_invite(self):
         second_reviewer = User.objects.create_user(username='second-reviewer', password='pass1234')
@@ -243,6 +313,39 @@ class ReviewerInviteApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('turned off', str(response.data).lower())
 
+    @patch('videos.reviews.api.logger')
+    def test_reviewer_invite_claim_failure_emits_product_event_log(self, logger_mock):
+        link = ReviewLink.objects.create(
+            session=self.session,
+            token='revoked-review-link-telemetry',
+            created_by=self.owner,
+            expires_at=timezone.now() + timedelta(days=7),
+            is_active=True,
+            allow_video_feedback=True,
+        )
+        invite_code = SignupInviteCode.objects.create(code='REVOKEDLOG123', created_by=self.owner, max_uses=1, is_active=False)
+        ReviewerInvite.objects.create(
+            created_by=self.owner,
+            student=self.owner,
+            invite_code=invite_code,
+            review_link=link,
+            session=self.session,
+            label='Revoked invite telemetry',
+            intent=ReviewerInvite.INTENT_LIGHTWEIGHT_REVIEW,
+            status=ReviewerInvite.STATUS_REVOKED,
+            expires_at=timezone.now() + timedelta(days=7),
+        )
+
+        self._auth(self.existing_reviewer)
+        response = self.client.post('/api/reviewer-invites/claim/', {'claim_code': 'REVOKEDLOG123'}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        logger_mock.info.assert_called_once()
+        call_args = logger_mock.info.call_args.args
+        self.assertEqual(call_args[1], 'reviewer_invite_claim_failed')
+        self.assertEqual(call_args[-1]['action'], 'api_reviewer_invite_claim')
+        self.assertEqual(call_args[-1]['claim_source'], 'claim_endpoint')
+
     def test_expired_reviewer_invite_cannot_be_claimed_and_is_marked_expired(self):
         link = ReviewLink.objects.create(
             session=self.session,
@@ -272,6 +375,36 @@ class ReviewerInviteApiTests(APITestCase):
         invite_code.refresh_from_db()
         self.assertEqual(reviewer_invite.status, ReviewerInvite.STATUS_EXPIRED)
         self.assertFalse(invite_code.is_active)
+
+    def test_listed_expired_reviewer_invite_includes_expired_resolution(self):
+        link = ReviewLink.objects.create(
+            session=self.session,
+            token='expired-list-review-link',
+            created_by=self.owner,
+            expires_at=timezone.now() - timedelta(minutes=5),
+            is_active=True,
+            allow_video_feedback=True,
+        )
+        invite_code = SignupInviteCode.objects.create(code='LISTEXP123', created_by=self.owner, max_uses=1)
+        ReviewerInvite.objects.create(
+            created_by=self.owner,
+            student=self.owner,
+            invite_code=invite_code,
+            review_link=link,
+            session=self.session,
+            label='Expired invite',
+            intent=ReviewerInvite.INTENT_LIGHTWEIGHT_REVIEW,
+            expires_at=timezone.now() - timedelta(minutes=5),
+        )
+
+        self._auth(self.owner)
+        response = self.client.get(f'/api/reviewer-invites/?session_id={self.session.id}')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['status'], ReviewerInvite.STATUS_EXPIRED)
+        self.assertEqual(response.data[0]['resolution']['code'], 'invite_expired')
+        self.assertEqual(response.data[0]['resolution']['phase'], 'blocked')
 
     def test_review_link_info_surfaces_claim_error_for_already_claimed_invite(self):
         second_reviewer = User.objects.create_user(username='third-reviewer', password='pass1234')

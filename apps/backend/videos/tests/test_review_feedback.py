@@ -8,7 +8,7 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
-from videos.models import Profile, ReviewLink, Session, VideoFeedback
+from videos.models import Profile, ReviewLink, ReviewRequest, Session, VideoFeedback
 
 
 class ReviewFeedbackApiTests(APITestCase):
@@ -40,6 +40,18 @@ class ReviewFeedbackApiTests(APITestCase):
 
     def _video_file(self, name='feedback.mp4', content_type='video/mp4'):
         return SimpleUploadedFile(name, b'video-feedback-data', content_type=content_type)
+
+    def _create_review_request(self):
+        return ReviewRequest.objects.create(
+            session=self.session,
+            student=self.owner,
+            reviewer=self.reviewer,
+            created_by=self.owner,
+            review_link=self.link,
+            instrument='drums',
+            goal='Lock the groove',
+            status=ReviewRequest.STATUS_REQUESTED,
+        )
 
     def test_review_link_info_returns_public_preview_without_login(self):
         response = self.client.get(f'/api/review/{self.link.token}/')
@@ -134,6 +146,7 @@ class ReviewFeedbackApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_authenticated_reviewer_can_post_video_feedback(self):
+        review_request = self._create_review_request()
         self._auth(self.reviewer)
         response = self.client.post(
             f'/api/review/{self.link.token}/feedback/',
@@ -159,6 +172,39 @@ class ReviewFeedbackApiTests(APITestCase):
         self.assertEqual(feedback.feedback_category, 'posture')
         self.assertEqual(feedback.timestamp_seconds, 25)
         self.assertFalse(feedback.is_legacy_text_feedback)
+
+        detail_response = self.client.get(f'/api/review-requests/{review_request.id}/')
+        self.assertEqual(detail_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(detail_response.data['resolution']['code'], 'waiting_on_owner')
+        self.assertEqual(detail_response.data['resolution']['phase'], 'waiting')
+        self.assertEqual(detail_response.data['resolution']['awaiting_actor'], 'owner')
+        self.assertEqual(detail_response.data['resolution']['occurred_label'], 'Responded')
+        self.assertTrue(bool(detail_response.data['resolution']['occurred_at']))
+
+    @patch('videos.reviews.api.logger')
+    def test_first_structured_response_emits_product_event_log(self, logger_mock):
+        self._create_review_request()
+        self._auth(self.reviewer)
+
+        response = self.client.post(
+            f'/api/review/{self.link.token}/feedback/',
+            {
+                'text': 'First structured response',
+                'feedback_category': 'timing',
+                'timestamp_seconds': 18,
+                'feedback_video': self._video_file('first-response.mp4'),
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        logger_mock.info.assert_called_once()
+        call_args = logger_mock.info.call_args.args
+        self.assertEqual(call_args[1], 'reviewer_first_response_submitted')
+        self.assertEqual(call_args[-1]['action'], 'api_review_feedback_create')
+        self.assertEqual(call_args[-1]['review_request_id'], response.data['review_request_id'])
+        self.assertEqual(call_args[-1]['category'], 'timing')
+        self.assertEqual(call_args[-1]['response_mode'], 'video')
 
     def test_feedback_post_is_idempotent_for_client_upload_id(self):
         self._auth(self.reviewer)
