@@ -81,6 +81,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   const [selectedAudioInputId, setSelectedAudioInputId] = useState(readStoredAudioInputId)
   const [videoInputs, setVideoInputs] = useState([])
   const [selectedVideoInputId, setSelectedVideoInputId] = useState(readStoredVideoInputId)
+  const [requestingPermissionLabel, setRequestingPermissionLabel] = useState('camera')
 
   const liveRef = useRef(null)
   const playbackRef = useRef(null)
@@ -631,6 +632,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     stopMetronome()
     stopStream()
     closeAudioContext()
+    setRequestingPermissionLabel('camera')
     setState(STATES.REQUESTING)
     setError(null)
     try {
@@ -658,6 +660,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     stopMetronome()
     stopStream()
     closeAudioContext()
+    setRequestingPermissionLabel('screen and camera')
     setState(STATES.REQUESTING)
     setError(null)
     try {
@@ -767,7 +770,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       })
     } catch (e) {
       const message = e?.name === 'NotAllowedError'
-        ? 'Screen capture permission denied.'
+        ? 'Screen sharing was blocked. Allow screen access to use Screen + Cam, or use single-cam mode.'
         : ((e?.name === 'NotFoundError' || e?.name === 'OverconstrainedError') && selectedVideoInputId)
             ? 'Selected camera is unavailable. Reconnect it or choose another camera.'
         : ((e?.name === 'NotFoundError' || e?.name === 'OverconstrainedError') && selectedAudioInputId)
@@ -1034,6 +1037,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
           ) : (
             <>
               <div className="w-full max-w-md space-y-3">
+                <p className="text-center text-xs text-white/55">Start with single-cam for the fastest flow. Add screen only when needed.</p>
                 <button
                   onClick={openCamera}
                   className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-4 hover:bg-white/15 transition-all duration-200"
@@ -1045,7 +1049,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                       </svg>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-white">Camera</p>
+                      <p className="text-sm font-medium text-white">Single-cam</p>
                       <p className="mt-1 text-xs text-white/55">Record with camera and microphone.</p>
                     </div>
                   </div>
@@ -1064,8 +1068,8 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                       </svg>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-white">Screen + Cam</p>
-                      <p className="mt-1 text-xs text-white/55">Share your screen and keep yourself in frame.</p>
+                      <p className="text-sm font-medium text-white">Add screen (optional)</p>
+                      <p className="mt-1 text-xs text-white/55">Share your screen while keeping yourself in frame.</p>
                     </div>
                   </div>
                 </button>
@@ -1100,7 +1104,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       {state === STATES.REQUESTING && (
         <div className="aspect-video flex flex-col items-center justify-center gap-3">
           <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          <p className="text-xs text-white/50">Requesting camera access...</p>
+          <p className="text-xs text-white/50">Requesting {requestingPermissionLabel} access...</p>
         </div>
       )}
 
@@ -1144,7 +1148,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                       onClick={openScreenCam}
                       className="rounded-full px-3 py-1.5 text-xs transition-colors bg-white/10 text-white/80 hover:bg-white/20"
                     >
-                      Switch to Screen + Cam
+                      Add screen (optional)
                     </button>
                   ) : (
                     <button
@@ -1152,7 +1156,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                       onClick={openCamera}
                       className="rounded-full px-3 py-1.5 text-xs transition-colors bg-white/10 text-white/80 hover:bg-white/20"
                     >
-                      Switch to Camera
+                      Back to single-cam
                     </button>
                   )}
                 </div>

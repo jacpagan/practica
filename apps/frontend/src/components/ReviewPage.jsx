@@ -273,7 +273,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
   const canStudentClose = memberRole === 'student' || memberRole === 'owner'
   const statusKey = String(reviewRequest?.status || '').trim().toLowerCase()
   const canShowClosure = Boolean(reviewRequest && canStudentClose && ['responded', 'viewed', 'resubmitted', 'needs_resubmission', 'declined_unrelated', 'flagged'].includes(statusKey))
-  const canShowRetry = Boolean(reviewRequest && canStudentClose && ['viewed', 'needs_resubmission', 'declined_unrelated'].includes(statusKey))
+  const canShowRetry = Boolean(reviewRequest && canStudentClose && ['responded', 'viewed', 'needs_resubmission', 'declined_unrelated'].includes(statusKey))
   const reviewerCanModerate = Boolean(reviewRequest && memberRole === 'reviewer' && ['requested', 'opened'].includes(statusKey))
   const reviewerName = reviewRequest?.reviewer?.display_name || reviewRequest?.reviewer?.username || 'your reviewer'
   const reviewPageHeading = useMemo(() => {
@@ -403,14 +403,18 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
     return null
   }, [canStudentClose, hasCurrentUserFeedback, memberRole, reviewRequest, reviewerName, reviewerShouldRespond, statusKey])
   const closureBarRetryLabel = statusKey === 'needs_resubmission'
-    ? 'Continue with new take'
+    ? 'Record new take'
     : statusKey === 'declined_unrelated'
-      ? 'Continue with matching take'
-      : 'Continue loop'
+      ? 'Record matching take'
+      : 'Record next take'
+  const closureBarCloseLabel = statusKey === 'resubmitted'
+    ? 'Mark loop complete'
+    : 'Close thread'
+  const closureBarPrimaryAction = canShowRetry ? 'retry' : 'close'
   const closureBarSubtleText = statusKey === 'responded'
-    ? 'Feedback is ready. Watch it, then continue or close the thread.'
+    ? 'Feedback is ready. Record your next take now, or close this thread.'
     : statusKey === 'viewed'
-      ? 'You have seen the feedback. Continue when you are ready, or close this thread.'
+      ? 'You have seen the feedback. Record your next take, or close this thread.'
       : statusKey === 'needs_resubmission'
         ? 'Your reviewer asked for a new take.'
         : statusKey === 'declined_unrelated'
@@ -1298,7 +1302,8 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
           onRetry={handleRetryRequest}
           subtleText={closureBarSubtleText}
           retryLabel={closureBarRetryLabel}
-          closeLabel="Close thread"
+          closeLabel={closureBarCloseLabel}
+          primaryAction={closureBarPrimaryAction}
         />
       ) : null}
     </div>
