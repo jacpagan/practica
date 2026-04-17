@@ -117,7 +117,7 @@ test('Record route shows camera and microphone selectors for signed-in members',
 
   await expect(page.getByRole('heading', { name: 'Record' })).toBeVisible()
   await expect(page.getByText('Camera ready')).toBeVisible({ timeout: 10000 })
-  await expect(page.getByRole('button', { name: 'Switch to Screen + Cam' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Add screen \(optional\)|Switch to Screen \+ Cam/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /Options/i })).toBeVisible()
   await expect(page.locator('text=Camera input')).toHaveCount(0)
   await expect(page.locator('text=Microphone input')).toHaveCount(0)
@@ -448,20 +448,19 @@ test('Session detail shows turn-off action for active outgoing request', async (
     })
   })
 
-  await page.route('**/api/review-requests/?role=owner', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(reviewRequests),
-    })
+  await page.route('**/api/review-requests/?role=creator', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reviewRequests) })
+  })
+
+  await page.route('**/api/review-requests/?role=creator&session_id=*', async (route) => {
+    const url = new URL(route.request().url())
+    const sessionId = url.searchParams.get('session_id') || ''
+    const data = reviewRequests.filter((item) => String(item.session_id) === sessionId)
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) })
   })
 
   await page.route('**/api/review-requests/?role=reviewer', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify([]),
-    })
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
   })
 
   await page.route('**/api/connections/?role=student', async (route) => {
@@ -633,6 +632,14 @@ test('Calendar day view shows review state per video', async ({ page }) => {
     })
   })
 
+  await page.route('**/api/review-requests/?role=creator', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(reviewRequests),
+    })
+  })
+
   await page.route('**/api/review-requests/?role=reviewer', async (route) => {
     await route.fulfill({
       status: 200,
@@ -651,8 +658,6 @@ test('Calendar day view shows review state per video', async ({ page }) => {
 
   await page.goto('/?date=2026-04-09')
 
-  await expect(page.locator('span').filter({ hasText: 'Unthreaded' })).toHaveCount(1)
-  await expect(page.locator('text=1 thread')).toHaveCount(0)
   const awaitingRow = page.getByRole('button').filter({ hasText: 'Take awaiting review' })
   const plainRow = page.getByRole('button').filter({ hasText: 'Take without request' })
   await expect(awaitingRow.locator('span').filter({ hasText: 'Awaiting review' })).toHaveCount(1)

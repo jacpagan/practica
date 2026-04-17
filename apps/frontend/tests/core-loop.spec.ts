@@ -408,8 +408,9 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
 
   await studentPage.goto(`/sessions/${initialSessionId}`)
   await studentPage.getByRole('button', { name: 'Review feedback' }).click()
-  await expect(studentPage.getByRole('button', { name: 'Continue loop' })).toBeVisible()
-  await studentPage.getByRole('button', { name: 'Continue loop' }).click()
+  const continueLoopButton = studentPage.getByRole('button', { name: /Record next take|Continue loop/ })
+  await expect(continueLoopButton).toBeVisible()
+  await continueLoopButton.click()
   await expect(studentPage).toHaveURL(/\/upload$/)
   await expect(studentPage.getByRole('heading', { name: 'New take' })).toBeVisible()
 
