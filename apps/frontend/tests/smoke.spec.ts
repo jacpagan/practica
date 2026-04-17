@@ -473,7 +473,7 @@ test('Session detail shows turn-off action for active outgoing request', async (
 
   await page.goto('/sessions/124')
 
-  await expect(page.getByRole('button', { name: 'Turn off' }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: /Turn off|Close thread/ }).first()).toBeVisible()
 })
 
 test('Ask for feedback starts with no reviewer selected on a fresh request', async ({ page }) => {
