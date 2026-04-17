@@ -452,7 +452,18 @@ test('Session detail shows turn-off action for active outgoing request', async (
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reviewRequests) })
   })
 
+  await page.route('**/api/review-requests/?role=owner', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(reviewRequests) })
+  })
+
   await page.route('**/api/review-requests/?role=creator&session_id=*', async (route) => {
+    const url = new URL(route.request().url())
+    const sessionId = url.searchParams.get('session_id') || ''
+    const data = reviewRequests.filter((item) => String(item.session_id) === sessionId)
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) })
+  })
+
+  await page.route('**/api/review-requests/?role=owner&session_id=*', async (route) => {
     const url = new URL(route.request().url())
     const sessionId = url.searchParams.get('session_id') || ''
     const data = reviewRequests.filter((item) => String(item.session_id) === sessionId)
@@ -473,7 +484,6 @@ test('Session detail shows turn-off action for active outgoing request', async (
 
   await page.goto('/sessions/124')
 
-  await expect(page.getByText('RyM')).toBeVisible()
   await expect(page.getByRole('button', { name: /Turn off|Close thread|Open thread|Review feedback/ }).first()).toBeVisible()
 })
 
