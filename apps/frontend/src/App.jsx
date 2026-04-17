@@ -67,8 +67,7 @@ function AppContent() {
   const [selectedSession, setSelectedSession] = useState(null)
   const [sessions, setSessions] = useState([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
-  const [studentReviewRequests, setStudentReviewRequests] = useState([])
-  const [studentReviewRequestsLoading, setStudentReviewRequestsLoading] = useState(false)
+  const [ownerReviewRequests, setOwnerReviewRequests] = useState([])
   const [hasReviewerWorkspace, setHasReviewerWorkspace] = useState(false)
   const [reviewerPendingCount, setReviewerPendingCount] = useState(0)
   const reviewerPollRef = useRef(null)
@@ -341,16 +340,13 @@ function AppContent() {
     }
   }, [fetchPaginated, monthCacheKey, token])
 
-  const loadStudentReviewRequests = useCallback(async () => {
+  const loadOwnerReviewRequests = useCallback(async () => {
     if (!token) return
-    setStudentReviewRequestsLoading(true)
     try {
-      const items = await fetchPaginated('/api/review-requests/?role=owner')
-      setStudentReviewRequests(items)
+      const items = await fetchPaginated('/api/review-requests/?role=creator')
+      setOwnerReviewRequests(items)
     } catch {
-      setStudentReviewRequests([])
-    } finally {
-      setStudentReviewRequestsLoading(false)
+      setOwnerReviewRequests([])
     }
   }, [fetchPaginated, token])
 
@@ -487,13 +483,9 @@ function AppContent() {
     navigate({ view: 'detail', sessionId: session.id })
   }, [navigate])
 
-  const hasActiveStudentLoop = useMemo(
-    () => studentReviewRequests.some((item) => !['closed', 'revoked'].includes(String(item?.status || '').trim().toLowerCase())),
-    [studentReviewRequests],
-  )
-  const activeStudentRequestBySessionId = useMemo(() => {
+  const activeOwnerRequestBySessionId = useMemo(() => {
     const bySessionId = new Map()
-    const requests = [...studentReviewRequests].sort((left, right) => new Date(right.created_at) - new Date(left.created_at))
+    const requests = [...ownerReviewRequests].sort((left, right) => new Date(right.created_at) - new Date(left.created_at))
     requests.forEach((item) => {
       const status = String(item?.status || '').trim().toLowerCase()
       if (['closed', 'revoked'].includes(status)) return
@@ -502,7 +494,7 @@ function AppContent() {
       bySessionId.set(sessionId, item)
     })
     return bySessionId
-  }, [studentReviewRequests])
+  }, [ownerReviewRequests])
   const ownReadySessionCount = useMemo(
     () => sessions.filter((item) => item?.can_edit && item?.processing_status === 'ready').length,
     [sessions],
@@ -572,7 +564,7 @@ function AppContent() {
 
   const openHomeWorkItem = useCallback((session, returnRoute = { view: 'calendar', sessionId: null, seriesName: '' }) => {
     if (!session?.id) return
-    const activeRequest = activeStudentRequestBySessionId.get(Number(session.id))
+    const activeRequest = activeOwnerRequestBySessionId.get(Number(session.id))
     const tokenValue = activeRequest?.feedback_link?.token || activeRequest?.review_link?.token || ''
     if (tokenValue) {
       setDetailReturnRoute(returnRoute)
@@ -582,14 +574,14 @@ function AppContent() {
       return
     }
     openSession(session, returnRoute)
-  }, [activeStudentRequestBySessionId, navigate, openSession])
+  }, [activeOwnerRequestBySessionId, navigate, openSession])
 
   useEffect(() => {
     if (!user) return
     if (view === 'series') loadSessions()
-    if (view === 'calendar') loadStudentReviewRequests()
+    if (view === 'calendar') loadOwnerReviewRequests()
     loadReviewerWorkspaceAvailability()
-  }, [user, view, loadSessions, loadStudentReviewRequests, loadReviewerWorkspaceAvailability])
+  }, [user, view, loadSessions, loadOwnerReviewRequests, loadReviewerWorkspaceAvailability])
 
   useEffect(() => {
     if (autoQuickRecordCheckedRef.current) return
@@ -764,13 +756,22 @@ function AppContent() {
             sessions={sessions}
             sessionsLoading={sessionsLoading}
             routeDateKey={routeDate}
-            reviewRequests={studentReviewRequests}
+            reviewRequests={ownerReviewRequests}
             onOpenSession={(session, returnRoute) => openSession(session, returnRoute || { view: 'calendar', sessionId: null, seriesName: '' })}
             onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
             onContinueThread={(seriesName, dateKey) => handleRecordAnother({
               practiceSeries: String(seriesName || '').trim(),
               returnRoute: { view: 'calendar', sessionId: null, date: String(dateKey || '') },
             })}
+            onQuickRecord={(dateKey) => handleRecordAnother({
+              returnRoute: { view: 'calendar', sessionId: null, date: String(dateKey || '') },
+            })}
+            onQuickUpload={(dateKey) => {
+              setPendingPracticeSeries('')
+              setPendingUploadReturnRoute({ view: 'calendar', sessionId: null, date: String(dateKey || '') })
+              setOpenRecorderOnUpload(false)
+              navigate({ view: 'upload', sessionId: null })
+            }}
             onOpenListDate={(dateKey) => {
               try { window.localStorage.setItem('practica.filter.date.v1', String(dateKey || '')) } catch {}
               navigate({ view: 'calendar', sessionId: null, date: String(dateKey || '') })
@@ -790,7 +791,7 @@ function AppContent() {
             seriesName={routeSeriesName}
             sessions={sessions}
             sessionsLoading={sessionsLoading}
-            reviewRequests={studentReviewRequests}
+            reviewRequests={ownerReviewRequests}
             token={token}
             onBack={() => navigate({ view: 'calendar', sessionId: null })}
             onOpenSession={openSession}

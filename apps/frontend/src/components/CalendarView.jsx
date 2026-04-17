@@ -102,7 +102,7 @@ const sessionReviewChipStatus = (status = '') => {
   return signal || ''
 }
 
-function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '', reviewRequests = [], onOpenSession, onOpenSeries, onMonthChange, onOpenListDate, onContinueThread }) {
+function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '', reviewRequests = [], onOpenSession, onOpenSeries, onMonthChange, onOpenListDate, onContinueThread, onQuickRecord, onQuickUpload }) {
   const today = startOfDay(new Date())
   const initialMonthDate = routeDateKey ? parseDateKey(routeDateKey) : today
   const [activeMonth, setActiveMonth] = useState(new Date(initialMonthDate.getFullYear(), initialMonthDate.getMonth(), 1))
@@ -502,6 +502,20 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                 <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-wrap sm:justify-end">
                   <button
                     type="button"
+                    onClick={() => onQuickRecord?.(selectedDateKey)}
+                    className="rounded-lg bg-gray-900 px-2.5 py-2 text-xs font-medium text-white hover:bg-gray-800"
+                  >
+                    Record
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onQuickUpload?.(selectedDateKey)}
+                    className="rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                  >
+                    Upload
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => moveSelectedDay(-1)}
                     className="text-xs text-gray-500 hover:text-gray-900 rounded-lg border border-gray-200 px-2 py-2"
                   >
@@ -589,6 +603,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                               key={session.id}
                               session={session}
                               status={sessionReviewChipStatus(activeRequestBySessionId.get(Number(session.id))?.status)}
+                              requestItem={activeRequestBySessionId.get(Number(session.id)) || null}
                               onOpen={() => onOpenSession?.(session, { view: 'calendar', date: selectedDateKey })}
                               onChangeThread={() => setEditing(session)}
                             />
