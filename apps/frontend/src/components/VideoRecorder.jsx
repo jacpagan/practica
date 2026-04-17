@@ -626,6 +626,11 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   // ── Camera ──
 
   const openCamera = async () => {
+    cancelCountIn()
+    stopTimer()
+    stopMetronome()
+    stopStream()
+    closeAudioContext()
     setState(STATES.REQUESTING)
     setError(null)
     try {
@@ -648,6 +653,11 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
 
   // Screen + Camera (PiP)
   const openScreenCam = async () => {
+    cancelCountIn()
+    stopTimer()
+    stopMetronome()
+    stopStream()
+    closeAudioContext()
     setState(STATES.REQUESTING)
     setError(null)
     try {
@@ -1126,6 +1136,28 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
               </div>
             </div>
             <div className="space-y-3">
+              {state === STATES.PREVIEWING ? (
+                <div className="flex flex-wrap gap-2">
+                  {mode === 'camera' ? (
+                    <button
+                      type="button"
+                      onClick={openScreenCam}
+                      className="rounded-full px-3 py-1.5 text-xs transition-colors bg-white/10 text-white/80 hover:bg-white/20"
+                    >
+                      Switch to Screen + Cam
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={openCamera}
+                      className="rounded-full px-3 py-1.5 text-xs transition-colors bg-white/10 text-white/80 hover:bg-white/20"
+                    >
+                      Switch to Camera
+                    </button>
+                  )}
+                </div>
+              ) : null}
+
               <button
                 type="button"
                 onClick={() => setShowOptions((current) => !current)}
