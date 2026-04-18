@@ -714,10 +714,6 @@ function AppContent() {
             reviewRequests={ownerReviewRequests}
             onOpenSession={(session, returnRoute) => openSession(session, returnRoute || { view: 'calendar', sessionId: null, seriesName: '' })}
             onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
-            onContinueThread={(seriesName, dateKey) => handleRecordAnother({
-              practiceSeries: String(seriesName || '').trim(),
-              returnRoute: { view: 'calendar', sessionId: null, date: String(dateKey || '') },
-            })}
             onQuickRecord={(dateKey) => handleRecordAnother({
               returnRoute: { view: 'calendar', sessionId: null, date: String(dateKey || '') },
             })}

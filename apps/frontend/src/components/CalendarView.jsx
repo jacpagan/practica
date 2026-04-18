@@ -102,7 +102,7 @@ const sessionReviewChipStatus = (status = '') => {
   return signal || ''
 }
 
-function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '', reviewRequests = [], onOpenSession, onOpenSeries, onMonthChange, onOpenListDate, onContinueThread, onQuickRecord }) {
+function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '', reviewRequests = [], onOpenSession, onOpenSeries, onMonthChange, onOpenListDate, onQuickRecord }) {
   const today = startOfDay(new Date())
   const initialMonthDate = routeDateKey ? parseDateKey(routeDateKey) : today
   const [activeMonth, setActiveMonth] = useState(new Date(initialMonthDate.getFullYear(), initialMonthDate.getMonth(), 1))
@@ -566,13 +566,6 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                           </div>
                           {group.seriesName !== UNTHREADED_KEY && (
                             <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center sm:flex-wrap">
-                              <button
-                                type="button"
-                                onClick={() => onContinueThread?.(group.seriesName, selectedDateKey)}
-                                className="col-span-2 rounded-xl bg-gray-900 px-3 py-2 text-xs font-medium text-white hover:bg-gray-800 sm:col-span-1"
-                              >
-                                Continue thread
-                              </button>
                               <button
                                 type="button"
                                 onClick={() => onOpenSeries?.(group.seriesName)}
