@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { reportClientError, isLikelyVideoFile, videoFileAccept } from './utils'
+import { reportClientError } from './utils'
 import { AuthProvider, useAuth } from './auth'
 import { ToastProvider, useToast } from './components/Toast'
 import NotificationsBell from './components/NotificationsBell'
 import { ConfirmProvider, useConfirm } from './components/ConfirmDialog'
 import AuthForm from './components/AuthForm'
 const ReviewPage = React.lazy(() => import('./components/ReviewPage'))
-import SessionUpload from './components/SessionUpload'
 // Inline header create buttons to avoid any chance of circular init
 const SessionDetail = React.lazy(() => import('./components/SessionDetail'))
 const SeriesView = React.lazy(() => import('./components/SeriesView'))
@@ -27,7 +26,7 @@ const parseRoute = (pathname, search = '') => {
   if (pathname === '/archive') return { view: 'calendar', sessionId: null }
   if (pathname === '/calendar') return { view: 'calendar', sessionId: null, date }
   if (pathname === '/library') return { view: 'calendar', sessionId: null, date }
-  if (pathname === '/upload') return { view: 'upload', sessionId: null }
+  if (pathname === '/upload') return { view: 'record', sessionId: null }
   if (pathname === '/record' || pathname === '/recording') return { view: 'record', sessionId: null }
   if (pathname === '/requests') return { view: 'requests', sessionId: null }
   const reviewMatch = pathname.match(/^\/r\/(.+)$/)
@@ -42,7 +41,7 @@ const parseRoute = (pathname, search = '') => {
 const routePath = ({ view, sessionId, token, claim, seriesName, date }) => {
   if (view === 'privacy') return '/privacy'
   if (view === 'archive') return '/'
-  if (view === 'upload') return '/upload'
+  if (view === 'upload') return '/record'
   if (view === 'record') return '/record'
   if (view === 'requests') return '/requests'
   if (view === 'series' && seriesName) return `/series/${encodeURIComponent(seriesName)}`
@@ -509,47 +508,22 @@ function AppContent() {
     [sessions],
   )
 
-  // Header Upload button (desktop + mobile)
-  const uploadInputRef = React.useRef(null)
-  const [prefillUploadFile, setPrefillUploadFile] = React.useState(null)
-  React.useEffect(() => {
-    const handler = (e) => {
-      const file = e.detail?.file
-      if (!file || !isLikelyVideoFile(file)) return
-      setPrefillUploadFile(file)
-      setPendingUploadReturnRoute(currentReturnRoute)
-      setOpenRecorderOnUpload(false)
-      navigate({ view: 'upload', sessionId: null })
-    }
-    window.addEventListener('practica:header-upload', handler)
-    return () => window.removeEventListener('practica:header-upload', handler)
-  }, [currentReturnRoute, navigate])
-
   // Global modal recorder
   const [showRecorderModal, setShowRecorderModal] = useState(false)
   const openGlobalRecorder = useCallback(() => {
-    const supported = typeof window !== 'undefined' && typeof window.MediaRecorder !== 'undefined' && !!(navigator.mediaDevices?.getUserMedia)
-    if (supported) {
-      // Navigate to dedicated recording page for a simpler, stable flow
-      navigate({ view: 'record', sessionId: null })
-    } else {
-      // Fallback: go to upload and use native capture
-      setPendingUploadReturnRoute(currentReturnRoute)
-      setOpenRecorderOnUpload(true)
-      navigate({ view: 'upload', sessionId: null })
-    }
-  }, [currentReturnRoute, navigate])
+    navigate({ view: 'record', sessionId: null })
+  }, [navigate])
 
   // no dropdown menu state
 
   const handleRecordAnother = useCallback((draft = null) => {
     setSelectedSession(null)
     setJustUploadedSessionId(null)
-    setOpenRecorderOnUpload(true)
+    setOpenRecorderOnUpload(false)
     setPendingFollowUpRequestDraft(draft || null)
     setPendingPracticeSeries(String(draft?.practiceSeries || '').trim())
     setPendingUploadReturnRoute(resolveUploadReturnRoute(draft))
-    navigate({ view: 'upload', sessionId: null })
+    navigate({ view: 'record', sessionId: null })
   }, [navigate, resolveUploadReturnRoute])
 
   const startQuickRecord = useCallback(() => {
@@ -558,8 +532,8 @@ function AppContent() {
     setPendingFollowUpRequestDraft(null)
     setPendingPracticeSeries('')
     setPendingUploadReturnRoute(currentReturnRoute)
-    setOpenRecorderOnUpload(true)
-    navigate({ view: 'upload', sessionId: null })
+    setOpenRecorderOnUpload(false)
+    navigate({ view: 'record', sessionId: null })
   }, [currentReturnRoute, navigate])
 
   const openHomeWorkItem = useCallback((session, returnRoute = { view: 'calendar', sessionId: null, seriesName: '' }) => {
@@ -670,16 +644,6 @@ function AppContent() {
             >
               Record
             </button>
-            <button
-              onClick={() => uploadInputRef.current?.click()}
-              className="hidden sm:inline-flex rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors"
-            >
-              Upload
-            </button>
-            <input ref={uploadInputRef} type="file" accept={videoFileAccept()} className="hidden" onChange={(e) => {
-              const f = e.target?.files?.[0]; e.target.value = '';
-              if (!f || !isLikelyVideoFile(f)) return; setPrefillUploadFile(f); setPendingUploadReturnRoute(currentReturnRoute); setOpenRecorderOnUpload(false); navigate({ view: 'upload', sessionId: null })
-            }} />
             <div className="flex items-center gap-2 sm:border-l sm:border-gray-100 sm:pl-3">
               <NotificationsBell
                 token={token}
@@ -717,23 +681,13 @@ function AppContent() {
               </button>
             </nav>
           ) : null}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2">
             <button
               onClick={openGlobalRecorder}
               className="w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
             >
               Record
             </button>
-            <button
-              onClick={() => uploadInputRef.current?.click()}
-              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors"
-            >
-              Upload
-            </button>
-            <input ref={uploadInputRef} type="file" accept={videoFileAccept()} className="hidden" onChange={(e) => {
-              const f = e.target?.files?.[0]; e.target.value = '';
-              if (!f || !isLikelyVideoFile(f)) return; setPrefillUploadFile(f); setPendingUploadReturnRoute(currentReturnRoute); setOpenRecorderOnUpload(false); navigate({ view: 'upload', sessionId: null })
-            }} />
           </div>
         </div>
       </header>
@@ -766,12 +720,6 @@ function AppContent() {
             onQuickRecord={(dateKey) => handleRecordAnother({
               returnRoute: { view: 'calendar', sessionId: null, date: String(dateKey || '') },
             })}
-            onQuickUpload={(dateKey) => {
-              setPendingPracticeSeries('')
-              setPendingUploadReturnRoute({ view: 'calendar', sessionId: null, date: String(dateKey || '') })
-              setOpenRecorderOnUpload(false)
-              navigate({ view: 'upload', sessionId: null })
-            }}
             onOpenListDate={(dateKey) => {
               try { window.localStorage.setItem('practica.filter.date.v1', String(dateKey || '')) } catch {}
               navigate({ view: 'calendar', sessionId: null, date: String(dateKey || '') })
@@ -798,7 +746,7 @@ function AppContent() {
             onCreateVideo={() => {
               setPendingPracticeSeries(routeSeriesName)
               setPendingUploadReturnRoute({ view: 'series', sessionId: null, seriesName: routeSeriesName })
-              navigate({ view: 'upload', sessionId: null })
+              navigate({ view: 'record', sessionId: null })
             }}
           />
         )}
@@ -823,30 +771,6 @@ function AppContent() {
               </div>
             </div>
           )
-        )}
-
-        {view === 'upload' && (
-          <SessionUpload
-            token={token}
-            practiceThreadOptions={practiceThreadOptions}
-            onComplete={handleUploadComplete}
-            onCancel={({ bypassUploadGuard = false } = {}) => {
-              const nextRoute = pendingUploadReturnRoute?.view
-                ? pendingUploadReturnRoute
-                : (pendingPracticeSeries
-                    ? { view: 'series', sessionId: null, seriesName: pendingPracticeSeries }
-                    : { view: 'calendar', sessionId: null })
-              setPendingUploadReturnRoute({ view: 'calendar', sessionId: null })
-              navigate(nextRoute, { bypassUploadGuard })
-            }}
-            initialRecorderOpen={openRecorderOnUpload}
-            initialPracticeSeries={pendingPracticeSeries}
-            onPracticeSeriesHandled={() => setPendingPracticeSeries('')}
-            onRecorderOpenHandled={() => setOpenRecorderOnUpload(false)}
-            onUploadGuardChange={setUploadNavigationGuard}
-            prefillFile={prefillUploadFile}
-            onPrefillUsed={() => setPrefillUploadFile(null)}
-          />
         )}
 
         {view === 'record' && (
@@ -896,11 +820,10 @@ function AppContent() {
       {showRecorderModal ? (
         <RecorderModal
           onClose={() => setShowRecorderModal(false)}
-          onRecorded={(file) => {
-            setPrefillUploadFile(file)
+          onRecorded={() => {
             setPendingUploadReturnRoute(currentReturnRoute)
             setOpenRecorderOnUpload(false)
-            navigate({ view: 'upload', sessionId: null })
+            navigate({ view: 'record', sessionId: null })
           }}
         />
       ) : null}

@@ -102,7 +102,7 @@ const sessionReviewChipStatus = (status = '') => {
   return signal || ''
 }
 
-function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '', reviewRequests = [], onOpenSession, onOpenSeries, onMonthChange, onOpenListDate, onContinueThread, onQuickRecord, onQuickUpload }) {
+function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '', reviewRequests = [], onOpenSession, onOpenSeries, onMonthChange, onOpenListDate, onContinueThread, onQuickRecord }) {
   const today = startOfDay(new Date())
   const initialMonthDate = routeDateKey ? parseDateKey(routeDateKey) : today
   const [activeMonth, setActiveMonth] = useState(new Date(initialMonthDate.getFullYear(), initialMonthDate.getMonth(), 1))
@@ -506,13 +506,6 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                     className="rounded-lg bg-gray-900 px-2.5 py-2 text-xs font-medium text-white hover:bg-gray-800"
                   >
                     Record
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onQuickUpload?.(selectedDateKey)}
-                    className="rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                  >
-                    Upload
                   </button>
                   <button
                     type="button"
