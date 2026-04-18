@@ -254,7 +254,23 @@ async function installSignedInUploadMocks(page) {
     })
   })
 
+  await page.route('**/api/connections/?role=creator', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    })
+  })
+
   await page.route('**/api/review-requests/?session_id=999&role=student', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    })
+  })
+
+  await page.route('**/api/review-requests/?session_id=999&role=creator', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -354,7 +370,7 @@ test('signed-in upload -> request -> feedback loop works', async ({ browser, req
 
   await studentPage.goto(`/sessions/${sessionId}`)
   await expect(studentPage.getByRole('button', { name: 'Review feedback' })).toBeVisible()
-  await expect(studentPage.getByText('E2E Teacher')).toBeVisible()
+  await expect(studentPage.getByText('E2E Teacher', { exact: true })).toBeVisible()
 
   await studentContext.close()
   await teacherContext.close()
@@ -411,6 +427,8 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
   const continueLoopButton = studentPage.getByRole('button', { name: /Record next take|Continue loop/ })
   await expect(continueLoopButton).toBeVisible()
   await continueLoopButton.click()
+  await expect(studentPage).toHaveURL(/\/record$/)
+  await studentPage.goto('/upload')
   await expect(studentPage).toHaveURL(/\/upload$/)
   await expect(studentPage.getByRole('heading', { name: 'New take' })).toBeVisible()
 

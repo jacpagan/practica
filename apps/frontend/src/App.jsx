@@ -6,6 +6,7 @@ import NotificationsBell from './components/NotificationsBell'
 import { ConfirmProvider, useConfirm } from './components/ConfirmDialog'
 import AuthForm from './components/AuthForm'
 const ReviewPage = React.lazy(() => import('./components/ReviewPage'))
+import SessionUpload from './components/SessionUpload'
 // Inline header create buttons to avoid any chance of circular init
 const SessionDetail = React.lazy(() => import('./components/SessionDetail'))
 const SeriesView = React.lazy(() => import('./components/SeriesView'))
@@ -26,7 +27,7 @@ const parseRoute = (pathname, search = '') => {
   if (pathname === '/archive') return { view: 'calendar', sessionId: null }
   if (pathname === '/calendar') return { view: 'calendar', sessionId: null, date }
   if (pathname === '/library') return { view: 'calendar', sessionId: null, date }
-  if (pathname === '/upload') return { view: 'record', sessionId: null }
+  if (pathname === '/upload') return { view: 'upload', sessionId: null }
   if (pathname === '/record' || pathname === '/recording') return { view: 'record', sessionId: null }
   if (pathname === '/requests') return { view: 'requests', sessionId: null }
   const reviewMatch = pathname.match(/^\/r\/(.+)$/)
@@ -41,7 +42,7 @@ const parseRoute = (pathname, search = '') => {
 const routePath = ({ view, sessionId, token, claim, seriesName, date }) => {
   if (view === 'privacy') return '/privacy'
   if (view === 'archive') return '/'
-  if (view === 'upload') return '/record'
+  if (view === 'upload') return '/upload'
   if (view === 'record') return '/record'
   if (view === 'requests') return '/requests'
   if (view === 'series' && seriesName) return `/series/${encodeURIComponent(seriesName)}`
@@ -771,6 +772,28 @@ function AppContent() {
               </div>
             </div>
           )
+        )}
+
+        {view === 'upload' && (
+          <SessionUpload
+            token={token}
+            practiceThreadOptions={practiceThreadOptions}
+            onComplete={handleUploadComplete}
+            onCancel={({ bypassUploadGuard = false } = {}) => {
+              const nextRoute = pendingUploadReturnRoute?.view
+                ? pendingUploadReturnRoute
+                : (pendingPracticeSeries
+                    ? { view: 'series', sessionId: null, seriesName: pendingPracticeSeries }
+                    : { view: 'calendar', sessionId: null })
+              setPendingUploadReturnRoute({ view: 'calendar', sessionId: null })
+              navigate(nextRoute, { bypassUploadGuard })
+            }}
+            initialRecorderOpen={openRecorderOnUpload}
+            initialPracticeSeries={pendingPracticeSeries}
+            onPracticeSeriesHandled={() => setPendingPracticeSeries('')}
+            onRecorderOpenHandled={() => setOpenRecorderOnUpload(false)}
+            onUploadGuardChange={setUploadNavigationGuard}
+          />
         )}
 
         {view === 'record' && (
