@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import VideoRecorder from './VideoRecorder'
-import { MAX_RECORDER_DURATION_SECONDS, createSessionUpload, uploadErrorMessage } from '../utils'
+import { MAX_RECORDER_DURATION_SECONDS, createSessionUpload, isLikelyVideoFile, uploadErrorMessage, videoFileAccept } from '../utils'
 import { useAuth } from '../auth'
 import { useToast } from './Toast'
 
@@ -15,6 +15,7 @@ export default function RecorderPage({ onCancel, onComplete }) {
   const [saveError, setSaveError] = useState('')
   const ownedPreviewUrlRef = useRef('')
   const shouldAutoSaveRef = useRef(false)
+  const fileInputRef = useRef(null)
 
   useEffect(() => () => {
     if (ownedPreviewUrlRef.current) {
@@ -39,6 +40,17 @@ export default function RecorderPage({ onCancel, onComplete }) {
     }
     ownedPreviewUrlRef.current = URL.createObjectURL(nextFile)
     setPreviewUrl(ownedPreviewUrlRef.current)
+  }
+
+  const handlePickedFile = (event) => {
+    const nextFile = event.target?.files?.[0]
+    event.target.value = ''
+    if (!nextFile) return
+    if (!isLikelyVideoFile(nextFile)) {
+      toast.error('Please choose a video file.')
+      return
+    }
+    handleRecorded(nextFile)
   }
 
   const handleSave = async ({ auto = false } = {}) => {
@@ -88,15 +100,33 @@ export default function RecorderPage({ onCancel, onComplete }) {
         </div>
 
         {!file ? (
-          <div className="rounded-[28px] overflow-hidden shadow-2xl border border-gray-200">
-            <VideoRecorder
-              onRecorded={(f) => handleRecorded(f)}
-              onCancel={onCancel}
-              maxDuration={MAX_RECORDER_DURATION_SECONDS}
-              autoUseOnStop={true}
-              minAutoUseSeconds={0}
-              autoOpenOnMount={true}
-            />
+          <div className="space-y-3">
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50"
+              >
+                Upload video
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={videoFileAccept()}
+                className="hidden"
+                onChange={handlePickedFile}
+              />
+            </div>
+            <div className="rounded-[28px] overflow-hidden shadow-2xl border border-gray-200">
+              <VideoRecorder
+                onRecorded={(f) => handleRecorded(f)}
+                onCancel={onCancel}
+                maxDuration={MAX_RECORDER_DURATION_SECONDS}
+                autoUseOnStop={true}
+                minAutoUseSeconds={0}
+                autoOpenOnMount={true}
+              />
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
