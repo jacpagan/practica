@@ -2,8 +2,15 @@ import React from 'react'
 import VideoThumbnail from './VideoThumbnail'
 import StatusChip from './StatusChip'
 import usePrefetchSession from '../hooks/usePrefetchSession'
-import { formatResolutionTimestamp } from './ResolutionBanner'
 import { fmtTimer } from '../utils'
+
+const formatResolutionTimestamp = (resolution) => {
+  const raw = resolution?.updated_at || resolution?.created_at || ''
+  if (!raw) return ''
+  const date = new Date(raw)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString(undefined, { hour12: undefined })
+}
 
 export default function SessionListItem({ session, onOpen, status = '', requestItem = null, showSeries = false, highlight = false, onRecordFollowUp = null, onChangeThread = null, prefetch = true }) {
   const prefetchSession = usePrefetchSession()
