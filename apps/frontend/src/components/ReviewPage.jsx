@@ -429,18 +429,39 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
               : 'Ready to close this thread'
 
   const openResponseComposer = useCallback(() => {
+    reportClientEvent('reviewer_quick_action_selected', {
+      action: 'reviewer_quick_action_respond',
+      review_request_id: reviewRequest?.id || null,
+      status: statusKey,
+    })
     try { responseComposerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch {}
-  }, [])
+  }, [reviewRequest?.id, statusKey])
 
   const confirmReviewerModerationAction = useCallback((actionKey) => {
     if (actionKey === 'needs_resubmission') {
-      return window.confirm('Request resubmission? This will mark the thread as waiting on creator.')
+      const confirmed = window.confirm('Request resubmission? This will mark the thread as waiting on creator.')
+      if (!confirmed) {
+        reportClientEvent('reviewer_quick_action_cancelled', {
+          action: 'reviewer_quick_action_needs_resubmission',
+          review_request_id: reviewRequest?.id || null,
+          status: statusKey,
+        })
+      }
+      return confirmed
     }
     if (actionKey === 'declined_unrelated') {
-      return window.confirm('Mark unrelated? This will mark the thread as waiting on creator.')
+      const confirmed = window.confirm('Mark unrelated? This will mark the thread as waiting on creator.')
+      if (!confirmed) {
+        reportClientEvent('reviewer_quick_action_cancelled', {
+          action: 'reviewer_quick_action_declined_unrelated',
+          review_request_id: reviewRequest?.id || null,
+          status: statusKey,
+        })
+      }
+      return confirmed
     }
     return true
-  }, [])
+  }, [reviewRequest?.id, statusKey])
 
   const reasonLabel = (value = '') => {
     const normalized = String(value || '').trim().toLowerCase()
@@ -949,6 +970,11 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
                   type="button"
                   onClick={() => {
                     if (!confirmReviewerModerationAction('needs_resubmission')) return
+                    reportClientEvent('reviewer_quick_action_selected', {
+                      action: 'reviewer_quick_action_needs_resubmission',
+                      review_request_id: reviewRequest?.id || null,
+                      status: statusKey,
+                    })
                     handleReviewerLoopState('needs_resubmission', 'needs_new_take')
                   }}
                   disabled={!reviewerCanModerate || closing}
@@ -960,6 +986,11 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
                   type="button"
                   onClick={() => {
                     if (!confirmReviewerModerationAction('declined_unrelated')) return
+                    reportClientEvent('reviewer_quick_action_selected', {
+                      action: 'reviewer_quick_action_declined_unrelated',
+                      review_request_id: reviewRequest?.id || null,
+                      status: statusKey,
+                    })
                     handleReviewerLoopState('declined_unrelated', 'unrelated_video')
                   }}
                   disabled={!reviewerCanModerate || closing}

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { fmtDate } from '../utils'
+import { fmtDate, reportClientEvent } from '../utils'
 import StatusChip from './StatusChip'
 
 const formatResolutionTimestamp = (resolution) => {
@@ -7,7 +7,9 @@ const formatResolutionTimestamp = (resolution) => {
   if (!raw) return ''
   const date = new Date(raw)
   if (Number.isNaN(date.getTime())) return ''
-  return date.toLocaleString(undefined, { hour12: undefined })
+  const dayPart = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  const timePart = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  return `${dayPart} · ${timePart}`
 }
 
 const statusPriority = {
@@ -101,11 +103,21 @@ const emptyCopyForFilter = (filter) => {
   return 'No requests in this view.'
 }
 
-function RequestCard({ item, onOpenReviewRequest }) {
+function RequestCard({ item, onOpenReviewRequest, activeFilter = '' }) {
   const normalizedStatus = String(item?.status || '').trim().toLowerCase()
   const memberName = item?.creator?.display_name || item?.member?.display_name || item?.owner?.display_name || item?.student?.display_name || item?.creator?.username || item?.member?.username || item?.owner?.username || item?.student?.username || 'Member'
   const resolution = item?.resolution || null
   const resolutionTimestamp = formatResolutionTimestamp(resolution)
+
+  const handleOpenRequest = () => {
+    reportClientEvent('reviewer_inbox_request_opened', {
+      action: 'reviewer_inbox_open_request',
+      review_request_id: item?.id || null,
+      status: normalizedStatus,
+      filter: String(activeFilter || '').trim().toLowerCase(),
+    })
+    onOpenReviewRequest?.(item)
+  }
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
@@ -131,7 +143,7 @@ function RequestCard({ item, onOpenReviewRequest }) {
         <div className="shrink-0 flex items-center gap-2">
           <button
             type="button"
-            onClick={() => onOpenReviewRequest?.(item)}
+            onClick={handleOpenRequest}
             className="rounded-xl bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
           >
             {requestActionLabel(normalizedStatus)}
@@ -246,7 +258,13 @@ function TeachingView({ token, onOpenReviewRequest }) {
                     <button
                       key={filterValue}
                       type="button"
-                      onClick={() => setActiveFilter(filterValue)}
+                      onClick={() => {
+                        reportClientEvent('reviewer_inbox_filter_changed', {
+                          action: 'reviewer_inbox_filter_changed',
+                          filter: filterValue,
+                        })
+                        setActiveFilter(filterValue)
+                      }}
                       className={`rounded-full border px-3 py-1.5 text-xs ${activeFilter === filterValue ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
                     >
                       {filterLabel[filterValue]} ({countsByFilter[filterValue] || 0})
@@ -257,7 +275,14 @@ function TeachingView({ token, onOpenReviewRequest }) {
                   Sort
                   <select
                     value={activeSort}
-                    onChange={(event) => setActiveSort(event.target.value)}
+                    onChange={(event) => {
+                      reportClientEvent('reviewer_inbox_sort_changed', {
+                        action: 'reviewer_inbox_sort_changed',
+                        sort: event.target.value,
+                        filter: activeFilter,
+                      })
+                      setActiveSort(event.target.value)
+                    }}
                     className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700"
                   >
                     {sortOptions.map((option) => (
@@ -289,7 +314,7 @@ function TeachingView({ token, onOpenReviewRequest }) {
               ) : (
                 <div className="space-y-3">
                   {visibleRequests.map((item) => (
-                    <RequestCard key={item.id} item={item} onOpenReviewRequest={onOpenReviewRequest} />
+                    <RequestCard key={item.id} item={item} activeFilter={activeFilter} onOpenReviewRequest={onOpenReviewRequest} />
                   ))}
                 </div>
               )}
