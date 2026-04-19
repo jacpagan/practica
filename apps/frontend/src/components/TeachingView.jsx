@@ -106,15 +106,6 @@ function RequestCard({ item, onOpenReviewRequest }) {
   const memberName = item?.creator?.display_name || item?.member?.display_name || item?.owner?.display_name || item?.student?.display_name || item?.creator?.username || item?.member?.username || item?.owner?.username || item?.student?.username || 'Member'
   const resolution = item?.resolution || null
   const resolutionTimestamp = formatResolutionTimestamp(resolution)
-  const reviewToken = item?.feedback_link?.token || item?.review_link?.token || ''
-
-  const openRequest = () => {
-    if (reviewToken) {
-      window.location.assign(`/r/${reviewToken}`)
-      return
-    }
-    onOpenReviewRequest?.(item)
-  }
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
@@ -140,7 +131,7 @@ function RequestCard({ item, onOpenReviewRequest }) {
         <div className="shrink-0 flex items-center gap-2">
           <button
             type="button"
-            onClick={openRequest}
+            onClick={() => onOpenReviewRequest?.(item)}
             className="rounded-xl bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
           >
             {requestActionLabel(normalizedStatus)}
