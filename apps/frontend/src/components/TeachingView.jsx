@@ -57,8 +57,8 @@ const sortOptions = [
 
 const requestActionLabel = (status = '') => {
   const normalized = String(status || '').trim().toLowerCase()
-  if (needsActionStatuses.has(normalized)) return 'Open request'
-  if (waitingOnCreatorStatuses.has(normalized)) return 'Open request'
+  if (needsActionStatuses.has(normalized)) return 'Review now'
+  if (waitingOnCreatorStatuses.has(normalized)) return 'Open thread'
   return 'View history'
 }
 
@@ -265,6 +265,21 @@ function TeachingView({ token, onOpenReviewRequest }) {
                     ))}
                   </select>
                 </label>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-gray-900">
+                  {activeFilter === FILTER_AWAITING_REVIEW
+                    ? 'Needs action'
+                    : activeFilter === FILTER_NEEDS_NEW_TAKE
+                      ? 'Needs new take'
+                      : activeFilter === FILTER_RECENTLY_RESPONDED
+                        ? 'Recently responded'
+                        : activeFilter === FILTER_DONE
+                          ? 'Done'
+                          : 'All requests'}
+                </p>
+                <p className="text-xs text-gray-500">{visibleRequests.length}</p>
               </div>
 
               {visibleRequests.length === 0 ? (
