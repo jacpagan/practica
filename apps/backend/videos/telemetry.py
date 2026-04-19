@@ -15,6 +15,9 @@ PRODUCT_EVENT_EXTRA_WHITELIST = {
     'response_mode',
     'prior_status',
     'practice_series',
+    'filter',
+    'sort',
+    'status',
 }
 
 

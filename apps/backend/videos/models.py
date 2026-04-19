@@ -95,8 +95,24 @@ class ReviewerInvite(models.Model):
         self.mark_expired_if_needed(save=True)
         return self.status == self.STATUS_PENDING and self.invite_code.can_redeem()
 
+    @property
+    def owner(self):
+        return self.student
+
+    @owner.setter
+    def owner(self, value):
+        self.student = value
+
+    @property
+    def member(self):
+        return self.student
+
+    @member.setter
+    def member(self, value):
+        self.student = value
+
     def __str__(self):
-        return f"ReviewerInvite {self.id} student={self.student_id} status={self.status} intent={self.intent}"
+        return f"ReviewerInvite {self.id} member={self.student_id} status={self.status} intent={self.intent}"
 
 class Exercise(models.Model):
     """A named exercise in the library."""
@@ -437,6 +453,14 @@ class ReviewRequest(models.Model):
         self.student = value
 
     @property
+    def member(self):
+        return self.student
+
+    @member.setter
+    def member(self, value):
+        self.student = value
+
+    @property
     def feedback_link(self):
         return self.review_link
 
@@ -521,3 +545,22 @@ class FeedbackTemplate(models.Model):
 
     def __str__(self):
         return f"FeedbackTemplate reviewer={self.reviewer_id} title={self.title}"
+
+
+class ProductEventLog(models.Model):
+    event_name = models.CharField(max_length=80, db_index=True)
+    path = models.CharField(max_length=512, blank=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='product_event_logs')
+    is_authenticated = models.BooleanField(default=False)
+    client_trace_id = models.CharField(max_length=128, blank=True)
+    extra_json = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        indexes = [
+            models.Index(fields=['event_name', 'created_at']),
+        ]
+
+    def __str__(self):
+        return f"ProductEventLog event={self.event_name} at={self.created_at.isoformat()}"

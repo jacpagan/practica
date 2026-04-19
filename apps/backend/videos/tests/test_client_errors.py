@@ -1,9 +1,16 @@
 from unittest.mock import patch
 
+from django.contrib.auth.models import User
 from rest_framework.test import APITestCase
+
+from videos.models import ProductEventLog
 
 
 class ClientErrorTelemetryTests(APITestCase):
+    def setUp(self):
+        super().setUp()
+        ProductEventLog.objects.all().delete()
+
     @patch('videos.views.logger')
     def test_product_event_logs_normalized_payload(self, logger_mock):
         response = self.client.post(
@@ -33,6 +40,10 @@ class ClientErrorTelemetryTests(APITestCase):
         self.assertEqual(logged_extra['review_token_present'], True)
         self.assertNotIn('ignore_me', logged_extra)
         self.assertLessEqual(len(logged_extra['reason']), 160)
+        stored = ProductEventLog.objects.get()
+        self.assertEqual(stored.event_name, 'reviewer_invite_claim_failed')
+        self.assertEqual(stored.path, '/api/review/:token/')
+        self.assertEqual(stored.extra_json.get('action'), 'ask_for_feedback')
 
     @patch('videos.views.logger')
     def test_non_product_event_uses_legacy_client_error_log(self, logger_mock):
@@ -51,3 +62,24 @@ class ClientErrorTelemetryTests(APITestCase):
         logger_mock.warning.assert_called_once()
         logger_mock.info.assert_not_called()
 
+    def test_product_event_insights_requires_staff(self):
+        user = User.objects.create_user(username='member', password='test-pass')
+        self.client.force_authenticate(user=user)
+        response = self.client.get('/api/product-events/insights/')
+        self.assertEqual(response.status_code, 403)
+
+    def test_product_event_insights_returns_aggregates_for_staff(self):
+        staff = User.objects.create_user(username='admin', password='test-pass', is_staff=True)
+        ProductEventLog.objects.create(event_name='reviewer_inbox_filter_changed', path='/requests', is_authenticated=False)
+        ProductEventLog.objects.create(event_name='reviewer_inbox_filter_changed', path='/requests', is_authenticated=False)
+        ProductEventLog.objects.create(event_name='reviewer_quick_action_selected', path='/r/:token', is_authenticated=False)
+
+        self.client.force_authenticate(user=staff)
+        response = self.client.get('/api/product-events/insights/?window_hours=48&limit=5')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['total_events'], 3)
+        self.assertEqual(response.data['top_events'][0]['event_name'], 'reviewer_inbox_filter_changed')
+        self.assertEqual(response.data['top_events'][0]['count'], 2)
+        self.assertEqual(response.data['top_paths'][0]['path'], '/requests')
+        self.assertEqual(response.data['top_paths'][0]['count'], 2)

@@ -3,6 +3,7 @@ from .models import (
     Profile, Session, Chapter, VideoFeedback, MultipartSessionUpload, SessionAsset,
     SessionLastSeen,
     SignupInviteCode,
+    ProductEventLog,
     ReviewerInvite,
     ReviewRequest, ReviewRequestEvent, ReviewerRosterMembership, FeedbackTemplate,
 )
@@ -35,10 +36,14 @@ class SignupInviteCodeAdmin(admin.ModelAdmin):
 
 @admin.register(ReviewerInvite)
 class ReviewerInviteAdmin(admin.ModelAdmin):
-    list_display = ['id', 'label', 'student', 'status', 'intent', 'claimed_by', 'expires_at', 'created_at']
+    list_display = ['id', 'label', 'member_display', 'status', 'intent', 'claimed_by', 'expires_at', 'created_at']
     list_filter = ['status', 'intent', 'created_at']
     search_fields = ['label', 'student__username', 'created_by__username', 'claimed_by__username', 'invite_code__code']
     raw_id_fields = ['created_by', 'student', 'invite_code', 'review_link', 'session', 'review_request', 'claimed_by']
+
+    @admin.display(description='Member')
+    def member_display(self, obj):
+        return obj.student
 
 
 @admin.register(Session)
@@ -136,3 +141,11 @@ class ReviewRequestEventAdmin(admin.ModelAdmin):
     list_filter = ['event_type', 'to_status', 'reason_code', 'created_at']
     search_fields = ['review_request__goal', 'review_request__session__title', 'actor__username', 'note']
     raw_id_fields = ['review_request', 'actor']
+
+
+@admin.register(ProductEventLog)
+class ProductEventLogAdmin(admin.ModelAdmin):
+    list_display = ['id', 'event_name', 'path', 'is_authenticated', 'user', 'created_at']
+    list_filter = ['event_name', 'is_authenticated', 'created_at']
+    search_fields = ['event_name', 'path', 'client_trace_id', 'user__username']
+    raw_id_fields = ['user']

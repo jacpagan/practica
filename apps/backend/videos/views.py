@@ -3,7 +3,7 @@ import os
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse, HttpResponse
 from django.db import connection
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.utils import timezone
 from django.conf import settings
 from django.contrib.auth import authenticate
@@ -16,7 +16,7 @@ from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
-from .models import SignupInviteCode
+from .models import ProductEventLog, SignupInviteCode
 from .serializers import (
     UserSerializer, UserSummarySerializer, RegisterSerializer,
     SignupInviteCodeSerializer,
@@ -137,6 +137,14 @@ def client_error_view(request):
 
     if source == PRODUCT_EVENT_SOURCE:
         log_product_event(logger, request, event_name=message, extra=extra, path_override=path)
+        ProductEventLog.objects.create(
+            event_name=message[:80] or 'unknown',
+            path=path,
+            user=request.user if getattr(request.user, 'is_authenticated', False) else None,
+            is_authenticated=bool(getattr(request.user, 'is_authenticated', False)),
+            client_trace_id=client_trace_id,
+            extra_json=extra,
+        )
         return Response({'ok': True}, status=status.HTTP_202_ACCEPTED)
 
     request_id = request.META.get('HTTP_X_REQUEST_ID', '')
@@ -151,6 +159,49 @@ def client_error_view(request):
         bool(stack),
     )
     return Response({'ok': True}, status=status.HTTP_202_ACCEPTED)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def product_event_insights_view(request):
+    if not request.user.is_staff:
+        return Response({'error': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        window_hours = max(1, min(24 * 30, int(request.query_params.get('window_hours', 24))))
+    except (TypeError, ValueError):
+        window_hours = 24
+    try:
+        limit = max(1, min(50, int(request.query_params.get('limit', 10))))
+    except (TypeError, ValueError):
+        limit = 10
+
+    threshold = timezone.now() - timezone.timedelta(hours=window_hours)
+    event_name_filter = str(request.query_params.get('event_name', '')).strip()
+
+    qs = ProductEventLog.objects.filter(created_at__gte=threshold)
+    if event_name_filter:
+        qs = qs.filter(event_name=event_name_filter)
+
+    top_events = list(
+        qs.values('event_name').annotate(count=Count('id')).order_by('-count', 'event_name')[:limit]
+    )
+    top_paths = list(
+        qs.exclude(path='').values('path').annotate(count=Count('id')).order_by('-count', 'path')[:limit]
+    )
+    recent_events = list(
+        qs.values('id', 'event_name', 'path', 'is_authenticated', 'client_trace_id', 'extra_json', 'created_at')
+        .order_by('-created_at')[:limit]
+    )
+
+    return Response({
+        'window_hours': window_hours,
+        'event_name': event_name_filter,
+        'total_events': qs.count(),
+        'top_events': top_events,
+        'top_paths': top_paths,
+        'recent_events': recent_events,
+    })
 
 
 # ── Legacy product surfaces removed ─────────────────────────────────
