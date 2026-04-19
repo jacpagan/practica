@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { feedbackCategoryLabel, feedbackCategoryOptions, feedbackCategoryTone, fmtTimer, MAX_RECORDER_DURATION_SECONDS, MAX_VIDEO_UPLOAD_BYTES, reportClientEvent, sessionVideoSources, videoUrl, isLikelyVideoFile, videoFileAccept, uploadMultipartRequest } from '../utils'
 import { useAuth } from '../auth'
 import AuthForm from './AuthForm'

@@ -343,7 +343,7 @@ function AppContent() {
   const loadOwnerReviewRequests = useCallback(async () => {
     if (!token) return
     try {
-      const items = await fetchPaginated('/api/review-requests/?role=creator')
+      const items = await fetchPaginated('/api/review-requests/?role=owner')
       setOwnerReviewRequests(items)
     } catch {
       setOwnerReviewRequests([])

@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useToast } from './Toast'
+import { formatResolutionTimestamp } from './ResolutionBanner'
 
-// Lightweight in-app bell that polls for new feedback for the signed-in member (student/owner role).
+// Lightweight in-app bell that polls for new feedback for the signed-in member in the creator role.
 // It shows a subtle badge in the header and a dropdown list to open recent items.
 // This avoids heavy infra (no push/SSE) and keeps privacy by default.
 
@@ -184,6 +185,8 @@ export default function NotificationsBell({ token, onOpenReviewRequest, onOpenPr
               <div key={r.id} className="rounded-lg border border-gray-200 p-3">
                 <p className="text-sm font-medium text-gray-900 line-clamp-1">{r.session?.title || 'Feedback'}</p>
                 <p className="text-xs text-gray-500 mt-0.5">{r.reviewer?.display_name || r.reviewer?.username || 'Reviewer'}</p>
+                <p className="text-sm text-gray-700 mt-2">{r?.resolution?.detail || 'Feedback is ready to review.'}</p>
+                {formatResolutionTimestamp(r?.resolution) ? <p className="text-xs text-gray-500 mt-1">{formatResolutionTimestamp(r.resolution)}</p> : null}
                 <div className="mt-2 flex gap-2 justify-end">
                   <button
                     type="button"
@@ -199,7 +202,7 @@ export default function NotificationsBell({ token, onOpenReviewRequest, onOpenPr
                       setOpen(false)
                     }}
                   >
-                    Open
+                    Review feedback
                   </button>
                 </div>
               </div>
