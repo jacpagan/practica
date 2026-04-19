@@ -1,30 +1,16 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useToast } from './Toast'
 import { fmtDate } from '../utils'
 import VideoThumbnail from './VideoThumbnail'
 import SessionListItem from './SessionListItem'
 import ThreadPickerModal from './ThreadPickerModal'
-
-const requestStatusTone = {
-  requested: 'bg-amber-100 text-amber-800',
-  opened: 'bg-blue-100 text-blue-800',
-  responded: 'bg-emerald-100 text-emerald-800',
-  viewed: 'bg-violet-100 text-violet-800',
-  resubmitted: 'bg-fuchsia-100 text-fuchsia-800',
-  closed: 'bg-gray-100 text-gray-700',
-  revoked: 'bg-red-100 text-red-700',
-}
-
-const requestStatusLabel = (value = '') => {
-  const normalized = String(value || '').trim().toLowerCase()
-  if (!normalized) return 'Unknown'
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1)
-}
+import StatusChip from './StatusChip'
 
 function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, reviewRequests = [], token = '', onBack, onOpenSession, onCreateVideo }) {
-  const [editing, setEditing] = useState(null)
   const [renamingThread, setRenamingThread] = useState('')
+  const [threadMenuOpen, setThreadMenuOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const threadMenuRef = useRef(null)
   const toast = useToast()
   const threadOptions = useMemo(() => Array.from(new Set(sessions.map(s => String(s.practice_series || '').trim()).filter(Boolean))).sort(), [sessions])
   const seriesSessions = useMemo(() => {
@@ -57,12 +43,16 @@ function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, r
     [seriesSessions],
   )
   const latestReviewedSession = reviewedSessions[reviewedSessions.length - 1] || null
-  const totalReplies = useMemo(
-    () => seriesSessions.reduce((sum, session) => sum + Number(session.video_feedback_count || 0), 0),
-    [seriesSessions],
-  )
-  const latestRequestStatus = String(latestSession?.activeRequest?.status || '').trim().toLowerCase()
-
+  useEffect(() => {
+    if (!threadMenuOpen) return undefined
+    const handlePointerDown = (event) => {
+      const node = threadMenuRef.current
+      if (!node || node.contains(event.target)) return
+      setThreadMenuOpen(false)
+    }
+    window.addEventListener('pointerdown', handlePointerDown)
+    return () => window.removeEventListener('pointerdown', handlePointerDown)
+  }, [threadMenuOpen])
   if (sessionsLoading) {
     return (
       <div className="px-4 sm:px-6 py-6">
@@ -140,7 +130,7 @@ function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, r
                   <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">Take {latestSession?.takeNumber}</span>
                   {latestSession?.processing_status === 'ready' ? <span className="text-[11px] uppercase tracking-wide bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full">Ready</span> : null}
                   {latestSession?.processing_status === 'processing' ? <span className="text-[11px] uppercase tracking-wide bg-amber-100 text-amber-800 px-2 py-1 rounded-full">Processing</span> : null}
-                  {latestSession?.activeRequest ? <span className={`text-[11px] uppercase tracking-wide px-2 py-1 rounded-full ${requestStatusTone[latestRequestStatus] || 'bg-gray-100 text-gray-700'}`}>{requestStatusLabel(latestSession.activeRequest.status)}</span> : null}
+                  {latestSession?.activeRequest ? <StatusChip status={latestSession.activeRequest.status} resolution={latestSession.activeRequest.resolution} /> : null}
                 </div>
               </div>
               <div className="p-4 space-y-4">
@@ -203,47 +193,45 @@ function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, r
                   <p className="text-sm font-semibold text-gray-900">Thread timeline</p>
                   <p className="text-xs text-gray-500 mt-1">Oldest to newest.</p>
                 </div>
-                <button type="button" onClick={() => setRenamingThread(seriesName)} className="text-xs text-gray-600 hover:text-gray-900">
-                  Rename thread
-                </button>
+                <div className="relative" ref={threadMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setThreadMenuOpen((open) => !open)}
+                    className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                    aria-expanded={threadMenuOpen ? 'true' : 'false'}
+                    aria-haspopup="menu"
+                  >
+                    •••
+                  </button>
+                  {threadMenuOpen ? (
+                    <div className="absolute right-0 mt-2 w-44 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg z-10" role="menu">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setThreadMenuOpen(false)
+                          setRenamingThread(seriesName)
+                        }}
+                        className="w-full text-left rounded-lg px-2.5 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                        role="menuitem"
+                      >
+                        Rename thread
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               </div>
               <div className="space-y-3">
                 {seriesSessions.map((session) => (
                   <SessionListItem
                     key={session.id}
                     session={session}
+                    requestItem={session.activeRequest}
                     status={session.activeRequest?.status}
                     onOpen={() => onOpenSession?.(session, { view: 'series', seriesName })}
-                    onRecordFollowUp={session.activeRequest ? () => onCreateVideo?.({ parent_request_id: session.activeRequest.id, practiceSeries: seriesName }) : null}
-                    onChangeThread={() => setEditing(session)}
+                    minimal
                   />
                 ))}
               </div>
-              <ThreadPickerModal
-                open={Boolean(editing)}
-                title={`${editing?.practice_series ? 'Change' : 'Add to'} thread`}
-                initialValue={editing?.practice_series || ''}
-                options={threadOptions}
-                saving={saving}
-                onClose={() => setEditing(null)}
-                onSave={async (val) => {
-                  if (!editing?.id) return
-                  setSaving(true)
-                  try {
-                    const res = await fetch(`/api/sessions/${editing.id}/`, {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Token ${token}` } : {}) },
-                      body: JSON.stringify({ practice_series: val }),
-                    })
-                    const data = await res.json().catch(() => ({}))
-                    if (!res.ok) throw new Error(data?.error || 'Could not update')
-                    try { window.dispatchEvent(new CustomEvent('practica:session-updated', { detail: { id: editing.id } })) } catch {}
-                    toast.success(val ? 'Moved to thread' : 'Removed from thread')
-                  } catch (e) { toast.error(e?.message || 'Could not update thread') }
-                  setSaving(false)
-                  setEditing(null)
-                }}
-              />
               <ThreadPickerModal
                 open={Boolean(renamingThread)}
                 title="Rename thread"
