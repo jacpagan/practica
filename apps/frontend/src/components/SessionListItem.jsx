@@ -12,7 +12,15 @@ const formatResolutionTimestamp = (resolution) => {
   return date.toLocaleString(undefined, { hour12: undefined })
 }
 
-export default function SessionListItem({ session, onOpen, status = '', requestItem = null, showSeries = false, highlight = false, onRecordFollowUp = null, onChangeThread = null, prefetch = true }) {
+const formatCompactDateTime = (value) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const dayPart = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  const timePart = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  return `${dayPart} · ${timePart}`
+}
+
+export default function SessionListItem({ session, onOpen, status = '', requestItem = null, showSeries = false, highlight = false, onRecordFollowUp = null, onChangeThread = null, prefetch = true, minimal = false }) {
   const prefetchSession = usePrefetchSession()
   if (!session) return null
   const recordedAt = new Date(session.recorded_at || session.created_at)
@@ -21,7 +29,7 @@ export default function SessionListItem({ session, onOpen, status = '', requestI
   const replies = Number(session.video_feedback_count || 0)
   const resolution = requestItem?.resolution || null
   const resolutionTimestamp = formatResolutionTimestamp(resolution)
-  const recordedAtLabel = recordedAt.toLocaleString(undefined, { hour12: undefined })
+  const recordedAtLabel = formatCompactDateTime(recordedAt)
   const metadataLabel = hasDuration ? `${recordedAtLabel} • ${fmtTimer(durationSeconds)}` : recordedAtLabel
   return (
     <button
@@ -47,14 +55,14 @@ export default function SessionListItem({ session, onOpen, status = '', requestI
             </div>
             <p className="text-sm font-medium text-gray-900 mt-2 line-clamp-1">{session.title || 'Untitled'}</p>
             <p className="text-xs text-gray-500 mt-1">{metadataLabel}</p>
-            {resolution?.summary ? <p className="text-xs font-medium text-gray-700 mt-2 line-clamp-1">{resolution.summary}</p> : null}
-            {resolution?.detail ? <p className="text-xs text-gray-500 mt-1 line-clamp-2">{resolution.detail}</p> : null}
-            {resolutionTimestamp ? <p className="text-[11px] text-gray-400 mt-1 line-clamp-1">{resolutionTimestamp}</p> : null}
+            {!minimal && resolution?.summary ? <p className="text-xs font-medium text-gray-700 mt-2 line-clamp-1">{resolution.summary}</p> : null}
+            {!minimal && resolution?.detail ? <p className="text-xs text-gray-500 mt-1 line-clamp-2">{resolution.detail}</p> : null}
+            {!minimal && resolutionTimestamp ? <p className="text-[11px] text-gray-400 mt-1 line-clamp-1">{resolutionTimestamp}</p> : null}
           </div>
         </div>
         <div className="text-right shrink-0 space-y-2">
           <p className="text-xs text-gray-500">{replies} {replies === 1 ? 'reply' : 'replies'}</p>
-          {onChangeThread ? (
+          {!minimal && onChangeThread ? (
             <button
               type="button"
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChangeThread?.() }}
@@ -63,7 +71,7 @@ export default function SessionListItem({ session, onOpen, status = '', requestI
               {session.practice_series ? 'Change thread' : 'Add to thread'}
             </button>
           ) : null}
-          {onRecordFollowUp ? (
+          {!minimal && onRecordFollowUp ? (
             <button
               type="button"
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRecordFollowUp?.() }}
@@ -71,9 +79,7 @@ export default function SessionListItem({ session, onOpen, status = '', requestI
             >
               Record follow-up
             </button>
-          ) : (
-            <p className="text-xs text-gray-400">Open</p>
-          )}
+          ) : null}
         </div>
       </div>
     </button>

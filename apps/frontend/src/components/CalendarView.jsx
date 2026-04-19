@@ -1,9 +1,6 @@
 import React, { useMemo, useState, useRef, useCallback, useEffect } from 'react'
 import VideoThumbnail from './VideoThumbnail'
 import SessionListItem from './SessionListItem'
-import ThreadPickerModal from './ThreadPickerModal'
-import { useAuth } from '../auth'
-import { useToast } from './Toast'
 
 const monthLabel = (date) => date.toLocaleString(undefined, { month: 'long', year: 'numeric' })
 const dayLabel = (date) => date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
@@ -113,23 +110,9 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
   })()
   const [selectedDateKey, setSelectedDateKey] = useState(initialSelected)
   const [showDayModal, setShowDayModal] = useState(false)
-  const [editing, setEditing] = useState(null)
-  const [renamingThread, setRenamingThread] = useState('')
-  const [saving, setSaving] = useState(false)
   const [pendingFollowUpTarget, setPendingFollowUpTarget] = useState(null)
   const [highlightedGroupName, setHighlightedGroupName] = useState('')
   const groupRefs = useRef(new Map())
-  const threadOptions = useMemo(() => Array.from(new Set(sessions.map(s => String(s.practice_series || '').trim()).filter(Boolean))).sort(), [sessions])
-  const { token } = useAuth()
-  const toast = useToast()
-  const SORT_KEY = 'practica.sort.newestFirst.v1'
-  const readSort = () => {
-    try { return (window.localStorage.getItem(SORT_KEY) || 'true') === 'true' } catch { return true }
-  }
-  const [newestFirst, setNewestFirst] = useState(readSort)
-  useEffect(() => {
-    try { window.localStorage.setItem(SORT_KEY, String(Boolean(newestFirst))) } catch {}
-  }, [newestFirst])
 
   const monthBounds = useMemo(() => {
     const firstOfMonth = new Date(activeMonth.getFullYear(), activeMonth.getMonth(), 1)
@@ -243,7 +226,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
         .sort((a, b) => {
           const ta = new Date(a.recorded_at || a.created_at)
           const tb = new Date(b.recorded_at || b.created_at)
-          return newestFirst ? (tb - ta) : (ta - tb)
+          return tb - ta
         })
       const activeRequest = sortedItems
         .map((item) => activeRequestBySessionId.get(Number(item.id)) || null)
@@ -256,10 +239,10 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
       const fb = gb.items[0]
       const ta = fa ? new Date(fa.recorded_at || fa.created_at) : 0
       const tb = fb ? new Date(fb.recorded_at || fb.created_at) : 0
-      return newestFirst ? (tb - ta) : (ta - tb)
+      return tb - ta
     })
     return groupArray
-  }, [activeRequestBySessionId, newestFirst, selectedSessions])
+  }, [activeRequestBySessionId, selectedSessions])
 
   const monthStats = useMemo(() => ({
     feedbackReadyDays: Array.from(daySummaries.values()).filter((item) => item.followUpSignal === 'feedback_ready').length,
@@ -487,26 +470,9 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                     <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-700">
                       {selectedSessions.length} {selectedSessions.length === 1 ? 'take' : 'takes'}
                     </span>
-                    {selectedThreadCount > 0 ? (
-                      <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-700">
-                        {selectedThreadCount} {selectedThreadCount === 1 ? 'thread' : 'threads'}
-                      </span>
-                    ) : null}
-                    {hasUnthreadedGroup ? (
-                      <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-700">
-                        {UNTHREADED_LABEL}
-                      </span>
-                    ) : null}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-wrap sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={() => onQuickRecord?.(selectedDateKey)}
-                    className="rounded-lg bg-gray-900 px-2.5 py-2 text-xs font-medium text-white hover:bg-gray-800"
-                  >
-                    Record
-                  </button>
                   <button
                     type="button"
                     onClick={() => moveSelectedDay(-1)}
@@ -523,11 +489,10 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                   </button>
                   <button
                     type="button"
-                    onClick={() => setNewestFirst((v) => !v)}
-                    className={`col-span-2 text-[11px] rounded-xl px-2.5 py-2 border sm:col-span-1 sm:rounded-full sm:py-1 ${newestFirst ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
-                    title="Toggle sort order"
+                    onClick={() => onQuickRecord?.(selectedDateKey)}
+                    className="rounded-lg bg-gray-900 px-2.5 py-2 text-xs font-medium text-white hover:bg-gray-800"
                   >
-                    {newestFirst ? 'Newest first' : 'Oldest first'}
+                    Record
                   </button>
                   <button type="button" onClick={closeDayModal} className="col-span-2 text-xs text-gray-500 hover:text-gray-900 rounded-lg border border-gray-200 px-2 py-2 sm:col-span-1 sm:px-2 sm:py-1">Close</button>
                 </div>
@@ -549,7 +514,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                     <p className="text-xs text-gray-500 mt-1">Pick another day or jump back to today.</p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {sessionsByThread.map((group) => (
                       <div
                         key={group.seriesName}
@@ -557,28 +522,20 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                           if (node) groupRefs.current.set(group.seriesName, node)
                           else groupRefs.current.delete(group.seriesName)
                         }}
-                        className={`space-y-3 rounded-2xl border bg-gray-50/70 p-3 transition-all ${highlightedGroupName === group.seriesName ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-gray-200'}`}
+                        className={`space-y-2 rounded-xl border bg-white p-2.5 transition-all ${highlightedGroupName === group.seriesName ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'}`}
                       >
                         <div className="flex items-start justify-between gap-3 flex-wrap">
                           <div className="min-w-0">
                             <p className="text-xs uppercase tracking-wide text-gray-500">{group.seriesName === UNTHREADED_KEY ? UNTHREADED_LABEL : group.seriesName}</p>
-                            <p className="text-xs text-gray-500 mt-1">{group.items.length} {group.items.length === 1 ? 'take' : 'takes'}{group.seriesName === UNTHREADED_KEY ? '' : ' in this thread'}</p>
                           </div>
                           {group.seriesName !== UNTHREADED_KEY && (
-                            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center sm:flex-wrap">
+                            <div className="sm:flex sm:w-auto sm:items-center sm:flex-wrap">
                               <button
                                 type="button"
                                 onClick={() => onOpenSeries?.(group.seriesName)}
-                                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                                className="text-xs text-gray-500 hover:text-gray-900"
                               >
                                 Open thread
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setRenamingThread(group.seriesName)}
-                                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                              >
-                                Rename thread
                               </button>
                             </div>
                           )}
@@ -591,7 +548,7 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
                               status={sessionReviewChipStatus(activeRequestBySessionId.get(Number(session.id))?.status)}
                               requestItem={activeRequestBySessionId.get(Number(session.id)) || null}
                               onOpen={() => onOpenSession?.(session, { view: 'calendar', date: selectedDateKey })}
-                              onChangeThread={() => setEditing(session)}
+                              minimal
                             />
                           ))}
                         </div>
@@ -603,62 +560,6 @@ function CalendarView({ sessions = [], sessionsLoading = false, routeDateKey = '
             </div>
           </div>
         ) : null}
-        <ThreadPickerModal
-          open={Boolean(editing)}
-          title={`${editing?.practice_series ? 'Change' : 'Add to'} thread`}
-          initialValue={editing?.practice_series || ''}
-          options={threadOptions}
-          saving={saving}
-          onClose={() => setEditing(null)}
-          onSave={async (val) => {
-            if (!editing?.id || !token) return
-            setSaving(true)
-            try {
-              const res = await fetch(`/api/sessions/${editing.id}/`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', Authorization: `Token ${token}` },
-                body: JSON.stringify({ practice_series: val }),
-              })
-              const data = await res.json().catch(() => ({}))
-              if (!res.ok) throw new Error(data?.error || 'Could not update')
-              try { window.dispatchEvent(new CustomEvent('practica:session-updated', { detail: { id: editing.id } })) } catch {}
-              toast.success(val ? 'Moved to thread' : 'Removed from thread')
-            } catch (e) { toast.error(e?.message || 'Could not update thread') }
-            setSaving(false)
-            setEditing(null)
-          }}
-        />
-        <ThreadPickerModal
-          open={Boolean(renamingThread)}
-          title="Rename thread"
-          initialValue={renamingThread || ''}
-          options={threadOptions}
-          saving={saving}
-          onClose={() => setRenamingThread('')}
-          onSave={async (val) => {
-            if (!renamingThread || !token) return
-            setSaving(true)
-            try {
-              const res = await fetch('/api/sessions/threads/rename/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Token ${token}` },
-                body: JSON.stringify({ old_practice_series: renamingThread, new_practice_series: val }),
-              })
-              const data = await res.json().catch(() => ({}))
-              if (!res.ok) throw new Error(data?.error || 'Could not rename thread')
-              try { window.dispatchEvent(new CustomEvent('practica:thread-renamed', { detail: { oldSeriesName: renamingThread, newSeriesName: val } })) } catch {}
-              toast.success(
-                data?.affected_count === 1
-                  ? `Renamed “${renamingThread}” to “${val}” on 1 take`
-                  : `Renamed “${renamingThread}” to “${val}” on ${data?.affected_count || 0} takes`
-              )
-            } catch (e) {
-              toast.error(e?.message || 'Could not rename thread')
-            }
-            setSaving(false)
-            setRenamingThread('')
-          }}
-        />
       </div>
     </div>
   )
