@@ -45,7 +45,7 @@ export default function SessionListItem({ session, onOpen, status = '', requestI
             <div className="flex items-center gap-2 flex-wrap">
               {status ? <StatusChip status={status} resolution={resolution} /> : null}
               {session.processing_status === 'ready' ? (
-                <span className="text-[11px] uppercase tracking-wide bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full">Ready</span>
+                <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-600 px-2 py-1 rounded-full">Ready</span>
               ) : null}
               {showSeries && session.practice_series ? (
                 <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">

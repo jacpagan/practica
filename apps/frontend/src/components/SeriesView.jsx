@@ -6,6 +6,14 @@ import SessionListItem from './SessionListItem'
 import ThreadPickerModal from './ThreadPickerModal'
 import StatusChip from './StatusChip'
 
+const formatCompactDateTime = (value) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const dayPart = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  const timePart = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  return `${dayPart} · ${timePart}`
+}
+
 function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, reviewRequests = [], token = '', onBack, onOpenSession, onCreateVideo }) {
   const [renamingThread, setRenamingThread] = useState('')
   const [threadMenuOpen, setThreadMenuOpen] = useState(false)
@@ -89,7 +97,7 @@ function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, r
             <div>
               <p className="text-xs uppercase tracking-wide text-gray-500">Practice thread</p>
               <h2 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">{seriesName}</h2>
-              <p className="text-sm text-gray-500 mt-2">{latestSession ? `Latest ${new Date(latestSession.recorded_at || latestSession.created_at).toLocaleString(undefined, { hour12: undefined })}` : 'No takes yet'}</p>
+              <p className="text-sm text-gray-500 mt-2">{latestSession ? `Latest ${formatCompactDateTime(latestSession.recorded_at || latestSession.created_at)}` : 'No takes yet'}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {latestSession ? (
@@ -124,11 +132,11 @@ function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, r
                 <div>
                   <p className="text-xs uppercase tracking-wide text-gray-500">Latest take</p>
                   <h3 className="text-lg font-semibold text-gray-900 mt-1">{latestSession?.title}</h3>
-                  <p className="text-sm text-gray-500 mt-1">{latestSession ? new Date(latestSession.recorded_at || latestSession.created_at).toLocaleString(undefined, { hour12: undefined }) : ''}</p>
+                  <p className="text-sm text-gray-500 mt-1">{latestSession ? formatCompactDateTime(latestSession.recorded_at || latestSession.created_at) : ''}</p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">Take {latestSession?.takeNumber}</span>
-                  {latestSession?.processing_status === 'ready' ? <span className="text-[11px] uppercase tracking-wide bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full">Ready</span> : null}
+                  {latestSession?.processing_status === 'ready' ? <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-600 px-2 py-1 rounded-full">Ready</span> : null}
                   {latestSession?.processing_status === 'processing' ? <span className="text-[11px] uppercase tracking-wide bg-amber-100 text-amber-800 px-2 py-1 rounded-full">Processing</span> : null}
                   {latestSession?.activeRequest ? <StatusChip status={latestSession.activeRequest.status} resolution={latestSession.activeRequest.resolution} /> : null}
                 </div>
