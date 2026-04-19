@@ -19,7 +19,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from .models import ProductEventLog, SignupInviteCode
 from .serializers import (
-    UserSerializer, UserSummarySerializer, RegisterSerializer,
+    UserSerializer, RegisterSerializer,
     SignupInviteCodeSerializer,
 )
 from .services.media_pipeline import (
@@ -82,7 +82,14 @@ def user_search_view(request):
     qs = User.objects.select_related('profile').exclude(pk=request.user.pk).order_by('username')
     if query:
         qs = qs.filter(Q(username__icontains=query) | Q(profile__display_name__icontains=query))
-    return Response(UserSummarySerializer(qs[:10], many=True).data)
+    data = []
+    for user in qs[:10]:
+        display_name = user.username
+        profile = getattr(user, 'profile', None)
+        if profile and getattr(profile, 'display_name', ''):
+            display_name = profile.display_name
+        data.append({'id': user.id, 'username': user.username, 'display_name': display_name})
+    return Response(data)
 
 
 @api_view(['GET', 'POST'])
