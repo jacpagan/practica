@@ -5,19 +5,20 @@ import AuthForm from './AuthForm'
 import VideoRecorder from './VideoRecorder'
 import StatusChip from './StatusChip'
 import ClosureBar from './ClosureBar'
+import ResolutionBanner from './ResolutionBanner'
 
 const reviewLinkLoadErrorState = ({ status, data }) => {
   const code = data?.code || ''
   if (code === 'review_link_expired' || status === 410) {
     return {
       title: 'Private link expired',
-      message: 'This private feedback link expired. Ask the owner for a new link.',
+      message: 'This private feedback link expired. Ask the creator for a new link.',
     }
   }
   if (code === 'review_link_revoked' || status === 403) {
     return {
       title: 'Private link turned off',
-      message: 'The owner has turned off this private feedback link. Ask for a new one if you still need access.',
+      message: 'The creator has turned off this private feedback link. Ask for a new one if you still need access.',
     }
   }
   if (code === 'review_link_invalid' || status === 404) {
@@ -266,15 +267,17 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
 
   const memberRole = reviewRequest?.current_member_role || reviewRequest?.current_user_role || ''
   const canRespondToRequest = !reviewRequest || memberRole === 'reviewer'
-  const reviewerShouldRespond = memberRole === 'reviewer' && ['requested', 'opened'].includes(String(reviewRequest?.status || '').trim().toLowerCase())
+  const reviewerShouldRespond = memberRole === 'reviewer' && ['requested', 'opened', 'resubmitted'].includes(String(reviewRequest?.status || '').trim().toLowerCase())
   const hasCurrentUserFeedback = feedback.some((item) => item.authored_by_current_user)
   const isAdditionalResponseComposer = !(reviewerShouldRespond && !hasCurrentUserFeedback)
 
-  const canStudentClose = memberRole === 'student' || memberRole === 'owner'
+  const canCreatorClose = memberRole === 'owner' || memberRole === 'creator'
   const statusKey = String(reviewRequest?.status || '').trim().toLowerCase()
-  const canShowClosure = Boolean(reviewRequest && canStudentClose && ['responded', 'viewed', 'resubmitted', 'needs_resubmission', 'declined_unrelated', 'flagged'].includes(statusKey))
-  const canShowRetry = Boolean(reviewRequest && canStudentClose && ['responded', 'viewed', 'needs_resubmission', 'declined_unrelated'].includes(statusKey))
-  const reviewerCanModerate = Boolean(reviewRequest && memberRole === 'reviewer' && ['requested', 'opened'].includes(statusKey))
+  const canShowClosure = Boolean(reviewRequest && canCreatorClose && ['responded', 'viewed', 'resubmitted', 'needs_resubmission', 'declined_unrelated', 'flagged'].includes(statusKey))
+  const canShowRetry = Boolean(reviewRequest && canCreatorClose && ['responded', 'viewed', 'needs_resubmission', 'declined_unrelated'].includes(statusKey))
+  const reviewerCanModerate = Boolean(reviewRequest && memberRole === 'reviewer' && ['requested', 'opened', 'resubmitted'].includes(statusKey))
+  const reviewerCanQuickRespond = Boolean(reviewRequest && memberRole === 'reviewer' && link?.allow_video_feedback && canRespondToRequest)
+  const showReviewerQuickActions = Boolean(reviewRequest && memberRole === 'reviewer' && (reviewerCanQuickRespond || reviewerCanModerate))
   const reviewerName = reviewRequest?.reviewer?.display_name || reviewRequest?.reviewer?.username || 'your reviewer'
   const reviewPageHeading = useMemo(() => {
     if (!reviewRequest) {
@@ -298,7 +301,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
       }
         return {
           title: 'Trusted feedback',
-          subtitle: 'This thread stays private to the owner and assigned reviewer.',
+          subtitle: 'This thread stays private to the creator and assigned reviewer.',
         }
     }
     if (statusKey === 'responded') {
@@ -348,7 +351,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
       return {
         tone: 'border-blue-200 bg-blue-50',
         title: 'Your response is next',
-        message: 'Watch the take, then send one response video. Use reviewer actions only if the owner needs a different submission.',
+        message: 'Watch the take, then send one response video. Use reviewer actions only if the creator needs a different submission.',
       }
     }
     if (memberRole === 'reviewer' && hasCurrentUserFeedback) {
@@ -358,42 +361,42 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
         message: 'Your feedback is in the thread. Reopen it anytime to edit, add another response, or follow the next take.',
       }
     }
-    if (canStudentClose && statusKey === 'responded') {
+    if (canCreatorClose && statusKey === 'responded') {
       return {
         tone: 'border-emerald-200 bg-emerald-50',
         title: 'Feedback is ready',
         message: `Open the response from ${reviewerName}, then continue the loop or close the thread when you are done.`,
       }
     }
-    if (canStudentClose && statusKey === 'viewed') {
+    if (canCreatorClose && statusKey === 'viewed') {
       return {
         tone: 'border-violet-200 bg-violet-50',
         title: 'Ready for the next take',
         message: 'You have seen the feedback. Record the next take from your library when you are ready.',
       }
     }
-    if (canStudentClose && statusKey === 'needs_resubmission') {
+    if (canCreatorClose && statusKey === 'needs_resubmission') {
       return {
         tone: 'border-orange-200 bg-orange-50',
         title: 'New take requested',
         message: 'Your reviewer asked for a cleaner or more complete take. Continue the loop only when you are ready to resend.',
       }
     }
-    if (canStudentClose && statusKey === 'declined_unrelated') {
+    if (canCreatorClose && statusKey === 'declined_unrelated') {
       return {
         tone: 'border-rose-200 bg-rose-50',
         title: 'Matching take needed',
         message: 'Your reviewer said this take does not match the request. Continue only if you want to send the right take.',
       }
     }
-    if (canStudentClose && statusKey === 'flagged') {
+    if (canCreatorClose && statusKey === 'flagged') {
       return {
         tone: 'border-red-200 bg-red-50',
         title: 'Request flagged',
         message: 'This request is removed from the normal reviewer inbox for now. Review the thread note before continuing.',
       }
     }
-    if (canStudentClose && statusKey === 'resubmitted') {
+    if (canCreatorClose && statusKey === 'resubmitted') {
       return {
         tone: 'border-fuchsia-200 bg-fuchsia-50',
         title: 'Loop continuing',
@@ -401,7 +404,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
       }
     }
     return null
-  }, [canStudentClose, hasCurrentUserFeedback, memberRole, reviewRequest, reviewerName, reviewerShouldRespond, statusKey])
+  }, [canCreatorClose, hasCurrentUserFeedback, memberRole, reviewRequest, reviewerName, reviewerShouldRespond, statusKey])
   const closureBarRetryLabel = statusKey === 'needs_resubmission'
     ? 'Record new take'
     : statusKey === 'declined_unrelated'
@@ -424,6 +427,10 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
             : statusKey === 'resubmitted'
               ? 'Loop marked for continuation. Record the next take from your library when ready.'
               : 'Ready to close this thread'
+
+  const openResponseComposer = useCallback(() => {
+    try { responseComposerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch {}
+  }, [])
 
   const reasonLabel = (value = '') => {
     const normalized = String(value || '').trim().toLowerCase()
@@ -491,7 +498,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
   const handleReviewerLoopState = async (nextStatus, statusReason) => {
     if (!reviewerCanModerate || closing) return
     const statusNote = typeof window !== 'undefined'
-      ? window.prompt('Optional note for the owner', '') || ''
+      ? window.prompt('Optional note for the creator', '') || ''
       : ''
     setClosing(true)
     try {
@@ -818,7 +825,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
 
   if (!user) {
     const reviewerName = reviewRequest?.reviewer?.display_name || reviewRequest?.reviewer?.username || ''
-    const ownerName = reviewRequest?.owner?.display_name || reviewRequest?.owner?.username || reviewRequest?.student?.display_name || reviewRequest?.student?.username || ''
+    const creatorName = reviewRequest?.creator?.display_name || reviewRequest?.member?.display_name || reviewRequest?.owner?.display_name || reviewRequest?.creator?.username || reviewRequest?.member?.username || reviewRequest?.owner?.username || reviewRequest?.student?.display_name || reviewRequest?.student?.username || ''
     const authTitle = claimCode ? 'You were invited to review privately' : 'Sign in to continue'
     const authSubtitle = claimCode
       ? 'Create your account once or log in to join this private feedback thread as a trusted reviewer.'
@@ -836,7 +843,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
                   ? `${reviewerName} has been invited into a private feedback thread in Practica.`
                   : 'You have been invited into a private feedback thread in Practica.'}
               </p>
-              {ownerName ? <p className="text-xs text-gray-500 mt-2">Shared privately by {ownerName}.</p> : null}
+              {creatorName ? <p className="text-xs text-gray-500 mt-2">Shared privately by {creatorName}.</p> : null}
           {reviewRequest?.goal ? <p className="text-xs text-gray-500 mt-1">Focus: {reviewRequest.goal}</p> : null}
           {reviewRequest?.status_reason ? <p className="text-xs text-gray-500 mt-1">Reason: {reasonLabel(reviewRequest.status_reason)}</p> : null}
           {reviewRequest?.status_note ? <p className="text-xs text-gray-500 mt-1">Note: {reviewRequest.status_note}</p> : null}
@@ -880,7 +887,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
               <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">{reviewPageHeading.title}</h1>
               <p className="text-sm text-gray-600 mt-1">{reviewPageHeading.subtitle}</p>
             </div>
-            {reviewRequest ? <StatusChip status={reviewRequest.status} /> : null}
+            {reviewRequest ? <StatusChip status={reviewRequest.status} resolution={reviewRequest.resolution} /> : null}
           </div>
           <p className="text-xs text-gray-500 mt-2">Signed in as {user.display_name || user.username}.</p>
           {link?.expires_at ? <p className="text-xs text-gray-500 mt-1">Private access • sign-in required • expires {new Date(link.expires_at).toLocaleString(undefined, { hour12: undefined })}</p> : null}
@@ -890,8 +897,8 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 space-y-2">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-emerald-950">You’re in</p>
-                <p className="text-sm text-emerald-900 mt-1">You can review this take privately now, and this learner can ask you again later without sending a brand-new invite.</p>
+                <p className="text-sm font-semibold text-emerald-950">{reviewerInvite?.resolution?.summary || 'You’re in'}</p>
+                <p className="text-sm text-emerald-900 mt-1">{reviewerInvite?.resolution?.detail || 'You can review this take privately now, and this learner can ask you again later without sending a brand-new invite.'}</p>
               </div>
               <button type="button" onClick={dismissInviteClaimConfirmation} className="text-xs text-emerald-800 hover:text-emerald-950 transition-colors">
                 Dismiss
@@ -900,12 +907,52 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
           </div>
         ) : null}
 
-        {statusBanner ? (
+        {reviewRequest?.resolution ? (
+          <ResolutionBanner
+            resolution={reviewRequest.resolution}
+            statusReason={reviewRequest?.status_reason ? reasonLabel(reviewRequest.status_reason) : ''}
+            statusNote={reviewRequest?.status_note || ''}
+          />
+        ) : statusBanner ? (
           <div className={`rounded-xl border px-4 py-3 ${statusBanner.tone}`}>
             <p className="text-sm font-semibold text-gray-900">{statusBanner.title}</p>
             <p className="text-sm text-gray-700 mt-1">{statusBanner.message}</p>
             {reviewRequest?.status_reason ? <p className="text-xs text-gray-600 mt-2">Reason: {reasonLabel(reviewRequest.status_reason)}</p> : null}
             {reviewRequest?.status_note ? <p className="text-xs text-gray-600 mt-1">Note: {reviewRequest.status_note}</p> : null}
+          </div>
+        ) : null}
+
+        {showReviewerQuickActions ? (
+          <div className="rounded-xl border border-gray-200 bg-white px-3 py-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Reviewer actions</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={openResponseComposer}
+                  disabled={!reviewerCanQuickRespond}
+                  className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Respond
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleReviewerLoopState('needs_resubmission', 'needs_new_take')}
+                  disabled={!reviewerCanModerate || closing}
+                  className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Request resubmission
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleReviewerLoopState('declined_unrelated', 'unrelated_video')}
+                  disabled={!reviewerCanModerate || closing}
+                  className="text-xs text-rose-700 border border-rose-200 rounded-lg px-3 py-2 hover:bg-rose-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Mark unrelated
+                </button>
+              </div>
+            </div>
           </div>
         ) : null}
 
@@ -949,24 +996,6 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
               <p className="text-sm font-semibold text-gray-900">{reviewerShouldRespond && !hasCurrentUserFeedback ? 'Add your response' : 'Add another response'}</p>
               <p className="text-xs text-gray-500 mt-1">Record here or upload a video you already have.</p>
             </div>
-
-            {reviewerCanModerate ? (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Reviewer actions</p>
-                <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => handleReviewerLoopState('needs_resubmission', 'needs_new_take')} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
-                    Needs new take
-                  </button>
-                  <button type="button" onClick={() => handleReviewerLoopState('declined_unrelated', 'unrelated_video')} className="text-xs text-rose-700 border border-rose-200 rounded-lg px-3 py-2 hover:bg-rose-100 transition-colors">
-                    Unrelated take
-                  </button>
-                  <button type="button" onClick={() => handleReviewerLoopState('flagged', 'unsafe_content')} className="text-xs text-red-700 border border-red-200 rounded-lg px-3 py-2 hover:bg-red-100 transition-colors">
-                    Report unsafe
-                  </button>
-                </div>
-                <p className="text-xs text-amber-900">Use this when the take needs a different submission, does not match the request, or appears unsafe or inappropriate.</p>
-              </div>
-            ) : null}
 
             {memberRole === 'reviewer' && !isAdditionalResponseComposer ? (
               <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-3 space-y-3">

@@ -106,6 +106,15 @@ function RequestCard({ item, onOpenReviewRequest }) {
   const memberName = item?.creator?.display_name || item?.member?.display_name || item?.owner?.display_name || item?.student?.display_name || item?.creator?.username || item?.member?.username || item?.owner?.username || item?.student?.username || 'Member'
   const resolution = item?.resolution || null
   const resolutionTimestamp = formatResolutionTimestamp(resolution)
+  const reviewToken = item?.feedback_link?.token || item?.review_link?.token || ''
+
+  const openRequest = () => {
+    if (reviewToken) {
+      window.location.assign(`/r/${reviewToken}`)
+      return
+    }
+    onOpenReviewRequest?.(item)
+  }
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
@@ -131,7 +140,7 @@ function RequestCard({ item, onOpenReviewRequest }) {
         <div className="shrink-0 flex items-center gap-2">
           <button
             type="button"
-            onClick={() => onOpenReviewRequest?.(item)}
+            onClick={openRequest}
             className="rounded-xl bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
           >
             {requestActionLabel(normalizedStatus)}
@@ -171,6 +180,10 @@ function TeachingView({ token, onOpenReviewRequest }) {
 
   const sortedRequests = useMemo(() => {
     return [...requests].sort((left, right) => {
+      const leftPriority = statusPriority[String(left?.status || '').trim().toLowerCase()] ?? 99
+      const rightPriority = statusPriority[String(right?.status || '').trim().toLowerCase()] ?? 99
+      if (leftPriority !== rightPriority) return leftPriority - rightPriority
+
       if (activeSort === 'requested_asc') {
         return new Date(left?.created_at || 0) - new Date(right?.created_at || 0)
       }
@@ -181,10 +194,6 @@ function TeachingView({ token, onOpenReviewRequest }) {
       const leftActivity = new Date(left?.latest_feedback_at || left?.updated_at || left?.created_at || 0)
       const rightActivity = new Date(right?.latest_feedback_at || right?.updated_at || right?.created_at || 0)
       if (leftActivity.getTime() !== rightActivity.getTime()) return rightActivity - leftActivity
-
-      const leftPriority = statusPriority[String(left?.status || '').trim().toLowerCase()] ?? 99
-      const rightPriority = statusPriority[String(right?.status || '').trim().toLowerCase()] ?? 99
-      if (leftPriority !== rightPriority) return leftPriority - rightPriority
       return new Date(right?.created_at || 0) - new Date(left?.created_at || 0)
     })
   }, [activeSort, requests])
