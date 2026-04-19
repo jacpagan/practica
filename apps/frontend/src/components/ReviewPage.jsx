@@ -432,6 +432,16 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
     try { responseComposerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch {}
   }, [])
 
+  const confirmReviewerModerationAction = useCallback((actionKey) => {
+    if (actionKey === 'needs_resubmission') {
+      return window.confirm('Request resubmission? This will mark the thread as waiting on creator.')
+    }
+    if (actionKey === 'declined_unrelated') {
+      return window.confirm('Mark unrelated? This will mark the thread as waiting on creator.')
+    }
+    return true
+  }, [])
+
   const reasonLabel = (value = '') => {
     const normalized = String(value || '').trim().toLowerCase()
     if (!normalized) return ''
@@ -937,7 +947,10 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleReviewerLoopState('needs_resubmission', 'needs_new_take')}
+                  onClick={() => {
+                    if (!confirmReviewerModerationAction('needs_resubmission')) return
+                    handleReviewerLoopState('needs_resubmission', 'needs_new_take')
+                  }}
                   disabled={!reviewerCanModerate || closing}
                   className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -945,7 +958,10 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleReviewerLoopState('declined_unrelated', 'unrelated_video')}
+                  onClick={() => {
+                    if (!confirmReviewerModerationAction('declined_unrelated')) return
+                    handleReviewerLoopState('declined_unrelated', 'unrelated_video')
+                  }}
                   disabled={!reviewerCanModerate || closing}
                   className="text-xs text-rose-700 border border-rose-200 rounded-lg px-3 py-2 hover:bg-rose-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -953,6 +969,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
                 </button>
               </div>
             </div>
+            <p className="mt-2 text-xs text-gray-500">State-changing actions show a confirmation before updating the thread.</p>
           </div>
         ) : null}
 
