@@ -936,12 +936,12 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
           <div className="rounded-xl border border-gray-200 bg-white px-3 py-3">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Reviewer actions</p>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
                 <button
                   type="button"
                   onClick={openResponseComposer}
                   disabled={!reviewerCanQuickRespond}
-                  className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="text-xs font-medium text-white bg-gray-900 border border-gray-900 rounded-lg px-3 py-2 hover:bg-gray-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Respond
                 </button>
@@ -952,7 +952,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
                     handleReviewerLoopState('needs_resubmission', 'needs_new_take')
                   }}
                   disabled={!reviewerCanModerate || closing}
-                  className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Request resubmission
                 </button>
@@ -963,7 +963,7 @@ function ReviewPage({ reviewToken = '', onContinueLoop = null }) {
                     handleReviewerLoopState('declined_unrelated', 'unrelated_video')
                   }}
                   disabled={!reviewerCanModerate || closing}
-                  className="text-xs text-rose-700 border border-rose-200 rounded-lg px-3 py-2 hover:bg-rose-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="text-xs text-rose-700 border border-rose-200 rounded-lg px-3 py-2 hover:bg-rose-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 sm:ml-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Mark unrelated
                 </button>
