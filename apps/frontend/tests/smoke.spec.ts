@@ -287,6 +287,112 @@ test('Record route still opens preview when microphone fails', async ({ browser 
   await context.close()
 })
 
+test('Upload retries once after network interruption and reuses idempotency key', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('token', 'smoke-token')
+  })
+
+  const createdSession = {
+    id: 777,
+    title: 'Retry-safe take',
+    practice_series: '',
+    description: '',
+    video_file: '/media/sessions/retry-safe.mp4',
+    duration_seconds: null,
+    recorded_at: '2099-01-01T00:00:00Z',
+    created_at: '2099-01-01T00:00:00Z',
+    updated_at: '2099-01-01T00:00:00Z',
+    processing_status: 'ready',
+    processing_job_id: '',
+    processing_error: '',
+    tag_names: [],
+    assets: [],
+    chapters: [],
+    video_feedback: [],
+    active_review_link: null,
+    chapter_count: 0,
+    video_feedback_count: 0,
+    owner: { id: 1, display_name: 'Smoke Member' },
+    can_edit: true,
+  }
+
+  let uploadPostAttempts = 0
+  const uploadClientIds: string[] = []
+
+  await page.route('**/api/auth/me/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 1, username: 'smoke_member', display_name: 'Smoke Member' }),
+    })
+  })
+
+  await page.route('**/api/review-requests/?role=reviewer', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/review-requests/?role=owner', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/review-requests/?session_id=777&role=student', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/connections/?role=student', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/reviewer-invites/**', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/sessions/777/', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(createdSession) })
+  })
+
+  await page.route('**/api/sessions/', async (route) => {
+    const method = route.request().method()
+    if (method === 'GET') {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+      return
+    }
+
+    if (method === 'POST') {
+      uploadPostAttempts += 1
+      const rawBody = route.request().postData() || ''
+      const match = rawBody.match(/name="client_upload_id"\r\n\r\n([^\r\n]+)/)
+      uploadClientIds.push(match?.[1] || '')
+
+      if (uploadPostAttempts === 1) {
+        await route.abort('failed')
+        return
+      }
+
+      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(createdSession) })
+      return
+    }
+
+    await route.continue()
+  })
+
+  await page.goto('/upload')
+  await expect(page.getByRole('heading', { name: 'New take' })).toBeVisible()
+
+  await page.locator('[aria-label="Drop a video or browse files"] input[type=file]').first().setInputFiles({
+    name: 'retry-safe.mp4',
+    mimeType: 'video/mp4',
+    buffer: Buffer.from('smoke-video-bytes'),
+  })
+  await page.locator('input[type=text]').first().fill('Retry-safe take')
+  await page.getByRole('button', { name: 'Save to library' }).click()
+
+  await page.waitForURL(/\/sessions\/777$/)
+  expect(uploadPostAttempts).toBe(2)
+  expect(uploadClientIds[0]).toBeTruthy()
+  expect(uploadClientIds[0]).toBe(uploadClientIds[1])
+})
+
 test('Session detail separates access from request flow', async ({ page }) => {
   // Keep the lightweight private-link access path separate from the structured feedback request flow.
   await page.addInitScript(() => {

@@ -83,3 +83,47 @@ class ClientErrorTelemetryTests(APITestCase):
         self.assertEqual(response.data['top_events'][0]['count'], 2)
         self.assertEqual(response.data['top_paths'][0]['path'], '/requests')
         self.assertEqual(response.data['top_paths'][0]['count'], 2)
+        self.assertIn('upload_summary', response.data)
+
+    def test_product_event_insights_includes_upload_failure_buckets(self):
+        staff = User.objects.create_user(username='admin-upload', password='test-pass', is_staff=True)
+        ProductEventLog.objects.create(
+            event_name='session_upload_failed',
+            path='/upload',
+            is_authenticated=True,
+            extra_json={'code': 'upload_finalize_failed', 'status': 502, 'phase': 'resuming', 'upload_mode': 'multipart'},
+        )
+        ProductEventLog.objects.create(
+            event_name='session_upload_failed',
+            path='/upload',
+            is_authenticated=True,
+            extra_json={'code': 'upload_finalize_failed', 'status': 502, 'phase': 'resuming', 'upload_mode': 'multipart'},
+        )
+        ProductEventLog.objects.create(
+            event_name='session_upload_aborted',
+            path='/upload',
+            is_authenticated=True,
+            extra_json={'upload_mode': 'single'},
+        )
+        ProductEventLog.objects.create(
+            event_name='session_upload_succeeded',
+            path='/upload',
+            is_authenticated=True,
+            extra_json={'upload_mode': 'single'},
+        )
+
+        self.client.force_authenticate(user=staff)
+        response = self.client.get('/api/product-events/insights/?window_hours=48&limit=5')
+
+        self.assertEqual(response.status_code, 200)
+        summary = response.data['upload_summary']
+        self.assertEqual(summary['total_upload_events'], 4)
+        self.assertEqual(summary['upload_failed_count'], 2)
+        self.assertEqual(summary['upload_aborted_count'], 1)
+        self.assertEqual(summary['upload_succeeded_count'], 1)
+        self.assertEqual(summary['top_failure_codes'][0]['code'], 'upload_finalize_failed')
+        self.assertEqual(summary['top_failure_codes'][0]['count'], 2)
+        self.assertEqual(summary['top_failure_statuses'][0]['status'], '502')
+        self.assertEqual(summary['top_failure_statuses'][0]['count'], 2)
+        self.assertEqual(summary['top_failure_phases'][0]['phase'], 'resuming')
+        self.assertEqual(summary['top_failure_phases'][0]['count'], 2)

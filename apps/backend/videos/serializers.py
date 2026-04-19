@@ -15,6 +15,7 @@ from .models import (
     SignupInviteCode,
     ReviewerInvite,
 )
+from .reviews.presentation import resolve_review_request_resolution, resolve_reviewer_invite_resolution, resolve_session_resolution
 from .services.feedback_video_processing import feedback_video_playback_url
 from .video_uploads import is_allowed_video_upload
 
@@ -232,6 +233,8 @@ class SessionSerializer(serializers.ModelSerializer):
     processing_job_id = serializers.CharField(read_only=True)
     processing_error = serializers.CharField(read_only=True)
     assets = SessionAssetSerializer(many=True, read_only=True)
+    resolution = serializers.SerializerMethodField()
+    client_upload_id = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = Session
@@ -239,6 +242,8 @@ class SessionSerializer(serializers.ModelSerializer):
                   'reference_title', 'reference_url',
                   'duration_seconds', 'recorded_at', 'created_at', 'updated_at',
                   'processing_status', 'processing_job_id', 'processing_error',
+                  'resolution',
+                  'client_upload_id',
                   'tag_names', 'assets',
                   'chapters', 'video_feedback', 'active_review_link', 'chapter_count', 'video_feedback_count', 'owner',
                   'can_edit']
@@ -281,6 +286,9 @@ class SessionSerializer(serializers.ModelSerializer):
             return False
         return user.is_staff or obj.user_id == user.id
 
+    def get_resolution(self, obj):
+        return resolve_session_resolution(obj, self._request_user())
+
     def validate_video_file(self, value):
         if value and not is_allowed_video_upload(getattr(value, 'content_type', ''), getattr(value, 'name', '')):
             raise serializers.ValidationError('Only video files allowed.')
@@ -294,13 +302,14 @@ class SessionListSerializer(serializers.ModelSerializer):
     processing_job_id = serializers.CharField(read_only=True)
     processing_error = serializers.CharField(read_only=True)
     assets = SessionAssetSerializer(many=True, read_only=True)
+    resolution = serializers.SerializerMethodField()
 
     class Meta:
         model = Session
         fields = ['id', 'title', 'practice_series', 'description', 'video_file',
                   'duration_seconds', 'recorded_at', 'created_at',
                   'processing_status', 'processing_job_id', 'processing_error',
-                  'assets', 'video_feedback_count',
+                  'resolution', 'assets', 'video_feedback_count',
                   'can_edit']
         read_only_fields = ['id', 'recorded_at', 'created_at']
 
@@ -318,6 +327,9 @@ class SessionListSerializer(serializers.ModelSerializer):
         if not user:
             return False
         return user.is_staff or obj.user_id == user.id
+
+    def get_resolution(self, obj):
+        return resolve_session_resolution(obj, self._request_user())
 
 
 
@@ -409,8 +421,12 @@ class ReviewRequestEventSerializer(serializers.ModelSerializer):
 
 class ReviewRequestSerializer(serializers.ModelSerializer):
     student = UserSummarySerializer(read_only=True)
+    creator = UserSummarySerializer(source='student', read_only=True)
+    member = UserSummarySerializer(source='student', read_only=True)
     owner = UserSummarySerializer(source='student', read_only=True)
     reviewer = UserSummarySerializer(read_only=True)
+    creator_id = serializers.IntegerField(source='student_id', read_only=True)
+    member_id = serializers.IntegerField(source='student_id', read_only=True)
     owner_id = serializers.IntegerField(source='student_id', read_only=True)
     reviewer_id = serializers.PrimaryKeyRelatedField(
         source='reviewer',
@@ -444,27 +460,28 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
     follow_up_request_count = serializers.SerializerMethodField()
     feedback_category_counts = serializers.SerializerMethodField()
     events = serializers.SerializerMethodField()
+    resolution = serializers.SerializerMethodField()
 
     class Meta:
         model = ReviewRequest
         fields = [
             'id',
             'session', 'session_id',
-            'student',
-            'owner', 'owner_id', 'reviewer', 'reviewer_id',
+            'student', 'creator', 'member',
+            'creator_id', 'member_id', 'owner', 'owner_id', 'reviewer', 'reviewer_id',
             'review_link', 'feedback_link',
             'parent_request', 'parent_request_id',
             'parent_feedback_request',
             'instrument', 'student_level', 'goal', 'exercise_or_song', 'notes',
             'requested_turnaround_hours', 'deadline',
             'status', 'status_reason', 'status_note', 'opened_at', 'responded_at', 'viewed_at', 'flagged_at', 'resubmitted_at', 'closed_at',
-            'response_count', 'current_user_role', 'current_member_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count', 'feedback_category_counts', 'events',
+            'response_count', 'current_user_role', 'current_member_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count', 'feedback_category_counts', 'events', 'resolution',
             'created_at', 'updated_at',
         ]
         read_only_fields = [
-            'id', 'student', 'owner', 'reviewer', 'session', 'review_link', 'feedback_link', 'parent_request', 'parent_feedback_request',
+            'id', 'student', 'creator', 'member', 'creator_id', 'member_id', 'owner', 'reviewer', 'session', 'review_link', 'feedback_link', 'parent_request', 'parent_feedback_request',
             'status', 'status_reason', 'status_note', 'opened_at', 'responded_at', 'viewed_at', 'flagged_at', 'resubmitted_at', 'closed_at',
-            'response_count', 'current_user_role', 'current_member_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count', 'feedback_category_counts', 'events',
+            'response_count', 'current_user_role', 'current_member_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count', 'feedback_category_counts', 'events', 'resolution',
             'created_at', 'updated_at',
         ]
 
@@ -502,16 +519,11 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
         if user.id == obj.reviewer_id:
             return 'reviewer'
         if user.id == obj.student_id:
-            return 'student'
+            return 'owner'
         return ''
 
     def get_current_member_role(self, obj):
-        legacy = self.get_current_user_role(obj)
-        if legacy == 'reviewer':
-            return 'reviewer'
-        if legacy == 'student':
-            return 'owner'
-        return ''
+        return self.get_current_user_role(obj)
 
     def get_feedback_items(self, obj):
         feedback = obj.feedback_items.select_related('user', 'user__profile').order_by('timestamp_seconds', 'created_at')
@@ -536,6 +548,11 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
     def get_events(self, obj):
         events = obj.events.select_related('actor', 'actor__profile').all()
         return ReviewRequestEventSerializer(events, many=True, context=self.context).data
+
+    def get_resolution(self, obj):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
+        return resolve_review_request_resolution(obj, user)
 
     def validate(self, attrs):
         session = attrs.get('session') or getattr(self.instance, 'session', None)
@@ -572,6 +589,7 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
 
 class MemberConnectionSerializer(serializers.ModelSerializer):
     student = UserSummarySerializer(read_only=True)
+    creator = UserSummarySerializer(source='student', read_only=True)
     member = UserSummarySerializer(source='student', read_only=True)
     reviewer = UserSummarySerializer(read_only=True)
     pending_review_count = serializers.SerializerMethodField()
@@ -581,7 +599,7 @@ class MemberConnectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = ReviewerRosterMembership
         fields = [
-            'id', 'student', 'member', 'reviewer', 'is_active',
+            'id', 'student', 'creator', 'member', 'reviewer', 'is_active',
             'pending_review_count', 'total_review_count', 'last_request_at',
             'created_at', 'updated_at',
         ]
@@ -673,17 +691,21 @@ class SignupInviteCodeSerializer(serializers.ModelSerializer):
 
 class ReviewerInviteSerializer(serializers.ModelSerializer):
     student = UserSummarySerializer(read_only=True)
+    creator = UserSummarySerializer(source='student', read_only=True)
+    member = UserSummarySerializer(source='student', read_only=True)
+    owner = UserSummarySerializer(source='student', read_only=True)
     claimed_by = UserSummarySerializer(read_only=True)
     review_link = ReviewLinkSerializer(read_only=True)
     session = SessionListSerializer(read_only=True)
     claim_code = serializers.CharField(source='invite_code.code', read_only=True)
     invite_url = serializers.SerializerMethodField()
+    resolution = serializers.SerializerMethodField()
 
     class Meta:
         model = ReviewerInvite
         fields = [
-            'id', 'label', 'intent', 'status', 'claim_code', 'invite_url',
-            'student', 'claimed_by', 'claimed_at', 'expires_at',
+            'id', 'label', 'intent', 'status', 'claim_code', 'invite_url', 'resolution',
+            'student', 'creator', 'member', 'owner', 'claimed_by', 'claimed_at', 'expires_at',
             'session', 'review_link', 'created_at', 'updated_at',
         ]
         read_only_fields = fields
@@ -708,3 +730,8 @@ class ReviewerInviteSerializer(serializers.ModelSerializer):
             return base
         separator = '&' if '?' in base else '?'
         return f'{base}{separator}claim={claim_code}'
+
+    def get_resolution(self, obj):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
+        return resolve_reviewer_invite_resolution(obj, user)

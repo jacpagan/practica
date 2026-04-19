@@ -2,6 +2,7 @@ import secrets
 from datetime import timedelta
 
 from django.shortcuts import get_object_or_404
+from django.db import IntegrityError
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
@@ -18,6 +19,22 @@ from videos.models import Chapter, Exercise, ReviewLink, ReviewRequest, ReviewRe
 from videos.serializers import ChapterSerializer, ReviewLinkSerializer, ReviewVideoFeedbackSerializer, SessionListSerializer, SessionSerializer
 from videos.services.feedback_video_processing import prepare_feedback_video_upload
 from videos.video_uploads import is_allowed_video_upload
+
+
+def _first_error_message(errors):
+    if isinstance(errors, dict):
+        for value in errors.values():
+            message = _first_error_message(value)
+            if message:
+                return message
+        return ''
+    if isinstance(errors, list):
+        for value in errors:
+            message = _first_error_message(value)
+            if message:
+                return message
+        return ''
+    return str(errors or '').strip()
 
 
 def visible_sessions_qs(user):
@@ -93,8 +110,49 @@ class SessionViewSet(SessionMediaActionsMixin, viewsets.ModelViewSet):
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
-    def perform_create(self, serializer):
-        session = serializer.save(user=self.request.user)
+    def create(self, request, *args, **kwargs):
+        client_upload_id = normalized_client_upload_id(request.data.get('client_upload_id'))
+        if client_upload_id:
+            existing = Session.objects.filter(user=request.user, client_upload_id=client_upload_id).first()
+            if existing:
+                maybe_refresh_session_processing(existing)
+                existing.refresh_from_db()
+                data = self.get_serializer(existing).data
+                return Response(data, status=status.HTTP_200_OK)
+
+        serializer = self.get_serializer(data=request.data)
+        if not serializer.is_valid():
+            details = serializer.errors
+            message = _first_error_message(details) or 'Invalid upload payload'
+            code = 'upload_invalid_payload'
+            if 'video_file' in details and 'video' in message.lower():
+                code = 'upload_invalid_video_type'
+            return Response(
+                {
+                    'error': message,
+                    'code': code,
+                    'details': details,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            self.perform_create(serializer, client_upload_id=client_upload_id)
+        except IntegrityError:
+            if not client_upload_id:
+                raise
+            existing = Session.objects.filter(user=request.user, client_upload_id=client_upload_id).first()
+            if not existing:
+                raise
+            maybe_refresh_session_processing(existing)
+            existing.refresh_from_db()
+            data = self.get_serializer(existing).data
+            return Response(data, status=status.HTTP_200_OK)
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def perform_create(self, serializer, *, client_upload_id=''):
+        session = serializer.save(user=self.request.user, client_upload_id=client_upload_id)
         attach_tags_to_session(session, self.request.data.get('tags', ''))
         start_processing_pipeline(session)
 

@@ -1,5 +1,6 @@
 import logging
 import os
+from collections import Counter
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse, HttpResponse
 from django.db import connection
@@ -194,6 +195,48 @@ def product_event_insights_view(request):
         .order_by('-created_at')[:limit]
     )
 
+    upload_events_qs = qs.filter(event_name__in=['session_upload_succeeded', 'session_upload_failed', 'session_upload_aborted'])
+    upload_rows = list(upload_events_qs.values('event_name', 'extra_json'))
+    upload_mode_counts = Counter()
+    failure_code_counts = Counter()
+    failure_status_counts = Counter()
+    failure_phase_counts = Counter()
+
+    upload_succeeded_count = 0
+    upload_failed_count = 0
+    upload_aborted_count = 0
+    for row in upload_rows:
+        event_name = str(row.get('event_name', '')).strip()
+        extra = row.get('extra_json') if isinstance(row.get('extra_json'), dict) else {}
+        mode = str(extra.get('upload_mode', '')).strip().lower() or 'unknown'
+        upload_mode_counts[mode] += 1
+
+        if event_name == 'session_upload_succeeded':
+            upload_succeeded_count += 1
+            continue
+        if event_name == 'session_upload_aborted':
+            upload_aborted_count += 1
+            continue
+
+        upload_failed_count += 1
+        failure_code = str(extra.get('code', '')).strip().lower() or 'unknown'
+        failure_status = str(extra.get('status', '')).strip() or 'unknown'
+        failure_phase = str(extra.get('phase', '')).strip().lower() or 'unknown'
+        failure_code_counts[failure_code] += 1
+        failure_status_counts[failure_status] += 1
+        failure_phase_counts[failure_phase] += 1
+
+    upload_summary = {
+        'total_upload_events': len(upload_rows),
+        'upload_succeeded_count': upload_succeeded_count,
+        'upload_failed_count': upload_failed_count,
+        'upload_aborted_count': upload_aborted_count,
+        'upload_mode_counts': [{'upload_mode': mode, 'count': count} for mode, count in upload_mode_counts.most_common(limit)],
+        'top_failure_codes': [{'code': code, 'count': count} for code, count in failure_code_counts.most_common(limit)],
+        'top_failure_statuses': [{'status': status_value, 'count': count} for status_value, count in failure_status_counts.most_common(limit)],
+        'top_failure_phases': [{'phase': phase, 'count': count} for phase, count in failure_phase_counts.most_common(limit)],
+    }
+
     return Response({
         'window_hours': window_hours,
         'event_name': event_name_filter,
@@ -201,6 +244,7 @@ def product_event_insights_view(request):
         'top_events': top_events,
         'top_paths': top_paths,
         'recent_events': recent_events,
+        'upload_summary': upload_summary,
     })
 
 

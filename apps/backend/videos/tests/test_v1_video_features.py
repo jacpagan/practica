@@ -197,6 +197,46 @@ class V1VideoFeaturesTests(APITestCase):
         AWS_MEDIA_CONVERT_ROLE_ARN='',
         AWS_MEDIA_CONVERT_ENDPOINT_URL='',
     )
+    @patch('videos.media.services.enqueue_local_session_transcode', return_value=(True, ''))
+    def test_session_create_is_idempotent_for_client_upload_id(self, enqueue_local_transcode):
+        self.client.force_authenticate(user=self.owner)
+
+        first = self.client.post(
+            '/api/sessions/',
+            {
+                'title': 'Retry-safe upload',
+                'description': 'desc',
+                'client_upload_id': 'session-retry-123',
+                'video_file': self._video_file('retry-safe.mp4'),
+            },
+            format='multipart',
+        )
+
+        second = self.client.post(
+            '/api/sessions/',
+            {
+                'title': 'Retry-safe upload',
+                'description': 'desc',
+                'client_upload_id': 'session-retry-123',
+                'video_file': self._video_file('retry-safe.mp4'),
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
+        self.assertEqual(first.data['id'], second.data['id'])
+        self.assertEqual(
+            Session.objects.filter(user=self.owner, client_upload_id='session-retry-123').count(),
+            1,
+        )
+        enqueue_local_transcode.assert_called_once()
+
+    @override_settings(
+        AWS_STORAGE_BUCKET_NAME='',
+        AWS_MEDIA_CONVERT_ROLE_ARN='',
+        AWS_MEDIA_CONVERT_ENDPOINT_URL='',
+    )
     @patch('videos.media.services.enqueue_local_session_transcode', return_value=(False, 'ffmpeg missing'))
     def test_session_create_fails_when_conversion_is_unavailable(self, enqueue_local_transcode):
         self.client.force_authenticate(user=self.owner)
@@ -298,6 +338,34 @@ class V1VideoFeaturesTests(APITestCase):
         self.assertEqual(len(response.data['assets']), 1)
         self.assertTrue(response.data['assets'][0]['url'].endswith('/processed/sessions/1/proxy/video_proxy.mp4'))
 
+    def test_session_detail_includes_processing_resolution(self):
+        session = self._create_session(user=self.owner)
+        session.processing_status = Session.STATUS_PROCESSING
+        session.processing_error = ''
+        session.save(update_fields=['processing_status', 'processing_error'])
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.get(f'/api/sessions/{session.id}/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['resolution']['code'], 'processing')
+        self.assertEqual(response.data['resolution']['phase'], 'waiting')
+        self.assertEqual(response.data['resolution']['awaiting_actor'], 'system')
+
+    def test_session_detail_includes_failed_processing_resolution(self):
+        session = self._create_session(user=self.owner)
+        session.processing_status = Session.STATUS_FAILED
+        session.processing_error = 'Playback conversion is unavailable'
+        session.save(update_fields=['processing_status', 'processing_error'])
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.get(f'/api/sessions/{session.id}/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['resolution']['code'], 'playback_failed')
+        self.assertEqual(response.data['resolution']['phase'], 'blocked')
+        self.assertEqual(response.data['resolution']['awaiting_actor'], 'owner')
+
     @override_settings(
         AWS_STORAGE_BUCKET_NAME='',
         AWS_MEDIA_CONVERT_ROLE_ARN='',
@@ -317,6 +385,7 @@ class V1VideoFeaturesTests(APITestCase):
         )
 
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(res.data.get('code'), 'upload_invalid_video_type')
         self.assertIn('only video files allowed', str(res.data).lower())
 
     @override_settings(

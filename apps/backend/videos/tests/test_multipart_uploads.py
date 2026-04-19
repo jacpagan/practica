@@ -102,6 +102,23 @@ class MultipartUploadApiTests(APITestCase):
         self.assertEqual(set(session.tags.values_list('name', flat=True)), {'timing', 'groove'})
         self.assertIn('sessions/', session.video_file.name)
 
+    def test_multipart_initiate_returns_structured_code_for_invalid_size(self):
+        self.client.force_authenticate(user=self.member)
+
+        response = self.client.post(
+            '/api/sessions/multipart/initiate/',
+            {
+                'title': 'Bad upload',
+                'size_bytes': 'not-a-number',
+                'filename': 'drum-take.mp4',
+                'content_type': 'video/mp4',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data.get('code'), 'upload_invalid_file_size')
+
     def test_user_cannot_sign_other_users_upload(self):
         fake_s3 = FakeS3Client()
 
@@ -226,6 +243,44 @@ class MultipartUploadApiTests(APITestCase):
         self.assertEqual(status_res.status_code, status.HTTP_200_OK)
         self.assertEqual(status_res.data['status'], MultipartSessionUpload.STATUS_COMPLETED)
         self.assertEqual(status_res.data['session']['id'], session.id)
+
+    def test_complete_returns_existing_session_for_completed_upload(self):
+        session = Session.objects.create(
+            user=self.member,
+            title='Completed upload session',
+            description='',
+            video_file='sessions/member/completed.mp4',
+            processing_status=Session.STATUS_READY,
+        )
+        upload = MultipartSessionUpload.objects.create(
+            user=self.member,
+            session=session,
+            status=MultipartSessionUpload.STATUS_COMPLETED,
+            title='Completed upload session',
+            description='',
+            tags_csv='',
+            duration_seconds=None,
+            original_filename='completed.mp4',
+            content_type='video/mp4',
+            size_bytes=20 * 1024 * 1024,
+            s3_key='sessions/member/completed.mp4',
+            s3_upload_id='upload-complete-1',
+            expires_at=timezone.now() + timedelta(hours=1),
+            completed_at=timezone.now(),
+        )
+
+        self.client.force_authenticate(user=self.member)
+        complete_res = self.client.post(
+            '/api/sessions/multipart/complete/',
+            {
+                'multipart_upload_id': upload.id,
+                'parts': [{'part_number': 1, 'etag': '"etag-part-1"'}],
+            },
+            format='json',
+        )
+
+        self.assertEqual(complete_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(complete_res.data['id'], session.id)
 
     def test_multipart_initiate_accepts_mov_with_generic_content_type(self):
         fake_s3 = FakeS3Client()

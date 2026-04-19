@@ -9,6 +9,7 @@ const RETRY_MAX_DELAY_MS = 4000
 const MULTIPART_RECOVERY_ATTEMPTS = 4
 const MULTIPART_RECOVERY_DELAY_MS = 1500
 const MULTIPART_RESUME_PREFIX = 'practica.multipart.resume.v1'
+const SESSION_UPLOAD_ID_PREFIX = 'practica.session.upload_id.v1'
 const CLIENT_TRACE_ID_KEY = 'practica.client_trace_id.v1'
 export const MAX_RECORDER_DURATION_SECONDS = 300
 export const MAX_VIDEO_UPLOAD_BYTES = 2147483648
@@ -236,6 +237,48 @@ const multipartFingerprint = ({ payload, videoFile }) => {
 }
 
 const multipartResumeKey = (fingerprint) => `${MULTIPART_RESUME_PREFIX}:${fingerprint}`
+const sessionUploadIdKey = (fingerprint) => `${SESSION_UPLOAD_ID_PREFIX}:${fingerprint}`
+
+const createClientUploadId = () => {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID()
+    }
+  } catch {
+    // Fall through to timestamp-random id.
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+const readStoredUploadId = (storageKey) => {
+  const store = localStore()
+  if (!store) return ''
+  try {
+    return String(store.getItem(storageKey) || '').trim().slice(0, 64)
+  } catch {
+    return ''
+  }
+}
+
+const writeStoredUploadId = (storageKey, uploadId) => {
+  const store = localStore()
+  if (!store) return
+  try {
+    store.setItem(storageKey, String(uploadId || '').slice(0, 64))
+  } catch {
+    // Ignore storage errors.
+  }
+}
+
+const clearStoredUploadId = (storageKey) => {
+  const store = localStore()
+  if (!store) return
+  try {
+    store.removeItem(storageKey)
+  } catch {
+    // Ignore storage errors.
+  }
+}
 
 const readResumeRecord = (storageKey) => {
   const store = localStore()
@@ -725,27 +768,86 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
   throw lastError || new Error('Multipart upload failed')
 }
 
+const createSessionViaSingleUpload = async ({ token, payload, videoFile, onProgress, onStatusChange, signal, clientUploadId }) => {
+  const fd = new FormData()
+  fd.append('title', payload.title || '')
+  fd.append('practice_series', payload.practice_series || '')
+  fd.append('description', payload.description || '')
+  fd.append('reference_title', payload.reference_title || '')
+  fd.append('reference_url', payload.reference_url || '')
+  fd.append('video_file', videoFile)
+  fd.append('client_upload_id', clientUploadId)
+  if (payload.duration_seconds !== undefined && payload.duration_seconds !== null && payload.duration_seconds !== '') {
+    fd.append('duration_seconds', payload.duration_seconds)
+  }
+  if (payload.tags?.length) fd.append('tags', payload.tags.join(','))
+
+  let attempt = 0
+  let lastResponse = null
+  while (attempt < 2) {
+    attempt += 1
+    throwIfAborted(signal)
+    let response = null
+    try {
+      response = await uploadFormData({ url: '/api/sessions/', formData: fd, token, onProgress, signal })
+    } catch (error) {
+      if (isAbortError(error)) throw error
+      response = {
+        ok: false,
+        status: 0,
+        data: { error: 'Network interrupted during upload. Please retry.' },
+        text: '',
+      }
+    }
+    if (response.ok || response.status !== 0 || attempt >= 2) {
+      return response
+    }
+
+    lastResponse = response
+    onStatusChange?.('resuming')
+    if (onProgress) onProgress(null, null, videoFile.size)
+    await abortableSleep(800 * attempt, signal)
+  }
+  return lastResponse || {
+    ok: false,
+    status: 0,
+    data: { error: 'Network interrupted during upload. Please retry.' },
+    text: '',
+  }
+}
+
 export const createSessionUpload = async ({ token, payload, videoFile, onProgress, onStatusChange, signal }) => {
+  const fingerprint = multipartFingerprint({ payload, videoFile })
+  const uploadIdStorageKey = sessionUploadIdKey(fingerprint)
+  let clientUploadId = readStoredUploadId(uploadIdStorageKey)
+  if (!clientUploadId) {
+    clientUploadId = createClientUploadId()
+    writeStoredUploadId(uploadIdStorageKey, clientUploadId)
+  }
+
   try {
     if (videoFile && videoFile.size >= MULTIPART_THRESHOLD_BYTES) {
       const multipartRes = await createSessionViaMultipart({ token, payload, videoFile, onProgress, onStatusChange, signal })
-      if (multipartRes.ok || ![400, 404, 405].includes(multipartRes.status)) return multipartRes
+      if (multipartRes.ok || ![400, 404, 405].includes(multipartRes.status)) {
+        if (multipartRes.ok || multipartRes?.data?.code === 'upload_aborted') clearStoredUploadId(uploadIdStorageKey)
+        return multipartRes
+      }
     }
 
-    const fd = new FormData()
-    fd.append('title', payload.title || '')
-    fd.append('practice_series', payload.practice_series || '')
-    fd.append('description', payload.description || '')
-    fd.append('reference_title', payload.reference_title || '')
-    fd.append('reference_url', payload.reference_url || '')
-    fd.append('video_file', videoFile)
-    if (payload.duration_seconds !== undefined && payload.duration_seconds !== null && payload.duration_seconds !== '') {
-      fd.append('duration_seconds', payload.duration_seconds)
-    }
-    if (payload.tags?.length) fd.append('tags', payload.tags.join(','))
-    return uploadFormData({ url: '/api/sessions/', formData: fd, token, onProgress, signal })
+    const res = await createSessionViaSingleUpload({
+      token,
+      payload,
+      videoFile,
+      onProgress,
+      onStatusChange,
+      signal,
+      clientUploadId,
+    })
+    if (res.ok || res?.data?.code === 'upload_aborted') clearStoredUploadId(uploadIdStorageKey)
+    return res
   } catch (error) {
     if (isAbortError(error)) {
+      clearStoredUploadId(uploadIdStorageKey)
       return {
         ok: false,
         status: 499,
@@ -764,12 +866,31 @@ export const createSessionUpload = async ({ token, payload, videoFile, onProgres
 
 export const uploadErrorMessage = (res) => {
   if (!res) return 'Upload failed'
-  if (res?.data?.code === 'upload_aborted') return 'Upload aborted.'
+  const code = String(res?.data?.code || '').trim().toLowerCase()
+  if (code === 'upload_aborted') return 'Upload aborted.'
+  if (code === 'upload_expired') return 'Upload session expired. Please restart the upload.'
+  if (code === 'upload_not_open') return 'Upload session is no longer open. Please restart the upload.'
+  if (code === 'upload_invalid_video_type') return 'Only video files are allowed. Please choose a video and retry.'
+  if (code === 'upload_size_exceeded') return 'File exceeds the 2GB limit. Choose a smaller video and retry.'
+  if (code === 'upload_invalid_file_size') return 'Invalid file size. Please choose the file again and retry.'
+  if (code === 'upload_finalize_failed') return 'Could not finalize upload. Retry; if it keeps failing, restart upload.'
+  if (code === 'upload_status_unavailable') return 'Could not check upload status. Retry in a moment.'
+  if (code === 'upload_sign_part_failed' || code === 'upload_initiate_failed') {
+    return 'Upload service is temporarily unavailable. Retry in a moment.'
+  }
+  if (code === 'direct_uploads_not_configured') return 'Upload service is unavailable right now. Please try again later.'
   if (res.status === 0) return 'Network interrupted during upload. Please retry.'
   if (res.status === 410) return 'Upload session expired. Please retry.'
   if (res.status === 413) return 'File too large for server limits. Current max is 2GB.'
   if (res.status === 408 || res.status === 499 || res.status === 504) {
     return 'Upload timed out. Please retry on a stable connection.'
+  }
+  const details = res?.data?.details
+  if (details && typeof details === 'object') {
+    const firstField = Object.keys(details)[0]
+    const fieldErrors = details[firstField]
+    const firstFieldError = Array.isArray(fieldErrors) ? fieldErrors[0] : fieldErrors
+    if (firstFieldError) return `${String(firstFieldError)} Please fix and retry.`
   }
   if (String(res?.data?.error || '').toLowerCase().includes('expired')) {
     return 'Upload session expired. Please retry.'

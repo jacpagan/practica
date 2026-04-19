@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useToast } from './Toast'
-import { createSessionUpload, isLikelyVideoFile, MAX_RECORDER_DURATION_SECONDS, MAX_VIDEO_UPLOAD_BYTES, uploadErrorMessage, videoFileAccept } from '../utils'
+import { createSessionUpload, isLikelyVideoFile, MAX_RECORDER_DURATION_SECONDS, MAX_VIDEO_UPLOAD_BYTES, reportClientEvent, uploadErrorMessage, videoFileAccept } from '../utils'
 import VideoRecorder from './VideoRecorder'
 import { useConfirm } from './ConfirmDialog'
 import PracticeThreadField from './PracticeThreadField'
@@ -268,6 +268,7 @@ function SessionUpload({
     abortRequestedRef.current = false
     abortControllerRef.current = new AbortController()
     let success = false
+    const uploadMode = videoFile && videoFile.size >= 8 * 1024 * 1024 ? 'multipart' : 'single'
     try {
       const res = await createSessionUpload({
         token,
@@ -282,12 +283,33 @@ function SessionUpload({
         signal: abortControllerRef.current.signal,
       })
       if (!res.ok) {
-        if (res?.data?.code === 'upload_aborted') return
+        if (res?.data?.code === 'upload_aborted') {
+          reportClientEvent('session_upload_aborted', {
+            action: 'session_upload_aborted',
+            upload_mode: uploadMode,
+            file_size_bytes: videoFile?.size || 0,
+          })
+          return
+        }
+        reportClientEvent('session_upload_failed', {
+          action: 'session_upload_failed',
+          upload_mode: uploadMode,
+          status: Number(res?.status || 0),
+          code: String(res?.data?.code || '').slice(0, 80),
+          phase: uploadPhase,
+          file_size_bytes: videoFile?.size || 0,
+        })
         toast.error(uploadErrorMessage(res))
         return
       }
 
       success = true
+      reportClientEvent('session_upload_succeeded', {
+        action: 'session_upload_succeeded',
+        upload_mode: uploadMode,
+        session_id: res?.data?.id || null,
+        file_size_bytes: videoFile?.size || 0,
+      })
       try {
         if (practiceSeries.trim()) window.localStorage.setItem(LAST_SERIES_KEY, practiceSeries.trim())
       } catch {}
@@ -295,7 +317,22 @@ function SessionUpload({
       toast.success('Saved to your private library')
       onComplete?.({ ...res.data, local_preview_url: previewUrl || '' })
     } catch {
-      if (abortRequestedRef.current) return
+      if (abortRequestedRef.current) {
+        reportClientEvent('session_upload_aborted', {
+          action: 'session_upload_aborted',
+          upload_mode: uploadMode,
+          file_size_bytes: videoFile?.size || 0,
+        })
+        return
+      }
+      reportClientEvent('session_upload_failed', {
+        action: 'session_upload_failed',
+        upload_mode: uploadMode,
+        status: 0,
+        code: 'upload_network_interrupted',
+        phase: uploadPhase,
+        file_size_bytes: videoFile?.size || 0,
+      })
       toast.error('Error uploading')
     } finally {
       abortControllerRef.current = null

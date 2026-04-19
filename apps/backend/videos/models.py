@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from django.contrib.auth.models import User
 import secrets
 from django.utils import timezone
@@ -161,6 +162,7 @@ class Session(models.Model):
     processing_status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_UPLOADED)
     processing_job_id = models.CharField(max_length=64, blank=True, db_index=True)
     processing_error = models.TextField(blank=True)
+    client_upload_id = models.CharField(max_length=64, blank=True, db_index=True)
     tags = models.ManyToManyField(Tag, blank=True, related_name='sessions')
     duration_seconds = models.IntegerField(null=True, blank=True)
     recorded_at = models.DateTimeField(auto_now_add=True)
@@ -171,6 +173,13 @@ class Session(models.Model):
         ordering = ['-recorded_at']
         indexes = [
             models.Index(fields=['user', 'recorded_at']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'client_upload_id'],
+                condition=~Q(client_upload_id=''),
+                name='session_user_client_upload_uniq',
+            ),
         ]
 
     def __str__(self):
