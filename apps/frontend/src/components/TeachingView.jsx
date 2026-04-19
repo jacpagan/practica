@@ -1,7 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { fmtDate } from '../utils'
-import { formatResolutionTimestamp } from './ResolutionBanner'
 import StatusChip from './StatusChip'
+
+const formatResolutionTimestamp = (resolution) => {
+  const raw = resolution?.updated_at || resolution?.created_at || ''
+  if (!raw) return ''
+  const date = new Date(raw)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString(undefined, { hour12: undefined })
+}
 
 const statusPriority = {
   requested: 0,
