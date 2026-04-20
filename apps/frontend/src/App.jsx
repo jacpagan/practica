@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { reportClientError } from './utils'
 import { AuthProvider, useAuth } from './auth'
+import { monthCacheKeyForDate, sessionsMonthQueryPath } from './calendar'
 import { fetchPaginatedWithToken } from './pagination'
 import { parseRoute, resolveUploadReturnRouteDraft, routePath } from './routing'
 import { ToastProvider, useToast } from './components/Toast'
@@ -213,11 +214,7 @@ function AppContent() {
     }
   }, [fetchPaginated, token, toast])
 
-  const monthCacheKey = useCallback((monthDate) => {
-    const year = monthDate.getFullYear()
-    const month = String(monthDate.getMonth() + 1).padStart(2, '0')
-    return `${year}-${month}`
-  }, [])
+  const monthCacheKey = useCallback((monthDate) => monthCacheKeyForDate(monthDate), [])
 
   const loadCalendarMonth = useCallback(async (monthDate, { preferCache = true } = {}) => {
     if (!token) return
@@ -229,16 +226,11 @@ function AppContent() {
       return
     }
 
-    const year = monthDate.getFullYear()
-    const month = monthDate.getMonth()
-    const start = new Date(year, month, 1)
-    const end = new Date(year, month + 1, 0)
-    const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     const requestKey = `${cacheKey}:${Date.now()}`
     calendarMonthRequestRef.current = requestKey
     setSessionsLoading(true)
     try {
-      const items = await fetchPaginated(`/api/sessions/?start_date=${toISO(start)}&end_date=${toISO(end)}`)
+      const items = await fetchPaginated(sessionsMonthQueryPath(monthDate))
       calendarMonthCacheRef.current.set(cacheKey, items)
       if (calendarMonthRequestRef.current !== requestKey) return
       setSessions(items)
