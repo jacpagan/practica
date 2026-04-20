@@ -21,6 +21,7 @@ import { useSessionUpdatedListener } from './hooks/useSessionUpdatedListener'
 import { useSessionDetailActions } from './hooks/useSessionDetailActions'
 import { useSessionsLoader } from './hooks/useSessionsLoader'
 import { useThreadRenamedListener } from './hooks/useThreadRenamedListener'
+import { useUserMenuActions } from './hooks/useUserMenuActions'
 import { useViewDataRefresh } from './hooks/useViewDataRefresh'
 import { parseRoute, resolveUploadReturnRouteDraft, routePath } from './routing'
 import { ToastProvider, useToast } from './components/Toast'
@@ -306,13 +307,16 @@ function AppContent() {
     view,
   })
 
-  const reportProblem = useCallback(() => {
-    try {
-      const path = (window.location && (window.location.pathname + (window.location.search || ''))) || '/'
-      reportClientError({ source: 'UserReport', message: 'user_report', extra: { note: 'User pressed report', path } })
-      toast.success('Thanks for the report')
-    } catch {}
-  }, [toast])
+  const {
+    handleLogout,
+    reportProblem,
+  } = useUserMenuActions({
+    confirmAbortActiveUpload,
+    logout,
+    requestAbortActiveUpload,
+    toast,
+    uploadGuardRef,
+  })
 
   if (loading) {
     return (
@@ -333,13 +337,6 @@ function AppContent() {
       return <ReviewPage reviewToken={reviewToken} />
     }
     return <AuthForm />
-  }
-
-  const handleLogout = async () => {
-    const accepted = await confirmAbortActiveUpload('log out')
-    if (!accepted) return
-    if (uploadGuardRef.current.active) requestAbortActiveUpload()
-    logout()
   }
 
   return (
