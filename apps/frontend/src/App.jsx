@@ -41,7 +41,6 @@ const SeriesView = React.lazy(() => import('./components/SeriesView'))
 const RequestsView = React.lazy(() => import('./components/TeachingView'))
 import PrivacyPage from './components/PrivacyPage'
 const CalendarView = React.lazy(() => import('./components/CalendarView'))
-import RecorderModal from './components/RecorderModal'
 const RecorderPage = React.lazy(() => import('./components/RecorderPage'))
 
 function AppContent() {
@@ -230,9 +229,6 @@ function AppContent() {
     ownReadySessionCount,
     practiceThreadOptions,
   } = useLibraryMetrics({ ownerReviewRequests, sessions })
-
-  // Global modal recorder
-  const [showRecorderModal, setShowRecorderModal] = useState(false)
 
   // no dropdown menu state
 
@@ -529,16 +525,6 @@ function AppContent() {
         )}
         </React.Suspense>
       </main>
-      {showRecorderModal ? (
-        <RecorderModal
-          onClose={() => setShowRecorderModal(false)}
-          onRecorded={() => {
-            setPendingUploadReturnRoute(currentReturnRoute)
-            setOpenRecorderOnUpload(false)
-            navigate({ view: 'record', sessionId: null })
-          }}
-        />
-      ) : null}
     </div>
   )
 }
