@@ -6,6 +6,7 @@ import { useBeforeUnloadGuard } from './hooks/useBeforeUnloadGuard'
 import { useCalendarMonthLoader } from './hooks/useCalendarMonthLoader'
 import { useCurrentRoutePath } from './hooks/useCurrentRoutePath'
 import { useOfflineStatus } from './hooks/useOfflineStatus'
+import { useOpenHomeworkItem } from './hooks/useOpenHomeworkItem'
 import { useOpenSessionById } from './hooks/useOpenSessionById'
 import { useOwnerReviewRequestsLoader } from './hooks/useOwnerReviewRequestsLoader'
 import { usePaginatedFetch } from './hooks/usePaginatedFetch'
@@ -291,19 +292,14 @@ function AppContent() {
     setSelectedSession,
   })
 
-  const openHomeWorkItem = useCallback((session, returnRoute = { view: 'calendar', sessionId: null, seriesName: '' }) => {
-    if (!session?.id) return
-    const activeRequest = activeOwnerRequestBySessionId.get(Number(session.id))
-    const tokenValue = activeRequest?.feedback_link?.token || activeRequest?.review_link?.token || ''
-    if (tokenValue) {
-      setDetailReturnRoute(returnRoute)
-      setSelectedSession(null)
-      setOpenRecorderOnUpload(false)
-      navigate({ view: 'review', token: tokenValue, sessionId: null })
-      return
-    }
-    openSession(session, returnRoute)
-  }, [activeOwnerRequestBySessionId, navigate, openSession])
+  const openHomeWorkItem = useOpenHomeworkItem({
+    activeOwnerRequestBySessionId,
+    navigate,
+    openSession,
+    setDetailReturnRoute,
+    setOpenRecorderOnUpload,
+    setSelectedSession,
+  })
 
   useViewDataRefresh({
     loadOwnerReviewRequests,
