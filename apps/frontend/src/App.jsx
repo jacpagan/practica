@@ -5,6 +5,7 @@ import { useAuthExpiredListener } from './hooks/useAuthExpiredListener'
 import { useBeforeUnloadGuard } from './hooks/useBeforeUnloadGuard'
 import { useCalendarMonthLoader } from './hooks/useCalendarMonthLoader'
 import { useCurrentRoutePath } from './hooks/useCurrentRoutePath'
+import { useDetailRouteHydration } from './hooks/useDetailRouteHydration'
 import { useOfflineStatus } from './hooks/useOfflineStatus'
 import { useOpenHomeworkItem } from './hooks/useOpenHomeworkItem'
 import { useOpenSessionById } from './hooks/useOpenSessionById'
@@ -316,12 +317,13 @@ function AppContent() {
 
   // Keep Requests route accessible; show graceful empty state when no reviewer workspace
 
-  useEffect(() => {
-    if (!user) return
-    if (view === 'detail' && routeSessionId && selectedSession?.id !== routeSessionId) {
-      openSessionById(routeSessionId, { updateUrl: false })
-    }
-  }, [user, view, routeSessionId, selectedSession?.id, openSessionById])
+  useDetailRouteHydration({
+    openSessionById,
+    routeSessionId,
+    selectedSessionId: selectedSession?.id,
+    user,
+    view,
+  })
 
   const reportProblem = useCallback(() => {
     try {
