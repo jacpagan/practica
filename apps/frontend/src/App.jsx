@@ -16,6 +16,7 @@ import { useReviewerWorkspacePolling } from './hooks/useReviewerWorkspacePolling
 import { useSessionUpdatedListener } from './hooks/useSessionUpdatedListener'
 import { useSessionsLoader } from './hooks/useSessionsLoader'
 import { useThreadRenamedListener } from './hooks/useThreadRenamedListener'
+import { useViewDataRefresh } from './hooks/useViewDataRefresh'
 import { parseRoute, resolveUploadReturnRouteDraft, routePath } from './routing'
 import { ToastProvider, useToast } from './components/Toast'
 import NotificationsBell from './components/NotificationsBell'
@@ -313,12 +314,13 @@ function AppContent() {
     openSession(session, returnRoute)
   }, [activeOwnerRequestBySessionId, navigate, openSession])
 
-  useEffect(() => {
-    if (!user) return
-    if (view === 'series') loadSessions()
-    if (view === 'calendar') loadOwnerReviewRequests()
-    loadReviewerWorkspaceAvailability()
-  }, [user, view, loadSessions, loadOwnerReviewRequests, loadReviewerWorkspaceAvailability])
+  useViewDataRefresh({
+    loadOwnerReviewRequests,
+    loadReviewerWorkspaceAvailability,
+    loadSessions,
+    user,
+    view,
+  })
 
   useEffect(() => {
     if (autoQuickRecordCheckedRef.current) return
