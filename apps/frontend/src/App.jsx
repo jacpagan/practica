@@ -7,6 +7,7 @@ import { useBeforeUnloadGuard } from './hooks/useBeforeUnloadGuard'
 import { useCurrentRoutePath } from './hooks/useCurrentRoutePath'
 import { useOfflineStatus } from './hooks/useOfflineStatus'
 import { useOpenSessionById } from './hooks/useOpenSessionById'
+import { useOwnerReviewRequestsLoader } from './hooks/useOwnerReviewRequestsLoader'
 import { usePaginatedFetch } from './hooks/usePaginatedFetch'
 import { usePopStateUploadGuard } from './hooks/usePopStateUploadGuard'
 import { usePostLoginRedirect } from './hooks/usePostLoginRedirect'
@@ -218,15 +219,11 @@ function AppContent() {
     }
   }, [fetchPaginated, monthCacheKey, token])
 
-  const loadOwnerReviewRequests = useCallback(async () => {
-    if (!token) return
-    try {
-      const items = await fetchPaginated('/api/review-requests/?role=owner')
-      setOwnerReviewRequests(items)
-    } catch {
-      setOwnerReviewRequests([])
-    }
-  }, [fetchPaginated, token])
+  const loadOwnerReviewRequests = useOwnerReviewRequestsLoader({
+    fetchPaginated,
+    setOwnerReviewRequests,
+    token,
+  })
 
   const loadReviewerWorkspaceAvailability = useReviewerWorkspaceAvailability({
     fetchPaginated,
