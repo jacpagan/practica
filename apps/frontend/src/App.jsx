@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { reportClientError } from './utils'
 import { AuthProvider, useAuth } from './auth'
+import { fetchPaginatedWithToken } from './pagination'
 import { ToastProvider, useToast } from './components/Toast'
 import NotificationsBell from './components/NotificationsBell'
 import { ConfirmProvider, useConfirm } from './components/ConfirmDialog'
@@ -54,44 +55,7 @@ function AppContent() {
   const autoQuickRecordCheckedRef = useRef(false)
   const [offline, setOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false)
 
-  const fetchPaginated = useCallback(async (path) => {
-    if (!token) return []
-    let nextUrl = path
-    let items = []
-
-    while (nextUrl) {
-      let res
-      let attempt = 0
-      while (true) {
-        try {
-          res = await fetch(nextUrl, { headers: { Authorization: `Token ${token}` } })
-          // Retry only on 5xx; break on success or non-retriable
-          if (res.ok || res.status < 500 || attempt >= 2) break
-        } catch (e) {
-          if (attempt >= 2) throw e
-        }
-        await new Promise((r) => setTimeout(r, 400 * Math.pow(2, attempt)))
-        attempt += 1
-      }
-      if (!res.ok) throw new Error('paginated-fetch')
-      const data = await res.json()
-      if (Array.isArray(data)) {
-        items = items.concat(data)
-        break
-      }
-      items = items.concat(Array.isArray(data?.results) ? data.results : [])
-      const rawNext = String(data?.next || '').trim()
-      if (!rawNext) break
-      try {
-        const parsed = new URL(rawNext, window.location.origin)
-        nextUrl = `${parsed.pathname}${parsed.search}`
-      } catch {
-        nextUrl = rawNext
-      }
-    }
-
-    return items
-  }, [token])
+  const fetchPaginated = useCallback((path) => fetchPaginatedWithToken(path, token), [token])
 
   const applyRoute = useCallback((nextRoute, { replace = false } = {}) => {
     setView(nextRoute.view)
