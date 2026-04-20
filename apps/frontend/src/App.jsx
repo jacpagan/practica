@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { reportClientError } from './utils'
 import { AuthProvider, useAuth } from './auth'
-import { monthCacheKeyForDate, sessionsMonthQueryPath } from './calendar'
 import { useAuthExpiredListener } from './hooks/useAuthExpiredListener'
 import { useBeforeUnloadGuard } from './hooks/useBeforeUnloadGuard'
+import { useCalendarMonthLoader } from './hooks/useCalendarMonthLoader'
 import { useCurrentRoutePath } from './hooks/useCurrentRoutePath'
 import { useOfflineStatus } from './hooks/useOfflineStatus'
 import { useOpenSessionById } from './hooks/useOpenSessionById'
@@ -191,33 +191,14 @@ function AppContent() {
     view,
   })
 
-  const monthCacheKey = useCallback((monthDate) => monthCacheKeyForDate(monthDate), [])
-
-  const loadCalendarMonth = useCallback(async (monthDate, { preferCache = true } = {}) => {
-    if (!token) return
-    const cacheKey = monthCacheKey(monthDate)
-    const cached = calendarMonthCacheRef.current.get(cacheKey)
-    if (preferCache && cached) {
-      setSessions(cached)
-      setSessionsLoading(false)
-      return
-    }
-
-    const requestKey = `${cacheKey}:${Date.now()}`
-    calendarMonthRequestRef.current = requestKey
-    setSessionsLoading(true)
-    try {
-      const items = await fetchPaginated(sessionsMonthQueryPath(monthDate))
-      calendarMonthCacheRef.current.set(cacheKey, items)
-      if (calendarMonthRequestRef.current !== requestKey) return
-      setSessions(items)
-    } catch {
-      if (calendarMonthRequestRef.current !== requestKey) return
-      setSessions([])
-    } finally {
-      if (calendarMonthRequestRef.current === requestKey) setSessionsLoading(false)
-    }
-  }, [fetchPaginated, monthCacheKey, token])
+  const loadCalendarMonth = useCalendarMonthLoader({
+    calendarMonthCacheRef,
+    calendarMonthRequestRef,
+    fetchPaginated,
+    setSessions,
+    setSessionsLoading,
+    token,
+  })
 
   const loadOwnerReviewRequests = useOwnerReviewRequestsLoader({
     fetchPaginated,
