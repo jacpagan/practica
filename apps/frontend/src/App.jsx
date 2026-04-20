@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { reportClientError } from './utils'
 import { AuthProvider, useAuth } from './auth'
+import {
+  clearPostLoginRedirect,
+  currentLocationPath,
+  readPostLoginRedirect,
+  rememberPostLoginRedirect,
+} from './authRedirect'
 import { monthCacheKeyForDate, sessionsMonthQueryPath } from './calendar'
 import { fetchPaginatedWithToken } from './pagination'
 import { parseRoute, resolveUploadReturnRouteDraft, routePath } from './routing'
@@ -20,7 +26,6 @@ import RecorderModal from './components/RecorderModal'
 const RecorderPage = React.lazy(() => import('./components/RecorderPage'))
 
 function AppContent() {
-  const POST_LOGIN_REDIRECT_KEY = 'practica.post_login_redirect.v1'
   const { user, token, loading, logout } = useAuth()
   const toast = useToast()
   const confirm = useConfirm()
@@ -146,8 +151,7 @@ function AppContent() {
   useEffect(() => {
     const onAuthExpired = () => {
       try {
-        const fullPath = (window.location && (window.location.pathname + (window.location.search || ''))) || '/'
-        window.sessionStorage.setItem(POST_LOGIN_REDIRECT_KEY, fullPath)
+        rememberPostLoginRedirect(currentLocationPath())
       } catch {}
       try { toast.error('Session expired. Please sign in again.') } catch {}
       try { logout() } catch {}
@@ -161,10 +165,10 @@ function AppContent() {
   useEffect(() => {
     if (!user) return
     let stored = ''
-    try { stored = window.sessionStorage.getItem(POST_LOGIN_REDIRECT_KEY) || '' } catch {}
+    try { stored = readPostLoginRedirect() } catch {}
     if (!stored) return
     try {
-      window.sessionStorage.removeItem(POST_LOGIN_REDIRECT_KEY)
+      clearPostLoginRedirect()
       const url = new URL(stored, window.location.origin)
       const route = parseRoute(url.pathname, url.search)
       applyRoute(route, { replace: true })
