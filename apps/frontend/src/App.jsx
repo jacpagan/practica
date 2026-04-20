@@ -16,6 +16,7 @@ import { useOwnerReviewRequestsLoader } from './hooks/useOwnerReviewRequestsLoad
 import { usePaginatedFetch } from './hooks/usePaginatedFetch'
 import { usePopStateUploadGuard } from './hooks/usePopStateUploadGuard'
 import { usePostLoginRedirect } from './hooks/usePostLoginRedirect'
+import { usePrimaryNavigation } from './hooks/usePrimaryNavigation'
 import { useQuickRecordBootstrap } from './hooks/useQuickRecordBootstrap'
 import { useRecordingActions } from './hooks/useRecordingActions'
 import { useReviewerWorkspaceAvailability } from './hooks/useReviewerWorkspaceAvailability'
@@ -287,6 +288,13 @@ function AppContent() {
   })
 
   const {
+    goHome,
+    goPrivacy,
+    goRequests,
+    goSeries,
+  } = usePrimaryNavigation({ navigate })
+
+  const {
     onDetailSessionDelete,
     onDetailSessionUpdate,
     openReviewRequestToken,
@@ -327,19 +335,19 @@ function AppContent() {
       <header className="border-b border-gray-100 bg-white px-4 py-4 sm:px-6">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-4 min-w-0">
-            <button onClick={() => navigate({ view: 'calendar', sessionId: null })} className="text-lg font-semibold text-gray-900 tracking-tight">
+            <button onClick={goHome} className="text-lg font-semibold text-gray-900 tracking-tight">
               Practica
             </button>
             {hasReviewerWorkspace ? (
               <nav className="hidden sm:flex items-center gap-2 rounded-full border border-gray-200 p-1">
                 <button
-                  onClick={() => navigate({ view: 'calendar', sessionId: null })}
+                  onClick={goHome}
                   className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'calendar' || view === 'detail' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
                 >
                   Home
                 </button>
                 <button
-                  onClick={() => navigate({ view: 'requests', sessionId: null })}
+                  onClick={goRequests}
                   className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
                 >
                   Requests{reviewerPendingCount > 0 ? ` (${reviewerPendingCount})` : ''}
@@ -357,10 +365,10 @@ function AppContent() {
             <div className="flex items-center gap-2 sm:border-l sm:border-gray-100 sm:pl-3">
               <NotificationsBell
                 token={token}
-                onOpenPrivacy={() => navigate({ view: 'privacy', sessionId: null })}
+                onOpenPrivacy={goPrivacy}
                 onOpenReviewRequest={openReviewRequestToken}
               />
-              <button onClick={() => navigate({ view: 'privacy', sessionId: null })} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+              <button onClick={goPrivacy} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
                 Privacy
               </button>
               <span className="hidden sm:inline text-xs text-gray-400">{user.display_name || user.username}</span>
@@ -374,13 +382,13 @@ function AppContent() {
           {hasReviewerWorkspace ? (
             <nav className="grid grid-cols-2 gap-2">
               <button
-                onClick={() => navigate({ view: 'calendar', sessionId: null })}
+                onClick={goHome}
                 className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'calendar' || view === 'detail' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
               >
                 Home
               </button>
               <button
-                onClick={() => navigate({ view: 'requests', sessionId: null })}
+                onClick={goRequests}
                 className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
               >
                 Requests{reviewerPendingCount > 0 ? ` (${reviewerPendingCount})` : ''}
@@ -418,7 +426,7 @@ function AppContent() {
             routeDateKey={routeDate}
             reviewRequests={ownerReviewRequests}
             onOpenSession={(session, returnRoute) => openSession(session, returnRoute || { view: 'calendar', sessionId: null, seriesName: '' })}
-            onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
+            onOpenSeries={goSeries}
             onQuickRecord={(dateKey) => handleRecordAnother({
               returnRoute: { view: 'calendar', sessionId: null, date: String(dateKey || '') },
             })}
@@ -433,7 +441,7 @@ function AppContent() {
         )}
 
         {view === 'privacy' && (
-          <PrivacyPage signedIn onBack={() => navigate({ view: 'calendar', sessionId: null })} />
+          <PrivacyPage signedIn onBack={goHome} />
         )}
 
         {view === 'series' && (
@@ -443,7 +451,7 @@ function AppContent() {
             sessionsLoading={sessionsLoading}
             reviewRequests={ownerReviewRequests}
             token={token}
-            onBack={() => navigate({ view: 'calendar', sessionId: null })}
+            onBack={goHome}
             onOpenSession={openSession}
             onCreateVideo={() => {
               setPendingPracticeSeries(routeSeriesName)
@@ -463,7 +471,7 @@ function AppContent() {
                   <p className="text-sm font-semibold text-gray-900">No trusted feedback inbox yet</p>
                   <p className="text-xs text-gray-500 mt-1">Structured requests appear here when someone brings you into their practice loop.</p>
                   <div className="mt-4">
-              <button type="button" onClick={() => navigate({ view: 'calendar', sessionId: null })} className="text-xs rounded-lg bg-gray-900 text-white px-3 py-1.5 hover:bg-gray-800">Back to Home</button>
+              <button type="button" onClick={goHome} className="text-xs rounded-lg bg-gray-900 text-white px-3 py-1.5 hover:bg-gray-800">Back to Home</button>
                   </div>
                 </div>
               </div>
@@ -495,7 +503,7 @@ function AppContent() {
 
         {view === 'record' && (
           <RecorderPage
-            onCancel={() => navigate({ view: 'calendar', sessionId: null })}
+            onCancel={goHome}
             onComplete={handleUploadComplete}
           />
         )}
@@ -518,7 +526,7 @@ function AppContent() {
             onOpenReviewRequest={openReviewRequestToken}
             justUploaded={selectedSession.id === justUploadedSessionId}
             onRecordAnother={(draft = null) => handleRecordAnother(draft || { practiceSeries: selectedSession.practice_series || '' })}
-            onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
+            onOpenSeries={goSeries}
             onSessionUpdate={onDetailSessionUpdate}
             onSessionDelete={onDetailSessionDelete}
           />
