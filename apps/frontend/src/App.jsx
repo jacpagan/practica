@@ -7,6 +7,7 @@ import {
 } from './authRedirect'
 import { monthCacheKeyForDate, sessionsMonthQueryPath } from './calendar'
 import { useAuthExpiredListener } from './hooks/useAuthExpiredListener'
+import { useBeforeUnloadGuard } from './hooks/useBeforeUnloadGuard'
 import { useOfflineStatus } from './hooks/useOfflineStatus'
 import { fetchPaginatedWithToken } from './pagination'
 import { parseRoute, resolveUploadReturnRouteDraft, routePath } from './routing'
@@ -137,6 +138,7 @@ function AppContent() {
   }, [reviewClaim, reviewToken, routeDate, routeSessionId, routeSeriesName, view])
 
   useAuthExpiredListener({ logout, navigate, toast })
+  useBeforeUnloadGuard(uploadGuardRef)
 
   // After successful sign-in, return user to the last route if we saved one
   useEffect(() => {
@@ -170,16 +172,6 @@ function AppContent() {
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [applyRoute, requestAbortActiveUpload])
-
-  useEffect(() => {
-    const onBeforeUnload = (event) => {
-      if (!uploadGuardRef.current.active) return
-      event.preventDefault()
-      event.returnValue = ''
-    }
-    window.addEventListener('beforeunload', onBeforeUnload)
-    return () => window.removeEventListener('beforeunload', onBeforeUnload)
-  }, [])
 
   const loadSessions = useCallback(async () => {
     if (!token) return
