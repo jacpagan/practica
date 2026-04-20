@@ -11,6 +11,7 @@ import { useOwnerReviewRequestsLoader } from './hooks/useOwnerReviewRequestsLoad
 import { usePaginatedFetch } from './hooks/usePaginatedFetch'
 import { usePopStateUploadGuard } from './hooks/usePopStateUploadGuard'
 import { usePostLoginRedirect } from './hooks/usePostLoginRedirect'
+import { useRecordingActions } from './hooks/useRecordingActions'
 import { useReviewerWorkspaceAvailability } from './hooks/useReviewerWorkspaceAvailability'
 import { useReviewerWorkspacePolling } from './hooks/useReviewerWorkspacePolling'
 import { useSessionUpdatedListener } from './hooks/useSessionUpdatedListener'
@@ -271,31 +272,24 @@ function AppContent() {
 
   // Global modal recorder
   const [showRecorderModal, setShowRecorderModal] = useState(false)
-  const openGlobalRecorder = useCallback(() => {
-    navigate({ view: 'record', sessionId: null })
-  }, [navigate])
 
   // no dropdown menu state
 
-  const handleRecordAnother = useCallback((draft = null) => {
-    setSelectedSession(null)
-    setJustUploadedSessionId(null)
-    setOpenRecorderOnUpload(false)
-    setPendingFollowUpRequestDraft(draft || null)
-    setPendingPracticeSeries(String(draft?.practiceSeries || '').trim())
-    setPendingUploadReturnRoute(resolveUploadReturnRoute(draft))
-    navigate({ view: 'record', sessionId: null })
-  }, [navigate, resolveUploadReturnRoute])
-
-  const startQuickRecord = useCallback(() => {
-    setSelectedSession(null)
-    setJustUploadedSessionId(null)
-    setPendingFollowUpRequestDraft(null)
-    setPendingPracticeSeries('')
-    setPendingUploadReturnRoute(currentReturnRoute)
-    setOpenRecorderOnUpload(false)
-    navigate({ view: 'record', sessionId: null })
-  }, [currentReturnRoute, navigate])
+  const {
+    handleRecordAnother,
+    openGlobalRecorder,
+    startQuickRecord,
+  } = useRecordingActions({
+    currentReturnRoute,
+    navigate,
+    resolveUploadReturnRoute,
+    setJustUploadedSessionId,
+    setOpenRecorderOnUpload,
+    setPendingFollowUpRequestDraft,
+    setPendingPracticeSeries,
+    setPendingUploadReturnRoute,
+    setSelectedSession,
+  })
 
   const openHomeWorkItem = useCallback((session, returnRoute = { view: 'calendar', sessionId: null, seriesName: '' }) => {
     if (!session?.id) return
