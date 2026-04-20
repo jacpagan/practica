@@ -9,6 +9,7 @@ import { useOfflineStatus } from './hooks/useOfflineStatus'
 import { usePaginatedFetch } from './hooks/usePaginatedFetch'
 import { usePopStateUploadGuard } from './hooks/usePopStateUploadGuard'
 import { usePostLoginRedirect } from './hooks/usePostLoginRedirect'
+import { useSessionUpdatedListener } from './hooks/useSessionUpdatedListener'
 import { parseRoute, resolveUploadReturnRouteDraft, routePath } from './routing'
 import { ToastProvider, useToast } from './components/Toast'
 import NotificationsBell from './components/NotificationsBell'
@@ -153,6 +154,12 @@ function AppContent() {
     requestAbortActiveUpload,
     uploadGuardRef,
   })
+  useSessionUpdatedListener({
+    calendarMonthCacheRef,
+    setSelectedSession,
+    setSessions,
+    token,
+  })
 
   const loadSessions = useCallback(async () => {
     if (!token) return
@@ -205,24 +212,6 @@ function AppContent() {
       setOwnerReviewRequests([])
     }
   }, [fetchPaginated, token])
-
-  // Listen for lightweight session updates from children (e.g., thread changes)
-  useEffect(() => {
-    const handler = async (e) => {
-      const id = Number(e?.detail?.id || 0)
-      if (!id || !token) return
-      calendarMonthCacheRef.current.clear()
-      try {
-        const res = await fetch(`/api/sessions/${id}/`, { headers: { Authorization: `Token ${token}` } })
-        if (!res.ok) return
-        const data = await res.json()
-        setSessions((current) => current.map((item) => (item.id === id ? { ...item, ...data } : item)))
-        setSelectedSession((prev) => (prev && prev.id === id ? { ...prev, ...data } : prev))
-      } catch {}
-    }
-    window.addEventListener('practica:session-updated', handler)
-    return () => window.removeEventListener('practica:session-updated', handler)
-  }, [token])
 
   useEffect(() => {
     const handler = async (event) => {
