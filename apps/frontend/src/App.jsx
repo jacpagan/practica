@@ -6,6 +6,7 @@ import { useBeforeUnloadGuard } from './hooks/useBeforeUnloadGuard'
 import { useCalendarMonthLoader } from './hooks/useCalendarMonthLoader'
 import { useCurrentRoutePath } from './hooks/useCurrentRoutePath'
 import { useDetailRouteHydration } from './hooks/useDetailRouteHydration'
+import { useInitialRouteNormalization } from './hooks/useInitialRouteNormalization'
 import { useLibraryMetrics } from './hooks/useLibraryMetrics'
 import { useNavigationActions } from './hooks/useNavigationActions'
 import { useOfflineStatus } from './hooks/useOfflineStatus'
@@ -80,15 +81,16 @@ function AppContent() {
 
   const fetchPaginated = usePaginatedFetch(token)
 
-  // Normalize URL on initial mount (e.g., convert /calendar to /), preserving query date if present
-  useEffect(() => {
-    const desired = routePath({ view, sessionId: routeSessionId, token: reviewToken, claim: reviewClaim, seriesName: routeSeriesName, date: routeDate })
-    const current = window.location.pathname + (window.location.search || '')
-    if (desired !== current) {
-      try { window.history.replaceState(null, '', desired) } catch {}
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  useInitialRouteNormalization({
+    route: {
+      view,
+      sessionId: routeSessionId,
+      token: reviewToken,
+      claim: reviewClaim,
+      seriesName: routeSeriesName,
+      date: routeDate,
+    },
+  })
 
   const {
     applyRoute,
