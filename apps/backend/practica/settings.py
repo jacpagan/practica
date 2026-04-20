@@ -9,10 +9,16 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'dev-insecure-change-in-production')
-
-DEBUG = os.environ.get('DEBUG', 'True').lower() in ['true', '1', 'yes']
 RUNNING_TESTS = any(arg == 'test' for arg in sys.argv[1:])
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ['true', '1', 'yes']
+
+_secret_key = os.environ.get('DJANGO_SECRET_KEY', '')
+if _secret_key:
+    SECRET_KEY = _secret_key
+elif DEBUG or RUNNING_TESTS:
+    SECRET_KEY = 'dev-insecure-change-in-production'
+else:
+    raise RuntimeError('DJANGO_SECRET_KEY must be set when DEBUG is false.')
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0').split(',')
 
