@@ -2,7 +2,7 @@ import math
 import logging
 
 from django.conf import settings
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
@@ -15,7 +15,7 @@ from videos.models import MultipartSessionUpload, Session
 from videos.serializers import SessionSerializer
 from videos.services.media_pipeline import apply_processing_update
 from .security import processing_callback_authorized
-from .services import start_processing_pipeline
+from .services import normalized_client_upload_id, start_processing_pipeline
 from .uploads import (
     attach_tags_to_session,
     direct_uploads_enabled,
@@ -34,6 +34,48 @@ def _upload_error(message, *, code, http_status):
     return Response({'error': message, 'code': code}, status=http_status)
 
 
+def _multipart_initiate_existing_response(upload, request):
+    if upload.status == MultipartSessionUpload.STATUS_INITIATED:
+        if upload.expires_at < timezone.now():
+            upload.status = MultipartSessionUpload.STATUS_EXPIRED
+            upload.save(update_fields=['status'])
+            return _upload_error(
+                'Previous upload expired. Restart upload to continue.',
+                code='upload_restart_required',
+                http_status=status.HTTP_409_CONFLICT,
+            )
+        part_size = recommended_part_size(upload.size_bytes)
+        total_parts = math.ceil(upload.size_bytes / part_size)
+        return Response(
+            {
+                'multipart_upload_id': upload.id,
+                'part_size': part_size,
+                'total_parts': total_parts,
+                'expires_at': upload.expires_at,
+                'status': upload.status,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    if upload.status == MultipartSessionUpload.STATUS_COMPLETED and upload.session_id:
+        session = get_object_or_404(Session, pk=upload.session_id, user=request.user)
+        serializer = SessionSerializer(session, context={'request': request})
+        return Response(
+            {
+                'multipart_upload_id': upload.id,
+                'status': upload.status,
+                'session': serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    return _upload_error(
+        'Previous upload is no longer resumable. Restart upload to continue.',
+        code='upload_restart_required',
+        http_status=status.HTTP_409_CONFLICT,
+    )
+
+
 class SessionMediaActionsMixin:
     @action(detail=False, methods=['post'], url_path='multipart/initiate')
     def multipart_initiate(self, request):
@@ -43,6 +85,12 @@ class SessionMediaActionsMixin:
         title = str(request.data.get('title', '')).strip()
         if not title:
             return _upload_error('Title is required', code='upload_title_required', http_status=status.HTTP_400_BAD_REQUEST)
+
+        client_upload_id = normalized_client_upload_id(request.data.get('client_upload_id'))
+        if client_upload_id:
+            existing_upload = MultipartSessionUpload.objects.filter(user=request.user, client_upload_id=client_upload_id).first()
+            if existing_upload:
+                return _multipart_initiate_existing_response(existing_upload, request)
 
         try:
             size_bytes = int(request.data.get('size_bytes', 0))
@@ -89,23 +137,32 @@ class SessionMediaActionsMixin:
         except (BotoCoreError, ClientError):
             return _upload_error('Could not start multipart upload', code='upload_initiate_failed', http_status=status.HTTP_502_BAD_GATEWAY)
 
-        upload = MultipartSessionUpload.objects.create(
-            user=request.user,
-            status=MultipartSessionUpload.STATUS_INITIATED,
-            title=title,
-            practice_series=str(request.data.get('practice_series', '')).strip(),
-            description=str(request.data.get('description', '')).strip(),
-            reference_title=str(request.data.get('reference_title', '')).strip(),
-            reference_url=str(request.data.get('reference_url', '')).strip(),
-            tags_csv=tags_csv,
-            duration_seconds=duration_seconds,
-            original_filename=filename,
-            content_type=content_type,
-            size_bytes=size_bytes,
-            s3_key=key,
-            s3_upload_id=resp['UploadId'],
-            expires_at=expires_at,
-        )
+        try:
+            upload = MultipartSessionUpload.objects.create(
+                user=request.user,
+                status=MultipartSessionUpload.STATUS_INITIATED,
+                title=title,
+                practice_series=str(request.data.get('practice_series', '')).strip(),
+                description=str(request.data.get('description', '')).strip(),
+                reference_title=str(request.data.get('reference_title', '')).strip(),
+                reference_url=str(request.data.get('reference_url', '')).strip(),
+                tags_csv=tags_csv,
+                duration_seconds=duration_seconds,
+                original_filename=filename,
+                content_type=content_type,
+                client_upload_id=client_upload_id,
+                size_bytes=size_bytes,
+                s3_key=key,
+                s3_upload_id=resp['UploadId'],
+                expires_at=expires_at,
+            )
+        except IntegrityError:
+            if not client_upload_id:
+                raise
+            existing_upload = MultipartSessionUpload.objects.filter(user=request.user, client_upload_id=client_upload_id).first()
+            if existing_upload:
+                return _multipart_initiate_existing_response(existing_upload, request)
+            raise
 
         return Response({
             'multipart_upload_id': upload.id,

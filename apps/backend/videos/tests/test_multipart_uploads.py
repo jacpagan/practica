@@ -13,8 +13,10 @@ from videos.models import MultipartSessionUpload, Profile, Session
 class FakeS3Client:
     def __init__(self):
         self.parts_by_upload_id = {}
+        self.create_calls = 0
 
     def create_multipart_upload(self, **kwargs):
+        self.create_calls += 1
         self.created = kwargs
         return {'UploadId': 'upload-123'}
 
@@ -101,6 +103,120 @@ class MultipartUploadApiTests(APITestCase):
         self.assertEqual(session.duration_seconds, 900)
         self.assertEqual(set(session.tags.values_list('name', flat=True)), {'timing', 'groove'})
         self.assertIn('sessions/', session.video_file.name)
+
+    def test_multipart_initiate_is_idempotent_for_client_upload_id(self):
+        fake_s3 = FakeS3Client()
+        self.client.force_authenticate(user=self.member)
+
+        with patch('videos.media.api.s3_client', return_value=fake_s3):
+            first = self.client.post(
+                '/api/sessions/multipart/initiate/',
+                {
+                    'title': 'Retry-safe multipart',
+                    'size_bytes': 30 * 1024 * 1024,
+                    'filename': 'retry.mp4',
+                    'content_type': 'video/mp4',
+                    'client_upload_id': 'multipart-retry-123',
+                },
+                format='json',
+            )
+            second = self.client.post(
+                '/api/sessions/multipart/initiate/',
+                {
+                    'title': 'Retry-safe multipart',
+                    'size_bytes': 30 * 1024 * 1024,
+                    'filename': 'retry.mp4',
+                    'content_type': 'video/mp4',
+                    'client_upload_id': 'multipart-retry-123',
+                },
+                format='json',
+            )
+
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
+        self.assertEqual(first.data['multipart_upload_id'], second.data['multipart_upload_id'])
+        self.assertEqual(second.data.get('status'), MultipartSessionUpload.STATUS_INITIATED)
+        self.assertEqual(
+            MultipartSessionUpload.objects.filter(user=self.member, client_upload_id='multipart-retry-123').count(),
+            1,
+        )
+        self.assertEqual(fake_s3.create_calls, 1)
+
+    def test_multipart_initiate_returns_completed_session_for_existing_client_upload_id(self):
+        session = Session.objects.create(
+            user=self.member,
+            title='Completed upload session',
+            description='',
+            video_file='sessions/member/completed.mp4',
+            processing_status=Session.STATUS_READY,
+        )
+        MultipartSessionUpload.objects.create(
+            user=self.member,
+            session=session,
+            status=MultipartSessionUpload.STATUS_COMPLETED,
+            title='Completed upload session',
+            description='',
+            tags_csv='',
+            duration_seconds=None,
+            original_filename='completed.mp4',
+            content_type='video/mp4',
+            client_upload_id='multipart-complete-123',
+            size_bytes=20 * 1024 * 1024,
+            s3_key='sessions/member/completed.mp4',
+            s3_upload_id='upload-complete-1',
+            expires_at=timezone.now() + timedelta(hours=1),
+            completed_at=timezone.now(),
+        )
+
+        self.client.force_authenticate(user=self.member)
+        response = self.client.post(
+            '/api/sessions/multipart/initiate/',
+            {
+                'title': 'Completed upload session',
+                'size_bytes': 20 * 1024 * 1024,
+                'filename': 'completed.mp4',
+                'content_type': 'video/mp4',
+                'client_upload_id': 'multipart-complete-123',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['status'], MultipartSessionUpload.STATUS_COMPLETED)
+        self.assertEqual(response.data['session']['id'], session.id)
+
+    def test_multipart_initiate_returns_restart_required_for_expired_client_upload_id(self):
+        MultipartSessionUpload.objects.create(
+            user=self.member,
+            status=MultipartSessionUpload.STATUS_EXPIRED,
+            title='Expired upload',
+            description='',
+            tags_csv='',
+            duration_seconds=None,
+            original_filename='expired.mp4',
+            content_type='video/mp4',
+            client_upload_id='multipart-expired-123',
+            size_bytes=20 * 1024 * 1024,
+            s3_key='sessions/member/expired.mp4',
+            s3_upload_id='upload-expired-1',
+            expires_at=timezone.now() - timedelta(hours=1),
+        )
+
+        self.client.force_authenticate(user=self.member)
+        response = self.client.post(
+            '/api/sessions/multipart/initiate/',
+            {
+                'title': 'Expired upload',
+                'size_bytes': 20 * 1024 * 1024,
+                'filename': 'expired.mp4',
+                'content_type': 'video/mp4',
+                'client_upload_id': 'multipart-expired-123',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data.get('code'), 'upload_restart_required')
 
     def test_multipart_initiate_returns_structured_code_for_invalid_size(self):
         self.client.force_authenticate(user=self.member)

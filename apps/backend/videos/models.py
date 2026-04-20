@@ -244,6 +244,7 @@ class MultipartSessionUpload(models.Model):
     duration_seconds = models.IntegerField(null=True, blank=True)
     original_filename = models.CharField(max_length=255)
     content_type = models.CharField(max_length=100, blank=True)
+    client_upload_id = models.CharField(max_length=64, blank=True, db_index=True)
     size_bytes = models.BigIntegerField()
     s3_key = models.CharField(max_length=512)
     s3_upload_id = models.CharField(max_length=256)
@@ -257,6 +258,13 @@ class MultipartSessionUpload(models.Model):
         indexes = [
             models.Index(fields=['user', 'status']),
             models.Index(fields=['expires_at']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'client_upload_id'],
+                condition=~Q(client_upload_id=''),
+                name='multipart_upload_user_client_upload_uniq',
+            ),
         ]
         constraints = [
             models.UniqueConstraint(fields=['s3_key', 's3_upload_id'], name='multipart_upload_s3_key_upload_id_uniq'),

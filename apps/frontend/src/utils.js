@@ -534,7 +534,7 @@ const buildPartsPayload = (partsByNumber) =>
     .sort((a, b) => a[0] - b[0])
     .map(([partNumber, etag]) => ({ part_number: partNumber, etag }))
 
-const createSessionViaMultipartAttempt = async ({ token, payload, videoFile, onProgress, onStatusChange, signal }) => {
+const createSessionViaMultipartAttempt = async ({ token, payload, videoFile, onProgress, onStatusChange, signal, clientUploadId }) => {
   const normalizedContentType = normalizedVideoContentType(videoFile)
   const fingerprint = multipartFingerprint({ payload, videoFile })
   const storageKey = multipartResumeKey(fingerprint)
@@ -579,6 +579,7 @@ const createSessionViaMultipartAttempt = async ({ token, payload, videoFile, onP
           filename: videoFile.name,
           content_type: normalizedContentType,
           size_bytes: videoFile.size,
+          client_upload_id: clientUploadId,
         },
         signal,
       })
@@ -731,7 +732,7 @@ const createSessionViaMultipartAttempt = async ({ token, payload, videoFile, onP
   }
 }
 
-const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress, onStatusChange, signal }) => {
+const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress, onStatusChange, signal, clientUploadId }) => {
   let lastResult = null
   let lastError = null
 
@@ -739,7 +740,7 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
     throwIfAborted(signal)
 
     try {
-      const result = await createSessionViaMultipartAttempt({ token, payload, videoFile, onProgress, onStatusChange, signal })
+      const result = await createSessionViaMultipartAttempt({ token, payload, videoFile, onProgress, onStatusChange, signal, clientUploadId })
       if (!shouldRetryMultipartResult(result)) return result
       lastResult = result
     } catch (error) {
@@ -827,9 +828,25 @@ export const createSessionUpload = async ({ token, payload, videoFile, onProgres
 
   try {
     if (videoFile && videoFile.size >= MULTIPART_THRESHOLD_BYTES) {
-      const multipartRes = await createSessionViaMultipart({ token, payload, videoFile, onProgress, onStatusChange, signal })
+      const multipartRes = await createSessionViaMultipart({
+        token,
+        payload,
+        videoFile,
+        onProgress,
+        onStatusChange,
+        signal,
+        clientUploadId,
+      })
       if (multipartRes.ok || ![400, 404, 405].includes(multipartRes.status)) {
-        if (multipartRes.ok || multipartRes?.data?.code === 'upload_aborted') clearStoredUploadId(uploadIdStorageKey)
+        const multipartCode = String(multipartRes?.data?.code || '').trim().toLowerCase()
+        if (
+          multipartRes.ok
+          || multipartCode === 'upload_aborted'
+          || multipartCode === 'upload_expired'
+          || multipartCode === 'upload_restart_required'
+        ) {
+          clearStoredUploadId(uploadIdStorageKey)
+        }
         return multipartRes
       }
     }
@@ -868,6 +885,7 @@ export const uploadErrorMessage = (res) => {
   if (!res) return 'Upload failed'
   const code = String(res?.data?.code || '').trim().toLowerCase()
   if (code === 'upload_aborted') return 'Upload aborted.'
+  if (code === 'upload_restart_required') return 'Previous upload can’t resume. Please restart the upload.'
   if (code === 'upload_expired') return 'Upload session expired. Please restart the upload.'
   if (code === 'upload_not_open') return 'Upload session is no longer open. Please restart the upload.'
   if (code === 'upload_invalid_video_type') return 'Only video files are allowed. Please choose a video and retry.'
