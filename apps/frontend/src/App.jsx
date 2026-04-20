@@ -282,12 +282,10 @@ function AppContent() {
 
   const {
     handleLogout,
-    reportProblem,
   } = useUserMenuActions({
     confirmAbortActiveUpload,
     logout,
     requestAbortActiveUpload,
-    toast,
     uploadGuardRef,
   })
 
