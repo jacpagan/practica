@@ -6,9 +6,9 @@ import { useAuthExpiredListener } from './hooks/useAuthExpiredListener'
 import { useBeforeUnloadGuard } from './hooks/useBeforeUnloadGuard'
 import { useCurrentRoutePath } from './hooks/useCurrentRoutePath'
 import { useOfflineStatus } from './hooks/useOfflineStatus'
+import { usePaginatedFetch } from './hooks/usePaginatedFetch'
 import { usePopStateUploadGuard } from './hooks/usePopStateUploadGuard'
 import { usePostLoginRedirect } from './hooks/usePostLoginRedirect'
-import { fetchPaginatedWithToken } from './pagination'
 import { parseRoute, resolveUploadReturnRouteDraft, routePath } from './routing'
 import { ToastProvider, useToast } from './components/Toast'
 import NotificationsBell from './components/NotificationsBell'
@@ -61,7 +61,7 @@ function AppContent() {
   const autoQuickRecordCheckedRef = useRef(false)
   const offline = useOfflineStatus()
 
-  const fetchPaginated = useCallback((path) => fetchPaginatedWithToken(path, token), [token])
+  const fetchPaginated = usePaginatedFetch(token)
 
   const applyRoute = useCallback((nextRoute, { replace = false } = {}) => {
     setView(nextRoute.view)
