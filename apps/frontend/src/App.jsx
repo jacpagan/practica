@@ -23,6 +23,7 @@ import { useReviewerWorkspacePolling } from './hooks/useReviewerWorkspacePolling
 import { useSessionUpdatedListener } from './hooks/useSessionUpdatedListener'
 import { useSessionDetailActions } from './hooks/useSessionDetailActions'
 import { useSessionsLoader } from './hooks/useSessionsLoader'
+import { useSessionViewCallbacks } from './hooks/useSessionViewCallbacks'
 import { useThreadRenamedListener } from './hooks/useThreadRenamedListener'
 import { useUploadReturnRouting } from './hooks/useUploadReturnRouting'
 import { useUserMenuActions } from './hooks/useUserMenuActions'
@@ -289,6 +290,16 @@ function AppContent() {
     uploadGuardRef,
   })
 
+  const {
+    onDetailSessionDelete,
+    onDetailSessionUpdate,
+    openReviewRequestToken,
+  } = useSessionViewCallbacks({
+    navigate,
+    setSelectedSession,
+    setSessions,
+  })
+
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -351,11 +362,7 @@ function AppContent() {
               <NotificationsBell
                 token={token}
                 onOpenPrivacy={() => navigate({ view: 'privacy', sessionId: null })}
-                onOpenReviewRequest={(requestItem) => {
-                  const requestLink = requestItem?.feedback_link || requestItem?.review_link
-                  if (!requestLink?.token) return
-                  navigate({ view: 'review', token: requestLink.token, sessionId: null })
-                }}
+                onOpenReviewRequest={openReviewRequestToken}
               />
               <button onClick={() => navigate({ view: 'privacy', sessionId: null })} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
                 Privacy
@@ -452,11 +459,7 @@ function AppContent() {
 
         {view === 'requests' && (
           hasReviewerWorkspace ? (
-            <RequestsView token={token} onOpenReviewRequest={(requestItem) => {
-              const requestLink = requestItem?.feedback_link || requestItem?.review_link
-              if (!requestLink?.token) return
-              navigate({ view: 'review', token: requestLink.token, sessionId: null })
-            }} />
+            <RequestsView token={token} onOpenReviewRequest={openReviewRequestToken} />
           ) : (
             <div className="px-4 sm:px-6 py-6">
               <div className="max-w-3xl mx-auto">
@@ -516,24 +519,12 @@ function AppContent() {
             onBack={goBack}
             initialReviewRequestDraft={pendingFollowUpRequestDraft}
             onReviewRequestDraftCleared={() => setPendingFollowUpRequestDraft(null)}
-            onOpenReviewRequest={(requestItem) => {
-              if (!requestItem?.review_link?.token) return
-              navigate({ view: 'review', token: requestItem.review_link.token, sessionId: null })
-            }}
+            onOpenReviewRequest={openReviewRequestToken}
             justUploaded={selectedSession.id === justUploadedSessionId}
             onRecordAnother={(draft = null) => handleRecordAnother(draft || { practiceSeries: selectedSession.practice_series || '' })}
             onOpenSeries={(seriesName) => navigate({ view: 'series', sessionId: null, seriesName })}
-            onSessionUpdate={(sessionData) => {
-              setSelectedSession(sessionData)
-              setSessions((current) => current.map((item) => (
-                item.id === sessionData.id ? { ...item, ...sessionData } : item
-              )))
-            }}
-            onSessionDelete={(sessionId) => {
-              setSessions((current) => current.filter((item) => item.id !== sessionId))
-              setSelectedSession(null)
-              navigate({ view: 'calendar', sessionId: null }, { replace: true })
-            }}
+            onSessionUpdate={onDetailSessionUpdate}
+            onSessionDelete={onDetailSessionDelete}
           />
         )}
         </React.Suspense>
