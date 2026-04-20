@@ -14,6 +14,7 @@ import { usePostLoginRedirect } from './hooks/usePostLoginRedirect'
 import { useReviewerWorkspaceAvailability } from './hooks/useReviewerWorkspaceAvailability'
 import { useReviewerWorkspacePolling } from './hooks/useReviewerWorkspacePolling'
 import { useSessionUpdatedListener } from './hooks/useSessionUpdatedListener'
+import { useSessionsLoader } from './hooks/useSessionsLoader'
 import { useThreadRenamedListener } from './hooks/useThreadRenamedListener'
 import { parseRoute, resolveUploadReturnRouteDraft, routePath } from './routing'
 import { ToastProvider, useToast } from './components/Toast'
@@ -166,19 +167,13 @@ function AppContent() {
     token,
   })
 
-  const loadSessions = useCallback(async () => {
-    if (!token) return
-    setSessionsLoading(true)
-    try {
-      const items = await fetchPaginated('/api/sessions/')
-      setSessions(items)
-    } catch {
-      setSessions([])
-      toast.error('Could not load your library')
-    } finally {
-      setSessionsLoading(false)
-    }
-  }, [fetchPaginated, token, toast])
+  const loadSessions = useSessionsLoader({
+    fetchPaginated,
+    setSessions,
+    setSessionsLoading,
+    toast,
+    token,
+  })
 
   useThreadRenamedListener({
     calendarMonthCacheRef,
