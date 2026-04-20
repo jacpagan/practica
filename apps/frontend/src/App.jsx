@@ -14,6 +14,7 @@ import { usePostLoginRedirect } from './hooks/usePostLoginRedirect'
 import { useReviewerWorkspaceAvailability } from './hooks/useReviewerWorkspaceAvailability'
 import { useReviewerWorkspacePolling } from './hooks/useReviewerWorkspacePolling'
 import { useSessionUpdatedListener } from './hooks/useSessionUpdatedListener'
+import { useSessionDetailActions } from './hooks/useSessionDetailActions'
 import { useSessionsLoader } from './hooks/useSessionsLoader'
 import { useThreadRenamedListener } from './hooks/useThreadRenamedListener'
 import { useViewDataRefresh } from './hooks/useViewDataRefresh'
@@ -222,29 +223,25 @@ function AppContent() {
     toast,
   })
 
-  const openSession = useCallback((session, returnRoute = { view, sessionId: null, seriesName: routeSeriesName }) => {
-    if (!session?.id) return
-    setDetailReturnRoute(returnRoute)
-    setOpenRecorderOnUpload(false)
-    openSessionById(session.id)
-  }, [openSessionById, routeSeriesName, view])
-
-  const goBack = useCallback(() => {
-    navigate(detailReturnRoute?.view ? detailReturnRoute : { view: 'calendar', sessionId: null, seriesName: '' })
-    setSelectedSession(null)
-    setJustUploadedSessionId(null)
-  }, [detailReturnRoute, navigate])
-
-  const handleUploadComplete = useCallback((session) => {
-    calendarMonthCacheRef.current.clear()
-    setSessions((current) => [session, ...current.filter((item) => item.id !== session.id)])
-    setSelectedSession(session)
-    setJustUploadedSessionId(session.id)
-    setOpenRecorderOnUpload(false)
-    setPendingPracticeSeries('')
-    setPendingUploadReturnRoute({ view: 'calendar', sessionId: null })
-    navigate({ view: 'detail', sessionId: session.id })
-  }, [navigate])
+  const {
+    goBack,
+    handleUploadComplete,
+    openSession,
+  } = useSessionDetailActions({
+    calendarMonthCacheRef,
+    detailReturnRoute,
+    navigate,
+    openSessionById,
+    routeSeriesName,
+    setDetailReturnRoute,
+    setJustUploadedSessionId,
+    setOpenRecorderOnUpload,
+    setPendingPracticeSeries,
+    setPendingUploadReturnRoute,
+    setSelectedSession,
+    setSessions,
+    view,
+  })
 
   const activeOwnerRequestBySessionId = useMemo(() => {
     const bySessionId = new Map()
