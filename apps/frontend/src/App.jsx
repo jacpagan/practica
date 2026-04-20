@@ -6,6 +6,7 @@ import { useAuthExpiredListener } from './hooks/useAuthExpiredListener'
 import { useBeforeUnloadGuard } from './hooks/useBeforeUnloadGuard'
 import { useCurrentRoutePath } from './hooks/useCurrentRoutePath'
 import { useOfflineStatus } from './hooks/useOfflineStatus'
+import { useOpenSessionById } from './hooks/useOpenSessionById'
 import { usePaginatedFetch } from './hooks/usePaginatedFetch'
 import { usePopStateUploadGuard } from './hooks/usePopStateUploadGuard'
 import { usePostLoginRedirect } from './hooks/usePostLoginRedirect'
@@ -240,30 +241,12 @@ function AppContent() {
     token,
   })
 
-  const openSessionById = useCallback(async (sessionId, { updateUrl = true } = {}) => {
-    if (!token) return
-    try {
-      let res
-      let attempt = 0
-      while (true) {
-        try {
-          res = await fetch(`/api/sessions/${sessionId}/`, { headers: { Authorization: `Token ${token}` } })
-          if (res.ok || res.status < 500 || attempt >= 2) break
-        } catch (e) {
-          if (attempt >= 2) throw e
-        }
-        await new Promise((r) => setTimeout(r, 400 * Math.pow(2, attempt)))
-        attempt += 1
-      }
-      if (!res.ok) throw new Error('session')
-      const data = await res.json()
-      setSelectedSession(data)
-      if (updateUrl) navigate({ view: 'detail', sessionId: data.id })
-    } catch {
-      toast.error('Could not load video')
-      navigate({ view: 'calendar', sessionId: null }, { replace: true })
-    }
-  }, [navigate, token, toast])
+  const openSessionById = useOpenSessionById({
+    navigate,
+    setSelectedSession,
+    token,
+    toast,
+  })
 
   const openSession = useCallback((session, returnRoute = { view, sessionId: null, seriesName: routeSeriesName }) => {
     if (!session?.id) return
