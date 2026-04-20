@@ -9,6 +9,7 @@ import { useOfflineStatus } from './hooks/useOfflineStatus'
 import { usePaginatedFetch } from './hooks/usePaginatedFetch'
 import { usePopStateUploadGuard } from './hooks/usePopStateUploadGuard'
 import { usePostLoginRedirect } from './hooks/usePostLoginRedirect'
+import { useReviewerWorkspaceAvailability } from './hooks/useReviewerWorkspaceAvailability'
 import { useReviewerWorkspacePolling } from './hooks/useReviewerWorkspacePolling'
 import { useSessionUpdatedListener } from './hooks/useSessionUpdatedListener'
 import { useThreadRenamedListener } from './hooks/useThreadRenamedListener'
@@ -226,18 +227,12 @@ function AppContent() {
     }
   }, [fetchPaginated, token])
 
-  const loadReviewerWorkspaceAvailability = useCallback(async () => {
-    if (!token) return
-    try {
-      const requests = await fetchPaginated('/api/review-requests/?role=reviewer')
-      setHasReviewerWorkspace(requests.length > 0)
-      const pending = requests.filter((r) => ['requested', 'opened'].includes(String(r?.status || '').trim().toLowerCase())).length
-      setReviewerPendingCount(pending)
-    } catch {
-      setHasReviewerWorkspace(false)
-      setReviewerPendingCount(0)
-    }
-  }, [fetchPaginated, token])
+  const loadReviewerWorkspaceAvailability = useReviewerWorkspaceAvailability({
+    fetchPaginated,
+    setHasReviewerWorkspace,
+    setReviewerPendingCount,
+    token,
+  })
 
   useReviewerWorkspacePolling({
     loadReviewerWorkspaceAvailability,
