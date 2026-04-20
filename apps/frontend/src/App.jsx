@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './auth'
 import { monthCacheKeyForDate, sessionsMonthQueryPath } from './calendar'
 import { useAuthExpiredListener } from './hooks/useAuthExpiredListener'
 import { useBeforeUnloadGuard } from './hooks/useBeforeUnloadGuard'
+import { useCurrentRoutePath } from './hooks/useCurrentRoutePath'
 import { useOfflineStatus } from './hooks/useOfflineStatus'
 import { usePopStateUploadGuard } from './hooks/usePopStateUploadGuard'
 import { usePostLoginRedirect } from './hooks/usePostLoginRedirect'
@@ -131,9 +132,17 @@ function AppContent() {
 
   const resolveUploadReturnRoute = useCallback((draft = null) => resolveUploadReturnRouteDraft(draft, routeDate), [routeDate])
 
-  useEffect(() => {
-    currentPathRef.current = routePath({ view, sessionId: routeSessionId, token: reviewToken, claim: reviewClaim, seriesName: routeSeriesName, date: routeDate })
-  }, [reviewClaim, reviewToken, routeDate, routeSessionId, routeSeriesName, view])
+  useCurrentRoutePath({
+    currentPathRef,
+    route: {
+      view,
+      sessionId: routeSessionId,
+      token: reviewToken,
+      claim: reviewClaim,
+      seriesName: routeSeriesName,
+      date: routeDate,
+    },
+  })
 
   useAuthExpiredListener({ logout, navigate, toast })
   usePostLoginRedirect({ user, applyRoute })
