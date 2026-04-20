@@ -15,6 +15,7 @@ import { useOwnerReviewRequestsLoader } from './hooks/useOwnerReviewRequestsLoad
 import { usePaginatedFetch } from './hooks/usePaginatedFetch'
 import { usePopStateUploadGuard } from './hooks/usePopStateUploadGuard'
 import { usePostLoginRedirect } from './hooks/usePostLoginRedirect'
+import { useQuickRecordBootstrap } from './hooks/useQuickRecordBootstrap'
 import { useRecordingActions } from './hooks/useRecordingActions'
 import { useReviewerWorkspaceAvailability } from './hooks/useReviewerWorkspaceAvailability'
 import { useReviewerWorkspacePolling } from './hooks/useReviewerWorkspacePolling'
@@ -265,10 +266,7 @@ function AppContent() {
     view,
   })
 
-  useEffect(() => {
-    if (autoQuickRecordCheckedRef.current) return
-    autoQuickRecordCheckedRef.current = true
-  }, [])
+  useQuickRecordBootstrap(autoQuickRecordCheckedRef)
 
   // Keep Requests route accessible; show graceful empty state when no reviewer workspace
 
