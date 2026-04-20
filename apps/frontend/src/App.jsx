@@ -6,6 +6,7 @@ import { useBeforeUnloadGuard } from './hooks/useBeforeUnloadGuard'
 import { useCalendarMonthLoader } from './hooks/useCalendarMonthLoader'
 import { useCurrentRoutePath } from './hooks/useCurrentRoutePath'
 import { useDetailRouteHydration } from './hooks/useDetailRouteHydration'
+import { useLibraryMetrics } from './hooks/useLibraryMetrics'
 import { useOfflineStatus } from './hooks/useOfflineStatus'
 import { useOpenHomeworkItem } from './hooks/useOpenHomeworkItem'
 import { useOpenSessionById } from './hooks/useOpenSessionById'
@@ -246,31 +247,11 @@ function AppContent() {
     view,
   })
 
-  const activeOwnerRequestBySessionId = useMemo(() => {
-    const bySessionId = new Map()
-    const requests = [...ownerReviewRequests].sort((left, right) => new Date(right.created_at) - new Date(left.created_at))
-    requests.forEach((item) => {
-      const status = String(item?.status || '').trim().toLowerCase()
-      if (['closed', 'revoked'].includes(status)) return
-      const sessionId = Number(item?.session?.id || item?.session_id || 0)
-      if (!sessionId || bySessionId.has(sessionId)) return
-      bySessionId.set(sessionId, item)
-    })
-    return bySessionId
-  }, [ownerReviewRequests])
-  const ownReadySessionCount = useMemo(
-    () => sessions.filter((item) => item?.can_edit && item?.processing_status === 'ready').length,
-    [sessions],
-  )
-  const practiceThreadOptions = useMemo(
-    () => Array.from(new Set(
-      sessions
-        .filter((item) => item?.can_edit)
-        .map((item) => String(item?.practice_series || '').trim())
-        .filter(Boolean),
-    )).sort((left, right) => left.localeCompare(right)),
-    [sessions],
-  )
+  const {
+    activeOwnerRequestBySessionId,
+    ownReadySessionCount,
+    practiceThreadOptions,
+  } = useLibraryMetrics({ ownerReviewRequests, sessions })
 
   // Global modal recorder
   const [showRecorderModal, setShowRecorderModal] = useState(false)
