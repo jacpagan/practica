@@ -1,14 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { reportClientError } from './utils'
 import { AuthProvider, useAuth } from './auth'
-import {
-  clearPostLoginRedirect,
-  readPostLoginRedirect,
-} from './authRedirect'
 import { monthCacheKeyForDate, sessionsMonthQueryPath } from './calendar'
 import { useAuthExpiredListener } from './hooks/useAuthExpiredListener'
 import { useBeforeUnloadGuard } from './hooks/useBeforeUnloadGuard'
 import { useOfflineStatus } from './hooks/useOfflineStatus'
+import { usePostLoginRedirect } from './hooks/usePostLoginRedirect'
 import { fetchPaginatedWithToken } from './pagination'
 import { parseRoute, resolveUploadReturnRouteDraft, routePath } from './routing'
 import { ToastProvider, useToast } from './components/Toast'
@@ -138,22 +135,8 @@ function AppContent() {
   }, [reviewClaim, reviewToken, routeDate, routeSessionId, routeSeriesName, view])
 
   useAuthExpiredListener({ logout, navigate, toast })
+  usePostLoginRedirect({ user, applyRoute })
   useBeforeUnloadGuard(uploadGuardRef)
-
-  // After successful sign-in, return user to the last route if we saved one
-  useEffect(() => {
-    if (!user) return
-    let stored = ''
-    try { stored = readPostLoginRedirect() } catch {}
-    if (!stored) return
-    try {
-      clearPostLoginRedirect()
-      const url = new URL(stored, window.location.origin)
-      const route = parseRoute(url.pathname, url.search)
-      applyRoute(route, { replace: true })
-    } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user])
 
   useEffect(() => {
     const onPopState = () => {
