@@ -3,11 +3,10 @@ import { reportClientError } from './utils'
 import { AuthProvider, useAuth } from './auth'
 import {
   clearPostLoginRedirect,
-  currentLocationPath,
   readPostLoginRedirect,
-  rememberPostLoginRedirect,
 } from './authRedirect'
 import { monthCacheKeyForDate, sessionsMonthQueryPath } from './calendar'
+import { useAuthExpiredListener } from './hooks/useAuthExpiredListener'
 import { useOfflineStatus } from './hooks/useOfflineStatus'
 import { fetchPaginatedWithToken } from './pagination'
 import { parseRoute, resolveUploadReturnRouteDraft, routePath } from './routing'
@@ -137,18 +136,7 @@ function AppContent() {
     currentPathRef.current = routePath({ view, sessionId: routeSessionId, token: reviewToken, claim: reviewClaim, seriesName: routeSeriesName, date: routeDate })
   }, [reviewClaim, reviewToken, routeDate, routeSessionId, routeSeriesName, view])
 
-  useEffect(() => {
-    const onAuthExpired = () => {
-      try {
-        rememberPostLoginRedirect(currentLocationPath())
-      } catch {}
-      try { toast.error('Session expired. Please sign in again.') } catch {}
-      try { logout() } catch {}
-      try { navigate({ view: 'calendar', sessionId: null }, { replace: true }) } catch {}
-    }
-    window.addEventListener('practica:auth-expired', onAuthExpired, { once: true })
-    return () => window.removeEventListener('practica:auth-expired', onAuthExpired)
-  }, [logout, navigate, toast])
+  useAuthExpiredListener({ logout, navigate, toast })
 
   // After successful sign-in, return user to the last route if we saved one
   useEffect(() => {
