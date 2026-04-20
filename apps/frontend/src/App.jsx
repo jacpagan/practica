@@ -10,6 +10,7 @@ import { usePaginatedFetch } from './hooks/usePaginatedFetch'
 import { usePopStateUploadGuard } from './hooks/usePopStateUploadGuard'
 import { usePostLoginRedirect } from './hooks/usePostLoginRedirect'
 import { useSessionUpdatedListener } from './hooks/useSessionUpdatedListener'
+import { useThreadRenamedListener } from './hooks/useThreadRenamedListener'
 import { parseRoute, resolveUploadReturnRouteDraft, routePath } from './routing'
 import { ToastProvider, useToast } from './components/Toast'
 import NotificationsBell from './components/NotificationsBell'
@@ -175,6 +176,17 @@ function AppContent() {
     }
   }, [fetchPaginated, token, toast])
 
+  useThreadRenamedListener({
+    calendarMonthCacheRef,
+    loadSessions,
+    navigate,
+    routeSeriesName,
+    selectedSessionId: selectedSession?.id,
+    setSelectedSession,
+    token,
+    view,
+  })
+
   const monthCacheKey = useCallback((monthDate) => monthCacheKeyForDate(monthDate), [])
 
   const loadCalendarMonth = useCallback(async (monthDate, { preferCache = true } = {}) => {
@@ -212,32 +224,6 @@ function AppContent() {
       setOwnerReviewRequests([])
     }
   }, [fetchPaginated, token])
-
-  useEffect(() => {
-    const handler = async (event) => {
-      if (!token) return
-      calendarMonthCacheRef.current.clear()
-      const oldSeriesName = String(event?.detail?.oldSeriesName || '').trim()
-      const newSeriesName = String(event?.detail?.newSeriesName || '').trim()
-      try {
-        await loadSessions()
-      } catch {}
-      if (view === 'series' && oldSeriesName && routeSeriesName === oldSeriesName && newSeriesName) {
-        navigate({ view: 'series', sessionId: null, seriesName: newSeriesName }, { replace: true })
-      }
-      if (selectedSession?.id) {
-        try {
-          const res = await fetch(`/api/sessions/${selectedSession.id}/`, { headers: { Authorization: `Token ${token}` } })
-          if (res.ok) {
-            const data = await res.json()
-            setSelectedSession(data)
-          }
-        } catch {}
-      }
-    }
-    window.addEventListener('practica:thread-renamed', handler)
-    return () => window.removeEventListener('practica:thread-renamed', handler)
-  }, [loadSessions, navigate, routeSeriesName, selectedSession?.id, token, view])
 
   const loadReviewerWorkspaceAvailability = useCallback(async () => {
     if (!token) return
