@@ -22,9 +22,10 @@ import { useSessionUpdatedListener } from './hooks/useSessionUpdatedListener'
 import { useSessionDetailActions } from './hooks/useSessionDetailActions'
 import { useSessionsLoader } from './hooks/useSessionsLoader'
 import { useThreadRenamedListener } from './hooks/useThreadRenamedListener'
+import { useUploadReturnRouting } from './hooks/useUploadReturnRouting'
 import { useUserMenuActions } from './hooks/useUserMenuActions'
 import { useViewDataRefresh } from './hooks/useViewDataRefresh'
-import { parseRoute, resolveUploadReturnRouteDraft, routePath } from './routing'
+import { parseRoute, routePath } from './routing'
 import { ToastProvider, useToast } from './components/Toast'
 import NotificationsBell from './components/NotificationsBell'
 import { ConfirmProvider, useConfirm } from './components/ConfirmDialog'
@@ -106,16 +107,17 @@ function AppContent() {
     uploadGuardRef,
   })
 
-  const currentReturnRoute = useMemo(() => ({
+  const {
+    currentReturnRoute,
+    resolveUploadReturnRoute,
+  } = useUploadReturnRouting({
+    routeClaim: reviewClaim,
+    routeDate,
+    routeSeriesName,
+    routeSessionId,
+    reviewToken,
     view,
-    sessionId: routeSessionId,
-    token: reviewToken,
-    claim: reviewClaim,
-    seriesName: routeSeriesName,
-    date: routeDate,
-  }), [reviewClaim, reviewToken, routeDate, routeSessionId, routeSeriesName, view])
-
-  const resolveUploadReturnRoute = useCallback((draft = null) => resolveUploadReturnRouteDraft(draft, routeDate), [routeDate])
+  })
 
   useCurrentRoutePath({
     currentPathRef,
