@@ -9,7 +9,6 @@ from django.utils import timezone
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
-from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
 from rest_framework import status, serializers
 from rest_framework.decorators import api_view, permission_classes
@@ -33,7 +32,6 @@ logger = logging.getLogger(__name__)
 
 # ── Auth views ──────────────────────────────────────────────────────
 
-@csrf_exempt
 @ratelimit(key='ip', rate='5/h', method='POST', block=True)
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -52,7 +50,6 @@ def register_view(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-@csrf_exempt
 @ratelimit(key='ip', rate='10/m', method='POST', block=True)
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -130,7 +127,6 @@ def invite_code_detail(request, invite_id):
     return Response({'ok': True})
 
 
-@csrf_exempt
 @ratelimit(key='ip', rate='30/m', method='POST', block=True)
 @api_view(['POST'])
 @permission_classes([AllowAny])

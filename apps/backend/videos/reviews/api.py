@@ -2,8 +2,6 @@ import logging
 
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -91,7 +89,6 @@ def _validation_error_reason(exc):
     return str(detail)[:160]
 
 
-@csrf_exempt
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def review_link_info(request, token):
@@ -161,7 +158,6 @@ def review_link_info(request, token):
     return Response(payload)
 
 
-@csrf_exempt
 @api_view(['GET', 'POST', 'PATCH', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def review_link_feedback(request, token):
@@ -528,7 +524,6 @@ reviewer_templates = feedback_templates
 reviewer_template_detail = feedback_template_detail
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class ReviewRequestViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = ReviewRequestSerializer

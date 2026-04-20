@@ -4,8 +4,6 @@ from datetime import timedelta
 from django.shortcuts import get_object_or_404
 from django.db import IntegrityError
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -59,7 +57,6 @@ def can_modify_session(user, session):
     return can_edit_session(user, session)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class SessionViewSet(SessionMediaActionsMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
