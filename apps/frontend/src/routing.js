@@ -33,3 +33,24 @@ export const routePath = ({ view, sessionId, token, claim, seriesName, date }) =
   if (view === 'calendar') return date ? `/?date=${encodeURIComponent(date)}` : '/'
   return '/'
 }
+
+export const resolveUploadReturnRouteDraft = (draft = null, routeDate = '') => {
+  const explicit = draft?.returnRoute
+  if (explicit?.view) {
+    return {
+      view: explicit.view,
+      sessionId: explicit.sessionId ?? null,
+      token: explicit.token || '',
+      claim: explicit.claim || '',
+      seriesName: explicit.seriesName || '',
+      date: explicit.date || '',
+    }
+  }
+
+  const practiceSeries = String(draft?.practiceSeries || '').trim()
+  if (practiceSeries) {
+    return { view: 'series', sessionId: null, seriesName: practiceSeries }
+  }
+
+  return { view: 'calendar', sessionId: null, date: routeDate || '' }
+}

@@ -2,13 +2,13 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { reportClientError } from './utils'
 import { AuthProvider, useAuth } from './auth'
 import { fetchPaginatedWithToken } from './pagination'
+import { parseRoute, resolveUploadReturnRouteDraft, routePath } from './routing'
 import { ToastProvider, useToast } from './components/Toast'
 import NotificationsBell from './components/NotificationsBell'
 import { ConfirmProvider, useConfirm } from './components/ConfirmDialog'
 import AuthForm from './components/AuthForm'
 const ReviewPage = React.lazy(() => import('./components/ReviewPage'))
 import SessionUpload from './components/SessionUpload'
-import { parseRoute, routePath } from './routing'
 // Inline header create buttons to avoid any chance of circular init
 const SessionDetail = React.lazy(() => import('./components/SessionDetail'))
 const SeriesView = React.lazy(() => import('./components/SeriesView'))
@@ -124,26 +124,7 @@ function AppContent() {
     date: routeDate,
   }), [reviewClaim, reviewToken, routeDate, routeSessionId, routeSeriesName, view])
 
-  const resolveUploadReturnRoute = useCallback((draft = null) => {
-    const explicit = draft?.returnRoute
-    if (explicit?.view) {
-      return {
-        view: explicit.view,
-        sessionId: explicit.sessionId ?? null,
-        token: explicit.token || '',
-        claim: explicit.claim || '',
-        seriesName: explicit.seriesName || '',
-        date: explicit.date || '',
-      }
-    }
-
-    const practiceSeries = String(draft?.practiceSeries || '').trim()
-    if (practiceSeries) {
-      return { view: 'series', sessionId: null, seriesName: practiceSeries }
-    }
-
-    return { view: 'calendar', sessionId: null, date: routeDate || '' }
-  }, [routeDate])
+  const resolveUploadReturnRoute = useCallback((draft = null) => resolveUploadReturnRouteDraft(draft, routeDate), [routeDate])
 
   useEffect(() => {
     currentPathRef.current = routePath({ view, sessionId: routeSessionId, token: reviewToken, claim: reviewClaim, seriesName: routeSeriesName, date: routeDate })
