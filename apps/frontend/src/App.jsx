@@ -8,6 +8,7 @@ import {
   rememberPostLoginRedirect,
 } from './authRedirect'
 import { monthCacheKeyForDate, sessionsMonthQueryPath } from './calendar'
+import { useOfflineStatus } from './hooks/useOfflineStatus'
 import { fetchPaginatedWithToken } from './pagination'
 import { parseRoute, resolveUploadReturnRouteDraft, routePath } from './routing'
 import { ToastProvider, useToast } from './components/Toast'
@@ -59,7 +60,7 @@ function AppContent() {
   const uploadGuardRef = useRef({ active: false, abort: null })
   const currentPathRef = useRef(routePath(initialRoute))
   const autoQuickRecordCheckedRef = useRef(false)
-  const [offline, setOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false)
+  const offline = useOfflineStatus()
 
   const fetchPaginated = useCallback((path) => fetchPaginatedWithToken(path, token), [token])
 
@@ -135,18 +136,6 @@ function AppContent() {
   useEffect(() => {
     currentPathRef.current = routePath({ view, sessionId: routeSessionId, token: reviewToken, claim: reviewClaim, seriesName: routeSeriesName, date: routeDate })
   }, [reviewClaim, reviewToken, routeDate, routeSessionId, routeSeriesName, view])
-
-  useEffect(() => {
-    const updateOnline = () => setOffline(typeof navigator !== 'undefined' ? !navigator.onLine : false)
-    try {
-      window.addEventListener('online', updateOnline)
-      window.addEventListener('offline', updateOnline)
-      updateOnline()
-    } catch {}
-    return () => {
-      try { window.removeEventListener('online', updateOnline); window.removeEventListener('offline', updateOnline) } catch {}
-    }
-  }, [])
 
   useEffect(() => {
     const onAuthExpired = () => {
