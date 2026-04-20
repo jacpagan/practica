@@ -9,6 +9,7 @@ import { useOfflineStatus } from './hooks/useOfflineStatus'
 import { usePaginatedFetch } from './hooks/usePaginatedFetch'
 import { usePopStateUploadGuard } from './hooks/usePopStateUploadGuard'
 import { usePostLoginRedirect } from './hooks/usePostLoginRedirect'
+import { useReviewerWorkspacePolling } from './hooks/useReviewerWorkspacePolling'
 import { useSessionUpdatedListener } from './hooks/useSessionUpdatedListener'
 import { useThreadRenamedListener } from './hooks/useThreadRenamedListener'
 import { parseRoute, resolveUploadReturnRouteDraft, routePath } from './routing'
@@ -238,32 +239,11 @@ function AppContent() {
     }
   }, [fetchPaginated, token])
 
-  // Poll the reviewer pending count periodically; pause when tab is hidden
-  useEffect(() => {
-    if (!token) return () => {}
-    const start = () => {
-      if (reviewerPollRef.current) { try { clearInterval(reviewerPollRef.current) } catch {} }
-      loadReviewerWorkspaceAvailability()
-      reviewerPollRef.current = setInterval(() => {
-        if (typeof document !== 'undefined' && document.hidden) return
-        loadReviewerWorkspaceAvailability()
-      }, 45000)
-    }
-    const stop = () => {
-      if (reviewerPollRef.current) { try { clearInterval(reviewerPollRef.current) } catch {}; reviewerPollRef.current = null }
-    }
-    const onVisibility = () => {
-      if (typeof document !== 'undefined' && document.hidden) stop()
-      else start()
-    }
-    if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', onVisibility)
-      onVisibility()
-      return () => { document.removeEventListener('visibilitychange', onVisibility); stop() }
-    }
-    start()
-    return () => stop()
-  }, [loadReviewerWorkspaceAvailability, token])
+  useReviewerWorkspacePolling({
+    loadReviewerWorkspaceAvailability,
+    reviewerPollRef,
+    token,
+  })
 
   const openSessionById = useCallback(async (sessionId, { updateUrl = true } = {}) => {
     if (!token) return
