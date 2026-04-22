@@ -224,7 +224,7 @@ class FeedbackRequestApiTests(APITestCase):
         self._create_review_request()
 
         self._auth(self.student)
-        response = self.client.get('/api/connections/?role=student')
+        response = self.client.get('/api/connections/?role=creator')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)

@@ -37,7 +37,7 @@ def filter_review_requests_for_role(qs, *, user, role='', session_id='', status_
 
     if normalized_role == 'reviewer':
         qs = qs.filter(reviewer=user)
-    elif normalized_role in {'student', 'owner'}:
+    elif normalized_role in {'student', 'owner', 'creator'}:
         qs = qs.filter(student=user)
 
     if normalized_status_filter:
