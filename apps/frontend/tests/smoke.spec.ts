@@ -287,6 +287,166 @@ test('Record route still opens preview when microphone fails', async ({ browser 
   await context.close()
 })
 
+test('Record route keeps Screen + Cam preview when screen audio is unavailable', async ({ browser }) => {
+  const context = await browser.newContext()
+  const page = await context.newPage()
+
+  await context.addInitScript(() => {
+    window.localStorage.setItem('token', 'smoke-token')
+
+    const originalFetch = window.fetch.bind(window)
+    window.fetch = async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input)
+
+      if (url.includes('/api/auth/me/')) {
+        return new Response(JSON.stringify({ id: 1, username: 'smoke_member', display_name: 'Smoke Member' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (url.includes('/api/review-requests/')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      return originalFetch(input, init)
+    }
+
+    const mediaDevices = navigator.mediaDevices
+    if (!mediaDevices) return
+
+    mediaDevices.enumerateDevices = async () => ([
+      {
+        deviceId: 'video-device-1',
+        kind: 'videoinput',
+        label: 'Built-in Camera',
+        groupId: 'group-video',
+        toJSON() { return this },
+      },
+      {
+        deviceId: 'audio-device-1',
+        kind: 'audioinput',
+        label: 'Built-in Microphone',
+        groupId: 'group-audio',
+        toJSON() { return this },
+      },
+    ])
+
+    mediaDevices.getUserMedia = async () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 640
+      canvas.height = 360
+      const context2d = canvas.getContext('2d')
+      context2d.fillStyle = '#111827'
+      context2d.fillRect(0, 0, canvas.width, canvas.height)
+      return canvas.captureStream(1)
+    }
+
+    mediaDevices.getDisplayMedia = async (constraints) => {
+      const wantsAudio = Boolean(constraints?.audio)
+      if (wantsAudio) {
+        const error = new Error('Timed out waiting for screen capture')
+        error.name = 'AbortError'
+        throw error
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = 1280
+      canvas.height = 720
+      const context2d = canvas.getContext('2d')
+      context2d.fillStyle = '#1f2937'
+      context2d.fillRect(0, 0, canvas.width, canvas.height)
+      return canvas.captureStream(1)
+    }
+  })
+
+  await page.goto('/record')
+  await expect(page.getByText('Camera ready')).toBeVisible({ timeout: 10000 })
+  await page.getByRole('button', { name: 'Add screen (optional)' }).click()
+
+  await expect(page.getByRole('button', { name: 'Back to single-cam' })).toBeVisible({ timeout: 10000 })
+  await expect(page.getByText('Screen audio was unavailable, so this recording will use your mic audio only.')).toBeVisible()
+
+  await context.close()
+})
+
+test('Record route shows timeout guidance when Screen + Cam cannot start', async ({ browser }) => {
+  const context = await browser.newContext()
+  const page = await context.newPage()
+
+  await context.addInitScript(() => {
+    window.localStorage.setItem('token', 'smoke-token')
+
+    const originalFetch = window.fetch.bind(window)
+    window.fetch = async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input)
+
+      if (url.includes('/api/auth/me/')) {
+        return new Response(JSON.stringify({ id: 1, username: 'smoke_member', display_name: 'Smoke Member' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (url.includes('/api/review-requests/')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      return originalFetch(input, init)
+    }
+
+    const mediaDevices = navigator.mediaDevices
+    if (!mediaDevices) return
+
+    mediaDevices.enumerateDevices = async () => ([
+      {
+        deviceId: 'video-device-1',
+        kind: 'videoinput',
+        label: 'Built-in Camera',
+        groupId: 'group-video',
+        toJSON() { return this },
+      },
+      {
+        deviceId: 'audio-device-1',
+        kind: 'audioinput',
+        label: 'Built-in Microphone',
+        groupId: 'group-audio',
+        toJSON() { return this },
+      },
+    ])
+
+    mediaDevices.getUserMedia = async () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 640
+      canvas.height = 360
+      const context2d = canvas.getContext('2d')
+      context2d.fillStyle = '#111827'
+      context2d.fillRect(0, 0, canvas.width, canvas.height)
+      return canvas.captureStream(1)
+    }
+
+    mediaDevices.getDisplayMedia = async () => {
+      const error = new Error('Timed out waiting for screen capture')
+      error.name = 'AbortError'
+      throw error
+    }
+  })
+
+  await page.goto('/record')
+  await expect(page.getByText('Camera ready')).toBeVisible({ timeout: 10000 })
+  await page.getByRole('button', { name: 'Add screen (optional)' }).click()
+
+  await expect(page.getByText('Screen capture took too long to start. Try again, or switch to Single-cam first and then add screen.')).toBeVisible({ timeout: 10000 })
+  await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible()
+
+  await context.close()
+})
+
 test('Upload retries once after network interruption and reuses idempotency key', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('token', 'smoke-token')

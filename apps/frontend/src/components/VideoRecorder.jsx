@@ -89,6 +89,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   const mixedStreamRef = useRef(null)
   const camStreamRef = useRef(null)
   const displayStreamRef = useRef(null)
+  const displayAudioStreamRef = useRef(null)
   const compositeCanvasRef = useRef(null)
   const compositeRafRef = useRef(null)
   const recorderRef = useRef(null)
@@ -204,10 +205,12 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     mixedStreamRef.current?.getTracks().forEach(t => t.stop())
     camStreamRef.current?.getTracks().forEach(t => t.stop())
     displayStreamRef.current?.getTracks().forEach(t => t.stop())
+    displayAudioStreamRef.current?.getTracks().forEach(t => t.stop())
     streamRef.current = null
     mixedStreamRef.current = null
     camStreamRef.current = null
     displayStreamRef.current = null
+    displayAudioStreamRef.current = null
     compositeCanvasRef.current = null
   }, [])
 
@@ -355,6 +358,30 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
 
     return Promise.race([
       navigator.mediaDevices.getUserMedia(constraints),
+      timeoutPromise,
+    ]).finally(() => {
+      if (timeoutId) window.clearTimeout(timeoutId)
+    })
+  }, [])
+
+  const getDisplayMediaWithTimeout = useCallback((constraints, timeoutMs = 10000) => {
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      const unsupportedError = new Error('Screen capture not supported in this browser')
+      unsupportedError.name = 'NotSupportedError'
+      throw unsupportedError
+    }
+
+    let timeoutId = null
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = window.setTimeout(() => {
+        const timeoutError = new Error('Timed out waiting for screen capture')
+        timeoutError.name = 'AbortError'
+        reject(timeoutError)
+      }, timeoutMs)
+    })
+
+    return Promise.race([
+      navigator.mediaDevices.getDisplayMedia(constraints),
       timeoutPromise,
     ]).finally(() => {
       if (timeoutId) window.clearTimeout(timeoutId)
@@ -666,11 +693,35 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     try {
       if (!navigator.mediaDevices?.getDisplayMedia) throw new Error('Screen capture not supported in this browser')
       setWarning(null)
-      const display = await navigator.mediaDevices.getDisplayMedia({
+      const displayVideo = await getDisplayMediaWithTimeout({
         video: { frameRate: { ideal: 30 } },
-        audio: true,
-      })
-      displayStreamRef.current = display
+        audio: false,
+      }, 10000)
+
+      let displayAudio = null
+      let displayAudioWarning = ''
+      try {
+        displayAudio = await getDisplayMediaWithTimeout({
+          video: true,
+          audio: true,
+        }, 7000)
+      } catch (audioError) {
+        const isBlockingError = ['NotAllowedError', 'NotFoundError', 'AbortError'].includes(String(audioError?.name || ''))
+        if (isBlockingError) {
+          displayAudioWarning = 'Screen audio was unavailable, so this recording will use your mic audio only.'
+        }
+      }
+
+      displayStreamRef.current = displayVideo
+      if (displayAudio) {
+        const sourceAudioTracks = displayAudio.getAudioTracks()
+        if (sourceAudioTracks.length) {
+          displayAudioStreamRef.current = new MediaStream([sourceAudioTracks[0].clone()])
+        } else if (!displayAudioWarning) {
+          displayAudioWarning = 'Screen audio was unavailable, so this recording will use your mic audio only.'
+        }
+        displayAudio.getTracks().forEach((track) => track.stop())
+      }
 
       const cam = await openUserMediaWithFallback({ size: 'pip' })
       camStreamRef.current = cam
@@ -679,7 +730,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       const screenVideo = document.createElement('video')
       screenVideo.muted = true
       screenVideo.playsInline = true
-      screenVideo.srcObject = display
+      screenVideo.srcObject = displayVideo
       await screenVideo.play().catch(() => {})
 
       const camVideo = document.createElement('video')
@@ -689,7 +740,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       await camVideo.play().catch(() => {})
 
       const canvas = document.createElement('canvas')
-      const screenTrack = display.getVideoTracks()[0]
+      const screenTrack = displayVideo.getVideoTracks()[0]
       const screenSettings = screenTrack?.getSettings?.() || {}
       const width = Number(screenSettings.width || 1280)
       const height = Number(screenSettings.height || 720)
@@ -744,7 +795,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       draw()
 
       const compositeVideoStream = canvas.captureStream(30)
-      const audioMix = await ensureAudioMixForStreams([cam, display])
+      const audioMix = await ensureAudioMixForStreams([cam, displayVideo, displayAudioStreamRef.current])
 
       const finalTracks = []
       const cvt = compositeVideoStream.getVideoTracks()[0]
@@ -755,12 +806,13 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
 
       mixedStreamRef.current = finalStream
       streamRef.current = finalStream
+      setWarning(displayAudioWarning || null)
       setMode('screen_cam')
       setState(STATES.PREVIEWING)
       requestAnimationFrame(() => attachStream())
 
       // If share is stopped via browser UI
-      display.getVideoTracks().forEach((t) => {
+      displayVideo.getVideoTracks().forEach((t) => {
         t.onended = () => {
           stopRecording()
           cleanup()
@@ -771,11 +823,15 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     } catch (e) {
       const message = e?.name === 'NotAllowedError'
         ? 'Screen sharing was blocked. Allow screen access to use Screen + Cam, or use single-cam mode.'
+        : e?.name === 'AbortError'
+          ? 'Screen capture took too long to start. Try again, or switch to Single-cam first and then add screen.'
         : ((e?.name === 'NotFoundError' || e?.name === 'OverconstrainedError') && selectedVideoInputId)
             ? 'Selected camera is unavailable. Reconnect it or choose another camera.'
         : ((e?.name === 'NotFoundError' || e?.name === 'OverconstrainedError') && selectedAudioInputId)
             ? 'Selected microphone is unavailable. Reconnect your interface or choose another input.'
             : (e?.message || 'Could not start screen capture.')
+      stopStream()
+      closeAudioContext()
       setError(message)
       setState(STATES.IDLE)
     }
