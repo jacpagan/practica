@@ -14,6 +14,7 @@ The product is strongest when it helps someone:
 
 ## Product Docs
 
+- `docs/role-path-story-map.md`: canonical implemented map of user roles, route paths, stories, and end-to-end data flow
 - `docs/practica-v2-prd.md`: strategic source of truth for Practica v2
 - `docs/platform-effects-mvp-playbook.md`: shipped v1 baseline
 - `docs/flow-audit.md`: current flow audit and product gaps
