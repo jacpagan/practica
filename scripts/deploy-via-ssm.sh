@@ -61,9 +61,18 @@ fi
 git fetch --all --prune
 REF="__GIT_REF__"
 git clean -fd
-git checkout -f "$REF" || git checkout -f -B "$REF" "origin/$REF"
+if git show-ref --verify --quiet "refs/remotes/origin/$REF"; then
+  # Branch refs (for example, main): force local branch to exactly match origin.
+  git checkout -f -B "$REF" "origin/$REF"
+  git reset --hard "origin/$REF"
+elif git rev-parse --verify --quiet "$REF^{commit}" >/dev/null 2>&1; then
+  # Commit refs (for example, workflow-dispatch SHA): detach at exact commit.
+  git checkout -f --detach "$REF"
+else
+  echo "Requested deploy ref not found: $REF" >&2
+  exit 1
+fi
 git clean -fd
-git pull --ff-only origin "$REF" || true
 export DEPLOYED_GIT_SHA=$(git rev-parse HEAD 2>/dev/null || echo '')
 
 printf '%s' "__ENV_B64__" | base64 -d > .env.production
