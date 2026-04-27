@@ -1,5 +1,5 @@
 from datetime import timedelta
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -8,7 +8,7 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
-from videos.models import Profile, ReviewLink, ReviewRequest, Session, VideoFeedback
+from videos.models import ProductEventLog, Profile, ReviewLink, ReviewRequest, Session, VideoFeedback
 
 
 class ReviewFeedbackApiTests(APITestCase):
@@ -320,7 +320,17 @@ class ReviewFeedbackApiTests(APITestCase):
         )
         self._auth(self.owner)
 
-        with patch('django.core.files.storage.FileSystemStorage.url', side_effect=RuntimeError('storage unavailable')):
+        storage_failure = Mock()
+        storage_failure.exists.return_value = False
+        storage_failure.url.side_effect = RuntimeError('storage unavailable')
+        feedback_storage_failure = Mock()
+        feedback_storage_failure.exists.return_value = False
+        feedback_storage_failure.url.side_effect = RuntimeError('storage unavailable')
+
+        with patch('videos.serializers.default_storage', storage_failure), patch(
+            'videos.services.feedback_video_processing.default_storage',
+            feedback_storage_failure,
+        ):
             response = self.client.get(f'/api/sessions/{self.session.id}/')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -340,6 +350,10 @@ class ReviewFeedbackApiTests(APITestCase):
         self.assertEqual(first.data['token'], second.data['token'])
         self.assertIn('/r/', first.data['url'])
 
+        event_names = set(ProductEventLog.objects.values_list('event_name', flat=True))
+        self.assertIn('session_share_created', event_names)
+        self.assertIn('session_share_reused', event_names)
+
     def test_owner_can_revoke_private_share_link_via_delete_share_route(self):
         self._auth(self.owner)
 
@@ -349,6 +363,9 @@ class ReviewFeedbackApiTests(APITestCase):
         self.assertEqual(response.data, {'ok': True})
         self.link.refresh_from_db()
         self.assertFalse(self.link.is_active)
+
+        event_names = set(ProductEventLog.objects.values_list('event_name', flat=True))
+        self.assertIn('session_share_revoked', event_names)
 
     def test_revoked_private_link_returns_forbidden_with_specific_code(self):
         self.link.is_active = False

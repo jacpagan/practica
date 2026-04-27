@@ -828,6 +828,146 @@ test('Ask for feedback starts with no reviewer selected on a fresh request', asy
   await expect(page.getByRole('button', { name: 'Copy invite link' })).toBeVisible()
 })
 
+test('Session detail auto-creates a reviewer invite when no reviewer is selected', async ({ page }) => {
+  const inviteBodies = []
+
+  await page.addInitScript(() => {
+    window.localStorage.setItem('token', 'smoke-token')
+    const clipboard = {
+      writeText: async (text) => {
+        window.__copiedInviteUrl = text
+        return undefined
+      },
+    }
+    try {
+      Object.defineProperty(navigator, 'clipboard', {
+        value: clipboard,
+        configurable: true,
+      })
+    } catch {
+      try {
+        navigator.clipboard = clipboard
+      } catch {}
+    }
+  })
+
+  const sessionPayload = {
+    id: 126,
+    title: 'Invite session',
+    practice_series: '',
+    description: '',
+    video_file: '',
+    duration_seconds: null,
+    recorded_at: '2099-01-01T00:00:00Z',
+    created_at: '2099-01-01T00:00:00Z',
+    updated_at: '2099-01-01T00:00:00Z',
+    processing_status: 'ready',
+    processing_job_id: '',
+    processing_error: '',
+    tag_names: [],
+    assets: [],
+    chapters: [],
+    video_feedback: [],
+    active_review_link: null,
+    chapter_count: 0,
+    video_feedback_count: 0,
+    owner: { id: 1, display_name: 'Smoke Member' },
+    can_edit: true,
+  }
+
+  await page.route('**/api/auth/me/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 1, username: 'smoke_member', display_name: 'Smoke Member' }),
+    })
+  })
+
+  await page.route('**/api/sessions/126/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(sessionPayload),
+    })
+  })
+
+  await page.route('**/api/review-requests/?session_id=126&role=student', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    })
+  })
+
+  await page.route('**/api/review-requests/?role=owner', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    })
+  })
+
+  await page.route('**/api/connections/?role=student', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    })
+  })
+
+  await page.route('**/api/reviewer-invites/**', async (route) => {
+    const method = route.request().method()
+    const url = route.request().url()
+    if (method === 'GET' && url.includes('/api/reviewer-invites/?session_id=126')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      })
+      return
+    }
+
+    if (method !== 'POST') {
+      await route.continue()
+      return
+    }
+
+    const body = route.request().postDataJSON()
+    inviteBodies.push(body)
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 999,
+        status: 'pending',
+        intent: body.intent || 'lightweight_review',
+        label: body.label || '',
+        claim_code: 'CLAIM123',
+        invite_url: 'https://practica.jpagan.com/r/INVITE123?claim=CLAIM123',
+        review_link: {
+          token: 'INVITE123',
+          expires_at: '2099-01-08T00:00:00Z',
+          is_active: true,
+          allow_video_feedback: true,
+          url: 'https://practica.jpagan.com/r/INVITE123',
+        },
+      }),
+    })
+  })
+
+  await page.goto('/sessions/126')
+  await page.getByRole('button', { name: 'Ask for feedback' }).click()
+
+  await expect(page.getByText('No reviewer invites yet.')).toBeVisible()
+  expect(inviteBodies).toHaveLength(1)
+  expect(inviteBodies[0]).toMatchObject({
+    session_id: 126,
+    intent: 'roster_join',
+    label: 'Review Invite session',
+  })
+  await expect.poll(async () => page.evaluate(() => window.__copiedInviteUrl || '')).toBe('https://practica.jpagan.com/r/INVITE123?claim=CLAIM123')
+})
+
 test('Calendar day view shows review state per video', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('token', 'smoke-token')

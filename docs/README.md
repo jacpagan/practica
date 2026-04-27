@@ -20,6 +20,7 @@ Practica is a private video practice mirror where learners lead their own progre
 
 - `docs/local-dev-playbook.md`: cheapest safe local workflow for Django + Vite, tmux layout, and small commit loop
 - `docs/release-checklist.md`: step-by-step checklist for local testing, push-to-main, deploy, and production verification
+- `docs/production-runbook.md`: operator-focused production checks, verification, and recovery steps
 
 ## Product Framing
 

@@ -1,8 +1,8 @@
 # Practica Technical Product Requirements Document
 
-**Date:** April 6, 2026  
+**Date:** April 27, 2026
 **Status:** Current-state technical PRD  
-**Version:** Reflects the app as implemented as of commit `dc3984c` (update this line when the snapshot meaningfully drifts).
+**Version:** Reflects the app as implemented as of commit `1c2985b` (update this line when the snapshot meaningfully drifts).
 
 ## 1. Purpose
 
@@ -618,7 +618,7 @@ Key implementation files for this current-state PRD:
 
 ## 17. Bottom Line
 
-As of April 6, 2026, Practica is a working private video practice application with a credible learner-owned archive, a playback-processing pipeline, authenticated private review threads, and a structured reviewer workflow layer.
+As of April 27, 2026, Practica is a working private video practice application with a credible learner-owned archive, a playback-processing pipeline, authenticated private review threads, and a structured reviewer workflow layer.
 
 Its strongest implemented loop is:
 

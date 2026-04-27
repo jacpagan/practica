@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
-from videos.models import FeedbackTemplate, Profile, ReviewRequest, ReviewerRosterMembership, Session, SessionLastSeen, VideoFeedback
+from videos.models import FeedbackTemplate, ProductEventLog, Profile, ReviewRequest, ReviewerRosterMembership, Session, SessionLastSeen, VideoFeedback
 
 
 class FeedbackRequestApiTests(APITestCase):
@@ -168,6 +168,11 @@ class FeedbackRequestApiTests(APITestCase):
         self.assertEqual(feedback.timestamp_seconds, 42)
         self.assertEqual(feedback.review_request, review_request)
 
+        event_names = set(ProductEventLog.objects.values_list('event_name', flat=True))
+        self.assertIn('review_request_created', event_names)
+        self.assertIn('review_request_opened', event_names)
+        self.assertIn('review_request_responded', event_names)
+
     def test_owner_can_mark_feedback_request_viewed(self):
         review_request = self._create_review_request()
         review_request.status = ReviewRequest.STATUS_RESPONDED
@@ -192,6 +197,56 @@ class FeedbackRequestApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         review_request.refresh_from_db()
         self.assertEqual(review_request.status, ReviewRequest.STATUS_REQUESTED)
+
+    def test_owner_can_close_or_revoke_feedback_request(self):
+        review_request = self._create_review_request()
+        review_request.status = ReviewRequest.STATUS_RESPONDED
+        review_request.responded_at = timezone.now()
+        review_request.save(update_fields=['status', 'responded_at', 'updated_at'])
+
+        self._auth(self.student)
+        close_response = self.client.patch(
+            f'/api/review-requests/{review_request.id}/',
+            {
+                'status': 'closed',
+                'status_note': 'Wrapped up this loop.',
+            },
+            format='json',
+        )
+
+        self.assertEqual(close_response.status_code, status.HTTP_200_OK)
+        review_request.refresh_from_db()
+        self.assertEqual(review_request.status, ReviewRequest.STATUS_CLOSED)
+        self.assertIsNotNone(review_request.closed_at)
+        self.assertIn('wrapped up', review_request.status_note.lower())
+
+        review_request.status = ReviewRequest.STATUS_REQUESTED
+        review_request.closed_at = None
+        review_request.status_note = ''
+        review_request.save(update_fields=['status', 'closed_at', 'status_note', 'updated_at'])
+
+        revoke_response = self.client.patch(
+            f'/api/review-requests/{review_request.id}/',
+            {
+                'status': 'revoked',
+                'status_reason': 'spam',
+                'status_note': 'Turning off this thread.',
+            },
+            format='json',
+        )
+
+        self.assertEqual(revoke_response.status_code, status.HTTP_200_OK)
+        review_request.refresh_from_db()
+        self.assertEqual(review_request.status, ReviewRequest.STATUS_REVOKED)
+        self.assertIsNotNone(review_request.closed_at)
+        self.assertEqual(review_request.status_reason, ReviewRequest.REASON_SPAM)
+        self.assertIn('turning off', review_request.status_note.lower())
+        review_request.review_link.refresh_from_db()
+        self.assertFalse(review_request.review_link.is_active)
+
+        event_names = set(ProductEventLog.objects.values_list('event_name', flat=True))
+        self.assertIn('review_request_closed', event_names)
+        self.assertIn('review_request_revoked', event_names)
 
     def test_owner_opening_feedback_request_link_auto_marks_viewed_after_response(self):
         review_request = self._create_review_request()
@@ -335,6 +390,38 @@ class FeedbackRequestApiTests(APITestCase):
         self.assertIn('cleaner full take', review_request.status_note)
         self.assertEqual(response.data['events'][0]['to_status'], ReviewRequest.STATUS_NEEDS_RESUBMISSION)
         self.assertEqual(response.data['events'][0]['reason_code'], ReviewRequest.REASON_NEEDS_NEW_TAKE)
+
+    def test_reviewer_can_decline_or_flag_request_with_reason_defaults(self):
+        decline_request = self._create_review_request()
+        flag_request = self._create_review_request()
+
+        self._auth(self.reviewer)
+        decline_response = self.client.patch(
+            f'/api/review-requests/{decline_request.id}/',
+            {
+                'status': 'declined_unrelated',
+                'status_note': 'This looks like a different project.',
+            },
+            format='json',
+        )
+        self.assertEqual(decline_response.status_code, status.HTTP_200_OK)
+        decline_request.refresh_from_db()
+        self.assertEqual(decline_request.status, ReviewRequest.STATUS_DECLINED_UNRELATED)
+        self.assertEqual(decline_request.status_reason, ReviewRequest.REASON_UNRELATED_VIDEO)
+
+        flag_response = self.client.patch(
+            f'/api/review-requests/{flag_request.id}/',
+            {
+                'status': 'flagged',
+                'status_note': 'Unsafe content.',
+            },
+            format='json',
+        )
+        self.assertEqual(flag_response.status_code, status.HTTP_200_OK)
+        flag_request.refresh_from_db()
+        self.assertEqual(flag_request.status, ReviewRequest.STATUS_FLAGGED)
+        self.assertEqual(flag_request.status_reason, ReviewRequest.REASON_UNSAFE_CONTENT)
+        self.assertIsNotNone(flag_request.flagged_at)
 
     def test_flagged_request_is_hidden_from_reviewer_inbox(self):
         review_request = self._create_review_request()

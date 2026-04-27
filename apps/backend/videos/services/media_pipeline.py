@@ -31,6 +31,21 @@ def media_pipeline_enabled():
     )
 
 
+def configured_video_processing_mode():
+    mode = str(getattr(settings, 'VIDEO_PROCESSING_MODE', 'auto') or 'auto').strip().lower()
+    if mode not in {'auto', 'mediaconvert', 'local_ffmpeg'}:
+        return 'unconfigured'
+    if mode == 'mediaconvert':
+        return 'mediaconvert' if media_pipeline_enabled() else 'unconfigured'
+    if mode == 'local_ffmpeg':
+        return 'local_ffmpeg' if local_transcode_enabled() else 'unconfigured'
+    if media_pipeline_enabled():
+        return 'mediaconvert'
+    if local_transcode_enabled():
+        return 'local_ffmpeg'
+    return 'unconfigured'
+
+
 def _instance_role_credentials():
     try:
         token_request = Request(

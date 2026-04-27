@@ -2,6 +2,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.db import IntegrityError
 from django.test import override_settings
 from django.utils import timezone
 from rest_framework import status
@@ -141,6 +142,40 @@ class MultipartUploadApiTests(APITestCase):
             1,
         )
         self.assertEqual(fake_s3.create_calls, 1)
+
+    def test_multipart_upload_has_db_level_idempotency_constraint(self):
+        MultipartSessionUpload.objects.create(
+            user=self.member,
+            status=MultipartSessionUpload.STATUS_INITIATED,
+            title='First upload',
+            description='',
+            tags_csv='',
+            duration_seconds=None,
+            original_filename='first.mp4',
+            content_type='video/mp4',
+            client_upload_id='multipart-db-constraint-123',
+            size_bytes=20 * 1024 * 1024,
+            s3_key='sessions/member/first.mp4',
+            s3_upload_id='upload-first-1',
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        with self.assertRaises(IntegrityError):
+            MultipartSessionUpload.objects.create(
+                user=self.member,
+                status=MultipartSessionUpload.STATUS_INITIATED,
+                title='Second upload',
+                description='',
+                tags_csv='',
+                duration_seconds=None,
+                original_filename='second.mp4',
+                content_type='video/mp4',
+                client_upload_id='multipart-db-constraint-123',
+                size_bytes=20 * 1024 * 1024,
+                s3_key='sessions/member/second.mp4',
+                s3_upload_id='upload-second-1',
+                expires_at=timezone.now() + timedelta(hours=1),
+            )
 
     def test_multipart_initiate_returns_completed_session_for_existing_client_upload_id(self):
         session = Session.objects.create(

@@ -265,8 +265,6 @@ class MultipartSessionUpload(models.Model):
                 condition=~Q(client_upload_id=''),
                 name='multipart_upload_user_client_upload_uniq',
             ),
-        ]
-        constraints = [
             models.UniqueConstraint(fields=['s3_key', 's3_upload_id'], name='multipart_upload_s3_key_upload_id_uniq'),
         ]
 

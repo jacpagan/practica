@@ -1,6 +1,18 @@
+import logging
+
+from .models import ProductEventLog
+
 PRODUCT_EVENT_SOURCE = 'ProductEvent'
+
+logger = logging.getLogger(__name__)
+
+
 PRODUCT_EVENT_EXTRA_WHITELIST = {
     'action',
+    'code',
+    'file_size_bytes',
+    'phase',
+    'processing_mode',
     'session_id',
     'review_request_id',
     'invite_id',
@@ -18,6 +30,7 @@ PRODUCT_EVENT_EXTRA_WHITELIST = {
     'filter',
     'sort',
     'status',
+    'upload_mode',
 }
 
 
@@ -61,19 +74,42 @@ def normalized_product_event_extra(extra):
     return normalized
 
 
-def log_product_event(logger, request, event_name='', extra=None, path_override=''):
-    request_id = request.META.get('HTTP_X_REQUEST_ID', '')
+def record_product_event(*, event_name='', path='', user=None, is_authenticated=None, client_trace_id='', request_id='n/a', extra=None, logger_obj=None):
     raw_extra = extra if isinstance(extra, dict) else {}
     normalized_extra = normalized_product_event_extra(raw_extra)
-    client_trace_id = str(raw_extra.get('client_trace_id', '')).strip()[:128]
-    safe_path = sanitized_event_path(path_override or request.path)
     safe_name = str(event_name or '').strip()[:80] or 'unknown'
-    logger.info(
+    safe_path = sanitized_event_path(path)
+    normalized_is_authenticated = bool(is_authenticated if is_authenticated is not None else getattr(user, 'is_authenticated', False))
+    ProductEventLog.objects.create(
+        event_name=safe_name,
+        path=safe_path,
+        user=user if normalized_is_authenticated else None,
+        is_authenticated=normalized_is_authenticated,
+        client_trace_id=str(client_trace_id or '').strip()[:128],
+        extra_json=normalized_extra,
+    )
+    (logger_obj or logger).info(
         'ProductEvent event_name=%s path=%s is_authenticated=%s request_id=%s client_trace_id=%s extra=%s',
         safe_name,
         safe_path or 'unknown',
-        bool(getattr(request.user, 'is_authenticated', False)),
-        request_id,
-        client_trace_id or 'n/a',
+        normalized_is_authenticated,
+        str(request_id or '').strip()[:128] or 'n/a',
+        str(client_trace_id or '').strip()[:128] or 'n/a',
         normalized_extra,
+    )
+    return normalized_extra
+
+
+def log_product_event(logger, request, event_name='', extra=None, path_override=''):
+    request_id = request.META.get('HTTP_X_REQUEST_ID', '')
+    raw_extra = extra if isinstance(extra, dict) else {}
+    record_product_event(
+        event_name=event_name,
+        path=path_override or request.path,
+        user=request.user if getattr(request.user, 'is_authenticated', False) else None,
+        is_authenticated=bool(getattr(request.user, 'is_authenticated', False)),
+        client_trace_id=str(raw_extra.get('client_trace_id', '')).strip()[:128],
+        request_id=request_id,
+        extra=raw_extra,
+        logger_obj=logger,
     )
