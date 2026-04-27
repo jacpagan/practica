@@ -891,15 +891,12 @@ test('Session detail auto-creates a reviewer invite when no reviewer is selected
     })
   })
 
-  await page.route('**/api/review-requests/?session_id=126&role=student', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify([]),
-    })
-  })
+  await page.route('**/api/review-requests/**', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue()
+      return
+    }
 
-  await page.route('**/api/review-requests/?role=owner', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
