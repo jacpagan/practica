@@ -22,6 +22,7 @@ from .serializers import (
     SignupInviteCodeSerializer,
 )
 from .services.media_pipeline import (
+    configured_video_processing_mode,
     local_transcode_enabled,
     media_pipeline_enabled,
 )
@@ -141,14 +142,6 @@ def client_error_view(request):
 
     if source == PRODUCT_EVENT_SOURCE:
         log_product_event(logger, request, event_name=message, extra=extra, path_override=path)
-        ProductEventLog.objects.create(
-            event_name=message[:80] or 'unknown',
-            path=path,
-            user=request.user if getattr(request.user, 'is_authenticated', False) else None,
-            is_authenticated=bool(getattr(request.user, 'is_authenticated', False)),
-            client_trace_id=client_trace_id,
-            extra_json=extra,
-        )
         return Response({'ok': True}, status=status.HTTP_202_ACCEPTED)
 
     request_id = request.META.get('HTTP_X_REQUEST_ID', '')
@@ -262,6 +255,8 @@ def health_check(request):
         'timestamp': timezone.now().isoformat(),
         'services': {},
         'video_processing': {
+            'mode': getattr(settings, 'VIDEO_PROCESSING_MODE', 'auto'),
+            'configured_mode': configured_video_processing_mode(),
             'local_ffmpeg': local_transcode_enabled(),
             'mediaconvert': media_pipeline_enabled(),
         },

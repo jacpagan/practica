@@ -1,6 +1,6 @@
 # Practica Platform Engineering Charter
 
-**Date:** April 6, 2026  
+**Date:** April 27, 2026
 **Status:** Shared working charter  
 **Audience:** founder + platform engineer
 
@@ -152,7 +152,7 @@ Platform engineering should also avoid broad refactors that do not improve:
 
 ## 8. Current Platform Assessment
 
-As of April 6, 2026, Practica has a credible foundation but is not yet a fully mature platform.
+As of April 27, 2026, Practica has a credible foundation but is not yet a fully mature platform.
 
 ### 8.1 What is already strong
 

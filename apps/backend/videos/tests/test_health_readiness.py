@@ -22,6 +22,8 @@ class HealthReadinessTests(APITestCase):
         payload = response.json()
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload['video_processing']['mode'], 'auto')
+        self.assertEqual(payload['video_processing']['configured_mode'], 'local_ffmpeg')
         self.assertEqual(payload['video_processing']['local_ffmpeg'], True)
         self.assertEqual(payload['video_processing']['mediaconvert'], False)
         local_transcode_enabled.assert_called_once()

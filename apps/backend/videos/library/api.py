@@ -16,6 +16,7 @@ from videos.media.uploads import attach_tags_to_session, parse_tag_names
 from videos.models import Chapter, Exercise, ReviewLink, ReviewRequest, ReviewRequestEvent, Session, SessionAsset, SessionLastSeen, Tag, VideoFeedback
 from videos.serializers import ChapterSerializer, ReviewLinkSerializer, ReviewVideoFeedbackSerializer, SessionListSerializer, SessionSerializer
 from videos.services.feedback_video_processing import prepare_feedback_video_upload
+from videos.telemetry import record_product_event
 from videos.video_uploads import is_allowed_video_upload
 
 
@@ -55,6 +56,22 @@ def can_view_session(user, session):
 
 def can_modify_session(user, session):
     return can_edit_session(user, session)
+
+
+def _record_session_product_event(*, event_name, session, extra=None, path='/api/sessions/:id/'):
+    payload = {
+        'session_id': session.id,
+        'processing_status': session.processing_status,
+    }
+    if extra:
+        payload.update(extra)
+    record_product_event(
+        event_name=event_name,
+        path=path,
+        user=session.user,
+        is_authenticated=bool(session.user_id),
+        extra=payload,
+    )
 
 
 class SessionViewSet(SessionMediaActionsMixin, viewsets.ModelViewSet):
@@ -217,6 +234,12 @@ class SessionViewSet(SessionMediaActionsMixin, viewsets.ModelViewSet):
             if not can_edit_session(request.user, session):
                 raise PermissionDenied("You can only revoke your own sessions' links.")
             ReviewLink.objects.filter(session=session, is_active=True).update(is_active=False)
+            _record_session_product_event(
+                event_name='session_share_revoked',
+                session=session,
+                extra={'action': 'share_revoke'},
+                path='/api/sessions/:id/share/',
+            )
             return Response({'ok': True})
 
         if not can_edit_session(request.user, session):
@@ -228,6 +251,12 @@ class SessionViewSet(SessionMediaActionsMixin, viewsets.ModelViewSet):
             )
         existing_link = session.review_links.filter(is_active=True, expires_at__gt=timezone.now()).order_by('-created_at').first()
         if existing_link:
+            _record_session_product_event(
+                event_name='session_share_reused',
+                session=session,
+                extra={'action': 'share_create'},
+                path='/api/sessions/:id/share/',
+            )
             return Response(ReviewLinkSerializer(existing_link, context={'request': request}).data, status=status.HTTP_200_OK)
         link = ReviewLink.objects.create(
             session=session,
@@ -237,6 +266,12 @@ class SessionViewSet(SessionMediaActionsMixin, viewsets.ModelViewSet):
             is_active=True,
             allow_video_feedback=True,
         )
+        _record_session_product_event(
+            event_name='session_share_created',
+            session=session,
+            extra={'action': 'share_create'},
+            path='/api/sessions/:id/share/',
+        )
         return Response(ReviewLinkSerializer(link, context={'request': request}).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'], url_path='share/revoke')
@@ -245,6 +280,12 @@ class SessionViewSet(SessionMediaActionsMixin, viewsets.ModelViewSet):
         if not can_edit_session(request.user, session):
             raise PermissionDenied("You can only revoke your own sessions' links.")
         ReviewLink.objects.filter(session=session, is_active=True).update(is_active=False)
+        _record_session_product_event(
+            event_name='session_share_revoked',
+            session=session,
+            extra={'action': 'share_revoke'},
+            path='/api/sessions/:id/share/revoke/',
+        )
         return Response({'ok': True})
 
     @action(detail=True, methods=['post'], url_path='retry-processing')
@@ -255,6 +296,12 @@ class SessionViewSet(SessionMediaActionsMixin, viewsets.ModelViewSet):
         if session.processing_status not in {Session.STATUS_READY, Session.STATUS_FAILED}:
             return Response({'error': 'This take is already being processed.'}, status=status.HTTP_409_CONFLICT)
 
+        _record_session_product_event(
+            event_name='session_retry_processing_started',
+            session=session,
+            extra={'action': 'retry_processing'},
+            path='/api/sessions/:id/retry-processing/',
+        )
         session.assets.filter(asset_type=SessionAsset.TYPE_PROXY_MP4).delete()
         start_processing_pipeline(session)
         session.refresh_from_db()

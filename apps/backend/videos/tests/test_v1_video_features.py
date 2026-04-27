@@ -6,7 +6,7 @@ from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from videos.models import Profile, Session, SessionAsset, VideoFeedback
+from videos.models import ProductEventLog, Profile, Session, SessionAsset, VideoFeedback
 from videos.services.media_pipeline import _create_job_settings, sync_mediaconvert_session
 
 
@@ -257,6 +257,10 @@ class V1VideoFeaturesTests(APITestCase):
         self.assertIn('playback conversion is unavailable', created.processing_error.lower())
         enqueue_local_transcode.assert_called_once()
 
+        event_names = set(ProductEventLog.objects.values_list('event_name', flat=True))
+        self.assertIn('session_processing_started', event_names)
+        self.assertIn('session_processing_failed', event_names)
+
     @override_settings(
         AWS_STORAGE_BUCKET_NAME='',
         AWS_MEDIA_CONVERT_ROLE_ARN='',
@@ -331,7 +335,7 @@ class V1VideoFeaturesTests(APITestCase):
         )
         self.client.force_authenticate(user=self.owner)
 
-        with patch('django.core.files.storage.FileSystemStorage.url', side_effect=RuntimeError('storage unavailable')):
+        with patch('videos.serializers.default_storage.url', side_effect=RuntimeError('storage unavailable')):
             response = self.client.get(f'/api/sessions/{session.id}/')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -518,6 +522,61 @@ class V1VideoFeaturesTests(APITestCase):
         self.assertEqual(created.processing_status, Session.STATUS_PROCESSING)
         self.assertEqual(created.processing_job_id, 'mc-job-123')
         enqueue_session_processing.assert_called_once()
+
+    @override_settings(
+        VIDEO_PROCESSING_MODE='mediaconvert',
+        AWS_STORAGE_BUCKET_NAME='test-bucket',
+        AWS_MEDIA_CONVERT_ROLE_ARN='arn:aws:iam::123456789012:role/practica-mediaconvert',
+        AWS_MEDIA_CONVERT_ENDPOINT_URL='https://mediaconvert.us-east-1.amazonaws.com',
+    )
+    @patch('videos.media.services.enqueue_local_session_transcode')
+    @patch('videos.media.services.enqueue_session_processing', return_value=(False, 'MediaConvert enqueue failed', ''))
+    def test_session_create_with_explicit_mediaconvert_does_not_fall_back_to_local_ffmpeg(self, enqueue_session_processing, enqueue_local_transcode):
+        self.client.force_authenticate(user=self.owner)
+
+        res = self.client.post(
+            '/api/sessions/',
+            {
+                'title': 'MediaConvert only',
+                'description': 'managed pipeline only',
+                'video_file': self._video_file('uploaded.mp4'),
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        created = Session.objects.get(id=res.data['id'])
+        self.assertEqual(created.processing_status, Session.STATUS_FAILED)
+        self.assertIn('mediaconvert enqueue failed', created.processing_error.lower())
+        enqueue_session_processing.assert_called_once()
+        enqueue_local_transcode.assert_not_called()
+
+    @override_settings(
+        VIDEO_PROCESSING_MODE='local_ffmpeg',
+        AWS_STORAGE_BUCKET_NAME='',
+        AWS_MEDIA_CONVERT_ROLE_ARN='',
+        AWS_MEDIA_CONVERT_ENDPOINT_URL='',
+    )
+    @patch('videos.media.services.enqueue_session_processing')
+    @patch('videos.media.services.enqueue_local_session_transcode', return_value=(True, ''))
+    def test_session_create_with_explicit_local_ffmpeg_skips_mediaconvert(self, enqueue_local_transcode, enqueue_session_processing):
+        self.client.force_authenticate(user=self.owner)
+
+        res = self.client.post(
+            '/api/sessions/',
+            {
+                'title': 'Local ffmpeg only',
+                'description': 'dev fallback only',
+                'video_file': self._video_file('uploaded.mp4'),
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        created = Session.objects.get(id=res.data['id'])
+        self.assertEqual(created.processing_status, Session.STATUS_PROCESSING)
+        enqueue_local_transcode.assert_called_once()
+        enqueue_session_processing.assert_not_called()
 
     @override_settings(
         AWS_STORAGE_BUCKET_NAME='test-bucket',

@@ -6,6 +6,7 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from videos.models import ReviewLink, ReviewRequest, ReviewRequestEvent, ReviewerInvite, ReviewerRosterMembership, Session, SessionLastSeen, SignupInviteCode
+from videos.telemetry import record_product_event
 
 
 REVIEW_REQUEST_ALLOWED_TRANSITIONS = {
@@ -158,6 +159,26 @@ def _record_review_request_event(*, review_request, actor, event_type, from_stat
     )
 
 
+def _record_review_product_event(*, event_name, review_request, actor, extra=None, path='/api/review-requests/:id/'):
+    payload = {
+        'session_id': review_request.session_id,
+        'review_request_id': review_request.id,
+        'status': review_request.status,
+        'prior_status': review_request.status,
+        'reason': review_request.status_reason,
+        'action': event_name,
+    }
+    if extra:
+        payload.update(extra)
+    record_product_event(
+        event_name=event_name,
+        path=path,
+        user=actor,
+        is_authenticated=bool(getattr(actor, 'is_authenticated', False)),
+        extra=payload,
+    )
+
+
 def _set_review_request_status(*, review_request, next_status, reason_code='', note=''):
     review_request.status = next_status
     review_request.status_reason = str(reason_code or '').strip()
@@ -210,6 +231,16 @@ def create_review_request(*, serializer, actor):
             from_status=from_status,
             to_status=parent_request.status,
         )
+        _record_review_product_event(
+            event_name='review_request_resubmitted',
+            review_request=parent_request,
+            actor=actor,
+            extra={
+                'prior_status': from_status,
+                'reason': 'follow_up_created',
+            },
+            path='/api/review-requests/',
+        )
 
     link = ReviewLink.objects.create(
         session=review_request.session,
@@ -226,6 +257,15 @@ def create_review_request(*, serializer, actor):
         actor=actor,
         event_type=ReviewRequestEvent.EVENT_CREATED,
         to_status=review_request.status,
+    )
+    _record_review_product_event(
+        event_name='review_request_created',
+        review_request=review_request,
+        actor=actor,
+        extra={
+            'reason': 'created',
+        },
+        path='/api/review-requests/',
     )
     return review_request
 
@@ -247,6 +287,15 @@ def mark_review_request_opened(*, review_request, actor):
         event_type=ReviewRequestEvent.EVENT_OPENED,
         from_status=from_status,
         to_status=review_request.status,
+    )
+    _record_review_product_event(
+        event_name='review_request_opened',
+        review_request=review_request,
+        actor=actor,
+        extra={
+            'prior_status': from_status,
+        },
+        path='/api/review/:token/',
     )
     return review_request
 
@@ -270,6 +319,15 @@ def mark_review_request_responded(*, review_request, actor):
         event_type=ReviewRequestEvent.EVENT_RESPONDED,
         from_status=from_status,
         to_status=review_request.status,
+    )
+    _record_review_product_event(
+        event_name='review_request_responded',
+        review_request=review_request,
+        actor=actor,
+        extra={
+            'prior_status': from_status,
+        },
+        path='/api/review/:token/feedback/',
     )
     return review_request
 
@@ -301,6 +359,15 @@ def transition_review_request_status(*, review_request, actor, next_status):
             from_status=from_status,
             to_status=review_request.status,
         )
+        _record_review_product_event(
+            event_name='review_request_resubmitted',
+            review_request=review_request,
+            actor=actor,
+            extra={
+                'prior_status': from_status,
+            },
+            path='/api/review-requests/:id/',
+        )
         return review_request
 
     if actor.id in {review_request.student_id, review_request.reviewer_id} and normalized_status == ReviewRequest.STATUS_CLOSED:
@@ -315,6 +382,16 @@ def transition_review_request_status(*, review_request, actor, next_status):
             to_status=review_request.status,
             reason_code=reason_code,
             note=note,
+        )
+        _record_review_product_event(
+            event_name='review_request_closed',
+            review_request=review_request,
+            actor=actor,
+            extra={
+                'prior_status': from_status,
+                'reason': reason_code or 'closed',
+            },
+            path='/api/review-requests/:id/',
         )
         return review_request
 
@@ -332,6 +409,16 @@ def transition_review_request_status(*, review_request, actor, next_status):
             to_status=review_request.status,
             reason_code=reason_code,
             note=note,
+        )
+        _record_review_product_event(
+            event_name='review_request_revoked',
+            review_request=review_request,
+            actor=actor,
+            extra={
+                'prior_status': from_status,
+                'reason': reason_code or 'revoked',
+            },
+            path='/api/review-requests/:id/',
         )
         return review_request
 
@@ -361,6 +448,16 @@ def transition_review_request_status(*, review_request, actor, next_status):
             reason_code=final_reason,
             note=note,
         )
+        _record_review_product_event(
+            event_name=f'review_request_{normalized_status}',
+            review_request=review_request,
+            actor=actor,
+            extra={
+                'prior_status': from_status,
+                'reason': final_reason,
+            },
+            path='/api/review-requests/:id/',
+        )
         return review_request
 
     raise PermissionDenied('This status transition is not allowed.')
@@ -384,6 +481,15 @@ def mark_review_request_viewed(*, review_request, actor):
             event_type=ReviewRequestEvent.EVENT_VIEWED,
             from_status=from_status,
             to_status=review_request.status,
+        )
+        _record_review_product_event(
+            event_name='review_request_viewed',
+            review_request=review_request,
+            actor=actor,
+            extra={
+                'prior_status': from_status,
+            },
+            path='/api/review-requests/:id/mark-viewed/',
         )
 
     SessionLastSeen.objects.update_or_create(

@@ -46,6 +46,35 @@ class ClientErrorTelemetryTests(APITestCase):
         self.assertEqual(stored.extra_json.get('action'), 'ask_for_feedback')
 
     @patch('videos.views.logger')
+    def test_product_event_logs_upload_fields(self, logger_mock):
+        response = self.client.post(
+            '/api/client-errors/',
+            {
+                'source': 'ProductEvent',
+                'message': 'session_upload_failed',
+                'path': '/upload',
+                'extra': {
+                    'action': 'session_upload_failed',
+                    'upload_mode': 'multipart',
+                    'file_size_bytes': 9437184,
+                    'code': 'upload_finalize_failed',
+                    'phase': 'resuming',
+                    'status': 502,
+                },
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 202)
+        stored = ProductEventLog.objects.get()
+        self.assertEqual(stored.event_name, 'session_upload_failed')
+        self.assertEqual(stored.extra_json.get('upload_mode'), 'multipart')
+        self.assertEqual(stored.extra_json.get('file_size_bytes'), 9437184)
+        self.assertEqual(stored.extra_json.get('code'), 'upload_finalize_failed')
+        self.assertEqual(stored.extra_json.get('phase'), 'resuming')
+        self.assertEqual(stored.extra_json.get('status'), 502)
+
+    @patch('videos.views.logger')
     def test_non_product_event_uses_legacy_client_error_log(self, logger_mock):
         response = self.client.post(
             '/api/client-errors/',
