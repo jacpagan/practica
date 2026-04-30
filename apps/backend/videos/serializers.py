@@ -461,6 +461,7 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
     feedback_category_counts = serializers.SerializerMethodField()
     events = serializers.SerializerMethodField()
     resolution = serializers.SerializerMethodField()
+    notification_delivery = serializers.SerializerMethodField()
 
     class Meta:
         model = ReviewRequest
@@ -476,12 +477,13 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
             'requested_turnaround_hours', 'deadline',
             'status', 'status_reason', 'status_note', 'opened_at', 'responded_at', 'viewed_at', 'flagged_at', 'resubmitted_at', 'closed_at',
             'response_count', 'current_user_role', 'current_member_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count', 'feedback_category_counts', 'events', 'resolution',
+            'notification_delivery',
             'created_at', 'updated_at',
         ]
         read_only_fields = [
             'id', 'student', 'creator', 'member', 'creator_id', 'member_id', 'owner', 'reviewer', 'session', 'review_link', 'feedback_link', 'parent_request', 'parent_feedback_request',
             'status', 'status_reason', 'status_note', 'opened_at', 'responded_at', 'viewed_at', 'flagged_at', 'resubmitted_at', 'closed_at',
-            'response_count', 'current_user_role', 'current_member_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count', 'feedback_category_counts', 'events', 'resolution',
+            'response_count', 'current_user_role', 'current_member_role', 'feedback_items', 'latest_feedback_at', 'follow_up_request_count', 'feedback_category_counts', 'events', 'resolution', 'notification_delivery',
             'created_at', 'updated_at',
         ]
 
@@ -553,6 +555,9 @@ class ReviewRequestSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         user = getattr(request, 'user', None) if request else None
         return resolve_review_request_resolution(obj, user)
+
+    def get_notification_delivery(self, obj):
+        return getattr(obj, '_notification_delivery', None)
 
     def validate(self, attrs):
         session = attrs.get('session') or getattr(self.instance, 'session', None)

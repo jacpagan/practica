@@ -949,6 +949,124 @@ test('Ask for feedback starts with no reviewer selected on a fresh request', asy
   await expect(page.getByRole('button', { name: 'Copy invite link' })).toBeVisible()
 })
 
+test('Session detail shows an email delivery hint after sending a review request', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('token', 'smoke-token')
+  })
+
+  const sessionPayload = {
+    id: 127,
+    title: 'Email hint session',
+    practice_series: '',
+    description: '',
+    video_file: '',
+    duration_seconds: null,
+    recorded_at: '2099-01-01T00:00:00Z',
+    created_at: '2099-01-01T00:00:00Z',
+    updated_at: '2099-01-01T00:00:00Z',
+    processing_status: 'ready',
+    processing_job_id: '',
+    processing_error: '',
+    tag_names: [],
+    assets: [],
+    chapters: [],
+    video_feedback: [],
+    active_review_link: null,
+    chapter_count: 0,
+    video_feedback_count: 0,
+    owner: { id: 1, display_name: 'Smoke Member' },
+    can_edit: true,
+  }
+
+  await page.route('**/api/auth/me/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 1, username: 'smoke_member', display_name: 'Smoke Member' }),
+    })
+  })
+
+  await page.route('**/api/sessions/127/', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(sessionPayload) })
+  })
+
+  await page.route('**/api/review-requests/?session_id=127&role=student', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/review-requests/?role=reviewer', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/review-requests/?role=owner', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/connections/?role=student', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        { id: 1, reviewer: { id: 11, username: 'ryan', display_name: 'Ryan' }, student: { id: 1 }, pending_review_count: 0, total_review_count: 2, created_at: '2099-01-01T00:00:00Z' },
+      ]),
+    })
+  })
+
+  await page.route('**/api/review-requests/', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.continue()
+      return
+    }
+
+    const body = route.request().postDataJSON()
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 777,
+        session: sessionPayload,
+        reviewer: { id: 11, username: 'ryan', display_name: 'Ryan' },
+        status: 'requested',
+        instrument: body.instrument || 'drums',
+        goal: body.goal || '',
+        exercise_or_song: body.exercise_or_song || '',
+        notes: body.notes || '',
+        created_at: '2099-01-01T00:00:00Z',
+        updated_at: '2099-01-01T00:00:00Z',
+        review_link: {
+          token: 'REVIEW777',
+          expires_at: '2099-01-08T00:00:00Z',
+          is_active: true,
+          allow_video_feedback: true,
+          url: 'https://practica.jpagan.com/r/REVIEW777',
+        },
+        feedback_link: {
+          token: 'REVIEW777',
+          expires_at: '2099-01-08T00:00:00Z',
+          is_active: true,
+          allow_video_feedback: true,
+          url: 'https://practica.jpagan.com/r/REVIEW777',
+        },
+        notification_delivery: {
+          status: 'sent',
+          message: 'Email sent to Ryan. They will also see it in Practica when they sign in.',
+        },
+      }),
+    })
+  })
+
+  await page.route('**/api/reviewer-invites/**', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.goto('/sessions/127')
+  await page.getByRole('button', { name: 'Ask for feedback' }).click()
+  await page.getByRole('button', { name: 'Ryan' }).click()
+  await page.getByRole('button', { name: 'Send request' }).click()
+
+  await expect(page.getByText('Email sent to Ryan. They will also see it in Practica when they sign in.')).toBeVisible()
+})
+
 test('Session detail auto-creates a reviewer invite when no reviewer is selected', async ({ page }) => {
   const inviteBodies = []
 

@@ -56,12 +56,12 @@ class ReviewNotificationTests(APITestCase):
             format='json',
         )
         self.assertEqual(response.status_code, 201)
-        return response.data['id']
+        return response
 
     @patch('videos.services.notifications.send_mail')
     def test_review_request_creation_sends_email_to_reviewer(self, send_mail_mock):
         with patch('videos.reviews.services.transaction.on_commit', side_effect=lambda func: func()):
-            self._create_review_request()
+            response = self._create_review_request()
 
         send_mail_mock.assert_called_once()
         args, kwargs = send_mail_mock.call_args
@@ -70,13 +70,15 @@ class ReviewNotificationTests(APITestCase):
         self.assertEqual(kwargs['recipient_list'], ['reviewer@example.com'])
         self.assertIn('https://practica.test/requests', kwargs['message'])
         self.assertIn('https://practica.test/r/', kwargs['message'])
+        self.assertEqual(response.data['notification_delivery']['status'], 'sent')
+        self.assertIn('Email sent to Notification Reviewer', response.data['notification_delivery']['message'])
 
     @patch('videos.services.notifications.send_mail')
     def test_reviewer_response_sends_email_to_owner(self, send_mail_mock):
         with patch('videos.reviews.services.transaction.on_commit', side_effect=lambda func: func()):
-            review_request_id = self._create_review_request()
+            create_response = self._create_review_request()
         send_mail_mock.reset_mock()
-        review_request = ReviewRequest.objects.get(pk=review_request_id)
+        review_request = ReviewRequest.objects.get(pk=create_response.data['id'])
 
         self._auth(self.reviewer)
         with patch('videos.reviews.services.transaction.on_commit', side_effect=lambda func: func()):
@@ -103,9 +105,11 @@ class ReviewNotificationTests(APITestCase):
         self.reviewer.save(update_fields=['email'])
 
         with patch('videos.reviews.services.transaction.on_commit', side_effect=lambda func: func()):
-            self._create_review_request()
+            response = self._create_review_request()
 
         send_mail_mock.assert_not_called()
+        self.assertEqual(response.data['notification_delivery']['status'], 'missing_email')
+        self.assertIn('No email on file', response.data['notification_delivery']['message'])
 
     def _video_file(self, name='feedback.mp4', content_type='video/mp4'):
         from django.core.files.uploadedfile import SimpleUploadedFile

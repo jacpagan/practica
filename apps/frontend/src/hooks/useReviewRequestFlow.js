@@ -569,6 +569,7 @@ export default function useReviewRequestFlow({
       return
     }
 
+    const reviewerLabel = selectedReviewer.display_name || selectedReviewer.username || 'your reviewer'
     setCreatingRequest(true)
     try {
       const payload = {
@@ -598,7 +599,13 @@ export default function useReviewRequestFlow({
       setRequestGoal('')
       setRequestExerciseOrSong('')
       onReviewRequestDraftCleared?.()
-      toast.success(`Request sent to ${selectedReviewer.display_name || selectedReviewer.username}. They’ll see it in Practica when they sign in.`)
+      const notificationDelivery = data?.notification_delivery || {}
+      const notificationMessage = notificationDelivery?.message || `Request sent to ${reviewerLabel}. They’ll see it in Practica when they sign in.`
+      if (String(notificationDelivery?.status || '').trim().toLowerCase() === 'failed') {
+        toast.error(notificationMessage)
+      } else {
+        toast.success(notificationMessage)
+      }
       if ((data?.feedback_link?.url || data?.review_link?.url)) {
         try {
           await navigator.clipboard.writeText(data.feedback_link?.url || data.review_link?.url)

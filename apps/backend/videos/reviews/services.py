@@ -211,64 +211,65 @@ def ensure_member_connection(*, reviewer, student, created_by=None):
     return membership
 
 
-@transaction.atomic
 def create_review_request(*, serializer, actor):
-    review_request = serializer.save(
-        student=actor,
-        created_by=actor,
-    )
-    if review_request.parent_request_id:
-        parent_request = review_request.parent_request
-        from_status = parent_request.status
-        parent_request.status = ReviewRequest.STATUS_RESUBMITTED
-        parent_request.status_reason = ''
-        parent_request.status_note = ''
-        parent_request.resubmitted_at = timezone.now()
-        parent_request.save(update_fields=['status', 'status_reason', 'status_note', 'resubmitted_at', 'updated_at'])
+    with transaction.atomic():
+        review_request = serializer.save(
+            student=actor,
+            created_by=actor,
+        )
+        if review_request.parent_request_id:
+            parent_request = review_request.parent_request
+            from_status = parent_request.status
+            parent_request.status = ReviewRequest.STATUS_RESUBMITTED
+            parent_request.status_reason = ''
+            parent_request.status_note = ''
+            parent_request.resubmitted_at = timezone.now()
+            parent_request.save(update_fields=['status', 'status_reason', 'status_note', 'resubmitted_at', 'updated_at'])
+            _record_review_request_event(
+                review_request=parent_request,
+                actor=actor,
+                event_type=ReviewRequestEvent.EVENT_STATUS_CHANGED,
+                from_status=from_status,
+                to_status=parent_request.status,
+            )
+            _record_review_product_event(
+                event_name='review_request_resubmitted',
+                review_request=parent_request,
+                actor=actor,
+                extra={
+                    'prior_status': from_status,
+                    'reason': 'follow_up_created',
+                },
+                path='/api/review-requests/',
+            )
+
+        link = ReviewLink.objects.create(
+            session=review_request.session,
+            token=secrets.token_urlsafe(16),
+            created_by=actor,
+            expires_at=timezone.now() + timedelta(days=7),
+            is_active=True,
+            allow_video_feedback=True,
+        )
+        review_request.review_link = link
+        review_request.save(update_fields=['review_link', 'updated_at'])
         _record_review_request_event(
-            review_request=parent_request,
+            review_request=review_request,
             actor=actor,
-            event_type=ReviewRequestEvent.EVENT_STATUS_CHANGED,
-            from_status=from_status,
-            to_status=parent_request.status,
+            event_type=ReviewRequestEvent.EVENT_CREATED,
+            to_status=review_request.status,
         )
         _record_review_product_event(
-            event_name='review_request_resubmitted',
-            review_request=parent_request,
+            event_name='review_request_created',
+            review_request=review_request,
             actor=actor,
             extra={
-                'prior_status': from_status,
-                'reason': 'follow_up_created',
+                'reason': 'created',
             },
             path='/api/review-requests/',
         )
 
-    link = ReviewLink.objects.create(
-        session=review_request.session,
-        token=secrets.token_urlsafe(16),
-        created_by=actor,
-        expires_at=timezone.now() + timedelta(days=7),
-        is_active=True,
-        allow_video_feedback=True,
-    )
-    review_request.review_link = link
-    review_request.save(update_fields=['review_link', 'updated_at'])
-    _record_review_request_event(
-        review_request=review_request,
-        actor=actor,
-        event_type=ReviewRequestEvent.EVENT_CREATED,
-        to_status=review_request.status,
-    )
-    _record_review_product_event(
-        event_name='review_request_created',
-        review_request=review_request,
-        actor=actor,
-        extra={
-            'reason': 'created',
-        },
-        path='/api/review-requests/',
-    )
-    transaction.on_commit(lambda: send_review_request_created_notification(review_request=review_request, actor=actor))
+    review_request._notification_delivery = send_review_request_created_notification(review_request=review_request, actor=actor)
     return review_request
 
 
@@ -302,36 +303,37 @@ def mark_review_request_opened(*, review_request, actor):
     return review_request
 
 
-@transaction.atomic
 def mark_review_request_responded(*, review_request, actor):
-    if actor.id != review_request.reviewer_id and not actor.is_staff:
-        raise PermissionDenied('Only the assigned reviewer can respond to this review request.')
-    if review_request.status == ReviewRequest.STATUS_RESPONDED:
-        return review_request
-    _validate_transition(review_request, ReviewRequest.STATUS_RESPONDED)
-    from_status = review_request.status
-    review_request.status = ReviewRequest.STATUS_RESPONDED
-    review_request.status_reason = ''
-    review_request.status_note = ''
-    review_request.responded_at = timezone.now()
-    review_request.save(update_fields=['status', 'status_reason', 'status_note', 'responded_at', 'updated_at'])
-    _record_review_request_event(
-        review_request=review_request,
-        actor=actor,
-        event_type=ReviewRequestEvent.EVENT_RESPONDED,
-        from_status=from_status,
-        to_status=review_request.status,
-    )
-    _record_review_product_event(
-        event_name='review_request_responded',
-        review_request=review_request,
-        actor=actor,
-        extra={
-            'prior_status': from_status,
-        },
-        path='/api/review/:token/feedback/',
-    )
-    transaction.on_commit(lambda: send_review_request_responded_notification(review_request=review_request, actor=actor))
+    with transaction.atomic():
+        if actor.id != review_request.reviewer_id and not actor.is_staff:
+            raise PermissionDenied('Only the assigned reviewer can respond to this review request.')
+        if review_request.status == ReviewRequest.STATUS_RESPONDED:
+            return review_request
+        _validate_transition(review_request, ReviewRequest.STATUS_RESPONDED)
+        from_status = review_request.status
+        review_request.status = ReviewRequest.STATUS_RESPONDED
+        review_request.status_reason = ''
+        review_request.status_note = ''
+        review_request.responded_at = timezone.now()
+        review_request.save(update_fields=['status', 'status_reason', 'status_note', 'responded_at', 'updated_at'])
+        _record_review_request_event(
+            review_request=review_request,
+            actor=actor,
+            event_type=ReviewRequestEvent.EVENT_RESPONDED,
+            from_status=from_status,
+            to_status=review_request.status,
+        )
+        _record_review_product_event(
+            event_name='review_request_responded',
+            review_request=review_request,
+            actor=actor,
+            extra={
+                'prior_status': from_status,
+            },
+            path='/api/review/:token/feedback/',
+        )
+
+    review_request._notification_delivery = send_review_request_responded_notification(review_request=review_request, actor=actor)
     return review_request
 
 

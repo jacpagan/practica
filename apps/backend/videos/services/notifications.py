@@ -36,6 +36,29 @@ def _email_notifications_enabled():
     return bool(getattr(settings, 'EMAIL_NOTIFICATIONS_ENABLED', False))
 
 
+def _notification_delivery(review_request, recipient, notification_kind, status, reason=''):
+    recipient_name = _display_name(recipient) or ('reviewer' if notification_kind == 'review_request_created' else 'owner')
+    recipient_email = _recipient_email(recipient)
+    if status == 'sent':
+        message = f'Email sent to {recipient_name}. They will also see it in Practica when they sign in.'
+    elif status == 'missing_email':
+        message = f'No email on file for {recipient_name}; they will still see it in Practica when they sign in.'
+    elif status == 'disabled':
+        message = f'Email notifications are turned off; {recipient_name} will still see it in Practica when they sign in.'
+    else:
+        message = f'Email could not be sent to {recipient_name}; they will still see it in Practica when they sign in.'
+    return {
+        'status': status,
+        'message': message,
+        'notification_kind': notification_kind,
+        'recipient_name': recipient_name,
+        'recipient_email': recipient_email,
+        'reason': reason,
+        'session_id': review_request.session_id,
+        'review_request_id': review_request.id,
+    }
+
+
 def _record_notification_event(*, event_name, review_request, actor, recipient, notification_kind, channel='email', status='sent', reason='', path='/api/review-requests/'):
     record_product_event(
         event_name=event_name,
@@ -74,7 +97,7 @@ def _send_notification_email(*, review_request, actor, recipient, subject, body,
             reason='recipient_has_no_email',
             path=path,
         )
-        return False
+        return _notification_delivery(review_request, recipient, notification_kind, 'missing_email', 'recipient_has_no_email')
 
     if not _email_notifications_enabled():
         logger.info(
@@ -93,7 +116,7 @@ def _send_notification_email(*, review_request, actor, recipient, subject, body,
             reason='email_notifications_disabled',
             path=path,
         )
-        return False
+        return _notification_delivery(review_request, recipient, notification_kind, 'disabled', 'email_notifications_disabled')
 
     try:
         send_mail(
@@ -120,7 +143,7 @@ def _send_notification_email(*, review_request, actor, recipient, subject, body,
             reason=str(exc)[:160],
             path=path,
         )
-        return False
+        return _notification_delivery(review_request, recipient, notification_kind, 'failed', str(exc)[:160])
 
     logger.info(
         'Notification email sent: review_request_id=%s notification_kind=%s recipient=%s',
@@ -137,7 +160,7 @@ def _send_notification_email(*, review_request, actor, recipient, subject, body,
         status='sent',
         path=path,
     )
-    return True
+    return _notification_delivery(review_request, recipient, notification_kind, 'sent')
 
 
 def send_review_request_created_notification(*, review_request, actor):
