@@ -286,6 +286,14 @@ function AppContent() {
     requestAbortActiveUpload,
     uploadGuardRef,
   })
+  const requestsBadge = reviewerPendingCount > 0 ? (
+    <span
+      aria-label={`${reviewerPendingCount} pending review request${reviewerPendingCount === 1 ? '' : 's'}`}
+      className="inline-flex min-w-5 items-center justify-center rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-semibold text-white"
+    >
+      {reviewerPendingCount > 9 ? '9+' : reviewerPendingCount}
+    </span>
+  ) : null
 
   const {
     goHome,
@@ -348,9 +356,10 @@ function AppContent() {
                 </button>
                 <button
                   onClick={goRequests}
-                  className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
+                  className={`inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
                 >
-                  Requests{reviewerPendingCount > 0 ? ` (${reviewerPendingCount})` : ''}
+                  <span>Requests</span>
+                  {requestsBadge}
                 </button>
               </nav>
             ) : null}
@@ -389,9 +398,10 @@ function AppContent() {
               </button>
               <button
                 onClick={goRequests}
-                className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+                className={`inline-flex items-center justify-center gap-2 text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
               >
-                Requests{reviewerPendingCount > 0 ? ` (${reviewerPendingCount})` : ''}
+                <span>Requests</span>
+                {requestsBadge}
               </button>
             </nav>
           ) : null}

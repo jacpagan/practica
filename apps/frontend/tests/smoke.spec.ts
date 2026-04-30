@@ -28,6 +28,58 @@ test('Requests route (signed-out) shows Auth form', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Sign up' }).first()).toBeVisible()
 })
 
+test('Requests nav shows a pending badge for signed-in reviewers', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('token', 'smoke-token')
+  })
+
+  const pendingRequest = {
+    id: 901,
+    session: { id: 77, title: 'Kick pattern check' },
+    creator: { id: 1, username: 'jac', display_name: 'Jac' },
+    reviewer: { id: 7, username: 'smoke_teacher', display_name: 'Smoke Teacher' },
+    status: 'requested',
+    instrument: 'drums',
+    created_at: '2099-01-01T00:00:00Z',
+    updated_at: '2099-01-01T00:00:00Z',
+    latest_feedback_at: null,
+    resolution: { detail: 'Waiting on your first response.' },
+  }
+
+  await page.route('**/api/auth/me/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 7, username: 'smoke_teacher', display_name: 'Smoke Teacher' }),
+    })
+  })
+
+  await page.route('**/api/review-requests/?role=reviewer', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([pendingRequest]) })
+  })
+
+  await page.route('**/api/review-requests/?role=owner', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/connections/?role=student', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/inbox/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([pendingRequest]),
+    })
+  })
+
+  await page.goto('/requests')
+
+  await expect(page.getByRole('button', { name: 'Requests 1 pending review request' }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: /Requests/ })).toBeVisible()
+})
+
 test('Requests route shows a clear new-feedback banner for signed-in reviewers', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('token', 'smoke-token')
