@@ -6,6 +6,7 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from videos.models import ReviewLink, ReviewRequest, ReviewRequestEvent, ReviewerInvite, ReviewerRosterMembership, Session, SessionLastSeen, SignupInviteCode
+from videos.services.notifications import send_review_request_created_notification, send_review_request_responded_notification
 from videos.telemetry import record_product_event
 
 
@@ -267,6 +268,7 @@ def create_review_request(*, serializer, actor):
         },
         path='/api/review-requests/',
     )
+    transaction.on_commit(lambda: send_review_request_created_notification(review_request=review_request, actor=actor))
     return review_request
 
 
@@ -329,6 +331,7 @@ def mark_review_request_responded(*, review_request, actor):
         },
         path='/api/review/:token/feedback/',
     )
+    transaction.on_commit(lambda: send_review_request_responded_notification(review_request=review_request, actor=actor))
     return review_request
 
 

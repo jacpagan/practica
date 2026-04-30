@@ -318,6 +318,7 @@ The current product supports these functional goals:
 - The app must show lightweight in-app notifications for review responses that the owner has not yet marked viewed.
 - The owner must be able to mark a response as viewed from the notification surface.
 - Notification pause state and seen state must persist locally in the browser.
+- When configured, the backend should also send outbound email notifications for new review requests and newly submitted feedback so reviewers and owners do not have to poll the app manually.
 
 ## 7. Frontend Application Architecture
 

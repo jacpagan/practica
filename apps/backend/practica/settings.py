@@ -21,6 +21,10 @@ else:
     raise RuntimeError('DJANGO_SECRET_KEY must be set when DEBUG is false.')
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0').split(',')
+APP_BASE_URL = os.environ.get(
+    'APP_BASE_URL',
+    'https://practica.jpagan.com' if not DEBUG and not RUNNING_TESTS else 'http://localhost:3000',
+).rstrip('/')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -170,6 +174,34 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = UPLOAD_MAX_BYTES
 FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get('FILE_UPLOAD_MAX_MEMORY_SIZE', 5242880))
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Email notifications
+EMAIL_NOTIFICATIONS_ENABLED = os.environ.get(
+    'EMAIL_NOTIFICATIONS_ENABLED',
+    'true' if (
+        not DEBUG and not RUNNING_TESTS and (
+            os.environ.get('EMAIL_HOST')
+            or os.environ.get('EMAIL_HOST_USER')
+            or os.environ.get('EMAIL_BACKEND')
+        )
+    ) else 'false',
+).lower() in ['true', '1', 'yes']
+DEFAULT_FROM_EMAIL = os.environ.get(
+    'DEFAULT_FROM_EMAIL',
+    'no-reply@practica.jpagan.com' if not DEBUG else 'webmaster@localhost',
+)
+SERVER_EMAIL = os.environ.get('SERVER_EMAIL', DEFAULT_FROM_EMAIL)
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.smtp.EmailBackend' if EMAIL_NOTIFICATIONS_ENABLED else 'django.core.mail.backends.console.EmailBackend',
+)
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'true' if not DEBUG else 'false').lower() in ['true', '1', 'yes']
+EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'false').lower() in ['true', '1', 'yes']
+EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '10'))
 
 # Structured logging (stdout). Docker/host will collect.
 LOGGING = {

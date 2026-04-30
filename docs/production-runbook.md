@@ -27,6 +27,14 @@ Set these before the backend starts:
 - `AWS_MEDIA_CONVERT_OUTPUT_PREFIX`
 - `MEDIA_PROCESSING_CALLBACK_TOKEN`
 - `VIDEO_PROCESSING_MODE`
+- `APP_BASE_URL`
+- `EMAIL_NOTIFICATIONS_ENABLED`
+- `DEFAULT_FROM_EMAIL`
+- `EMAIL_BACKEND`
+- `EMAIL_HOST` and optional `EMAIL_PORT`
+- `EMAIL_HOST_USER`
+- `EMAIL_HOST_PASSWORD`
+- `EMAIL_USE_TLS` or `EMAIL_USE_SSL`
 - `DEPLOYED_GIT_SHA`
 
 Helpful but optional:
@@ -144,6 +152,7 @@ Useful log signatures:
 - `ProductEvent event_name=session_share_created`
 - `ProductEvent event_name=review_request_created`
 - `ProductEvent event_name=review_request_responded`
+- `ProductEvent event_name=review_request_notification_sent`
 
 ## Don’t Do This
 
