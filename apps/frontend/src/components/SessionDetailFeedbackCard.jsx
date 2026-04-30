@@ -1,6 +1,6 @@
 import React from 'react'
 
-function InviteRow({ invite, onCopyInviteUrl, onTurnOffInviteCode }) {
+function InviteRow({ invite, onCopyInviteUrl, onShareInviteUrl, onTurnOffInviteCode }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-3">
       <div className="min-w-0">
@@ -10,6 +10,9 @@ function InviteRow({ invite, onCopyInviteUrl, onTurnOffInviteCode }) {
         </p>
       </div>
       <div className="flex items-center gap-3">
+        <button type="button" onClick={() => onShareInviteUrl(invite.invite_url)} className="text-xs text-gray-700 hover:text-gray-900 transition-colors">
+          Share invite link
+        </button>
         <button type="button" onClick={() => onCopyInviteUrl(invite.invite_url, { successMessage: 'Invite link copied again' })} className="text-xs text-gray-700 hover:text-gray-900 transition-colors">
           Copy link
         </button>
@@ -43,7 +46,9 @@ export default function SessionDetailFeedbackCard({
   onToggleInviteManager,
   inviteManagerLoading,
   activeInviteCodes,
+  latestInviteUrl,
   onCopyInviteUrl,
+  onShareInviteUrl,
   onTurnOffInviteCode,
   sharing,
   waitingOnReviewer,
@@ -100,11 +105,31 @@ export default function SessionDetailFeedbackCard({
           <div className="rounded-lg border border-gray-200 bg-white px-3 py-3 space-y-3">
             {inviteManagerLoading ? <p className="text-xs text-gray-500">Loading invites…</p> : null}
             {!inviteManagerLoading && activeInviteCodes.length === 0 ? <p className="text-xs text-gray-600">No reviewer invites yet.</p> : null}
+            {latestInviteUrl ? (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-emerald-800">Invite link ready</p>
+                <input
+                  type="text"
+                  readOnly
+                  value={latestInviteUrl}
+                  className="w-full px-3 py-2 text-xs border border-emerald-200 rounded-lg bg-white text-gray-700"
+                />
+                <div className="flex flex-wrap justify-end gap-2">
+                  <button type="button" onClick={() => onShareInviteUrl(latestInviteUrl)} className="text-xs text-emerald-800 border border-emerald-300 rounded-lg px-3 py-2 hover:bg-emerald-100 transition-colors">
+                    Share invite link
+                  </button>
+                  <button type="button" onClick={() => onCopyInviteUrl(latestInviteUrl, { successMessage: 'Invite link copied again' })} className="text-xs text-emerald-800 border border-emerald-300 rounded-lg px-3 py-2 hover:bg-emerald-100 transition-colors">
+                    Copy again
+                  </button>
+                </div>
+              </div>
+            ) : null}
             {activeInviteCodes.map((invite) => (
               <InviteRow
                 key={invite.id}
                 invite={invite}
                 onCopyInviteUrl={onCopyInviteUrl}
+                onShareInviteUrl={onShareInviteUrl}
                 onTurnOffInviteCode={onTurnOffInviteCode}
               />
             ))}

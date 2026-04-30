@@ -357,6 +357,39 @@ export default function useReviewRequestFlow({
     }
   }
 
+  const shareUrl = async (url, {
+    title = 'Practica',
+    text = '',
+    successMessage = 'Share sheet opened',
+    copyFallbackMessage = 'Link copied',
+  } = {}) => {
+    const normalizedUrl = String(url || '').trim()
+    if (!normalizedUrl) return false
+
+    try {
+      if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+        await navigator.share({
+          title,
+          text,
+          url: normalizedUrl,
+        })
+        toast.success(successMessage)
+        return true
+      }
+    } catch (error) {
+      if (error?.name === 'AbortError') return false
+    }
+
+    try {
+      await navigator.clipboard.writeText(normalizedUrl)
+      toast.success(copyFallbackMessage)
+      return true
+    } catch {
+      toast.error('Could not share automatically. You can copy the link below.')
+      return false
+    }
+  }
+
   const loadInviteCodes = async () => {
     if (!token) return
     setInviteManagerLoading(true)
@@ -387,6 +420,23 @@ export default function useReviewRequestFlow({
       toast.error('Could not copy automatically. You can copy the link below.')
       return false
     }
+  }
+
+  const shareInviteUrl = async (inviteUrl) => shareUrl(inviteUrl, {
+    title: `Practica invite for ${session?.title || 'your take'}`,
+    text: 'Open this invite link in Practica or share it in Messages.',
+    successMessage: 'Share sheet opened',
+    copyFallbackMessage: 'Invite link copied',
+  })
+
+  const shareReviewRequestLink = async (requestItem) => {
+    const url = requestItem?.feedback_link?.url || requestItem?.review_link?.url
+    return shareUrl(url, {
+      title: `Practica feedback for ${session?.title || 'your take'}`,
+      text: 'Open this private feedback link in Practica or share it in Messages.',
+      successMessage: 'Share sheet opened',
+      copyFallbackMessage: 'Feedback request link copied',
+    })
   }
 
   const createBundledShareLink = async ({ intent = 'lightweight_review', label = `Access ${session.title}` } = {}) => {
@@ -548,7 +598,7 @@ export default function useReviewRequestFlow({
       setRequestGoal('')
       setRequestExerciseOrSong('')
       onReviewRequestDraftCleared?.()
-      toast.success(`Request sent to ${selectedReviewer.display_name || selectedReviewer.username}`)
+      toast.success(`Request sent to ${selectedReviewer.display_name || selectedReviewer.username}. They’ll see it in Practica when they sign in.`)
       if ((data?.feedback_link?.url || data?.review_link?.url)) {
         try {
           await navigator.clipboard.writeText(data.feedback_link?.url || data.review_link?.url)
@@ -693,6 +743,8 @@ export default function useReviewRequestFlow({
     latestInviteUrl,
     loadReviewRequests,
     markReviewRequestViewed,
+    shareInviteUrl,
+    shareReviewRequestLink,
     openRequestComposer,
     openReviewRequestThread,
     pendingShareIntentLabel,

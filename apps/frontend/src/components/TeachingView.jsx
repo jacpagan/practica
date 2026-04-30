@@ -222,6 +222,9 @@ function TeachingView({ token, onOpenReviewRequest }) {
   }, [activeFilter, sortedRequests])
 
   const urgentCount = countsByFilter[FILTER_AWAITING_REVIEW]
+  const topUrgentRequest = visibleRequests.find((item) => ['requested', 'opened', 'resubmitted'].includes(String(item?.status || '').trim().toLowerCase()))
+    || sortedRequests.find((item) => ['requested', 'opened', 'resubmitted'].includes(String(item?.status || '').trim().toLowerCase()))
+    || null
 
   return (
     <div className="px-4 sm:px-6 py-6">
@@ -242,13 +245,24 @@ function TeachingView({ token, onOpenReviewRequest }) {
           <>
             <div className={`rounded-2xl border px-4 py-4 ${urgentCount > 0 ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50'}`}>
               <p className="text-sm font-semibold text-gray-900">
-                {urgentCount > 0 ? `Needs action now: ${urgentCount}` : 'Nothing is waiting on you right now'}
+                {urgentCount > 0 ? 'New feedback waiting in your inbox' : 'Nothing is waiting on you right now'}
               </p>
               <p className="text-sm text-gray-700 mt-1">
                 {urgentCount > 0
-                  ? 'Start with requests marked Awaiting review.'
+                  ? `You have ${urgentCount} request${urgentCount === 1 ? '' : 's'} marked Awaiting review.`
                   : 'You are caught up. Check loops waiting on creators for follow-up progress.'}
               </p>
+              {urgentCount > 0 && topUrgentRequest ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onOpenReviewRequest?.(topUrgentRequest)}
+                    className="rounded-xl bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
+                  >
+                    Open first request
+                  </button>
+                </div>
+              ) : null}
             </div>
 
             <div className="rounded-2xl border border-gray-200 bg-white p-3 space-y-3">

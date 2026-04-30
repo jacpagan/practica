@@ -28,6 +28,75 @@ test('Requests route (signed-out) shows Auth form', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Sign up' }).first()).toBeVisible()
 })
 
+test('Requests route shows a clear new-feedback banner for signed-in reviewers', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('token', 'smoke-token')
+  })
+
+  await page.route('**/api/auth/me/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 7, username: 'smoke_teacher', display_name: 'Smoke Teacher' }),
+    })
+  })
+
+  await page.route('**/api/inbox/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          id: 901,
+          session: { id: 77, title: 'Kick pattern check' },
+          creator: { id: 1, username: 'jac', display_name: 'Jac' },
+          reviewer: { id: 7, username: 'smoke_teacher', display_name: 'Smoke Teacher' },
+          status: 'requested',
+          instrument: 'drums',
+          created_at: '2099-01-01T00:00:00Z',
+          updated_at: '2099-01-01T00:00:00Z',
+          latest_feedback_at: null,
+          resolution: { detail: 'Waiting on your first response.' },
+        },
+      ]),
+    })
+  })
+
+  await page.route('**/api/review-requests/?role=owner', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/review-requests/?role=reviewer', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          id: 901,
+          session: { id: 77, title: 'Kick pattern check' },
+          creator: { id: 1, username: 'jac', display_name: 'Jac' },
+          reviewer: { id: 7, username: 'smoke_teacher', display_name: 'Smoke Teacher' },
+          status: 'requested',
+          instrument: 'drums',
+          created_at: '2099-01-01T00:00:00Z',
+          updated_at: '2099-01-01T00:00:00Z',
+          latest_feedback_at: null,
+          resolution: { detail: 'Waiting on your first response.' },
+        },
+      ]),
+    })
+  })
+
+  await page.route('**/api/connections/?role=student', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.goto('/requests')
+
+  await expect(page.getByText('New feedback waiting in your inbox')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Open first request' })).toBeVisible()
+})
+
 test('Review route handles missing backend gracefully', async ({ page }) => {
   await page.goto('/r/TESTTOKEN')
   // Should show the private feedback header or a friendly error, not a crash
@@ -833,6 +902,7 @@ test('Session detail auto-creates a reviewer invite when no reviewer is selected
 
   await page.addInitScript(() => {
     window.localStorage.setItem('token', 'smoke-token')
+    window.__sharedInvitePayload = null
     const clipboard = {
       writeText: async (text) => {
         window.__copiedInviteUrl = text
@@ -847,6 +917,22 @@ test('Session detail auto-creates a reviewer invite when no reviewer is selected
     } catch {
       try {
         navigator.clipboard = clipboard
+      } catch {}
+    }
+    try {
+      Object.defineProperty(navigator, 'share', {
+        value: async (payload) => {
+          window.__sharedInvitePayload = payload
+          return undefined
+        },
+        configurable: true,
+      })
+    } catch {
+      try {
+        navigator.share = async (payload) => {
+          window.__sharedInvitePayload = payload
+          return undefined
+        }
       } catch {}
     }
   })
@@ -956,6 +1042,8 @@ test('Session detail auto-creates a reviewer invite when no reviewer is selected
   await page.getByRole('button', { name: 'Ask for feedback' }).click()
 
   await expect(page.getByText('No reviewer invites yet.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Share invite link' }).first()).toBeVisible()
+  await page.getByRole('button', { name: 'Share invite link' }).first().click()
   expect(inviteBodies).toHaveLength(1)
   expect(inviteBodies[0]).toMatchObject({
     session_id: 126,
@@ -963,6 +1051,7 @@ test('Session detail auto-creates a reviewer invite when no reviewer is selected
     label: 'Review Invite session',
   })
   await expect.poll(async () => page.evaluate(() => window.__copiedInviteUrl || '')).toBe('https://practica.jpagan.com/r/INVITE123?claim=CLAIM123')
+  await expect.poll(async () => page.evaluate(() => window.__sharedInvitePayload?.url || '')).toBe('https://practica.jpagan.com/r/INVITE123?claim=CLAIM123')
 })
 
 test('Calendar day view shows review state per video', async ({ page }) => {

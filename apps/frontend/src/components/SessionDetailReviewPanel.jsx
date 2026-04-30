@@ -136,6 +136,7 @@ function RequestHistoryItem({
   startFollowUp,
   patchReviewRequestStatus,
   copyReviewRequestLink,
+  shareReviewRequestLink,
   jumpToTimestamp,
   deletingFeedbackId,
   onStartEditingFeedback,
@@ -202,9 +203,14 @@ function RequestHistoryItem({
       ) : null}
       <div className="flex flex-wrap gap-2">
         {(requestItem.feedback_link?.url || requestItem.review_link?.url) ? (
-          <button type="button" onClick={() => copyReviewRequestLink(requestItem)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
-            Copy link
-          </button>
+          <>
+            <button type="button" onClick={() => shareReviewRequestLink(requestItem)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
+              Share request link
+            </button>
+            <button type="button" onClick={() => copyReviewRequestLink(requestItem)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
+              Copy link
+            </button>
+          </>
         ) : null}
         {(requestItem.feedback_link?.token || requestItem.review_link?.token) ? (
           <button type="button" onClick={() => openReviewRequestThread(requestItem)} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white transition-colors">
@@ -257,9 +263,10 @@ const SessionDetailReviewPanel = forwardRef(function SessionDetailReviewPanel(
     reviewerQuery,
     reviewerSearchLoading,
     reviewerResults,
-    latestInviteUrl,
-    copyInviteUrl,
-    submitFeedbackChoice,
+  latestInviteUrl,
+  copyInviteUrl,
+  shareInviteUrl,
+  submitFeedbackChoice,
     creatingRequest,
     sharing,
     reviewRequests,
@@ -285,8 +292,9 @@ const SessionDetailReviewPanel = forwardRef(function SessionDetailReviewPanel(
     openReviewRequestThread,
     patchReviewRequestStatus,
     startFollowUp,
-    copyReviewRequestLink,
-    jumpToTimestamp,
+  copyReviewRequestLink,
+  shareReviewRequestLink,
+  jumpToTimestamp,
     deletingFeedbackId,
     startEditingFeedback,
     deleteFeedback,
@@ -318,9 +326,9 @@ const SessionDetailReviewPanel = forwardRef(function SessionDetailReviewPanel(
           ) : null}
 
           {selectedReviewerName ? (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-emerald-800">Ready</p>
-              <p className="text-sm text-emerald-900 mt-1">This will ask {selectedReviewerName} for private feedback.</p>
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-3 space-y-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-blue-800">They will see it in Practica</p>
+              <p className="text-sm text-blue-900">This will ask {selectedReviewerName} for private feedback. On iPhone, tap Share after the invite link is created to text it in Messages.</p>
             </div>
           ) : null}
 
@@ -390,7 +398,10 @@ const SessionDetailReviewPanel = forwardRef(function SessionDetailReviewPanel(
                       value={latestInviteUrl}
                       className="w-full px-3 py-2 text-xs border border-emerald-200 rounded-lg bg-white text-gray-700"
                     />
-                    <div className="flex justify-end">
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <button type="button" onClick={() => shareInviteUrl(latestInviteUrl)} className="text-xs text-emerald-800 border border-emerald-300 rounded-lg px-3 py-2 hover:bg-emerald-100 transition-colors">
+                        Share invite link
+                      </button>
                       <button type="button" onClick={() => copyInviteUrlAgain(latestInviteUrl, { successMessage: 'Invite link copied again' })} className="text-xs text-emerald-800 border border-emerald-300 rounded-lg px-3 py-2 hover:bg-emerald-100 transition-colors">
                         Copy again
                       </button>
@@ -433,6 +444,7 @@ const SessionDetailReviewPanel = forwardRef(function SessionDetailReviewPanel(
                   startFollowUp={startFollowUp}
                   patchReviewRequestStatus={patchReviewRequestStatus}
                   copyReviewRequestLink={copyReviewRequestLink}
+                  shareReviewRequestLink={shareReviewRequestLink}
                   jumpToTimestamp={jumpToTimestamp}
                   deletingFeedbackId={deletingFeedbackId}
                   onStartEditingFeedback={startEditingFeedback}

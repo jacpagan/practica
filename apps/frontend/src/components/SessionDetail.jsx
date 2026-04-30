@@ -40,6 +40,8 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     openReviewRequestThread,
     pendingShareIntentLabel,
     patchReviewRequestStatus,
+    shareInviteUrl,
+    shareReviewRequestLink,
     recentReviewers,
     recentReviewersLoading,
     readyForFollowUp,
@@ -322,7 +324,9 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 onToggleInviteManager={toggleInviteManager}
                 inviteManagerLoading={inviteManagerLoading}
                 activeInviteCodes={activeInviteCodes}
+                latestInviteUrl={latestInviteUrl}
                 onCopyInviteUrl={copyInviteUrl}
+                onShareInviteUrl={shareInviteUrl}
                 onTurnOffInviteCode={turnOffInviteCode}
                 sessionProcessingError={session.processing_error}
                 sessionProcessingStatus={session.processing_status}
@@ -348,6 +352,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 reviewerResults={reviewerResults}
                 latestInviteUrl={latestInviteUrl}
                 copyInviteUrlAgain={copyInviteUrl}
+                shareInviteUrl={shareInviteUrl}
                 submitFeedbackChoice={submitFeedbackChoice}
                 creatingRequest={creatingRequest}
                 sharing={sharing}
@@ -374,6 +379,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 patchReviewRequestStatus={patchReviewRequestStatus}
                 startFollowUp={startFollowUp}
                 copyReviewRequestLink={copyReviewRequestLink}
+                shareReviewRequestLink={shareReviewRequestLink}
                 jumpToTimestamp={jumpToTimestamp}
                 deletingFeedbackId={deletingFeedbackId}
                 startEditingFeedback={startEditingFeedback}
