@@ -25,7 +25,6 @@ export default function ThreadsView({
   const [editingSession, setEditingSession] = useState(null)
   const [draftThread, setDraftThread] = useState('')
   const [saving, setSaving] = useState(false)
-  const [exporting, setExporting] = useState(false)
 
   const threadOptions = useMemo(() => Array.from(new Set(
     sessions
@@ -102,34 +101,6 @@ export default function ThreadsView({
 
   const clearThread = useCallback(() => saveThread(''), [saveThread])
 
-  const downloadBackup = useCallback(async () => {
-    if (!token || exporting) return
-    setExporting(true)
-    try {
-      const res = await fetch('/api/sessions/export/', {
-        headers: { Authorization: `Token ${token}` },
-      })
-      if (!res.ok) throw new Error('export')
-      const data = await res.json()
-      const exportedAt = data?.exported_at ? new Date(data.exported_at) : new Date()
-      const stamp = Number.isNaN(exportedAt.getTime()) ? new Date().toISOString().slice(0, 10) : exportedAt.toISOString().slice(0, 10)
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `practica-backup-${stamp}.json`
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
-      toast.success('Backup downloaded')
-    } catch {
-      toast.error('Could not download backup')
-    } finally {
-      setExporting(false)
-    }
-  }, [exporting, toast, token])
-
   if (sessionsLoading) {
     return (
       <div className="px-4 sm:px-6 py-6">
@@ -163,14 +134,6 @@ export default function ThreadsView({
             <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2.5 py-1.5 rounded-full">{totalThreads} {totalThreads === 1 ? 'thread' : 'threads'}</span>
             <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2.5 py-1.5 rounded-full">{totalVideos} {totalVideos === 1 ? 'video' : 'videos'}</span>
             <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2.5 py-1.5 rounded-full">{unthreadedCount} unthreaded</span>
-            <button
-              type="button"
-              onClick={downloadBackup}
-              disabled={exporting}
-              className="text-[11px] uppercase tracking-wide bg-white text-gray-700 border border-gray-200 px-2.5 py-1.5 rounded-full hover:bg-gray-50 disabled:opacity-50 transition-colors"
-            >
-              {exporting ? 'Downloading…' : 'Download backup'}
-            </button>
           </div>
         </div>
 
