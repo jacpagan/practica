@@ -62,11 +62,11 @@ export default function SessionDetailFeedbackCard({
         <p className="text-xs text-gray-500 mt-1">Use feedback when you want it. It stays attached to this take and never replaces the thread.</p>
       </div>
       <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
-        {!canCreateShareLink ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Not shareable yet</p>
-            <p className="text-sm text-amber-900 mt-1">
-              {sessionProcessingStatus === 'failed'
+          {!canCreateShareLink ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Not shareable yet</p>
+              <p className="text-sm text-amber-900 mt-1">
+                {sessionProcessingStatus === 'failed'
                 ? sessionProcessingError || 'Fix playback processing before sharing this private link.'
                 : 'Wait until playback is ready before sharing this private link.'}
             </p>
@@ -83,7 +83,7 @@ export default function SessionDetailFeedbackCard({
         <div className="flex flex-wrap gap-2">
           {!waitingOnReviewer && !feedbackReadyToReview && !readyForFollowUp && currentLoopStatus !== 'flagged' ? (
             <button type="button" onClick={onOpenRequestComposer} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
-              Share for feedback
+              Ask for feedback
             </button>
           ) : null}
           {activeReviewLink?.url ? (
