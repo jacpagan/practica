@@ -43,6 +43,12 @@ Important product context:
 - `source .venv/bin/activate && ruff check apps/backend/practica/ apps/backend/videos/`: lint backend Python.
 - `source .venv/bin/activate && cd apps/backend && python manage.py test`: run backend tests.
 
+## Delivery Defaults
+
+- Treat implementation requests as publish-intent by default: make the change, validate it, then publish the branch and open a draft PR instead of stopping at local edits.
+- Prefer the repository's GitHub publish flow for this, and continue through merge or deployment when the repo's normal path is available and the user has not asked to hold back.
+- Only leave work unpublished when the user explicitly asks for a local-only change, a review-only change, or when production risk requires confirmation.
+
 ## Coding Style & Naming Conventions
 
 Use 4-space indentation in Python and standard React/JS formatting already present in the repo. Prefer descriptive names: `snake_case` for Python functions and modules, `PascalCase` for React components, and `camelCase` for frontend helpers. Keep changes focused and consistent with surrounding code. Use `ruff` for backend style checks; avoid pinning Python package versions in `requirements.txt`.

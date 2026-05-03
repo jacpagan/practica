@@ -3,7 +3,7 @@ import { useCallback } from 'react'
 export const usePrimaryNavigation = ({
   navigate,
 }) => {
-  const goHome = useCallback(() => navigate({ view: 'calendar', sessionId: null }), [navigate])
+  const goHome = useCallback(() => navigate({ view: 'threads', sessionId: null }), [navigate])
   const goPrivacy = useCallback(() => navigate({ view: 'privacy', sessionId: null }), [navigate])
   const goRequests = useCallback(() => navigate({ view: 'requests', sessionId: null }), [navigate])
   const goRecord = useCallback(() => navigate({ view: 'record', sessionId: null }), [navigate])

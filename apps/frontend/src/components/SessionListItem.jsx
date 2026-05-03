@@ -61,8 +61,10 @@ export default function SessionListItem({ session, onOpen, status = '', requestI
           </div>
         </div>
         <div className="text-right shrink-0 space-y-2">
-          <p className="text-xs text-gray-500">{replies} {replies === 1 ? 'reply' : 'replies'}</p>
-          {!minimal && onChangeThread ? (
+          {!minimal ? (
+            <p className="text-xs text-gray-500">{replies} {replies === 1 ? 'reply' : 'replies'}</p>
+          ) : null}
+          {onChangeThread ? (
             <button
               type="button"
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChangeThread?.() }}

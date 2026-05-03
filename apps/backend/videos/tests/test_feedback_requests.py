@@ -129,6 +129,50 @@ class FeedbackRequestApiTests(APITestCase):
         self.assertEqual(response.data['code'], 'review_request_forbidden')
         self.assertFalse(VideoFeedback.objects.filter(review_request=review_request).exists())
 
+    def test_reviewer_can_reply_via_review_request_endpoint_without_active_link(self):
+        review_request = self._create_review_request()
+        review_request.review_link.is_active = False
+        review_request.review_link.save(update_fields=['is_active'])
+
+        self._auth(self.reviewer)
+        create_response = self.client.post(
+            f'/api/review-requests/{review_request.id}/feedback/',
+            {
+                'text': 'This thread should accept replies even if the link expired.',
+                'feedback_video': self._video_file('thread-reply.mp4'),
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        review_request.refresh_from_db()
+        self.assertEqual(review_request.status, ReviewRequest.STATUS_RESPONDED)
+        feedback = VideoFeedback.objects.get(review_request=review_request)
+
+        patch_response = self.client.patch(
+            f'/api/review-requests/{review_request.id}/feedback/',
+            {
+                'feedback_id': feedback.id,
+                'text': 'Edited through the request route.',
+                'feedback_category': 'timing',
+            },
+            format='multipart',
+        )
+        self.assertEqual(patch_response.status_code, status.HTTP_200_OK)
+        feedback.refresh_from_db()
+        self.assertEqual(feedback.text, 'Edited through the request route.')
+        self.assertEqual(feedback.feedback_category, 'timing')
+
+        delete_response = self.client.delete(
+            f'/api/review-requests/{review_request.id}/feedback/',
+            {
+                'feedback_id': feedback.id,
+            },
+            format='json',
+        )
+        self.assertEqual(delete_response.status_code, status.HTTP_200_OK)
+        self.assertFalse(VideoFeedback.objects.filter(review_request=review_request).exists())
+
     def test_outsider_cannot_open_review_request_link(self):
         review_request = self._create_review_request()
 

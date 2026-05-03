@@ -6,9 +6,7 @@ export default function useSessionDetailEditActions({
   authHeaders,
   toast,
   onSessionUpdate,
-  loadReviewRequests,
   setSession,
-  setActiveReviewLink,
 }) {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -49,7 +47,6 @@ export default function useSessionDetailEditActions({
       const data = await res.json()
       const next = { ...data, local_preview_url: session?.local_preview_url || '' }
       setSession(next)
-      setActiveReviewLink?.(next.active_review_link || null)
       onSessionUpdate?.(next)
       setEditing(false)
       toast.success('Video updated')
@@ -58,7 +55,7 @@ export default function useSessionDetailEditActions({
     } finally {
       setSaving(false)
     }
-  }, [authHeaders, editDescription, editPracticeSeries, editTitle, onSessionUpdate, session?.id, session?.local_preview_url, setActiveReviewLink, setSession, toast, token])
+  }, [authHeaders, editDescription, editPracticeSeries, editTitle, onSessionUpdate, session?.id, session?.local_preview_url, setSession, toast, token])
 
   const refreshSession = useCallback(async ({ silent = false } = {}) => {
     if (!token || !session?.id) return
@@ -69,15 +66,13 @@ export default function useSessionDetailEditActions({
       const data = await res.json()
       const next = { ...data, local_preview_url: session?.local_preview_url || '' }
       setSession(next)
-      setActiveReviewLink?.(next.active_review_link || null)
       onSessionUpdate?.(next)
-      await loadReviewRequests?.()
     } catch {
       if (!silent) toast.error('Could not refresh this video')
     } finally {
       setRefreshing(false)
     }
-  }, [authHeaders, loadReviewRequests, onSessionUpdate, session?.id, session?.local_preview_url, setActiveReviewLink, setSession, toast, token])
+  }, [authHeaders, onSessionUpdate, session?.id, session?.local_preview_url, setSession, toast, token])
 
   return {
     editDescription,

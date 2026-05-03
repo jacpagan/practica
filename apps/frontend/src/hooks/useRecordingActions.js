@@ -6,7 +6,6 @@ export const useRecordingActions = ({
   resolveUploadReturnRoute,
   setJustUploadedSessionId,
   setOpenRecorderOnUpload,
-  setPendingFollowUpRequestDraft,
   setPendingPracticeSeries,
   setPendingUploadReturnRoute,
   setSelectedSession,
@@ -19,7 +18,6 @@ export const useRecordingActions = ({
     setSelectedSession(null)
     setJustUploadedSessionId(null)
     setOpenRecorderOnUpload(false)
-    setPendingFollowUpRequestDraft(draft || null)
     setPendingPracticeSeries(String(draft?.practiceSeries || '').trim())
     setPendingUploadReturnRoute(resolveUploadReturnRoute(draft))
     navigate({ view: 'record', sessionId: null })
@@ -28,7 +26,6 @@ export const useRecordingActions = ({
     resolveUploadReturnRoute,
     setJustUploadedSessionId,
     setOpenRecorderOnUpload,
-    setPendingFollowUpRequestDraft,
     setPendingPracticeSeries,
     setPendingUploadReturnRoute,
     setSelectedSession,
@@ -37,7 +34,6 @@ export const useRecordingActions = ({
   const startQuickRecord = useCallback(() => {
     setSelectedSession(null)
     setJustUploadedSessionId(null)
-    setPendingFollowUpRequestDraft(null)
     setPendingPracticeSeries('')
     setPendingUploadReturnRoute(currentReturnRoute)
     setOpenRecorderOnUpload(false)
@@ -47,7 +43,6 @@ export const useRecordingActions = ({
     navigate,
     setJustUploadedSessionId,
     setOpenRecorderOnUpload,
-    setPendingFollowUpRequestDraft,
     setPendingPracticeSeries,
     setPendingUploadReturnRoute,
     setSelectedSession,

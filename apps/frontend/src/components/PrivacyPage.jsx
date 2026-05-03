@@ -13,7 +13,7 @@ function PrivacyPage({ onBack = null, signedIn = false }) {
         <div className="space-y-3">
           <p className="text-xs uppercase tracking-wide text-gray-500">Privacy</p>
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Your private practice mirror</h1>
-          <p className="text-sm text-gray-600">Practica is built for private self-review first. Your takes stay private by default, and you bring in trusted feedback only when you want it.</p>
+          <p className="text-sm text-gray-600">Practica is built to keep your takes private by default. You control what gets recorded, organized, and shared.</p>
         </div>
 
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
@@ -48,18 +48,9 @@ function PrivacyPage({ onBack = null, signedIn = false }) {
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-2">
-            <p className="text-sm font-semibold text-gray-900">How trusted feedback works</p>
-            <ul className="text-sm text-gray-600 space-y-1">
-              <li>Review links are authenticated and revocable.</li>
-              <li>Assigned review requests are visible only to the owner and assigned reviewer.</li>
-              <li>Links can expire and can be turned off at any time.</li>
-            </ul>
-          </div>
-
-          <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-2">
             <p className="text-sm font-semibold text-gray-900">What the platform stores</p>
             <ul className="text-sm text-gray-600 space-y-1">
-              <li>Account identity, private videos, trusted feedback videos, and workflow history needed to run the product.</li>
+              <li>Account identity, private videos, and workflow history needed to run the product.</li>
               <li>Minimal operational logs for uptime, errors, and debugging.</li>
               <li>Browser playback versions derived from uploaded videos.</li>
             </ul>

@@ -3,99 +3,16 @@ import { fmtTimer, sessionVideoSources, videoUrl } from '../utils'
 import { useConfirm } from './ConfirmDialog'
 import { useToast } from './Toast'
 import PracticeThreadField from './PracticeThreadField'
-import SessionDetailFeedbackCard from './SessionDetailFeedbackCard'
-import useReviewRequestFlow from '../hooks/useReviewRequestFlow'
-import SessionDetailReviewPanel from './SessionDetailReviewPanel'
-import SessionDetailFeedbackThread from './SessionDetailFeedbackThread'
 import useSessionDetailEditActions from '../hooks/useSessionDetailEditActions'
 import useSessionDetailMediaActions from '../hooks/useSessionDetailMediaActions'
-import useFeedbackEditActions from '../hooks/useFeedbackEditActions'
 
-function SessionDetail({ session: initialSession, token, onBack, onOpenReviewRequest, initialReviewRequestDraft = null, onReviewRequestDraftCleared, onSessionUpdate, onSessionDelete, justUploaded = false, onRecordAnother, onOpenSeries, practiceThreadOptions = [] }) {
+function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate, onSessionDelete, justUploaded = false, onRecordAnother, onOpenSeries, practiceThreadOptions = [] }) {
   const toast = useToast()
   const confirm = useConfirm()
   const videoRef = useRef(null)
-  const loopDetailsRef = useRef(null)
   const [session, setSession] = useState(initialSession)
   const authHeaders = useMemo(() => (token ? { Authorization: `Token ${token}` } : {}), [token])
   const canEdit = Boolean(session?.can_edit)
-  const canCreateShareLink = session?.processing_status === 'ready'
-  const {
-    activeReviewLink,
-    activeInviteCodes,
-    chooseReviewer,
-    currentLoopRequest,
-    currentLoopStatus,
-    currentLoopSummary,
-    creatingRequest,
-    designatedReviewers,
-    feedbackReadyToReview,
-    copyInviteUrl,
-    copyReviewRequestLink,
-    inviteManagerLoading,
-    justUploadedWithoutRequest,
-    latestInviteUrl,
-    loadReviewRequests,
-    openRequestComposer,
-    openReviewRequestThread,
-    pendingShareIntentLabel,
-    patchReviewRequestStatus,
-    shareInviteUrl,
-    shareReviewRequestLink,
-    recentReviewers,
-    recentReviewersLoading,
-    readyForFollowUp,
-    requestExerciseOrSong,
-    requestGoal,
-    requestInstrument,
-    requestNotes,
-    reviewRequests,
-    requestsLoading,
-    revokeShareLink,
-    reviewerQuery,
-    reviewerResults,
-    reviewerSearchLoading,
-    selectedReviewer,
-    selectedReviewerName,
-    setActiveReviewLink,
-    setPendingShareIntent,
-    setRequestExerciseOrSong,
-    setRequestGoal,
-    setRequestInstrument,
-    setRequestNotes,
-    setReviewerQuery,
-    setSelectedReviewer,
-    setShowInviteManager,
-    setShowLoopDetails,
-    setShowRequestComposer,
-    setShowRequestHistory,
-    setShowRequestDetails,
-    sharing,
-    showInviteManager,
-    showLoopDetails,
-    showRequestComposer,
-    showRequestDetails,
-    showRequestHistory,
-    submitFeedbackChoice,
-    toggleInviteManager,
-    turnOffInviteCode,
-    waitingOnReviewer,
-    startFollowUp,
-  } = useReviewRequestFlow({
-    session,
-    token,
-    authHeaders,
-    canEdit,
-    canCreateShareLink,
-    justUploaded,
-    initialReviewRequestDraft,
-    onReviewRequestDraftCleared,
-    onOpenReviewRequest,
-    onRecordAnother,
-    toast,
-    confirm,
-    loopDetailsRef,
-  })
   const playbackSources = useMemo(() => sessionVideoSources(session, session?.local_preview_url || ''), [session])
   const {
     cancelEditing,
@@ -117,9 +34,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     authHeaders,
     toast,
     onSessionUpdate,
-    loadReviewRequests,
     setSession,
-    setActiveReviewLink,
   })
   const {
     deleting,
@@ -143,37 +58,9 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
     videoRef,
   })
   const playableUrl = playbackSources[playbackSourceIndex] || null
-  const videoFeedback = Array.isArray(session?.video_feedback)
-    ? session.video_feedback
-    : []
-
   useEffect(() => {
     setSession(initialSession)
   }, [initialSession])
-
-  const {
-    editFeedbackInputRef,
-    editingFeedbackId,
-    editingFeedbackTimestampSeconds,
-    editingFeedbackVideoFile,
-    editingFeedbackPreviewUrl,
-    savingFeedbackId,
-    deletingFeedbackId,
-    editFeedbackUploadProgressPercent,
-    startEditingFeedback,
-    cancelEditingFeedback,
-    pickEditFeedbackFile,
-    saveFeedbackEdit,
-    deleteFeedback,
-    setEditingFeedbackTimestampSeconds,
-  } = useFeedbackEditActions({
-    token,
-    sessionId: session?.id,
-    authHeaders,
-    confirm,
-    toast,
-    refreshSession,
-  })
 
   useEffect(() => {
     if (!token || !session?.id) return undefined
@@ -194,7 +81,7 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
       cancelled = true
       if (timeoutId) window.clearTimeout(timeoutId)
     }
-  }, [authHeaders, loadReviewRequests, onSessionUpdate, session?.id, session?.processing_status, token])
+  }, [onSessionUpdate, refreshSession, session?.id, session?.processing_status, token])
 
   return (
     <div className="px-4 sm:px-6 py-4 pb-28 max-w-3xl mx-auto">
@@ -304,99 +191,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 </div>
               ) : null}
 
-              <SessionDetailFeedbackCard
-                canEdit={canEdit}
-                canCreateShareLink={canCreateShareLink}
-                currentLoopRequest={currentLoopRequest}
-                currentLoopStatus={currentLoopStatus}
-                currentLoopSummary={currentLoopSummary}
-                feedbackReadyToReview={feedbackReadyToReview}
-                pendingShareIntentLabel={pendingShareIntentLabel}
-                activeReviewLink={activeReviewLink}
-                onOpenRequestComposer={openRequestComposer}
-                onOpenReviewRequestThread={openReviewRequestThread}
-                onPatchReviewRequestStatus={patchReviewRequestStatus}
-                onRevokeShareLink={revokeShareLink}
-                onStartFollowUp={startFollowUp}
-                readyForFollowUp={readyForFollowUp}
-                revokingShare={sharing}
-                showInviteManager={showInviteManager}
-                onToggleInviteManager={toggleInviteManager}
-                inviteManagerLoading={inviteManagerLoading}
-                activeInviteCodes={activeInviteCodes}
-                latestInviteUrl={latestInviteUrl}
-                onCopyInviteUrl={copyInviteUrl}
-                onShareInviteUrl={shareInviteUrl}
-                onTurnOffInviteCode={turnOffInviteCode}
-                sessionProcessingError={session.processing_error}
-                sessionProcessingStatus={session.processing_status}
-                waitingOnReviewer={waitingOnReviewer}
-              />
-
-              <SessionDetailReviewPanel
-                ref={loopDetailsRef}
-                canEdit={canEdit}
-                showRequestComposer={showRequestComposer}
-                setShowRequestComposer={setShowRequestComposer}
-                canCreateShareLink={canCreateShareLink}
-                selectedReviewerName={selectedReviewerName}
-                selectedReviewer={selectedReviewer}
-                setSelectedReviewer={setSelectedReviewer}
-                setReviewerQuery={setReviewerQuery}
-                recentReviewersLoading={recentReviewersLoading}
-                designatedReviewers={designatedReviewers}
-                recentReviewers={recentReviewers}
-                chooseReviewer={chooseReviewer}
-                reviewerQuery={reviewerQuery}
-                reviewerSearchLoading={reviewerSearchLoading}
-                reviewerResults={reviewerResults}
-                latestInviteUrl={latestInviteUrl}
-                copyInviteUrlAgain={copyInviteUrl}
-                shareInviteUrl={shareInviteUrl}
-                submitFeedbackChoice={submitFeedbackChoice}
-                creatingRequest={creatingRequest}
-                sharing={sharing}
-                reviewRequests={reviewRequests}
-                requestsLoading={requestsLoading}
-                showRequestHistory={showRequestHistory}
-                setShowRequestHistory={setShowRequestHistory}
-                currentLoopSummary={currentLoopSummary}
-                currentLoopRequest={currentLoopRequest}
-                currentLoopStatus={currentLoopStatus}
-                waitingOnReviewer={waitingOnReviewer}
-                feedbackReadyToReview={feedbackReadyToReview}
-                readyForFollowUp={readyForFollowUp}
-                activeReviewLink={activeReviewLink}
-                pendingShareIntentLabel={pendingShareIntentLabel}
-                sessionProcessingStatus={session.processing_status}
-                sessionProcessingError={session.processing_error}
-                showInviteManager={showInviteManager}
-                toggleInviteManager={toggleInviteManager}
-                inviteManagerLoading={inviteManagerLoading}
-                activeInviteCodes={activeInviteCodes}
-                turnOffInviteCode={turnOffInviteCode}
-                openReviewRequestThread={openReviewRequestThread}
-                patchReviewRequestStatus={patchReviewRequestStatus}
-                startFollowUp={startFollowUp}
-                copyReviewRequestLink={copyReviewRequestLink}
-                shareReviewRequestLink={shareReviewRequestLink}
-                jumpToTimestamp={jumpToTimestamp}
-                deletingFeedbackId={deletingFeedbackId}
-                startEditingFeedback={startEditingFeedback}
-                deleteFeedback={deleteFeedback}
-                editingFeedbackId={editingFeedbackId}
-                editingFeedbackTimestampSeconds={editingFeedbackTimestampSeconds}
-                setEditingFeedbackTimestampSeconds={setEditingFeedbackTimestampSeconds}
-                editFeedbackInputRef={editFeedbackInputRef}
-                pickEditFeedbackFile={pickEditFeedbackFile}
-                editingFeedbackPreviewUrl={editingFeedbackPreviewUrl}
-                editingFeedbackVideoFile={editingFeedbackVideoFile}
-                savingFeedbackId={savingFeedbackId}
-                editFeedbackUploadProgressPercent={editFeedbackUploadProgressPercent}
-                cancelEditingFeedback={cancelEditingFeedback}
-                saveFeedbackEdit={saveFeedbackEdit}
-              />
-
               <details className="border-t border-gray-100 pt-4">
                 <summary className="cursor-pointer list-none text-sm text-gray-500 hover:text-gray-900 transition-colors">More options</summary>
                 <div className="flex flex-wrap gap-2 pt-4">
@@ -421,24 +215,6 @@ function SessionDetail({ session: initialSession, token, onBack, onOpenReviewReq
                 </div>
               </details>
 
-              <SessionDetailFeedbackThread
-                videoFeedback={videoFeedback}
-                jumpToTimestamp={jumpToTimestamp}
-                startEditingFeedback={startEditingFeedback}
-                deleteFeedback={deleteFeedback}
-                deletingFeedbackId={deletingFeedbackId}
-                editingFeedbackId={editingFeedbackId}
-                editingFeedbackTimestampSeconds={editingFeedbackTimestampSeconds}
-                setEditingFeedbackTimestampSeconds={setEditingFeedbackTimestampSeconds}
-                editFeedbackInputRef={editFeedbackInputRef}
-                pickEditFeedbackFile={pickEditFeedbackFile}
-                editingFeedbackPreviewUrl={editingFeedbackPreviewUrl}
-                editingFeedbackVideoFile={editingFeedbackVideoFile}
-                savingFeedbackId={savingFeedbackId}
-                editFeedbackUploadProgressPercent={editFeedbackUploadProgressPercent}
-                cancelEditingFeedback={cancelEditingFeedback}
-                saveFeedbackEdit={saveFeedbackEdit}
-              />
             </>
           )}
         </div>

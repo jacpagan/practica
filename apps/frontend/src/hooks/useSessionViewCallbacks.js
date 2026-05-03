@@ -15,18 +15,11 @@ export const useSessionViewCallbacks = ({
   const onDetailSessionDelete = useCallback((sessionId) => {
     setSessions((current) => current.filter((item) => item.id !== sessionId))
     setSelectedSession(null)
-    navigate({ view: 'calendar', sessionId: null }, { replace: true })
+    navigate({ view: 'threads', sessionId: null }, { replace: true })
   }, [navigate, setSelectedSession, setSessions])
-
-  const openReviewRequestToken = useCallback((requestItem) => {
-    const requestLink = requestItem?.feedback_link || requestItem?.review_link
-    if (!requestLink?.token) return
-    navigate({ view: 'review', token: requestLink.token, sessionId: null })
-  }, [navigate])
 
   return {
     onDetailSessionDelete,
     onDetailSessionUpdate,
-    openReviewRequestToken,
   }
 }

@@ -5,8 +5,6 @@ import { routePath } from '../routing'
 export const useNavigationActions = ({
   confirm,
   currentPathRef,
-  setReviewClaim,
-  setReviewToken,
   setRouteDate,
   setRouteSeriesName,
   setRouteSessionId,
@@ -17,8 +15,6 @@ export const useNavigationActions = ({
     setView(nextRoute.view)
     setRouteSessionId(nextRoute.sessionId ?? null)
     setRouteSeriesName(nextRoute.seriesName || '')
-    setReviewToken(nextRoute.token || '')
-    setReviewClaim(nextRoute.claim || '')
     setRouteDate(nextRoute.date || '')
     const path = routePath(nextRoute)
     const current = window.location.pathname + (window.location.search || '')
@@ -26,7 +22,7 @@ export const useNavigationActions = ({
       if (replace) window.history.replaceState(null, '', path)
       else window.history.pushState(null, '', path)
     }
-  }, [setReviewClaim, setReviewToken, setRouteDate, setRouteSeriesName, setRouteSessionId, setView])
+  }, [setRouteDate, setRouteSeriesName, setRouteSessionId, setView])
 
   const requestAbortActiveUpload = useCallback(() => {
     try { uploadGuardRef.current.abort?.() } catch {}

@@ -27,7 +27,7 @@ export const useOpenSessionById = ({
       if (updateUrl) navigate({ view: 'detail', sessionId: data.id })
     } catch {
       toast.error('Could not load video')
-      navigate({ view: 'calendar', sessionId: null }, { replace: true })
+      navigate({ view: 'threads', sessionId: null }, { replace: true })
     }
   }, [navigate, setSelectedSession, token, toast])
 }
