@@ -28,13 +28,11 @@ import { parseRoute, routePath } from './routing'
 import { ToastProvider, useToast } from './components/Toast'
 import { ConfirmProvider, useConfirm } from './components/ConfirmDialog'
 import AuthForm from './components/AuthForm'
-const ReviewPage = React.lazy(() => import('./components/ReviewPage'))
 import SessionUpload from './components/SessionUpload'
 // Inline header create buttons to avoid any chance of circular init
 const SessionDetail = React.lazy(() => import('./components/SessionDetail'))
 const SeriesView = React.lazy(() => import('./components/SeriesView'))
 const ThreadsView = React.lazy(() => import('./components/ThreadsView'))
-const RequestsView = React.lazy(() => import('./components/TeachingView'))
 import PrivacyPage from './components/PrivacyPage'
 const RecorderPage = React.lazy(() => import('./components/RecorderPage'))
 
@@ -47,22 +45,18 @@ function AppContent() {
   const [routeSessionId, setRouteSessionId] = useState(initialRoute.sessionId)
   const [routeSeriesName, setRouteSeriesName] = useState(initialRoute.seriesName || '')
   const [routeDate, setRouteDate] = useState(initialRoute.date || '')
-  const [reviewToken, setReviewToken] = useState(initialRoute.token || '')
-  const [reviewClaim, setReviewClaim] = useState(initialRoute.claim || '')
-  const [reviewRequestId, setRequestId] = useState(initialRoute.requestId ?? null)
   const [selectedSession, setSelectedSession] = useState(null)
   const [sessions, setSessions] = useState([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
-  const [detailReturnRoute, setDetailReturnRoute] = useState({ view: 'calendar', sessionId: null, seriesName: '' })
+  const [detailReturnRoute, setDetailReturnRoute] = useState({ view: 'threads', sessionId: null, seriesName: '' })
   const [openRecorderOnUpload, setOpenRecorderOnUpload] = useState(false)
   const [justUploadedSessionId, setJustUploadedSessionId] = useState(null)
-  const [pendingFollowUpRequestDraft, setPendingFollowUpRequestDraft] = useState(null)
   const [pendingPracticeSeries, setPendingPracticeSeries] = useState(initialRoute.seriesName || '')
   const [pendingUploadReturnRoute, setPendingUploadReturnRoute] = useState({
-    view: initialRoute.view === 'series' && initialRoute.seriesName ? 'series' : 'calendar',
+    view: initialRoute.view === 'series' && initialRoute.seriesName ? 'series' : 'threads',
     sessionId: null,
     seriesName: initialRoute.view === 'series' ? (initialRoute.seriesName || '') : '',
-    date: initialRoute.view === 'calendar' ? (initialRoute.date || '') : '',
+    date: initialRoute.view === 'threads' || initialRoute.view === 'calendar' ? (initialRoute.date || '') : '',
   })
   const calendarMonthCacheRef = useRef(new Map())
   const calendarMonthRequestRef = useRef('')
@@ -77,9 +71,6 @@ function AppContent() {
     route: {
       view,
       sessionId: routeSessionId,
-      token: reviewToken,
-      claim: reviewClaim,
-      requestId: reviewRequestId,
       seriesName: routeSeriesName,
       date: routeDate,
     },
@@ -94,9 +85,6 @@ function AppContent() {
   } = useNavigationActions({
     confirm,
     currentPathRef,
-    setReviewClaim,
-    setReviewToken,
-    setRequestId,
     setRouteDate,
     setRouteSeriesName,
     setRouteSessionId,
@@ -108,12 +96,9 @@ function AppContent() {
     currentReturnRoute,
     resolveUploadReturnRoute,
   } = useUploadReturnRouting({
-    routeClaim: reviewClaim,
     routeDate,
-    routeRequestId: reviewRequestId,
     routeSeriesName,
     routeSessionId,
-    reviewToken,
     view,
   })
 
@@ -122,9 +107,6 @@ function AppContent() {
     route: {
       view,
       sessionId: routeSessionId,
-      token: reviewToken,
-      claim: reviewClaim,
-      requestId: reviewRequestId,
       seriesName: routeSeriesName,
       date: routeDate,
     },
@@ -194,19 +176,17 @@ function AppContent() {
 
   const {
     practiceThreadOptions,
-  } = useLibraryMetrics({ ownerReviewRequests: [], sessions })
+  } = useLibraryMetrics({ sessions })
 
   const {
     handleRecordAnother,
     openGlobalRecorder,
-    startQuickRecord,
   } = useRecordingActions({
     currentReturnRoute,
     navigate,
     resolveUploadReturnRoute,
     setJustUploadedSessionId,
     setOpenRecorderOnUpload,
-    setPendingFollowUpRequestDraft,
     setPendingPracticeSeries,
     setPendingUploadReturnRoute,
     setSelectedSession,
@@ -246,7 +226,6 @@ function AppContent() {
   const {
     onDetailSessionDelete,
     onDetailSessionUpdate,
-    openReviewRequestToken,
   } = useSessionViewCallbacks({
     navigate,
     setSelectedSession,
@@ -268,9 +247,6 @@ function AppContent() {
     if (view === 'privacy') {
       return <PrivacyPage signedIn={false} />
     }
-    if (view === 'review' || view === 'request') {
-      return <ReviewPage reviewToken={reviewToken} reviewRequestId={reviewRequestId} />
-    }
     return <AuthForm />
   }
 
@@ -289,7 +265,7 @@ function AppContent() {
             </button>
             <button
               onClick={goHome}
-              className={`hidden sm:inline-flex text-sm px-3 py-1.5 rounded-full border transition-colors ${view === 'calendar' || view === 'detail' || view === 'series' ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:text-gray-900'}`}
+            className={`hidden sm:inline-flex text-sm px-3 py-1.5 rounded-full border transition-colors ${view === 'threads' || view === 'detail' || view === 'series' ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:text-gray-900'}`}
             >
               Threads
             </button>
@@ -315,7 +291,7 @@ function AppContent() {
         <div className="max-w-4xl mx-auto mt-3 space-y-2 sm:hidden">
           <button
             onClick={goHome}
-            className={`w-full text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'calendar' || view === 'detail' || view === 'series' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+            className={`w-full text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'threads' || view === 'detail' || view === 'series' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
           >
             Threads
           </button>
@@ -339,12 +315,12 @@ function AppContent() {
             </div>
           </div>
         }>
-        {view === 'calendar' && (
+        {view === 'threads' && (
           <ThreadsView
             sessions={sessions}
             sessionsLoading={sessionsLoading}
             token={token}
-            onOpenSession={(session, returnRoute) => openSession(session, returnRoute || { view: 'calendar', sessionId: null, seriesName: '' })}
+            onOpenSession={(session, returnRoute) => openSession(session, returnRoute || { view: 'threads', sessionId: null, seriesName: '' })}
             onCreateVideo={(seriesName) => handleRecordAnother(seriesName ? { practiceSeries: seriesName } : null)}
             onSessionUpdate={onDetailSessionUpdate}
           />
@@ -359,7 +335,6 @@ function AppContent() {
             seriesName={routeSeriesName}
             sessions={sessions}
             sessionsLoading={sessionsLoading}
-            reviewRequests={[]}
             token={token}
             onBack={goHome}
             onOpenSession={openSession}
@@ -369,10 +344,6 @@ function AppContent() {
               navigate({ view: 'record', sessionId: null })
             }}
           />
-        )}
-
-        {view === 'requests' && (
-          <RequestsView token={token} onOpenReviewRequest={openReviewRequestToken} />
         )}
 
         {view === 'upload' && (
@@ -385,8 +356,8 @@ function AppContent() {
                 ? pendingUploadReturnRoute
                 : (pendingPracticeSeries
                     ? { view: 'series', sessionId: null, seriesName: pendingPracticeSeries }
-                    : { view: 'calendar', sessionId: null })
-              setPendingUploadReturnRoute({ view: 'calendar', sessionId: null })
+                    : { view: 'threads', sessionId: null })
+              setPendingUploadReturnRoute({ view: 'threads', sessionId: null })
               navigate(nextRoute, { bypassUploadGuard })
             }}
             initialRecorderOpen={openRecorderOnUpload}
@@ -404,29 +375,12 @@ function AppContent() {
           />
         )}
 
-        {view === 'review' && (
-          <ReviewPage
-            reviewToken={reviewToken}
-            onContinueLoop={(draft) => handleRecordAnother(draft)}
-          />
-        )}
-
-        {view === 'request' && (
-          <ReviewPage
-            reviewRequestId={reviewRequestId}
-            onContinueLoop={(draft) => handleRecordAnother(draft)}
-          />
-        )}
-
         {view === 'detail' && selectedSession && (
           <SessionDetail
             session={selectedSession}
             token={token}
             practiceThreadOptions={practiceThreadOptions}
             onBack={goBack}
-            initialReviewRequestDraft={pendingFollowUpRequestDraft}
-            onReviewRequestDraftCleared={() => setPendingFollowUpRequestDraft(null)}
-            onOpenReviewRequest={openReviewRequestToken}
             justUploaded={selectedSession.id === justUploadedSessionId}
             onRecordAnother={(draft = null) => handleRecordAnother(draft || { practiceSeries: selectedSession.practice_series || '' })}
             onOpenSeries={goSeries}

@@ -177,8 +177,8 @@ def send_review_request_created_notification(*, review_request, actor):
             f'Instrument: {review_request.instrument or "unspecified"}',
             f'Goal: {review_request.goal or "unspecified"}',
             '',
-            f'Open it in Practica: {_app_url("/requests")}',
-            f'Direct review link: {_app_url(f"/r/{review_request.review_link.token}")}',
+            f'Open the thread in Practica: {_app_url(f"/requests/{review_request.id}")}',
+            f'Private link: {_app_url(f"/r/{review_request.review_link.token}")}',
             '',
             'If you do not want email notifications, open Practica directly instead.',
         ]
@@ -208,8 +208,8 @@ def send_review_request_responded_notification(*, review_request, actor):
             f'Instrument: {review_request.instrument or "unspecified"}',
             f'Goal: {review_request.goal or "unspecified"}',
             '',
-            f'Open your requests in Practica: {_app_url("/requests")}',
-            f'Direct review link: {_app_url(f"/r/{review_request.review_link.token}")}',
+            f'Open the thread in Practica: {_app_url(f"/requests/{review_request.id}")}',
+            f'Private link: {_app_url(f"/r/{review_request.review_link.token}")}',
             '',
             'You can mark it viewed in Practica once you have seen it.',
         ]

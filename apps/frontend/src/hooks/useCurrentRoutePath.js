@@ -10,11 +10,9 @@ export const useCurrentRoutePath = ({
     currentPathRef.current = routePath(route)
   }, [
     currentPathRef,
-    route.claim,
     route.date,
     route.seriesName,
     route.sessionId,
-    route.token,
     route.view,
   ])
 }

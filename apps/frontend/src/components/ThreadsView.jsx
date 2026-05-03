@@ -172,13 +172,13 @@ export default function ThreadsView({
                         {group.seriesName === UNTHREADED_KEY ? 'Add video' : 'Add to thread'}
                       </button>
                       {latest ? (
-                        <button
-                          type="button"
-                          onClick={() => onOpenSession?.(latest, { view: 'calendar', sessionId: null, seriesName: group.seriesName === UNTHREADED_KEY ? '' : group.seriesName })}
-                          className="rounded-full border border-gray-200 bg-white text-gray-900 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors"
-                        >
-                          Open latest
-                        </button>
+                      <button
+                        type="button"
+                        onClick={() => onOpenSession?.(latest, { view: 'threads', sessionId: null, seriesName: group.seriesName === UNTHREADED_KEY ? '' : group.seriesName })}
+                        className="rounded-full border border-gray-200 bg-white text-gray-900 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors"
+                      >
+                        Open latest
+                      </button>
                       ) : null}
                     </div>
                   </div>
@@ -188,7 +188,7 @@ export default function ThreadsView({
                       <SessionListItem
                         key={session.id}
                         session={session}
-                        onOpen={() => onOpenSession?.(session, { view: 'calendar', sessionId: null, seriesName: group.seriesName === UNTHREADED_KEY ? '' : group.seriesName })}
+                        onOpen={() => onOpenSession?.(session, { view: 'threads', sessionId: null, seriesName: group.seriesName === UNTHREADED_KEY ? '' : group.seriesName })}
                         onChangeThread={() => openThreadEditor(session)}
                         prefetch
                         minimal
