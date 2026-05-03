@@ -1,8 +1,10 @@
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -91,6 +93,27 @@ class V1VideoFeaturesTests(APITestCase):
 
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('current thread name is required', res.data['error'].lower())
+
+    def test_session_export_returns_threads_and_sessions(self):
+        first = self._create_session(user=self.owner, title='Groove take')
+        second = self._create_session(user=self.owner, title='Solo take')
+        first.practice_series = 'Groove Lab'
+        first.save(update_fields=['practice_series'])
+        Session.objects.filter(pk=first.id).update(recorded_at=timezone.now() - timedelta(days=1))
+        Session.objects.filter(pk=second.id).update(recorded_at=timezone.now())
+
+        self.client.force_authenticate(user=self.owner)
+        res = self.client.get('/api/sessions/export/')
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['generated_by']['username'], self.owner.username)
+        self.assertEqual(res.data['session_count'], 2)
+        self.assertEqual(res.data['thread_count'], 2)
+        self.assertEqual(res.data['threads'][0]['name'], '')
+        self.assertEqual(res.data['threads'][0]['session_ids'], [second.id])
+        self.assertEqual(res.data['threads'][1]['name'], 'Groove Lab')
+        self.assertEqual(res.data['threads'][1]['session_ids'], [first.id])
+        self.assertEqual(res.data['sessions'][0]['id'], second.id)
 
     def test_video_feedback_accepts_android_3gpp_with_generic_content_type(self):
         session = self._create_session(user=self.owner)

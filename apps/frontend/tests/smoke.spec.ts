@@ -75,6 +75,7 @@ test('Threads home shows grouped videos for signed-in members', async ({ page })
   await expect(page.getByText('Groove Lab')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Add to thread' }).first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'Change thread' }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Download backup' })).toBeVisible()
 })
 
 test('Record route shows camera and microphone selectors for signed-in members', async ({ page }) => {
