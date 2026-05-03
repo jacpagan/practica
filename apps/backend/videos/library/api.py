@@ -225,6 +225,55 @@ class SessionViewSet(SessionMediaActionsMixin, viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @action(detail=False, methods=['get'], url_path='export')
+    def export_library(self, request):
+        sessions = list(
+            self.get_queryset()
+            .prefetch_related(
+                'chapters', 'chapters__exercise',
+                'video_feedback', 'video_feedback__user', 'video_feedback__user__profile',
+                'tags', 'assets',
+            )
+            .select_related('user', 'user__profile')
+            .order_by('-recorded_at', '-id')
+        )
+        session_data = SessionSerializer(sessions, many=True, context={'request': request}).data
+
+        threads = []
+        thread_lookup = {}
+        for session in sessions:
+            thread_name = str(session.practice_series or '').strip()
+            thread_key = thread_name or '__unthreaded__'
+            thread = thread_lookup.get(thread_key)
+            if thread is None:
+                thread = {
+                    'name': thread_name,
+                    'session_ids': [],
+                    'take_count': 0,
+                    'latest_recorded_at': session.recorded_at.isoformat() if session.recorded_at else '',
+                }
+                thread_lookup[thread_key] = thread
+                threads.append(thread)
+            thread['session_ids'].append(session.id)
+            thread['take_count'] += 1
+
+        display_name = ''
+        if hasattr(request.user, 'profile') and getattr(request.user.profile, 'display_name', ''):
+            display_name = request.user.profile.display_name
+
+        return Response({
+            'exported_at': timezone.now().isoformat(),
+            'generated_by': {
+                'id': request.user.id,
+                'username': request.user.username,
+                'display_name': display_name or request.user.username,
+            },
+            'session_count': len(session_data),
+            'thread_count': len(threads),
+            'threads': threads,
+            'sessions': session_data,
+        })
+
     @action(detail=True, methods=['post', 'delete'], url_path='share')
     def create_share_link(self, request, pk=None):
         session = self.get_object()
