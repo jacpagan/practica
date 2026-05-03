@@ -3,24 +3,19 @@ import { AuthProvider, useAuth } from './auth'
 import AppErrorBoundary from './components/AppErrorBoundary'
 import { useAuthExpiredListener } from './hooks/useAuthExpiredListener'
 import { useBeforeUnloadGuard } from './hooks/useBeforeUnloadGuard'
-import { useCalendarMonthLoader } from './hooks/useCalendarMonthLoader'
 import { useCurrentRoutePath } from './hooks/useCurrentRoutePath'
 import { useDetailRouteHydration } from './hooks/useDetailRouteHydration'
 import { useInitialRouteNormalization } from './hooks/useInitialRouteNormalization'
 import { useLibraryMetrics } from './hooks/useLibraryMetrics'
 import { useNavigationActions } from './hooks/useNavigationActions'
 import { useOfflineStatus } from './hooks/useOfflineStatus'
-import { useOpenHomeworkItem } from './hooks/useOpenHomeworkItem'
 import { useOpenSessionById } from './hooks/useOpenSessionById'
-import { useOwnerReviewRequestsLoader } from './hooks/useOwnerReviewRequestsLoader'
 import { usePaginatedFetch } from './hooks/usePaginatedFetch'
 import { usePopStateUploadGuard } from './hooks/usePopStateUploadGuard'
 import { usePostLoginRedirect } from './hooks/usePostLoginRedirect'
 import { usePrimaryNavigation } from './hooks/usePrimaryNavigation'
 import { useQuickRecordBootstrap } from './hooks/useQuickRecordBootstrap'
 import { useRecordingActions } from './hooks/useRecordingActions'
-import { useReviewerWorkspaceAvailability } from './hooks/useReviewerWorkspaceAvailability'
-import { useReviewerWorkspacePolling } from './hooks/useReviewerWorkspacePolling'
 import { useSessionUpdatedListener } from './hooks/useSessionUpdatedListener'
 import { useSessionDetailActions } from './hooks/useSessionDetailActions'
 import { useSessionsLoader } from './hooks/useSessionsLoader'
@@ -31,7 +26,6 @@ import { useUserMenuActions } from './hooks/useUserMenuActions'
 import { useViewDataRefresh } from './hooks/useViewDataRefresh'
 import { parseRoute, routePath } from './routing'
 import { ToastProvider, useToast } from './components/Toast'
-import NotificationsBell from './components/NotificationsBell'
 import { ConfirmProvider, useConfirm } from './components/ConfirmDialog'
 import AuthForm from './components/AuthForm'
 const ReviewPage = React.lazy(() => import('./components/ReviewPage'))
@@ -39,9 +33,9 @@ import SessionUpload from './components/SessionUpload'
 // Inline header create buttons to avoid any chance of circular init
 const SessionDetail = React.lazy(() => import('./components/SessionDetail'))
 const SeriesView = React.lazy(() => import('./components/SeriesView'))
+const ThreadsView = React.lazy(() => import('./components/ThreadsView'))
 const RequestsView = React.lazy(() => import('./components/TeachingView'))
 import PrivacyPage from './components/PrivacyPage'
-const CalendarView = React.lazy(() => import('./components/CalendarView'))
 const RecorderPage = React.lazy(() => import('./components/RecorderPage'))
 
 function AppContent() {
@@ -55,13 +49,10 @@ function AppContent() {
   const [routeDate, setRouteDate] = useState(initialRoute.date || '')
   const [reviewToken, setReviewToken] = useState(initialRoute.token || '')
   const [reviewClaim, setReviewClaim] = useState(initialRoute.claim || '')
+  const [reviewRequestId, setRequestId] = useState(initialRoute.requestId ?? null)
   const [selectedSession, setSelectedSession] = useState(null)
   const [sessions, setSessions] = useState([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
-  const [ownerReviewRequests, setOwnerReviewRequests] = useState([])
-  const [hasReviewerWorkspace, setHasReviewerWorkspace] = useState(false)
-  const [reviewerPendingCount, setReviewerPendingCount] = useState(0)
-  const reviewerPollRef = useRef(null)
   const [detailReturnRoute, setDetailReturnRoute] = useState({ view: 'calendar', sessionId: null, seriesName: '' })
   const [openRecorderOnUpload, setOpenRecorderOnUpload] = useState(false)
   const [justUploadedSessionId, setJustUploadedSessionId] = useState(null)
@@ -88,6 +79,7 @@ function AppContent() {
       sessionId: routeSessionId,
       token: reviewToken,
       claim: reviewClaim,
+      requestId: reviewRequestId,
       seriesName: routeSeriesName,
       date: routeDate,
     },
@@ -104,6 +96,7 @@ function AppContent() {
     currentPathRef,
     setReviewClaim,
     setReviewToken,
+    setRequestId,
     setRouteDate,
     setRouteSeriesName,
     setRouteSessionId,
@@ -117,6 +110,7 @@ function AppContent() {
   } = useUploadReturnRouting({
     routeClaim: reviewClaim,
     routeDate,
+    routeRequestId: reviewRequestId,
     routeSeriesName,
     routeSessionId,
     reviewToken,
@@ -130,6 +124,7 @@ function AppContent() {
       sessionId: routeSessionId,
       token: reviewToken,
       claim: reviewClaim,
+      requestId: reviewRequestId,
       seriesName: routeSeriesName,
       date: routeDate,
     },
@@ -170,34 +165,6 @@ function AppContent() {
     view,
   })
 
-  const loadCalendarMonth = useCalendarMonthLoader({
-    calendarMonthCacheRef,
-    calendarMonthRequestRef,
-    fetchPaginated,
-    setSessions,
-    setSessionsLoading,
-    token,
-  })
-
-  const loadOwnerReviewRequests = useOwnerReviewRequestsLoader({
-    fetchPaginated,
-    setOwnerReviewRequests,
-    token,
-  })
-
-  const loadReviewerWorkspaceAvailability = useReviewerWorkspaceAvailability({
-    fetchPaginated,
-    setHasReviewerWorkspace,
-    setReviewerPendingCount,
-    token,
-  })
-
-  useReviewerWorkspacePolling({
-    loadReviewerWorkspaceAvailability,
-    reviewerPollRef,
-    token,
-  })
-
   const openSessionById = useOpenSessionById({
     navigate,
     setSelectedSession,
@@ -226,12 +193,8 @@ function AppContent() {
   })
 
   const {
-    activeOwnerRequestBySessionId,
-    ownReadySessionCount,
     practiceThreadOptions,
-  } = useLibraryMetrics({ ownerReviewRequests, sessions })
-
-  // no dropdown menu state
+  } = useLibraryMetrics({ ownerReviewRequests: [], sessions })
 
   const {
     handleRecordAnother,
@@ -249,26 +212,13 @@ function AppContent() {
     setSelectedSession,
   })
 
-  const openHomeWorkItem = useOpenHomeworkItem({
-    activeOwnerRequestBySessionId,
-    navigate,
-    openSession,
-    setDetailReturnRoute,
-    setOpenRecorderOnUpload,
-    setSelectedSession,
-  })
-
   useViewDataRefresh({
-    loadOwnerReviewRequests,
-    loadReviewerWorkspaceAvailability,
     loadSessions,
     user,
     view,
   })
 
   useQuickRecordBootstrap(autoQuickRecordCheckedRef)
-
-  // Keep Requests route accessible; show graceful empty state when no reviewer workspace
 
   useDetailRouteHydration({
     openSessionById,
@@ -286,19 +236,10 @@ function AppContent() {
     requestAbortActiveUpload,
     uploadGuardRef,
   })
-  const requestsBadge = reviewerPendingCount > 0 ? (
-    <span
-      aria-label={`${reviewerPendingCount} pending review request${reviewerPendingCount === 1 ? '' : 's'}`}
-      className="inline-flex min-w-5 items-center justify-center rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-semibold text-white"
-    >
-      {reviewerPendingCount > 9 ? '9+' : reviewerPendingCount}
-    </span>
-  ) : null
 
   const {
     goHome,
     goPrivacy,
-    goRequests,
     goSeries,
   } = usePrimaryNavigation({ navigate })
 
@@ -327,8 +268,8 @@ function AppContent() {
     if (view === 'privacy') {
       return <PrivacyPage signedIn={false} />
     }
-    if (view === 'review') {
-      return <ReviewPage reviewToken={reviewToken} />
+    if (view === 'review' || view === 'request') {
+      return <ReviewPage reviewToken={reviewToken} reviewRequestId={reviewRequestId} />
     }
     return <AuthForm />
   }
@@ -346,23 +287,12 @@ function AppContent() {
             <button onClick={goHome} className="text-lg font-semibold text-gray-900 tracking-tight">
               Practica
             </button>
-            {hasReviewerWorkspace ? (
-              <nav className="hidden sm:flex items-center gap-2 rounded-full border border-gray-200 p-1">
-                <button
-                  onClick={goHome}
-                  className={`text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'calendar' || view === 'detail' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
-                >
-                  Home
-                </button>
-                <button
-                  onClick={goRequests}
-                  className={`inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-full transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-900'}`}
-                >
-                  <span>Requests</span>
-                  {requestsBadge}
-                </button>
-              </nav>
-            ) : null}
+            <button
+              onClick={goHome}
+              className={`hidden sm:inline-flex text-sm px-3 py-1.5 rounded-full border transition-colors ${view === 'calendar' || view === 'detail' || view === 'series' ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:text-gray-900'}`}
+            >
+              Threads
+            </button>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <button
@@ -372,11 +302,6 @@ function AppContent() {
               Record
             </button>
             <div className="flex items-center gap-2 sm:border-l sm:border-gray-100 sm:pl-3">
-              <NotificationsBell
-                token={token}
-                onOpenPrivacy={goPrivacy}
-                onOpenReviewRequest={openReviewRequestToken}
-              />
               <button onClick={goPrivacy} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
                 Privacy
               </button>
@@ -388,23 +313,12 @@ function AppContent() {
           </div>
         </div>
         <div className="max-w-4xl mx-auto mt-3 space-y-2 sm:hidden">
-          {hasReviewerWorkspace ? (
-            <nav className="grid grid-cols-2 gap-2">
-              <button
-                onClick={goHome}
-                className={`text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'calendar' || view === 'detail' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
-              >
-                Home
-              </button>
-              <button
-                onClick={goRequests}
-                className={`inline-flex items-center justify-center gap-2 text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'requests' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
-              >
-                <span>Requests</span>
-                {requestsBadge}
-              </button>
-            </nav>
-          ) : null}
+          <button
+            onClick={goHome}
+            className={`w-full text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'calendar' || view === 'detail' || view === 'series' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+          >
+            Threads
+          </button>
           <div className="grid grid-cols-1 gap-2">
             <button
               onClick={openGlobalRecorder}
@@ -425,28 +339,14 @@ function AppContent() {
             </div>
           </div>
         }>
-        {/* List view removed. Calendar is primary. */}
-
-        {/* Archive view removed. */}
-
         {view === 'calendar' && (
-          <CalendarView
+          <ThreadsView
             sessions={sessions}
             sessionsLoading={sessionsLoading}
-            routeDateKey={routeDate}
-            reviewRequests={ownerReviewRequests}
+            token={token}
             onOpenSession={(session, returnRoute) => openSession(session, returnRoute || { view: 'calendar', sessionId: null, seriesName: '' })}
-            onOpenSeries={goSeries}
-            onQuickRecord={(dateKey) => handleRecordAnother({
-              returnRoute: { view: 'calendar', sessionId: null, date: String(dateKey || '') },
-            })}
-            onOpenListDate={(dateKey) => {
-              try { window.localStorage.setItem('practica.filter.date.v1', String(dateKey || '')) } catch {}
-              navigate({ view: 'calendar', sessionId: null, date: String(dateKey || '') })
-            }}
-            onMonthChange={(monthDate) => {
-              loadCalendarMonth(monthDate)
-            }}
+            onCreateVideo={(seriesName) => handleRecordAnother(seriesName ? { practiceSeries: seriesName } : null)}
+            onSessionUpdate={onDetailSessionUpdate}
           />
         )}
 
@@ -459,7 +359,7 @@ function AppContent() {
             seriesName={routeSeriesName}
             sessions={sessions}
             sessionsLoading={sessionsLoading}
-            reviewRequests={ownerReviewRequests}
+            reviewRequests={[]}
             token={token}
             onBack={goHome}
             onOpenSession={openSession}
@@ -472,21 +372,7 @@ function AppContent() {
         )}
 
         {view === 'requests' && (
-          hasReviewerWorkspace ? (
-            <RequestsView token={token} onOpenReviewRequest={openReviewRequestToken} />
-          ) : (
-            <div className="px-4 sm:px-6 py-6">
-              <div className="max-w-3xl mx-auto">
-                <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center">
-                  <p className="text-sm font-semibold text-gray-900">No trusted feedback inbox yet</p>
-                  <p className="text-xs text-gray-500 mt-1">Structured requests appear here when someone brings you into their practice loop.</p>
-                  <div className="mt-4">
-              <button type="button" onClick={goHome} className="text-xs rounded-lg bg-gray-900 text-white px-3 py-1.5 hover:bg-gray-800">Back to Home</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )
+          <RequestsView token={token} onOpenReviewRequest={openReviewRequestToken} />
         )}
 
         {view === 'upload' && (
@@ -521,6 +407,13 @@ function AppContent() {
         {view === 'review' && (
           <ReviewPage
             reviewToken={reviewToken}
+            onContinueLoop={(draft) => handleRecordAnother(draft)}
+          />
+        )}
+
+        {view === 'request' && (
+          <ReviewPage
+            reviewRequestId={reviewRequestId}
             onContinueLoop={(draft) => handleRecordAnother(draft)}
           />
         )}
