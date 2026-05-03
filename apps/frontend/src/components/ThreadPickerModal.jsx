@@ -9,6 +9,8 @@ export default function ThreadPickerModal({
   onSave,
   onClose,
   saving = false,
+  onClear = null,
+  clearLabel = 'Remove from thread',
 }) {
   const [value, setValue] = useState(initialValue || '')
   const [inputRef, setInputRef] = useState(null)
@@ -36,6 +38,11 @@ export default function ThreadPickerModal({
             placeholder="Choose or create a thread"
           />
           <div className="flex items-center justify-end gap-2">
+            {onClear && String(value || '').trim() ? (
+              <button type="button" onClick={() => onClear?.()} disabled={saving} className="text-xs text-red-600 hover:text-red-700">
+                {clearLabel}
+              </button>
+            ) : null}
             <button type="button" onClick={onClose} className="text-xs text-gray-600 hover:text-gray-900">Cancel</button>
             <button type="button" onClick={() => onSave?.(String(value || '').trim())} disabled={saving} className="text-xs font-medium text-white bg-gray-900 rounded-lg px-3 py-2 hover:bg-gray-800 disabled:opacity-50">{saving ? 'Saving…' : 'Save'}</button>
           </div>

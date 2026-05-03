@@ -22,14 +22,14 @@ export default function SessionDetailFeedbackThread({
   return (
     <div className="rounded-xl border border-gray-200 bg-white px-4 py-4 space-y-3">
       <div>
-        <p className="text-sm font-semibold text-gray-900">Feedback</p>
+        <p className="text-sm font-semibold text-gray-900">Attached feedback</p>
         <p className="text-xs text-gray-500 mt-1">Responses stay private to you and the people included in this review.</p>
       </div>
 
       {videoFeedback.length === 0 ? (
         <div className="rounded-xl bg-gray-50 px-3 py-3">
           <p className="text-sm text-gray-600">No responses yet.</p>
-          <p className="text-xs text-gray-400 mt-1">Use a private review or a private link when you want a response.</p>
+          <p className="text-xs text-gray-400 mt-1">Use a review request or a private link when you want a response.</p>
         </div>
       ) : (
         <div className="space-y-3">
