@@ -55,14 +55,16 @@ export default function SessionListItem({ session, onOpen, status = '', requestI
             </div>
             <p className="text-sm font-medium text-gray-900 mt-2 line-clamp-1">{session.title || 'Untitled'}</p>
             <p className="text-xs text-gray-500 mt-1">{metadataLabel}</p>
-            {!minimal && resolution?.summary ? <p className="text-xs font-medium text-gray-700 mt-2 line-clamp-1">{resolution.summary}</p> : null}
-            {!minimal && resolution?.detail ? <p className="text-xs text-gray-500 mt-1 line-clamp-2">{resolution.detail}</p> : null}
-            {!minimal && resolutionTimestamp ? <p className="text-[11px] text-gray-400 mt-1 line-clamp-1">{resolutionTimestamp}</p> : null}
+            {!minimal && resolution?.summary ? <p className="text-xs font-medium text-gray-700 mt-2 line-clamp-1">resolution.summary</p> : null}
+            {!minimal && resolution?.detail ? <p className="text-xs text-gray-500 mt-1 line-clamp-2">resolution.detail</p> : null}
+            {!minimal && resolutionTimestamp ? <p className="text-[11px] text-gray-400 mt-1 line-clamp-1">resolutionTimestamp</p> : null}
           </div>
         </div>
         <div className="text-right shrink-0 space-y-2">
-          <p className="text-xs text-gray-500">{replies} {replies === 1 ? 'reply' : 'replies'}</p>
-          {!minimal && onChangeThread ? (
+          {!minimal ? (
+            <p className="text-xs text-gray-500">{replies} {replies === 1 ? 'reply' : 'replies'}</p>
+          ) : null}
+          {onChangeThread ? (
             <button
               type="button"
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChangeThread?.() }}
