@@ -14,7 +14,7 @@ function InviteRow({ invite, onCopyInviteUrl, onShareInviteUrl, onTurnOffInviteC
           Share invite link
         </button>
         <button type="button" onClick={() => onCopyInviteUrl(invite.invite_url, { successMessage: 'Invite link copied again' })} className="text-xs text-gray-700 hover:text-gray-900 transition-colors">
-          Copy link
+          Copy invite link
         </button>
         <button type="button" onClick={() => onTurnOffInviteCode(invite.id)} className="text-xs text-red-600 hover:text-red-700 transition-colors">
           Turn off
@@ -58,8 +58,8 @@ export default function SessionDetailFeedbackCard({
   return (
     <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 space-y-4">
       <div>
-        <p className="text-sm font-semibold text-gray-900">Feedback</p>
-        <p className="text-xs text-gray-500 mt-1">Ask one trusted person for feedback. If they are new, Practica creates the invite for you.</p>
+        <p className="text-sm font-semibold text-gray-900">Optional feedback</p>
+        <p className="text-xs text-gray-500 mt-1">Use feedback when you want it. It stays attached to this take and never replaces the thread.</p>
       </div>
       <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
         {!canCreateShareLink ? (
@@ -83,7 +83,7 @@ export default function SessionDetailFeedbackCard({
         <div className="flex flex-wrap gap-2">
           {!waitingOnReviewer && !feedbackReadyToReview && !readyForFollowUp && currentLoopStatus !== 'flagged' ? (
             <button type="button" onClick={onOpenRequestComposer} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
-              Ask for feedback
+              Share for feedback
             </button>
           ) : null}
           {activeReviewLink?.url ? (
