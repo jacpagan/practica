@@ -244,10 +244,16 @@ class SessionSerializer(serializers.ModelSerializer):
                   'processing_status', 'processing_job_id', 'processing_error',
                   'resolution',
                   'client_upload_id',
+                  'ml_training_enabled', 'ml_training_consent_source', 'ml_training_consent_at',
+                  'ml_training_consent_revoked_at', 'ml_training_consent_revocation_source',
                   'tag_names', 'assets',
                   'chapters', 'video_feedback', 'active_review_link', 'chapter_count', 'video_feedback_count', 'owner',
                   'can_edit']
-        read_only_fields = ['id', 'recorded_at', 'created_at', 'updated_at']
+        read_only_fields = [
+            'id', 'recorded_at', 'created_at', 'updated_at',
+            'ml_training_enabled', 'ml_training_consent_source', 'ml_training_consent_at',
+            'ml_training_consent_revoked_at', 'ml_training_consent_revocation_source',
+        ]
 
     def get_tag_names(self, obj):
         return [t.name for t in obj.tags.all()]
