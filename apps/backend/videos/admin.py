@@ -6,6 +6,7 @@ from .models import (
     ProductEventLog,
     ReviewerInvite,
     ReviewRequest, ReviewRequestEvent, ReviewerRosterMembership, FeedbackTemplate,
+    MLDatasetSnapshot, MLModelSuggestion,
 )
 
 
@@ -48,7 +49,7 @@ class ReviewerInviteAdmin(admin.ModelAdmin):
 
 @admin.register(Session)
 class SessionAdmin(admin.ModelAdmin):
-    list_display = ['title', 'practice_series', 'user', 'processing_status', 'recorded_at']
+    list_display = ['title', 'practice_series', 'user', 'processing_status', 'ml_training_enabled', 'recorded_at']
     search_fields = ['title', 'practice_series', 'description']
     list_filter = ['user', 'processing_status']
     inlines = [ChapterInline, VideoFeedbackInline]
@@ -133,6 +134,22 @@ class FeedbackTemplateAdmin(admin.ModelAdmin):
     @admin.display(description='Reviewer')
     def reviewer_display(self, obj):
         return obj.reviewer
+
+
+@admin.register(MLDatasetSnapshot)
+class MLDatasetSnapshotAdmin(admin.ModelAdmin):
+    list_display = ['id', 'snapshot_version', 'row_count', 'created_by', 'created_at']
+    list_filter = ['snapshot_version', 'created_at']
+    search_fields = ['snapshot_version']
+    raw_id_fields = ['created_by']
+
+
+@admin.register(MLModelSuggestion)
+class MLModelSuggestionAdmin(admin.ModelAdmin):
+    list_display = ['id', 'session', 'model_name', 'model_version', 'decision', 'resolved_thread_label', 'created_at']
+    list_filter = ['model_name', 'model_version', 'decision', 'created_at']
+    search_fields = ['session__title', 'predicted_thread_label', 'resolved_thread_label', 'note']
+    raw_id_fields = ['session', 'created_by']
 
 
 @admin.register(ReviewRequestEvent)

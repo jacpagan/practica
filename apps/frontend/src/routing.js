@@ -4,6 +4,7 @@ export const parseRoute = (pathname, search = '') => {
   if (pathname === '/') {
     return { view: 'threads', sessionId: null, date }
   }
+  if (pathname.startsWith('/requests') || pathname.startsWith('/review/')) return { view: 'threads', sessionId: null, date }
   if (pathname === '/privacy') return { view: 'privacy', sessionId: null }
   if (pathname === '/archive') return { view: 'threads', sessionId: null }
   if (pathname === '/calendar') return { view: 'threads', sessionId: null, date }

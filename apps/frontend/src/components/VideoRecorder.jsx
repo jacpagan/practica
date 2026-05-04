@@ -863,7 +863,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       const outputType = mimeType || recorder.mimeType || 'video/webm'
       const blob = new Blob(chunksRef.current, { type: outputType })
       const ext = outputType.includes('mp4') ? 'mp4' : 'webm'
-      const file = new File([blob], `reply-${Date.now()}.${ext}`, { type: outputType })
+      const file = new File([blob], `take-${Date.now()}.${ext}`, { type: outputType })
 
       if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
       blobUrlRef.current = URL.createObjectURL(blob)

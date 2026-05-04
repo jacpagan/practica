@@ -164,6 +164,11 @@ class Session(models.Model):
     processing_error = models.TextField(blank=True)
     client_upload_id = models.CharField(max_length=64, blank=True, db_index=True)
     tags = models.ManyToManyField(Tag, blank=True, related_name='sessions')
+    ml_training_enabled = models.BooleanField(default=False, db_index=True)
+    ml_training_consent_source = models.CharField(max_length=64, blank=True)
+    ml_training_consent_at = models.DateTimeField(null=True, blank=True)
+    ml_training_consent_revoked_at = models.DateTimeField(null=True, blank=True)
+    ml_training_consent_revocation_source = models.CharField(max_length=64, blank=True)
     duration_seconds = models.IntegerField(null=True, blank=True)
     recorded_at = models.DateTimeField(auto_now_add=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -560,6 +565,64 @@ class FeedbackTemplate(models.Model):
 
     def __str__(self):
         return f"FeedbackTemplate reviewer={self.reviewer_id} title={self.title}"
+
+
+class MLDatasetSnapshot(models.Model):
+    """Versioned metadata describing an exported training dataset snapshot."""
+
+    snapshot_version = models.CharField(max_length=32, db_index=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='ml_dataset_snapshots')
+    session_ids_json = models.JSONField(default=list, blank=True)
+    manifest_json = models.JSONField(default=dict, blank=True)
+    row_count = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        indexes = [
+            models.Index(fields=['snapshot_version', 'created_at']),
+        ]
+
+    def __str__(self):
+        return f"MLDatasetSnapshot version={self.snapshot_version} rows={self.row_count}"
+
+
+class MLModelSuggestion(models.Model):
+    """A baseline model prediction plus the human feedback that followed it."""
+
+    DECISION_ACCEPTED = 'accepted'
+    DECISION_REJECTED = 'rejected'
+    DECISION_EDITED = 'edited'
+    DECISION_CHOICES = [
+        (DECISION_ACCEPTED, 'Accepted'),
+        (DECISION_REJECTED, 'Rejected'),
+        (DECISION_EDITED, 'Edited'),
+    ]
+
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='ml_suggestions')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='ml_model_suggestions')
+    model_name = models.CharField(max_length=64, db_index=True)
+    model_version = models.CharField(max_length=32, db_index=True)
+    predicted_thread_label = models.CharField(max_length=200, blank=True)
+    predicted_label_choices_json = models.JSONField(default=list, blank=True)
+    confidence_json = models.JSONField(default=dict, blank=True)
+    explanation_json = models.JSONField(default=dict, blank=True)
+    decision = models.CharField(max_length=16, choices=DECISION_CHOICES, blank=True)
+    resolved_thread_label = models.CharField(max_length=200, blank=True)
+    resolved_label_choices_json = models.JSONField(default=list, blank=True)
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+        indexes = [
+            models.Index(fields=['session', 'created_at']),
+            models.Index(fields=['model_name', 'model_version']),
+        ]
+
+    def __str__(self):
+        return f"MLModelSuggestion session={self.session_id} model={self.model_name}:{self.model_version}"
 
 
 class ProductEventLog(models.Model):

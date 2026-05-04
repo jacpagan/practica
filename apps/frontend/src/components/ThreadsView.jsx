@@ -127,7 +127,7 @@ export default function ThreadsView({
         <div className="space-y-3">
           <div>
             <p className="text-xs uppercase tracking-wide text-gray-500">Private archive</p>
-            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">Threads</h2>
+            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">Practice archive</h2>
             <p className="text-sm text-gray-500 mt-2">Keep each take grouped by topic. Move a video when it belongs somewhere else, or leave it unthreaded if it stands alone.</p>
           </div>
           <div className="flex flex-wrap gap-2">

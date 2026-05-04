@@ -267,7 +267,7 @@ function AppContent() {
               onClick={goHome}
             className={`hidden sm:inline-flex text-sm px-3 py-1.5 rounded-full border transition-colors ${view === 'threads' || view === 'detail' || view === 'series' ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:text-gray-900'}`}
             >
-              Threads
+              Archive
             </button>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -293,7 +293,7 @@ function AppContent() {
             onClick={goHome}
             className={`w-full text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'threads' || view === 'detail' || view === 'series' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
           >
-            Threads
+            Archive
           </button>
           <div className="grid grid-cols-1 gap-2">
             <button

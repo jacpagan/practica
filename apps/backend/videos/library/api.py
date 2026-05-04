@@ -14,6 +14,7 @@ from videos.media.api import SessionMediaActionsMixin
 from videos.media.services import maybe_refresh_session_processing, normalized_client_upload_id, start_processing_pipeline
 from videos.media.uploads import attach_tags_to_session, parse_tag_names
 from videos.models import Chapter, Exercise, ReviewLink, ReviewRequest, ReviewRequestEvent, Session, SessionAsset, SessionLastSeen, Tag, VideoFeedback
+from videos.services.ml_training import build_dataset_snapshot, normalize_label, normalize_source, record_session_suggestion_feedback, suggest_session_thread
 from videos.serializers import ChapterSerializer, ReviewLinkSerializer, ReviewVideoFeedbackSerializer, SessionListSerializer, SessionSerializer
 from videos.services.feedback_video_processing import prepare_feedback_video_upload
 from videos.telemetry import record_product_event
@@ -224,6 +225,118 @@ class SessionViewSet(SessionMediaActionsMixin, viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK,
         )
+
+    @action(detail=True, methods=['post', 'delete'], url_path='ml-consent')
+    def ml_consent(self, request, pk=None):
+        session = self.get_object()
+        if not can_edit_session(request.user, session):
+            raise PermissionDenied("You can only change training consent for your own sessions.")
+
+        if request.method == 'DELETE':
+            enabled = False
+        else:
+            raw_enabled = request.data.get('enabled', request.data.get('ml_training_enabled', True))
+            enabled = str(raw_enabled).strip().lower() not in {'0', 'false', 'no', 'off'}
+
+        source = normalize_source(
+            request.data.get('source')
+            or request.data.get('consent_source')
+            or request.query_params.get('source')
+            or request.query_params.get('consent_source')
+            or 'member_settings'
+        )
+        update_fields = [
+            'ml_training_enabled',
+            'ml_training_consent_source',
+            'ml_training_consent_at',
+            'ml_training_consent_revoked_at',
+            'ml_training_consent_revocation_source',
+        ]
+
+        session.ml_training_enabled = enabled
+        if enabled:
+            session.ml_training_consent_source = source
+            session.ml_training_consent_at = timezone.now()
+            session.ml_training_consent_revoked_at = None
+            session.ml_training_consent_revocation_source = ''
+        else:
+            session.ml_training_consent_revoked_at = timezone.now()
+            session.ml_training_consent_revocation_source = source
+        session.save(update_fields=update_fields)
+
+        return Response(SessionSerializer(session, context={'request': request}).data)
+
+    @action(detail=True, methods=['get', 'post'], url_path='ml-suggestions')
+    def ml_suggestions(self, request, pk=None):
+        session = self.get_object()
+        if not can_view_session(request.user, session):
+            raise PermissionDenied("You can only inspect ML suggestions for your own sessions.")
+
+        suggestion = suggest_session_thread(session)
+        if request.method == 'GET':
+            return Response(suggestion)
+
+        decision = normalize_label(request.data.get('decision')).lower()
+        if decision not in {'accepted', 'rejected', 'edited'}:
+            return Response({'error': 'decision must be accepted, rejected, or edited.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        resolved_thread_label = normalize_label(
+            request.data.get('resolved_thread_label')
+            or request.data.get('thread_label')
+            or suggestion.get('thread', {}).get('label', '')
+        )
+        resolved_label_choices = request.data.get('resolved_label_choices')
+        if isinstance(resolved_label_choices, str):
+            resolved_label_choices = parse_tag_names(resolved_label_choices)
+        if not isinstance(resolved_label_choices, list):
+            resolved_label_choices = []
+        note = normalize_label(request.data.get('note') or request.data.get('feedback_note') or '')
+        record = record_session_suggestion_feedback(
+            session=session,
+            created_by=request.user,
+            suggestion_payload=suggestion,
+            decision=decision,
+            resolved_thread_label=resolved_thread_label,
+            resolved_label_choices=resolved_label_choices,
+            note=note,
+        )
+        return Response({
+            'suggestion': suggestion,
+            'feedback': {
+                'id': record.id,
+                'decision': record.decision,
+                'resolved_thread_label': record.resolved_thread_label,
+                'resolved_label_choices': record.resolved_label_choices_json,
+                'note': record.note,
+                'created_at': record.created_at,
+            },
+        }, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['get'], url_path='ml/training-export')
+    def ml_training_export(self, request):
+        if not request.user.is_staff:
+            raise PermissionDenied("Only staff can export ML training data.")
+
+        try:
+            limit = max(1, min(1000, int(request.query_params.get('limit', 250))))
+        except (TypeError, ValueError):
+            limit = 250
+
+        sessions = list(
+            Session.objects.filter(ml_training_enabled=True)
+            .select_related('user', 'user__profile')
+            .prefetch_related('tags', 'review_requests', 'review_requests__feedback_items', 'video_feedback')
+            .order_by('-recorded_at', '-id')[:limit]
+        )
+        snapshot, rows, manifest = build_dataset_snapshot(sessions=sessions, created_by=request.user)
+        return Response({
+            'snapshot_id': snapshot.id,
+            'snapshot_version': snapshot.snapshot_version,
+            'generated_at': snapshot.created_at,
+            'row_count': snapshot.row_count,
+            'manifest': manifest,
+            'rows': rows,
+        })
 
     @action(detail=True, methods=['post', 'delete'], url_path='share')
     def create_share_link(self, request, pk=None):

@@ -24,7 +24,7 @@ function AuthForm({
   const [loading, setLoading] = useState(false)
 
   const title = contextTitle || 'Practica'
-  const subtitle = contextSubtitle || 'A private video practice mirror for self-led learning and trusted feedback.'
+  const subtitle = contextSubtitle || 'A private video practice mirror for self-led learning.'
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -64,13 +64,11 @@ function AuthForm({
         {inviteCodeLocked && inviteCode ? (
           <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left">
             <p className="text-xs font-medium uppercase tracking-wide text-emerald-800">
-              {inviteContext === 'reviewer'
-                ? 'Trusted reviewer invite'
-                : 'Private invite'}
+              Private invite
             </p>
             <p className="text-sm text-emerald-900 mt-1">
               {mode === 'register'
-                ? 'Create your account once and this invite will connect you to the private feedback thread automatically.'
+                ? 'Create your account once and this invite will connect you to the private practice workspace automatically.'
                 : 'Already have an account? Log in and we will connect this invite to your account automatically.'}
             </p>
           </div>
