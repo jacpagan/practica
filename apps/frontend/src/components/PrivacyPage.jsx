@@ -26,7 +26,7 @@ function PrivacyPage({ onBack = null, signedIn = false }) {
             <ul className="text-sm text-gray-600 space-y-1">
               <li>Practica does not watch, score, or track your practice in the background.</li>
               <li>No device telemetry or auto-logging of sessions.</li>
-              <li>Only what you intentionally record or upload—and any trusted feedback you choose to keep—is stored.</li>
+              <li>Only what you intentionally record or upload is stored.</li>
             </ul>
           </div>
 

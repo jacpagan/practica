@@ -47,7 +47,7 @@ export default function useSessionDetailMediaActions({
     if (!token || !session?.id) return
     const accepted = await confirm({
       title: 'Delete video?',
-      message: 'This removes the video and all attached feedback videos.',
+      message: 'This removes the video and any derived playback assets.',
       confirmLabel: 'Delete',
       cancelLabel: 'Keep',
       tone: 'danger',
