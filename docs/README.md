@@ -7,8 +7,6 @@ Practica is a private video practice mirror where learners lead their own progre
 - `AGENTS.md` (repo root): engineering commands, structure, tests, and release expectations
 - `docs/practica-master-spec.md`: single Practica product and technical source of truth
 
-The older product docs in `docs/` are retired snapshots or implementation notes. Do not treat them as authoritative.
-
 ## Working Docs
 
 - `docs/local-dev-playbook.md`: cheapest safe local workflow for Django + Vite, tmux layout, and small commit loop
