@@ -61,7 +61,7 @@ function SessionUpload({
     const hh = pad2(now.getHours())
     const mi = pad2(now.getMinutes())
     const ss = pad2(now.getSeconds())
-    return `video - ${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
+    return `take - ${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
   }
 
   const pad2 = (n) => String(n).padStart(2, '0')
@@ -75,7 +75,7 @@ function SessionUpload({
     const hh = pad2(now.getHours())
     const mi = pad2(now.getMinutes())
     const ss = pad2(now.getSeconds())
-    return `${normalizedSeries} - ${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
+    return `${normalizedSeries} - take - ${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
   }
 
   useEffect(() => {
@@ -314,7 +314,7 @@ function SessionUpload({
         if (practiceSeries.trim()) window.localStorage.setItem(LAST_SERIES_KEY, practiceSeries.trim())
       } catch {}
       onUploadGuardChange?.({ active: false, abort: null })
-      toast.success('Saved to your private library')
+      toast.success('Saved to your private archive')
       onComplete?.({ ...res.data, local_preview_url: previewUrl || '' })
     } catch {
       if (abortRequestedRef.current) {
@@ -392,7 +392,7 @@ function SessionUpload({
         <div className="mb-6 space-y-3">
           <div>
             <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">New take</h2>
-            <p className="text-sm text-gray-500 mt-1">Record or upload a private take for your practice mirror.</p>
+            <p className="text-sm text-gray-500 mt-1">Record or upload a private take for your archive.</p>
           </div>
 
           <div className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-4">
@@ -500,13 +500,13 @@ function SessionUpload({
             </summary>
             <div className="space-y-4 pt-4">
               <div>
-                <label className="block text-sm text-gray-600 mb-1.5">Practice thread</label>
+                <label className="block text-sm text-gray-600 mb-1.5">Routine</label>
                 <PracticeThreadField
                   value={practiceSeries}
                   onChange={setPracticeSeries}
                   options={practiceThreadOptions}
                   disabled={isUploading}
-                  placeholder="Choose a thread or create a new one"
+                  placeholder="Choose a routine or create a new one"
                 />
               </div>
 
@@ -554,7 +554,7 @@ function SessionUpload({
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={handleCancel} className="flex-1 text-sm text-gray-600 border border-gray-200 rounded-lg py-2.5 hover:bg-gray-50 transition-colors">{isUploading ? 'Abort upload' : 'Cancel'}</button>
             <button type="submit" disabled={isUploading} className="flex-1 text-sm font-medium text-white bg-gray-900 rounded-lg py-2.5 hover:bg-gray-800 disabled:opacity-40 transition-colors">
-              {isUploading ? (uploadPhase === 'resuming' ? 'Resuming upload…' : `Saving${uploadProgress !== null ? ` ${uploadProgress}%` : '...'}`) : 'Save to library'}
+              {isUploading ? (uploadPhase === 'resuming' ? 'Resuming upload…' : `Saving${uploadProgress !== null ? ` ${uploadProgress}%` : '...'}`) : 'Save to archive'}
             </button>
           </div>
 

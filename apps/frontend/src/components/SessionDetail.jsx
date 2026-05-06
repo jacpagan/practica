@@ -86,7 +86,7 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
   return (
     <div className="px-4 sm:px-6 py-4 pb-28 max-w-3xl mx-auto">
       <div className="mb-4">
-        <button onClick={onBack} className="text-sm text-gray-500 hover:text-gray-900 transition-colors">← Back to library</button>
+        <button onClick={onBack} className="text-sm text-gray-500 hover:text-gray-900 transition-colors">← Back to archive</button>
       </div>
 
       <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
@@ -115,7 +115,7 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
                 value={editPracticeSeries}
                 onChange={setEditPracticeSeries}
                 options={practiceThreadOptions}
-                placeholder="Choose a thread or create a new one"
+                placeholder="Choose a routine or create a new one"
               />
               <textarea
                 value={editDescription}
@@ -142,7 +142,7 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
                     <div className="flex items-center gap-2 flex-wrap mt-2">
                       <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{session.practice_series}</span>
                       <button type="button" onClick={() => onOpenSeries?.(session.practice_series)} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
-                        View thread
+                        View routine
                       </button>
                     </div>
                   ) : null}
@@ -151,7 +151,7 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
 
               {justUploaded ? (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-                  <p className="text-sm font-medium text-emerald-900">This take is now in your private library.</p>
+                  <p className="text-sm font-medium text-emerald-900">This take is now in your private archive.</p>
                 </div>
               ) : null}
 

@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-export const useThreadRenamedListener = ({
+export const useRoutineRenamedListener = ({
   calendarMonthCacheRef,
   loadSessions,
   navigate,
@@ -32,8 +32,8 @@ export const useThreadRenamedListener = ({
         } catch {}
       }
     }
-    window.addEventListener('practica:thread-renamed', handler)
-    return () => window.removeEventListener('practica:thread-renamed', handler)
+    window.addEventListener('practica:routine-renamed', handler)
+    return () => window.removeEventListener('practica:routine-renamed', handler)
   }, [
     calendarMonthCacheRef,
     loadSessions,

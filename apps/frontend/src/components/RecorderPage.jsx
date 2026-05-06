@@ -27,7 +27,7 @@ export default function RecorderPage({ onCancel, onComplete }) {
   const defaultTitle = () => {
     const now = new Date()
     const pad = (n) => String(n).padStart(2, '0')
-    return `video - ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
+    return `take - ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
   }
 
   const handleRecorded = (nextFile) => {
@@ -73,7 +73,7 @@ export default function RecorderPage({ onCancel, onComplete }) {
         setProgress(null)
         return
       }
-      if (!auto) toast.success('Saved to your private library')
+      if (!auto) toast.success('Saved to your private archive')
       try { onComplete?.(res.data) } catch {}
     } catch {
       const message = 'Upload failed'

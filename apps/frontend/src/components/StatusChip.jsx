@@ -8,8 +8,8 @@ const LABELS = {
   responded: 'Ready',
   viewed: 'Ready',
   resubmitted: 'Ready',
-  closed: 'Done',
-  revoked: 'Off',
+  closed: 'Complete',
+  revoked: 'Hidden',
 }
 
 const STYLES = {

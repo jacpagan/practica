@@ -20,7 +20,7 @@ import { useSessionUpdatedListener } from './hooks/useSessionUpdatedListener'
 import { useSessionDetailActions } from './hooks/useSessionDetailActions'
 import { useSessionsLoader } from './hooks/useSessionsLoader'
 import { useSessionViewCallbacks } from './hooks/useSessionViewCallbacks'
-import { useThreadRenamedListener } from './hooks/useThreadRenamedListener'
+import { useRoutineRenamedListener } from './hooks/useRoutineRenamedListener'
 import { useUploadReturnRouting } from './hooks/useUploadReturnRouting'
 import { useUserMenuActions } from './hooks/useUserMenuActions'
 import { useViewDataRefresh } from './hooks/useViewDataRefresh'
@@ -32,7 +32,7 @@ import SessionUpload from './components/SessionUpload'
 // Inline header create buttons to avoid any chance of circular init
 const SessionDetail = React.lazy(() => import('./components/SessionDetail'))
 const SeriesView = React.lazy(() => import('./components/SeriesView'))
-const ThreadsView = React.lazy(() => import('./components/ThreadsView'))
+const EvidenceView = React.lazy(() => import('./components/EvidenceView'))
 import PrivacyPage from './components/PrivacyPage'
 const RecorderPage = React.lazy(() => import('./components/RecorderPage'))
 
@@ -48,15 +48,15 @@ function AppContent() {
   const [selectedSession, setSelectedSession] = useState(null)
   const [sessions, setSessions] = useState([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
-  const [detailReturnRoute, setDetailReturnRoute] = useState({ view: 'threads', sessionId: null, seriesName: '' })
+  const [detailReturnRoute, setDetailReturnRoute] = useState({ view: 'evidence', sessionId: null, seriesName: '' })
   const [openRecorderOnUpload, setOpenRecorderOnUpload] = useState(false)
   const [justUploadedSessionId, setJustUploadedSessionId] = useState(null)
   const [pendingPracticeSeries, setPendingPracticeSeries] = useState(initialRoute.seriesName || '')
   const [pendingUploadReturnRoute, setPendingUploadReturnRoute] = useState({
-    view: initialRoute.view === 'series' && initialRoute.seriesName ? 'series' : 'threads',
+    view: initialRoute.view === 'series' && initialRoute.seriesName ? 'series' : 'evidence',
     sessionId: null,
     seriesName: initialRoute.view === 'series' ? (initialRoute.seriesName || '') : '',
-    date: initialRoute.view === 'threads' || initialRoute.view === 'calendar' ? (initialRoute.date || '') : '',
+    date: initialRoute.view === 'evidence' || initialRoute.view === 'calendar' ? (initialRoute.date || '') : '',
   })
   const calendarMonthCacheRef = useRef(new Map())
   const calendarMonthRequestRef = useRef('')
@@ -136,7 +136,7 @@ function AppContent() {
     token,
   })
 
-  useThreadRenamedListener({
+  useRoutineRenamedListener({
     calendarMonthCacheRef,
     loadSessions,
     navigate,
@@ -265,9 +265,9 @@ function AppContent() {
             </button>
             <button
               onClick={goHome}
-            className={`hidden sm:inline-flex text-sm px-3 py-1.5 rounded-full border transition-colors ${view === 'threads' || view === 'detail' || view === 'series' ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:text-gray-900'}`}
-            >
-              Archive
+            className={`hidden sm:inline-flex text-sm px-3 py-1.5 rounded-full border transition-colors ${view === 'evidence' || view === 'detail' || view === 'series' ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:text-gray-900'}`}
+          >
+              Evidence
             </button>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -291,9 +291,9 @@ function AppContent() {
         <div className="max-w-4xl mx-auto mt-3 space-y-2 sm:hidden">
           <button
             onClick={goHome}
-            className={`w-full text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'threads' || view === 'detail' || view === 'series' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+            className={`w-full text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'evidence' || view === 'detail' || view === 'series' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
           >
-            Archive
+            Evidence
           </button>
           <div className="grid grid-cols-1 gap-2">
             <button
@@ -315,12 +315,12 @@ function AppContent() {
             </div>
           </div>
         }>
-        {view === 'threads' && (
-          <ThreadsView
+        {view === 'evidence' && (
+          <EvidenceView
             sessions={sessions}
             sessionsLoading={sessionsLoading}
             token={token}
-            onOpenSession={(session, returnRoute) => openSession(session, returnRoute || { view: 'threads', sessionId: null, seriesName: '' })}
+            onOpenSession={(session, returnRoute) => openSession(session, returnRoute || { view: 'evidence', sessionId: null, seriesName: '' })}
             onCreateVideo={(seriesName) => handleRecordAnother(seriesName ? { practiceSeries: seriesName } : null)}
             onSessionUpdate={onDetailSessionUpdate}
           />
@@ -338,11 +338,11 @@ function AppContent() {
             token={token}
             onBack={goHome}
             onOpenSession={openSession}
-            onCreateVideo={() => {
-              setPendingPracticeSeries(routeSeriesName)
-              setPendingUploadReturnRoute({ view: 'series', sessionId: null, seriesName: routeSeriesName })
-              navigate({ view: 'record', sessionId: null })
-            }}
+              onCreateVideo={() => {
+                setPendingPracticeSeries(routeSeriesName)
+                setPendingUploadReturnRoute({ view: 'series', sessionId: null, seriesName: routeSeriesName })
+                navigate({ view: 'record', sessionId: null })
+              }}
           />
         )}
 
@@ -351,13 +351,13 @@ function AppContent() {
             token={token}
             practiceThreadOptions={practiceThreadOptions}
             onComplete={handleUploadComplete}
-            onCancel={({ bypassUploadGuard = false } = {}) => {
+                onCancel={({ bypassUploadGuard = false } = {}) => {
               const nextRoute = pendingUploadReturnRoute?.view
                 ? pendingUploadReturnRoute
                 : (pendingPracticeSeries
                     ? { view: 'series', sessionId: null, seriesName: pendingPracticeSeries }
-                    : { view: 'threads', sessionId: null })
-              setPendingUploadReturnRoute({ view: 'threads', sessionId: null })
+                    : { view: 'evidence', sessionId: null })
+              setPendingUploadReturnRoute({ view: 'evidence', sessionId: null })
               navigate(nextRoute, { bypassUploadGuard })
             }}
             initialRecorderOpen={openRecorderOnUpload}
