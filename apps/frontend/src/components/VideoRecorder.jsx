@@ -1053,10 +1053,10 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   // ── Render ──
 
   return (
-    <div className={`overflow-hidden bg-gray-950 relative ${isCaptureMode ? 'rounded-[28px] shadow-2xl' : 'rounded-2xl'}`}>
+    <div className={`overflow-hidden bg-gray-950 relative h-[100dvh] sm:h-auto ${isCaptureMode ? 'sm:rounded-[28px] sm:shadow-2xl' : 'sm:rounded-2xl'}`}>
       {/* ── IDLE STATE ── */}
       {state === STATES.IDLE && (
-        <div className="aspect-video flex flex-col items-center justify-center gap-3 px-4">
+        <div className="h-full sm:aspect-video flex flex-col items-center justify-center gap-3 px-4">
           {error ? (
             <>
               <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
@@ -1158,7 +1158,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
 
       {/* ── REQUESTING PERMISSION ── */}
       {state === STATES.REQUESTING && (
-        <div className="aspect-video flex flex-col items-center justify-center gap-3">
+        <div className="h-full sm:aspect-video flex flex-col items-center justify-center gap-3">
           <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
           <p className="text-xs text-white/50">Requesting {requestingPermissionLabel} access...</p>
         </div>
@@ -1166,13 +1166,13 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
 
       {/* ── LIVE PREVIEW / RECORDING ── */}
       {(state === STATES.PREVIEWING || state === STATES.RECORDING) && (
-        <div className="bg-gray-950 relative" ref={videoContainerRef}>
+        <div className="bg-gray-950 relative h-full sm:h-auto" ref={videoContainerRef}>
           <video
             ref={setLiveRef}
             autoPlay
             muted
             playsInline
-            className="w-full aspect-video object-cover"
+            className="w-full h-full sm:h-auto sm:aspect-video object-cover"
             style={{ transform: mode === 'camera' ? 'scaleX(-1)' : 'none' }}
           />
 
@@ -1186,7 +1186,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
             />
           )}
 
-          <div className="p-4 bg-gray-950 space-y-4">
+          <div className="absolute inset-x-0 bottom-0 z-20 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-black/90 via-black/70 to-transparent space-y-4">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/90">
                   {countInRemaining ? `Starting in ${countInRemaining}` : state === STATES.RECORDING ? 'Recording' : 'Camera ready'}
@@ -1599,17 +1599,17 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
 
       {/* ── RECORDED — PLAYBACK ── */}
       {state === STATES.RECORDED && recordedFile && (
-        <div className="relative">
+        <div className="relative h-full sm:h-auto">
           <video
             ref={playbackRef}
             src={blobUrlRef.current}
-            className="w-full aspect-video object-cover"
+            className="w-full h-full sm:h-auto sm:aspect-video object-cover"
             controls
             playsInline
           />
 
           {/* Actions bar */}
-          <div className="p-4 bg-gray-900 space-y-3">
+          <div className="absolute inset-x-0 bottom-0 z-20 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-black/95 via-black/75 to-transparent space-y-3">
             <div>
               <p className="text-sm font-medium text-white">Recording ready</p>
               <p className="text-xs text-white/50 mt-1">{fmtTimer(elapsed)} · {(recordedFile.size / 1024 / 1024).toFixed(1)} MB</p>

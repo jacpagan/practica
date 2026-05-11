@@ -2,11 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { fmtTimer, sessionVideoSources, videoUrl } from '../utils'
 import { useConfirm } from './ConfirmDialog'
 import { useToast } from './Toast'
-import PracticeThreadField from './PracticeThreadField'
+import SkillField from './SkillField'
 import useSessionDetailEditActions from '../hooks/useSessionDetailEditActions'
 import useSessionDetailMediaActions from '../hooks/useSessionDetailMediaActions'
 
-function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate, onSessionDelete, justUploaded = false, onRecordAnother, onOpenSeries, practiceThreadOptions = [] }) {
+function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate, onSessionDelete, justUploaded = false, onRecordAnother, onOpenSeries, skillOptions = [] }) {
   const toast = useToast()
   const confirm = useConfirm()
   const videoRef = useRef(null)
@@ -84,13 +84,19 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
   }, [onSessionUpdate, refreshSession, session?.id, session?.processing_status, token])
 
   return (
-    <div className="px-4 sm:px-6 py-4 pb-28 max-w-3xl mx-auto">
-      <div className="mb-4">
-        <button onClick={onBack} className="text-sm text-gray-500 hover:text-gray-900 transition-colors">← Back to archive</button>
+    <div className="sm:px-6 sm:py-4 sm:pb-28 sm:max-w-3xl sm:mx-auto">
+      <div className="hidden sm:block mb-4">
+        <button onClick={onBack} className="text-sm text-gray-500 hover:text-gray-900 transition-colors">← Back to progress</button>
       </div>
 
-      <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
-        <div className="aspect-video bg-black">
+      <div className="relative sm:rounded-2xl sm:border sm:border-gray-200 bg-black sm:bg-white overflow-hidden">
+        <button
+          onClick={onBack}
+          className="sm:hidden absolute top-[max(0.75rem,env(safe-area-inset-top))] left-4 z-40 text-xs text-white/85 rounded-full border border-white/25 bg-black/45 px-3 py-1.5 backdrop-blur"
+        >
+          Back
+        </button>
+        <div className="h-[100dvh] sm:h-auto sm:aspect-video bg-black">
           {playableUrl && !playbackFailed ? (
             <video key={playableUrl} ref={videoRef} src={playableUrl} controls playsInline onError={handlePlaybackError} className="w-full h-full bg-black" />
           ) : (
@@ -102,7 +108,7 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
           )}
         </div>
 
-        <div className="p-4 sm:p-4 space-y-3">
+        <div className="p-4 sm:p-4 space-y-3 bg-white rounded-t-3xl sm:rounded-none -mt-8 sm:mt-0 relative z-30">
           {editing ? (
             <div className="space-y-4">
               <input
@@ -111,11 +117,11 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
                 onChange={(event) => setEditTitle(event.target.value)}
                 className="w-full text-lg font-semibold text-gray-900 border-b border-gray-200 focus:border-gray-400 focus:outline-none pb-1"
               />
-              <PracticeThreadField
+              <SkillField
                 value={editPracticeSeries}
                 onChange={setEditPracticeSeries}
-                options={practiceThreadOptions}
-                placeholder="Choose a routine or create a new one"
+                options={skillOptions}
+                placeholder="Choose a skill or create a new one"
               />
               <textarea
                 value={editDescription}
@@ -142,7 +148,7 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
                     <div className="flex items-center gap-2 flex-wrap mt-2">
                       <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{session.practice_series}</span>
                       <button type="button" onClick={() => onOpenSeries?.(session.practice_series)} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
-                        View routine
+                        View skill
                       </button>
                     </div>
                   ) : null}
@@ -151,7 +157,7 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
 
               {justUploaded ? (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-                  <p className="text-sm font-medium text-emerald-900">This take is now in your private archive.</p>
+                  <p className="text-sm font-medium text-emerald-900">This proof is now in your private archive.</p>
                 </div>
               ) : null}
 
