@@ -23,7 +23,7 @@ export const useSessionDetailActions = ({
   }, [openSessionById, routeSeriesName, setDetailReturnRoute, setOpenRecorderOnUpload, view])
 
   const goBack = useCallback(() => {
-    navigate(detailReturnRoute?.view ? detailReturnRoute : { view: 'threads', sessionId: null, seriesName: '' })
+    navigate(detailReturnRoute?.view ? detailReturnRoute : { view: 'evidence', sessionId: null, seriesName: '' })
     setSelectedSession(null)
     setJustUploadedSessionId(null)
   }, [detailReturnRoute, navigate, setJustUploadedSessionId, setSelectedSession])
@@ -35,7 +35,7 @@ export const useSessionDetailActions = ({
     setJustUploadedSessionId(session.id)
     setOpenRecorderOnUpload(false)
     setPendingPracticeSeries('')
-    setPendingUploadReturnRoute({ view: 'threads', sessionId: null })
+    setPendingUploadReturnRoute({ view: 'evidence', sessionId: null })
     navigate({ view: 'detail', sessionId: session.id })
   }, [
     calendarMonthCacheRef,

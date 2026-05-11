@@ -14,12 +14,12 @@ const formatCompactDateTime = (value) => {
 }
 
 function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, token = '', onBack, onOpenSession, onCreateVideo }) {
-  const [renamingThread, setRenamingThread] = useState('')
-  const [threadMenuOpen, setThreadMenuOpen] = useState(false)
+  const [renamingRoutine, setRenamingRoutine] = useState('')
+  const [routineMenuOpen, setRoutineMenuOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const threadMenuRef = useRef(null)
+  const routineMenuRef = useRef(null)
   const toast = useToast()
-  const threadOptions = useMemo(() => Array.from(new Set(sessions.map(s => String(s.practice_series || '').trim()).filter(Boolean))).sort(), [sessions])
+  const routineOptions = useMemo(() => Array.from(new Set(sessions.map(s => String(s.practice_series || '').trim()).filter(Boolean))).sort(), [sessions])
   const seriesSessions = useMemo(() => {
     const filtered = sessions
       .filter((session) => session.can_edit && String(session.practice_series || '').trim() === String(seriesName || '').trim())
@@ -34,22 +34,22 @@ function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, t
   const latestSession = seriesSessions[seriesSessions.length - 1] || null
   const previousSession = seriesSessions.length > 1 ? seriesSessions[seriesSessions.length - 2] : null
   useEffect(() => {
-    if (!threadMenuOpen) return undefined
+    if (!routineMenuOpen) return undefined
     const handlePointerDown = (event) => {
-      const node = threadMenuRef.current
+      const node = routineMenuRef.current
       if (!node || node.contains(event.target)) return
-      setThreadMenuOpen(false)
+      setRoutineMenuOpen(false)
     }
     window.addEventListener('pointerdown', handlePointerDown)
     return () => window.removeEventListener('pointerdown', handlePointerDown)
-  }, [threadMenuOpen])
+  }, [routineMenuOpen])
   if (sessionsLoading) {
     return (
       <div className="px-4 sm:px-6 py-6">
         <div className="max-w-4xl mx-auto space-y-4">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
-              <p className="text-xs uppercase tracking-wide text-gray-500">Practice thread</p>
+              <p className="text-xs uppercase tracking-wide text-gray-500">Routine</p>
               <div className="h-6 w-48 bg-gray-200 rounded animate-pulse mt-1" />
               <div className="h-4 w-32 bg-gray-100 rounded animate-pulse mt-2" />
             </div>
@@ -73,11 +73,11 @@ function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, t
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="space-y-3">
           <button type="button" onClick={onBack} className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
-            ← Back to home
+            ← Back to archive
           </button>
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
-              <p className="text-xs uppercase tracking-wide text-gray-500">Practice thread</p>
+              <p className="text-xs uppercase tracking-wide text-gray-500">Routine</p>
               <h2 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">{seriesName}</h2>
               <p className="text-sm text-gray-500 mt-2">{latestSession ? `Latest ${formatCompactDateTime(latestSession.recorded_at || latestSession.created_at)}` : 'No takes yet'}</p>
             </div>
@@ -104,8 +104,8 @@ function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, t
 
         {seriesSessions.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
-            <p className="text-sm text-gray-700">No takes in this thread yet.</p>
-            <p className="text-xs text-gray-500 mt-1">Create a new video and save it into this practice thread.</p>
+            <p className="text-sm text-gray-700">No takes in this routine yet.</p>
+            <p className="text-xs text-gray-500 mt-1">Create a new video and save it into this routine.</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -159,31 +159,31 @@ function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, t
             <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-3">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">Thread timeline</p>
+                  <p className="text-sm font-semibold text-gray-900">Routine timeline</p>
                   <p className="text-xs text-gray-500 mt-1">Oldest to newest.</p>
                 </div>
-                <div className="relative" ref={threadMenuRef}>
+                <div className="relative" ref={routineMenuRef}>
                   <button
                     type="button"
-                    onClick={() => setThreadMenuOpen((open) => !open)}
+                    onClick={() => setRoutineMenuOpen((open) => !open)}
                     className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                    aria-expanded={threadMenuOpen ? 'true' : 'false'}
+                    aria-expanded={routineMenuOpen ? 'true' : 'false'}
                     aria-haspopup="menu"
                   >
                     •••
                   </button>
-                  {threadMenuOpen ? (
+                  {routineMenuOpen ? (
                     <div className="absolute right-0 mt-2 w-44 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg z-10" role="menu">
                       <button
                         type="button"
                         onClick={() => {
-                          setThreadMenuOpen(false)
-                          setRenamingThread(seriesName)
+                          setRoutineMenuOpen(false)
+                          setRenamingRoutine(seriesName)
                         }}
                         className="w-full text-left rounded-lg px-2.5 py-2 text-xs text-gray-700 hover:bg-gray-50"
                         role="menuitem"
                       >
-                        Rename thread
+                        Rename routine
                       </button>
                     </div>
                   ) : null}
@@ -200,32 +200,32 @@ function SeriesView({ seriesName = '', sessions = [], sessionsLoading = false, t
                 ))}
               </div>
               <ThreadPickerModal
-                open={Boolean(renamingThread)}
-                title="Rename thread"
-                initialValue={renamingThread || ''}
-                options={threadOptions}
+                open={Boolean(renamingRoutine)}
+                title="Rename routine"
+                initialValue={renamingRoutine || ''}
+                options={routineOptions}
                 saving={saving}
-                onClose={() => setRenamingThread('')}
+                onClose={() => setRenamingRoutine('')}
                 onSave={async (val) => {
-                  if (!renamingThread || !token) return
+                  if (!renamingRoutine || !token) return
                   setSaving(true)
                   try {
                     const res = await fetch('/api/sessions/threads/rename/', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Token ${token}` } : {}) },
-                      body: JSON.stringify({ old_practice_series: renamingThread, new_practice_series: val }),
+                      body: JSON.stringify({ old_practice_series: renamingRoutine, new_practice_series: val }),
                     })
                     const data = await res.json().catch(() => ({}))
-                    if (!res.ok) throw new Error(data?.error || 'Could not rename thread')
-                    try { window.dispatchEvent(new CustomEvent('practica:thread-renamed', { detail: { oldSeriesName: renamingThread, newSeriesName: val } })) } catch {}
+                    if (!res.ok) throw new Error(data?.error || 'Could not rename routine')
+                    try { window.dispatchEvent(new CustomEvent('practica:routine-renamed', { detail: { oldSeriesName: renamingRoutine, newSeriesName: val } })) } catch {}
                     toast.success(
                       data?.affected_count === 1
-                        ? `Renamed “${renamingThread}” to “${val}” on 1 take`
-                        : `Renamed “${renamingThread}” to “${val}” on ${data?.affected_count || 0} takes`
+                        ? `Renamed “${renamingRoutine}” to “${val}” on 1 take`
+                        : `Renamed “${renamingRoutine}” to “${val}” on ${data?.affected_count || 0} takes`
                     )
-                  } catch (e) { toast.error(e?.message || 'Could not rename thread') }
+                  } catch (e) { toast.error(e?.message || 'Could not rename routine') }
                   setSaving(false)
-                  setRenamingThread('')
+                  setRenamingRoutine('')
                 }}
               />
             </div>

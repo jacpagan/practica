@@ -24,7 +24,7 @@ function AuthForm({
   const [loading, setLoading] = useState(false)
 
   const title = contextTitle || 'Practica'
-  const subtitle = contextSubtitle || 'A private video practice mirror for self-led learning.'
+  const subtitle = contextSubtitle || 'A private evidence archive for self-led learning.'
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -66,11 +66,11 @@ function AuthForm({
             <p className="text-xs font-medium uppercase tracking-wide text-emerald-800">
               Private invite
             </p>
-            <p className="text-sm text-emerald-900 mt-1">
+              <p className="text-sm text-emerald-900 mt-1">
               {mode === 'register'
-                ? 'Create your account once and this invite will connect you to the private practice workspace automatically.'
+                ? 'Create your account once and this invite will connect you to the private archive automatically.'
                 : 'Already have an account? Log in and we will connect this invite to your account automatically.'}
-            </p>
+              </p>
           </div>
         ) : null}
         <div className="flex items-center justify-center gap-3 mb-6">

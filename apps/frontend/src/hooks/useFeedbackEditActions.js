@@ -100,7 +100,7 @@ export default function useFeedbackEditActions({
     if (!token || !sessionId) return
     const accepted = await confirm({
       title: 'Delete feedback video?',
-      message: 'This removes your feedback video from the thread.',
+      message: 'This removes your feedback video from the take.',
       confirmLabel: 'Delete',
       cancelLabel: 'Keep',
       tone: 'danger',

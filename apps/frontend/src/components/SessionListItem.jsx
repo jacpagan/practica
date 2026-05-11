@@ -43,18 +43,18 @@ export default function SessionListItem({ session, onOpen, showSeries = false, h
             <p className="text-sm font-medium text-gray-900 mt-2 line-clamp-1">{session.title || 'Untitled'}</p>
             <p className="text-xs text-gray-500 mt-1">{metadataLabel}</p>
           </div>
-        </div>
-        <div className="text-right shrink-0 space-y-2">
-          {onChangeThread ? (
-            <button
-              type="button"
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChangeThread?.() }}
-              className="text-[11px] px-2.5 py-1.5 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50"
-            >
-              {session.practice_series ? 'Change thread' : 'Add to thread'}
-            </button>
-          ) : null}
-        </div>
+            </div>
+            <div className="text-right shrink-0 space-y-2">
+              {onChangeThread ? (
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChangeThread?.() }}
+                  className="text-[11px] px-2.5 py-1.5 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50"
+                >
+                  {session.practice_series ? 'Change routine' : 'Add to routine'}
+                </button>
+              ) : null}
+            </div>
       </div>
     </button>
   )

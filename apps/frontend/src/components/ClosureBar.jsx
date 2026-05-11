@@ -7,7 +7,7 @@ export default function ClosureBar({
   onRetry = () => {},
   subtleText = '',
   retryLabel = 'Continue loop',
-  closeLabel = 'Close thread',
+  closeLabel = 'Close routine',
   primaryAction = 'close',
 }) {
   if (!canClose && !canRetry) return null
