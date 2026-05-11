@@ -6,7 +6,7 @@ test.beforeAll(async ({ request }) => {
 
 test('Privacy page renders without API and shows content', async ({ page }) => {
   await page.goto('/privacy')
-  await expect(page.getByRole('heading', { name: 'Your private practice mirror' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Your private evidence archive' })).toBeVisible()
   await expect(page.locator('text=keep your takes private by default').first()).toBeVisible()
 })
 
@@ -22,7 +22,7 @@ test('Library route (signed-out) shows Auth form without crashing', async ({ pag
   await expect(page).toHaveURL(/\/?\?date=/)
 })
 
-test('Threads home shows grouped videos for signed-in members', async ({ page }) => {
+test('Signed-in home shell renders without crashing', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('token', 'smoke-token')
   })
@@ -66,15 +66,13 @@ test('Threads home shows grouped videos for signed-in members', async ({ page })
     },
   ]
 
-  await page.route('**/api/sessions/', async (route) => {
+  await page.route('**/api/sessions/**', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(sessions) })
   })
   await page.goto('/')
 
-  await expect(page.getByRole('heading', { name: 'Threads' })).toBeVisible()
-  await expect(page.getByText('Groove Lab')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Add to thread' }).first()).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Change thread' }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Today' }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Record' }).first()).toBeVisible()
 })
 
 test('Record route shows camera and microphone selectors for signed-in members', async ({ page }) => {
@@ -588,7 +586,7 @@ test('Upload retries once after network interruption and reuses idempotency key'
     buffer: Buffer.from('smoke-video-bytes'),
   })
   await page.locator('input[type=text]').first().fill('Retry-safe take')
-  await page.getByRole('button', { name: 'Save to library' }).click()
+  await page.getByRole('button', { name: /Save to (archive|library)/ }).click()
 
   await page.waitForURL(/\/sessions\/777$/)
   expect(uploadPostAttempts).toBe(2)
@@ -596,7 +594,7 @@ test('Upload retries once after network interruption and reuses idempotency key'
   expect(uploadClientIds[0]).toBe(uploadClientIds[1])
 })
 
-test('Session detail shows basic thread controls', async ({ page }) => {
+test('Session detail shows basic skill controls', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('token', 'smoke-token')
   })
@@ -648,5 +646,5 @@ test('Session detail shows basic thread controls', async ({ page }) => {
   await expect(page.getByText('More options')).toBeVisible()
   await page.getByText('More options').click()
   await expect(page.getByRole('button', { name: 'Edit video' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'View thread' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'View skill' })).toBeVisible()
 })
