@@ -120,6 +120,83 @@ export const fmtDate = (d) => {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+const toLocalDayNumber = (value) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000)
+}
+
+const toLocalDateKey = (value) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+export const calculatePracticeProgress = (sessions = []) => {
+  const sorted = Array.isArray(sessions)
+    ? sessions
+      .filter(Boolean)
+      .slice()
+      .sort((left, right) => new Date(right.recorded_at || right.created_at || 0) - new Date(left.recorded_at || left.created_at || 0))
+    : []
+
+  const proofDays = new Set()
+  const dayNumbers = []
+  const skillCounts = new Map()
+  const recentProofs = sorted.slice(0, 6)
+
+  sorted.forEach((session) => {
+    const dateValue = session?.recorded_at || session?.created_at
+    const dayNumber = toLocalDayNumber(dateValue)
+    if (dayNumber !== null) {
+      proofDays.add(toLocalDateKey(dateValue))
+      dayNumbers.push(dayNumber)
+    }
+
+    const skill = String(session?.practice_series || '').trim()
+    if (skill) {
+      skillCounts.set(skill, (skillCounts.get(skill) || 0) + 1)
+    }
+  })
+
+  const activeSkill = sorted.find((session) => String(session?.practice_series || '').trim())?.practice_series?.trim() || 'Your skill'
+  const uniqueDays = Array.from(proofDays).filter(Boolean)
+  const orderedDayNumbers = Array.from(new Set(dayNumbers)).sort((left, right) => right - left)
+
+  let streak = 0
+  for (let index = 0; index < orderedDayNumbers.length; index += 1) {
+    if (index === 0) {
+      streak = 1
+      continue
+    }
+    if (orderedDayNumbers[index - 1] - orderedDayNumbers[index] !== 1) break
+    streak += 1
+  }
+
+  const proofCount = sorted.length
+  const xp = (proofCount * 25) + Math.max(0, streak - 1) * 5
+  const level = Math.max(1, Math.floor(xp / 100) + 1)
+  const nextLevelAt = level * 100
+
+  return {
+    activeSkill,
+    proofCount,
+    xp,
+    level,
+    streak,
+    nextLevelAt,
+    nextLevelRemaining: Math.max(0, nextLevelAt - xp),
+    uniqueDayCount: uniqueDays.length,
+    skillCount: Array.from(skillCounts.keys()).length,
+    recentProofs,
+    proofDays: uniqueDays,
+    latestProofAt: sorted[0]?.recorded_at || sorted[0]?.created_at || '',
+  }
+}
+
 export const feedbackCategoryOptions = () => ([
   { value: '', label: 'Uncategorized' },
   { value: 'timing', label: 'Timing' },
