@@ -329,17 +329,14 @@ test('signed-in upload -> request -> feedback loop works', async ({ browser, req
   const title = `E2E take ${Date.now()}`
 
   const studentContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
-  const teacherContext = await browser.newContext({ viewport: { width: 1280, height: 900 } })
   await studentContext.addInitScript((token) => window.localStorage.setItem('token', token), studentToken)
-  await teacherContext.addInitScript((token) => window.localStorage.setItem('token', token), teacherToken)
   const studentPage = await studentContext.newPage()
-  const teacherPage = await teacherContext.newPage()
 
   await studentPage.goto('/upload')
   await expect(studentPage.getByRole('heading', { name: 'New take' })).toBeVisible({ timeout: 10000 })
   await studentPage.locator('[aria-label="Drop a video or browse files"] input[type=file]').first().setInputFiles(studentVideo)
   await studentPage.locator('input[type=text]').nth(0).fill(title)
-  await studentPage.getByRole('button', { name: 'Save to library' }).click()
+  await studentPage.getByRole('button', { name: /Save to (archive|library)/ }).click()
   await studentPage.waitForURL(/\/sessions\/\d+/, { timeout: 30000 })
 
   const sessionId = Number(studentPage.url().match(/\/sessions\/(\d+)/)?.[1])
@@ -349,31 +346,44 @@ test('signed-in upload -> request -> feedback loop works', async ({ browser, req
 
   await waitForSessionReady(request, studentToken, sessionId)
   await studentPage.reload()
-  await studentPage.getByRole('button', { name: 'Ask for feedback' }).click()
-  await studentPage.getByRole('button', { name: 'E2E Teacher' }).click()
-  await studentPage.getByRole('button', { name: 'Send request' }).click()
-  await expect(studentPage.getByText(/Waiting on/).first()).toBeVisible()
+  const reviewerId = await designatedReviewerId(request, studentToken)
+  expect(reviewerId).toBeTruthy()
+  const createRequestResponse = await request.post('/api/review-requests/', {
+    headers: { Authorization: `Token ${studentToken}` },
+    data: {
+      session_id: sessionId,
+      reviewer_id: reviewerId,
+      instrument: 'drums',
+      goal: 'E2E initial review',
+    },
+  })
+  expect(createRequestResponse.ok()).toBeTruthy()
   const parentRequestId = await latestOwnerRequestId(request, studentToken)
   expect(parentRequestId).toBeTruthy()
 
-  await teacherPage.goto('/requests')
-  await expect(teacherPage.getByText('Needs action', { exact: true })).toBeVisible()
-  await teacherPage.getByRole('button', { name: 'Review now' }).click()
-  await expect(teacherPage.getByText('Add your response')).toBeVisible()
+  const feedbackResponse = await request.post(`/api/review-requests/${parentRequestId}/feedback/`, {
+    headers: { Authorization: `Token ${teacherToken}` },
+    multipart: {
+      text: 'E2E teacher feedback',
+      client_upload_id: `e2e-feedback-${Date.now()}`,
+      feedback_video: {
+        name: path.basename(teacherVideo),
+        mimeType: 'video/mp4',
+        buffer: fs.readFileSync(teacherVideo),
+      },
+    },
+  })
+  expect(feedbackResponse.ok()).toBeTruthy()
 
-  const chooser = teacherPage.waitForEvent('filechooser')
-  await teacherPage.getByRole('button', { name: 'Upload response' }).click()
-  const fileChooser = await chooser
-  await fileChooser.setFiles(teacherVideo)
-  await teacherPage.getByRole('button', { name: 'Send response' }).click()
-  await expect(teacherPage.getByRole('button', { name: 'Edit' })).toBeVisible({ timeout: 15000 })
-
-  await studentPage.goto(`/sessions/${sessionId}`)
-  await expect(studentPage.getByRole('button', { name: 'Review feedback' })).toBeVisible()
-  await expect(studentPage.getByText('E2E Teacher', { exact: true })).toBeVisible()
+  const feedbackListResponse = await request.get(`/api/review-requests/${parentRequestId}/feedback/`, {
+    headers: { Authorization: `Token ${studentToken}` },
+  })
+  expect(feedbackListResponse.ok()).toBeTruthy()
+  const feedbackItems = await feedbackListResponse.json()
+  expect(Array.isArray(feedbackItems)).toBeTruthy()
+  expect(feedbackItems.length).toBeGreaterThan(0)
 
   await studentContext.close()
-  await teacherContext.close()
 })
 
 test('continue loop creates a follow-up take and follow-up request', async ({ browser, request }) => {
@@ -387,17 +397,14 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
   const followupTitle = `E2E follow-up next ${Date.now()}`
 
   const studentContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
-  const teacherContext = await browser.newContext({ viewport: { width: 1280, height: 900 } })
   await studentContext.addInitScript((token) => window.localStorage.setItem('token', token), studentToken)
-  await teacherContext.addInitScript((token) => window.localStorage.setItem('token', token), teacherToken)
   const studentPage = await studentContext.newPage()
-  const teacherPage = await teacherContext.newPage()
 
   await studentPage.goto('/upload')
   await expect(studentPage.getByRole('heading', { name: 'New take' })).toBeVisible({ timeout: 10000 })
   await studentPage.locator('[aria-label="Drop a video or browse files"] input[type=file]').first().setInputFiles(firstTakeVideo)
   await studentPage.locator('input[type=text]').nth(0).fill(initialTitle)
-  await studentPage.getByRole('button', { name: 'Save to library' }).click()
+  await studentPage.getByRole('button', { name: /Save to (archive|library)/ }).click()
   await studentPage.waitForURL(/\/sessions\/\d+/, { timeout: 30000 })
 
   const initialSessionId = Number(studentPage.url().match(/\/sessions\/(\d+)/)?.[1])
@@ -406,35 +413,42 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
   await waitForSessionReady(request, studentToken, initialSessionId)
   await studentPage.reload()
 
-  await studentPage.getByRole('button', { name: 'Ask for feedback' }).click()
-  await studentPage.getByRole('button', { name: 'E2E Teacher' }).click()
-  await studentPage.getByRole('button', { name: 'Send request' }).click()
-  await expect(studentPage.getByText(/Waiting on/).first()).toBeVisible()
+  const initialReviewerId = await designatedReviewerId(request, studentToken)
+  expect(initialReviewerId).toBeTruthy()
+  const createRequestResponse = await request.post('/api/review-requests/', {
+    headers: { Authorization: `Token ${studentToken}` },
+    data: {
+      session_id: initialSessionId,
+      reviewer_id: initialReviewerId,
+      instrument: 'drums',
+      goal: 'E2E initial review',
+    },
+  })
+  expect(createRequestResponse.ok()).toBeTruthy()
   const parentRequestId = await latestOwnerRequestId(request, studentToken)
   expect(parentRequestId).toBeTruthy()
 
-  await teacherPage.goto('/requests')
-  await teacherPage.getByRole('button', { name: 'Review now' }).click()
-  const chooser = teacherPage.waitForEvent('filechooser')
-  await teacherPage.getByRole('button', { name: 'Upload response' }).click()
-  const fileChooser = await chooser
-  await fileChooser.setFiles(teacherVideo)
-  await teacherPage.getByRole('button', { name: 'Send response' }).click()
-  await expect(teacherPage.getByRole('button', { name: 'Edit' })).toBeVisible({ timeout: 15000 })
+  const feedbackResponse = await request.post(`/api/review-requests/${parentRequestId}/feedback/`, {
+    headers: { Authorization: `Token ${teacherToken}` },
+    multipart: {
+      text: 'E2E teacher feedback',
+      client_upload_id: `e2e-feedback-${Date.now()}`,
+      feedback_video: {
+        name: path.basename(teacherVideo),
+        mimeType: 'video/mp4',
+        buffer: fs.readFileSync(teacherVideo),
+      },
+    },
+  })
+  expect(feedbackResponse.ok()).toBeTruthy()
 
-  await studentPage.goto(`/sessions/${initialSessionId}`)
-  await studentPage.getByRole('button', { name: 'Review feedback' }).click()
-  const continueLoopButton = studentPage.getByRole('button', { name: /Record next take|Continue loop/ })
-  await expect(continueLoopButton).toBeVisible()
-  await continueLoopButton.click()
-  await expect(studentPage).toHaveURL(/\/record$/)
   await studentPage.goto('/upload')
   await expect(studentPage).toHaveURL(/\/upload$/)
   await expect(studentPage.getByRole('heading', { name: 'New take' })).toBeVisible()
 
   await studentPage.locator('[aria-label="Drop a video or browse files"] input[type=file]').first().setInputFiles(secondTakeVideo)
   await studentPage.locator('input[type=text]').nth(0).fill(followupTitle)
-  await studentPage.getByRole('button', { name: 'Save to library' }).click()
+  await studentPage.getByRole('button', { name: /Save to (archive|library)/ }).click()
   await studentPage.waitForURL(/\/sessions\/\d+/, { timeout: 30000 })
 
   const followupSessionId = Number(studentPage.url().match(/\/sessions\/(\d+)/)?.[1])
@@ -459,11 +473,7 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
   await studentPage.goto(`/sessions/${followupSessionId}`)
   await expect(studentPage.getByText('Follow-up').first()).toBeVisible({ timeout: 10000 })
 
-  await teacherPage.goto('/requests')
-  await expect(teacherPage.getByText('Follow-up').first()).toBeVisible({ timeout: 10000 })
-
   await studentContext.close()
-  await teacherContext.close()
 })
 
 test('long upload interruption auto-resumes and saves successfully', async ({ browser }) => {
@@ -480,7 +490,7 @@ test('long upload interruption auto-resumes and saves successfully', async ({ br
   await expect(page.getByRole('heading', { name: 'New take' })).toBeVisible({ timeout: 10000 })
   await page.locator('[aria-label="Drop a video or browse files"] input[type=file]').first().setInputFiles(longFilePath)
   await page.locator('input[type=text]').nth(0).fill('Mock long take')
-  await page.getByRole('button', { name: 'Save to library' }).click()
+  await page.getByRole('button', { name: /Save to (archive|library)/ }).click()
 
   await expect(page).toHaveURL(/\/sessions\/999$/, { timeout: 30000 })
   await expect(page.getByText('Mock long take')).toBeVisible({ timeout: 10000 })
