@@ -15,6 +15,14 @@ export const useSessionDetailActions = ({
   setSessions,
   view,
 }) => {
+  const buildProofReturnRoute = useCallback((session) => {
+    const practiceSeries = String(session?.practice_series || '').trim()
+    if (practiceSeries) {
+      return { view: 'skill', sessionId: null, seriesName: practiceSeries }
+    }
+    return { view: 'progress', sessionId: null, seriesName: '' }
+  }, [])
+
   const openSession = useCallback((session, returnRoute = { view, sessionId: null, seriesName: routeSeriesName }) => {
     if (!session?.id) return
     setDetailReturnRoute(returnRoute)
@@ -30,16 +38,20 @@ export const useSessionDetailActions = ({
 
   const handleUploadComplete = useCallback((session) => {
     calendarMonthCacheRef.current.clear()
+    const nextReturnRoute = buildProofReturnRoute(session)
     setSessions((current) => [session, ...current.filter((item) => item.id !== session.id)])
     setSelectedSession(session)
+    setDetailReturnRoute(nextReturnRoute)
     setJustUploadedSessionId(session.id)
     setOpenRecorderOnUpload(false)
     setPendingPracticeSeries('')
-    setPendingUploadReturnRoute({ view: 'today', sessionId: null })
+    setPendingUploadReturnRoute(nextReturnRoute)
     navigate({ view: 'detail', sessionId: session.id })
   }, [
+    buildProofReturnRoute,
     calendarMonthCacheRef,
     navigate,
+    setDetailReturnRoute,
     setJustUploadedSessionId,
     setOpenRecorderOnUpload,
     setPendingPracticeSeries,

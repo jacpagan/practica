@@ -13,7 +13,7 @@ function PrivacyPage({ onBack = null, signedIn = false }) {
         <div className="space-y-3">
           <p className="text-xs uppercase tracking-wide text-gray-500">Privacy</p>
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Your private proof archive</h1>
-          <p className="text-sm text-gray-600">Practica is built to keep your proofs private by default. You control what gets recorded, organized, and shared.</p>
+          <p className="text-sm text-gray-600">Practica is built to keep your proofs private by default. You control what gets recorded, organized, and stored in your archive.</p>
         </div>
 
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
@@ -43,7 +43,7 @@ function PrivacyPage({ onBack = null, signedIn = false }) {
             <ul className="text-sm text-gray-600 space-y-1">
               <li>Your videos are private by default.</li>
               <li>Nothing is publicly searchable or browsable.</li>
-              <li>Access only happens through your account or links you explicitly create.</li>
+              <li>Access normally happens through your account.</li>
             </ul>
           </div>
 
@@ -68,7 +68,8 @@ function PrivacyPage({ onBack = null, signedIn = false }) {
           <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-2">
             <p className="text-sm font-semibold text-gray-900">Control and deletion</p>
             <ul className="text-sm text-gray-600 space-y-1">
-              <li>You can revoke links and delete videos.</li>
+              <li>You can delete videos you own.</li>
+              <li>Older private feedback-link tools can be revoked when used.</li>
               <li>Derived playback assets follow the same private access model.</li>
               <li>Operational backups may persist briefly before expiring from backup rotation.</li>
             </ul>

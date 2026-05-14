@@ -132,8 +132,8 @@ export default function ProgressView({
         <div className="space-y-3">
           <div>
             <p className="text-xs uppercase tracking-wide text-gray-500">Progress</p>
-            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">Proof history</h2>
-            <p className="text-sm text-gray-500 mt-2">Keep each proof grouped by skill. Move a proof when it belongs somewhere else, or leave it ungrouped if it stands alone.</p>
+            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">Skill timelines</h2>
+            <p className="text-sm text-gray-500 mt-2">Each skill is a simple timeline of proofs. Add the next proof to the right skill, move it when needed, or leave it ungrouped if it stands alone.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2.5 py-1.5 rounded-full">{totalSkills} {totalSkills === 1 ? 'skill' : 'skills'}</span>
@@ -143,9 +143,9 @@ export default function ProgressView({
         </div>
 
         {sessions.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
-            <p className="text-sm text-gray-700">No proofs yet.</p>
-            <p className="text-xs text-gray-500 mt-1">Record or upload a first proof, then group it into a skill.</p>
+            <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
+              <p className="text-sm text-gray-700">No proofs yet.</p>
+            <p className="text-xs text-gray-500 mt-1">Record or upload a first proof. It will show up here as soon as it is saved.</p>
             <div className="mt-4">
               <button type="button" onClick={onRecordProof} className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors">
                 Record proof
@@ -179,7 +179,7 @@ export default function ProgressView({
                       {latest ? (
                         <button
                           type="button"
-                          onClick={() => onOpenSession?.(latest, { view: 'detail', sessionId: latest.id })}
+                          onClick={() => onOpenSession?.(latest, { view: 'progress', sessionId: null, seriesName: '' })}
                           className="rounded-full border border-gray-200 bg-white text-gray-900 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors"
                         >
                           Open latest
@@ -193,7 +193,7 @@ export default function ProgressView({
                       <SessionListItem
                         key={session.id}
                         session={session}
-                        onOpen={() => onOpenSession?.(session, { view: 'detail', sessionId: session.id })}
+                        onOpen={() => onOpenSession?.(session, { view: 'progress', sessionId: null, seriesName: '' })}
                         onChangeSkill={() => openSkillEditor(session)}
                         prefetch
                         minimal

@@ -6,13 +6,28 @@ import SkillField from './SkillField'
 import useSessionDetailEditActions from '../hooks/useSessionDetailEditActions'
 import useSessionDetailMediaActions from '../hooks/useSessionDetailMediaActions'
 
-function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate, onSessionDelete, justUploaded = false, onRecordAnother, onOpenSeries, skillOptions = [] }) {
+function SessionDetail({
+  session: initialSession,
+  token,
+  onBack,
+  onOpenProgress,
+  onSessionUpdate,
+  onSessionDelete,
+  justUploaded = false,
+  onRecordAnother,
+  onOpenSeries,
+  skillOptions = [],
+  returnRoute = null,
+}) {
   const toast = useToast()
   const confirm = useConfirm()
   const videoRef = useRef(null)
   const [session, setSession] = useState(initialSession)
   const authHeaders = useMemo(() => (token ? { Authorization: `Token ${token}` } : {}), [token])
   const canEdit = Boolean(session?.can_edit)
+  const returnRouteView = String(returnRoute?.view || '').trim()
+  const returnsToSkill = returnRouteView === 'skill' && String(returnRoute?.seriesName || '').trim().length > 0
+  const backLabel = returnsToSkill ? 'Back to skill' : 'Back to progress'
   const playbackSources = useMemo(() => sessionVideoSources(session, session?.local_preview_url || ''), [session])
   const {
     cancelEditing,
@@ -86,7 +101,7 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
   return (
     <div className="sm:px-6 sm:py-4 sm:pb-28 sm:max-w-3xl sm:mx-auto">
       <div className="hidden sm:block mb-4">
-        <button onClick={onBack} className="text-sm text-gray-500 hover:text-gray-900 transition-colors">← Back to progress</button>
+        <button onClick={onBack} className="text-sm text-gray-500 hover:text-gray-900 transition-colors">← {backLabel}</button>
       </div>
 
       <div className="relative sm:rounded-2xl sm:border sm:border-gray-200 bg-black sm:bg-white overflow-hidden">
@@ -155,9 +170,40 @@ function SessionDetail({ session: initialSession, token, onBack, onSessionUpdate
                 </div>
               </div>
 
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => onRecordAnother?.({ practiceSeries: session.practice_series || '' })}
+                  className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
+                >
+                  Record next proof
+                </button>
+                <button
+                  type="button"
+                  onClick={onBack}
+                  className="rounded-full border border-gray-200 bg-white text-gray-900 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors"
+                >
+                  {backLabel}
+                </button>
+                {!returnsToSkill ? (
+                  <button
+                    type="button"
+                    onClick={onOpenProgress}
+                    className="rounded-full border border-gray-200 bg-white text-gray-900 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors"
+                  >
+                    Open progress
+                  </button>
+                ) : null}
+              </div>
+
               {justUploaded ? (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-                  <p className="text-sm font-medium text-emerald-900">This proof is now in your private archive.</p>
+                  <p className="text-sm font-medium text-emerald-900">This proof is saved.</p>
+                  <p className="text-sm text-emerald-800 mt-1">
+                    {returnsToSkill
+                      ? 'Go back to the skill timeline to see where it landed, or record the next proof now.'
+                      : 'Go to Progress to see it land in your archive, or record the next proof now.'}
+                  </p>
                 </div>
               ) : null}
 

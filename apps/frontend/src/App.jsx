@@ -402,6 +402,8 @@ function AppContent() {
             token={token}
             skillOptions={skillOptions}
             onBack={goBack}
+            onOpenProgress={goProgress}
+            returnRoute={detailReturnRoute}
             justUploaded={selectedSession.id === justUploadedSessionId}
             onRecordAnother={(draft = null) => handleRecordAnother(draft || { practiceSeries: selectedSession.practice_series || '' })}
             onOpenSeries={goSkill}

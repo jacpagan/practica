@@ -52,10 +52,10 @@ export default function TodayView({
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <p className="text-xs uppercase tracking-wide text-gray-500">Current skill</p>
+          <p className="text-xs uppercase tracking-wide text-gray-500">Next proof</p>
           <h3 className="text-xl font-semibold text-gray-900 mt-1 truncate">{progress.activeSkill}</h3>
           <p className="text-sm text-gray-600 mt-2">
-            Pick one action, record proof, and save it under the right skill.
+            Pick one action, record one proof, then finish in Progress so you can see it land in the right skill timeline.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <button
@@ -96,8 +96,8 @@ export default function TodayView({
         <div className="space-y-3">
           <div>
             <p className="text-xs uppercase tracking-wide text-gray-500">Recent proof</p>
-            <h3 className="text-lg font-semibold text-gray-900 mt-1">What you already did</h3>
-            <p className="text-sm text-gray-500 mt-1">Review the last few proofs to keep the loop real.</p>
+            <h3 className="text-lg font-semibold text-gray-900 mt-1">Latest finish point</h3>
+            <p className="text-sm text-gray-500 mt-1">Open the latest proof or head to Progress to close the loop cleanly.</p>
           </div>
 
           {progress.recentProofs.length === 0 ? (
@@ -120,7 +120,7 @@ export default function TodayView({
                 <SessionListItem
                   key={session.id}
                   session={session}
-                  onOpen={() => onOpenSession?.(session, { view: 'detail', sessionId: session.id })}
+                  onOpen={() => onOpenSession?.(session, { view: 'today', sessionId: null, seriesName: '' })}
                   showSeries
                   prefetch
                   minimal

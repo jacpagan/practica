@@ -95,7 +95,7 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
               {latestSession ? (
                 <button
                   type="button"
-                  onClick={() => onOpenSession?.(latestSession, { view: 'skill', skillName })}
+                  onClick={() => onOpenSession?.(latestSession, { view: 'skill', sessionId: null, seriesName: skillName })}
                   className="rounded-full border border-gray-200 bg-white text-gray-900 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors"
                 >
                   Open latest proof
@@ -137,7 +137,7 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => onOpenSession?.(latestSession, { view: 'skill', skillName })}
+                    onClick={() => onOpenSession?.(latestSession, { view: 'skill', sessionId: null, seriesName: skillName })}
                     className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
                   >
                     Open latest proof
@@ -160,7 +160,7 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
                   <p className="text-sm font-medium text-gray-900 mt-1">{previousSession.title}</p>
                   <p className="text-xs text-gray-500 mt-1">{fmtDate(previousSession.recorded_at || previousSession.created_at)}</p>
                 </div>
-                <button type="button" onClick={() => onOpenSession?.(previousSession, { view: 'skill', skillName })} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                <button type="button" onClick={() => onOpenSession?.(previousSession, { view: 'skill', sessionId: null, seriesName: skillName })} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors">
                   Open previous proof
                 </button>
               </div>
@@ -169,8 +169,8 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
             <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-3">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">Skill timeline</p>
-                  <p className="text-xs text-gray-500 mt-1">Oldest to newest.</p>
+                  <p className="text-sm font-semibold text-gray-900">Proof timeline</p>
+                  <p className="text-xs text-gray-500 mt-1">Oldest to newest, so the next proof has a clear place to land.</p>
                 </div>
                 <div className="relative" ref={skillMenuRef}>
                   <button
@@ -204,7 +204,7 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
                   <SessionListItem
                     key={session.id}
                     session={session}
-                    onOpen={() => onOpenSession?.(session, { view: 'skill', skillName })}
+                    onOpen={() => onOpenSession?.(session, { view: 'skill', sessionId: null, seriesName: skillName })}
                     minimal
                   />
                 ))}
