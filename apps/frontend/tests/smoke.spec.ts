@@ -66,12 +66,16 @@ test('Progress view shows grouped proofs for signed-in members', async ({ page }
     },
   ]
 
+  await page.route('**/api/sessions/', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(sessions) })
+  })
+
   await page.route('**/api/sessions/**', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(sessions) })
   })
   await page.goto('/progress')
 
-  await expect(page.getByRole('heading', { name: 'Proof history' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Skill timelines' })).toBeVisible()
   await expect(page.getByText('Groove Lab')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Add to skill' }).first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'Add proof' }).first()).toBeVisible()
