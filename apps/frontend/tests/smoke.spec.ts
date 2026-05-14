@@ -14,12 +14,12 @@ test('Library route (signed-out) shows Auth form without crashing', async ({ pag
   await page.goto('/library?date=2026-04-01')
   await expect(page.getByRole('button', { name: 'Log in' }).first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'Sign up' }).first()).toBeVisible()
-  // Query string should be preserved by route normalization
-  await expect(page).toHaveURL(/\/?\?date=/)
+  // Legacy routes normalize to progress.
+  await expect(page).toHaveURL(/\/progress$/)
   // Report link available and non-crashing
   await page.getByRole('button', { name: 'Report a problem' }).click()
   // No navigation expected.
-  await expect(page).toHaveURL(/\/?\?date=/)
+  await expect(page).toHaveURL(/\/progress$/)
 })
 
 test('Progress view shows grouped proofs for signed-in members', async ({ page }) => {
@@ -285,6 +285,13 @@ test('Record route falls back when selected camera fails', async ({ browser }) =
         })
       }
 
+      if (url.includes('/api/sessions/')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
       return originalFetch(input, init)
     }
 
@@ -366,6 +373,13 @@ test('Record route still opens preview when microphone fails', async ({ browser 
         })
       }
 
+      if (url.includes('/api/sessions/')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
       return originalFetch(input, init)
     }
 
@@ -436,6 +450,13 @@ test('Record route keeps Screen + Cam preview when screen audio is unavailable',
       }
 
       if (url.includes('/api/review-requests/')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (url.includes('/api/sessions/')) {
         return new Response(JSON.stringify([]), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -521,6 +542,13 @@ test('Record route shows timeout guidance when Screen + Cam cannot start', async
       }
 
       if (url.includes('/api/review-requests/')) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (url.includes('/api/sessions/')) {
         return new Response(JSON.stringify([]), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -724,6 +752,14 @@ test('Session detail shows basic skill controls', async ({ page }) => {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(sessionPayload),
+    })
+  })
+
+  await page.route('**/api/sessions/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
     })
   })
 
