@@ -1,6 +1,6 @@
 # Practica Docs
 
-Practica is a private video practice mirror where learners lead their own progress and bring in trusted feedback when they want it.
+Practica is a private skill game where one person does a tiny action, records proof, and sees progress over time.
 
 ## Source Of Truth
 
@@ -10,7 +10,8 @@ Practica is a private video practice mirror where learners lead their own progre
 ## Working Docs
 
 - `docs/local-dev-playbook.md`: cheapest safe local workflow for Django + Vite, tmux layout, and small commit loop
-- `docs/tdd-strategy.md`: focused test strategy for the core loop
+- `docs/habits.md`: distilled Atomic Habits operating memo for product decisions and daily skill loops
+- `docs/tdd-strategy.md`: focused test strategy for the proof and progress loop
 - `docs/revenue-brief.md`: business prompt for revenue growth, pricing, and buyer focus
 - `docs/release-checklist.md`: step-by-step checklist for local testing, push-to-main, deploy, and production verification
 - `docs/production-runbook.md`: operator-focused production checks, verification, and recovery steps
@@ -19,22 +20,21 @@ Practica is a private video practice mirror where learners lead their own progre
 
 Use this order of truth when talking about Practica:
 
-1. It is a private practice mirror.
-2. It helps learners review themselves clearly over time.
-3. It supports trusted feedback when useful.
-4. It can support structured reviewer or teacher workflows without becoming a public marketplace or heavy LMS.
+1. It is a private skill game.
+2. It helps one person do one small action today.
+3. It turns that action into proof and progress.
+4. It stays private by default and avoids public marketplace mechanics.
 
 ## Naming Guidance
 
 Preferred global language:
 
-- `learner`
 - `member`
-- `take`
-- `practice thread`
+- `skill`
+- `proof`
+- `today`
+- `progress`
 - `private archive`
-- `practice mirror`
-- `trusted feedback`
 
 Allowed workflow-context language:
 

@@ -3,7 +3,7 @@ import { useToast } from './Toast'
 import { createSessionUpload, isLikelyVideoFile, MAX_RECORDER_DURATION_SECONDS, MAX_VIDEO_UPLOAD_BYTES, reportClientEvent, uploadErrorMessage, videoFileAccept } from '../utils'
 import VideoRecorder from './VideoRecorder'
 import { useConfirm } from './ConfirmDialog'
-import PracticeThreadField from './PracticeThreadField'
+import SkillField from './SkillField'
 
 const LAST_SERIES_KEY = 'practica.last_series.v1'
 
@@ -13,7 +13,7 @@ function SessionUpload({
   onCancel,
   initialRecorderOpen = false,
   initialPracticeSeries = '',
-  practiceThreadOptions = [],
+  skillOptions = [],
   onPracticeSeriesHandled,
   onRecorderOpenHandled,
   onUploadGuardChange,
@@ -61,7 +61,7 @@ function SessionUpload({
     const hh = pad2(now.getHours())
     const mi = pad2(now.getMinutes())
     const ss = pad2(now.getSeconds())
-    return `take - ${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
+    return `proof - ${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
   }
 
   const pad2 = (n) => String(n).padStart(2, '0')
@@ -75,7 +75,7 @@ function SessionUpload({
     const hh = pad2(now.getHours())
     const mi = pad2(now.getMinutes())
     const ss = pad2(now.getSeconds())
-    return `${normalizedSeries} - take - ${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
+    return `${normalizedSeries} - proof - ${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
   }
 
   useEffect(() => {
@@ -98,8 +98,8 @@ function SessionUpload({
     if (!isLikelyVideoFile(prefillFile)) return
     setVideoFile(prefillFile)
     if (!titleManuallyEdited) {
-      const hasThread = String(practiceSeries || '').trim().length > 0
-      setTitle(hasThread ? seriesBasedTitle(practiceSeries) : defaultPracticeTitle())
+      const hasSkill = String(practiceSeries || '').trim().length > 0
+      setTitle(hasSkill ? seriesBasedTitle(practiceSeries) : defaultPracticeTitle())
     }
     replaceOwnedPreviewUrl(URL.createObjectURL(prefillFile))
     setShowVideoDetails(true)
@@ -191,8 +191,8 @@ function SessionUpload({
     }
     setVideoFile(file)
     if (!titleManuallyEdited) {
-      const hasThread = String(practiceSeries || '').trim().length > 0
-      setTitle(hasThread ? seriesBasedTitle(practiceSeries) : defaultPracticeTitle())
+      const hasSkill = String(practiceSeries || '').trim().length > 0
+      setTitle(hasSkill ? seriesBasedTitle(practiceSeries) : defaultPracticeTitle())
     }
     replaceOwnedPreviewUrl(URL.createObjectURL(file))
   }
@@ -221,8 +221,8 @@ function SessionUpload({
     if (isUploading) return
     setVideoFile(file)
     if (!titleManuallyEdited) {
-      const hasThread = String(practiceSeries || '').trim().length > 0
-      setTitle(hasThread ? seriesBasedTitle(practiceSeries) : defaultPracticeTitle())
+      const hasSkill = String(practiceSeries || '').trim().length > 0
+      setTitle(hasSkill ? seriesBasedTitle(practiceSeries) : defaultPracticeTitle())
     }
     replaceOwnedPreviewUrl(URL.createObjectURL(file))
     if (source === 'paste') {
@@ -391,8 +391,8 @@ function SessionUpload({
       <div className="max-w-lg mx-auto">
         <div className="mb-6 space-y-3">
           <div>
-            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">New take</h2>
-            <p className="text-sm text-gray-500 mt-1">Record or upload a private take for your archive.</p>
+            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">New proof</h2>
+            <p className="text-sm text-gray-500 mt-1">Record or upload a private proof for your archive.</p>
           </div>
 
           <div className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-4">
@@ -500,13 +500,13 @@ function SessionUpload({
             </summary>
             <div className="space-y-4 pt-4">
               <div>
-                <label className="block text-sm text-gray-600 mb-1.5">Routine</label>
-                <PracticeThreadField
+                <label className="block text-sm text-gray-600 mb-1.5">Skill</label>
+                <SkillField
                   value={practiceSeries}
                   onChange={setPracticeSeries}
-                  options={practiceThreadOptions}
+                  options={skillOptions}
                   disabled={isUploading}
-                  placeholder="Choose a routine or create a new one"
+                  placeholder="Choose a skill or create a new one"
                 />
               </div>
 
@@ -554,7 +554,7 @@ function SessionUpload({
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={handleCancel} className="flex-1 text-sm text-gray-600 border border-gray-200 rounded-lg py-2.5 hover:bg-gray-50 transition-colors">{isUploading ? 'Abort upload' : 'Cancel'}</button>
             <button type="submit" disabled={isUploading} className="flex-1 text-sm font-medium text-white bg-gray-900 rounded-lg py-2.5 hover:bg-gray-800 disabled:opacity-40 transition-colors">
-              {isUploading ? (uploadPhase === 'resuming' ? 'Resuming upload…' : `Saving${uploadProgress !== null ? ` ${uploadProgress}%` : '...'}`) : 'Save to archive'}
+              {isUploading ? (uploadPhase === 'resuming' ? 'Resuming upload…' : `Saving${uploadProgress !== null ? ` ${uploadProgress}%` : '...'}`) : 'Save proof'}
             </button>
           </div>
 

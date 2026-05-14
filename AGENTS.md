@@ -9,26 +9,25 @@
 
 ## Product Direction
 
-Use `docs/practica-v2-prd.md` as the strategic source of truth for product-facing work.
+Use `docs/practica-master-spec.md` as the strategic source of truth for product-facing work.
 
 Important product context:
 
-- Practica uses a member-first identity model with a teacher workflow layer for async music instruction.
-- The initial wedge is independent drum teachers working with their existing students inside trusted networks.
-- The current shipped foundation remains the private member-owned library plus authenticated review flows described in `docs/platform-effects-mvp-playbook.md`.
-- Preserve `private by default`, `member-owned archive`, and `video-first feedback` as core product principles.
-- Prioritize teacher workflow primitives next: `ReviewRequest`, teacher inbox, roster, designated-teacher permissions, and reusable templates.
-- Optimize for completed review cycles: `submission -> feedback -> resubmission`.
-- Keep `teacher` and `student` as workflow-context labels, not global account identity types.
-- Do not introduce public marketplace mechanics, public discovery, heavy school-workspace abstractions, streaks, or practice-plan systems unless the user explicitly asks for that strategy shift.
+- Practica is now a private skill game built around one person, one habit or skill, and a daily proof loop.
+- The current shipped foundation remains private-by-default capture, playback, and proof history.
+- Preserve `private by default`, `member-owned proof archive`, `video-first capture`, and `progress-first` as core product principles.
+- Prioritize the surfaces that support the loop: `Today`, `Record`, `Progress`, and proof detail.
+- Optimize for a repeatable loop: `pick -> do -> record -> see progress -> repeat`.
+- Keep legacy teacher/reviewer workflows dormant and secondary unless the user explicitly asks for a strategy shift back to review.
+- Do not introduce public marketplace mechanics, public discovery, heavy school-workspace abstractions, or practice-plan systems unless the user explicitly asks for that strategy shift.
 
 ## Documentation Source Of Truth
 
 - `docs/README.md`: index of product and technical docs.
-- `docs/practica-v2-prd.md`: v2 product requirements and roadmap direction.
-- `docs/platform-effects-mvp-playbook.md`: shipped v1 baseline.
-- `docs/flow-audit.md`: implementation and foundation gaps.
-- `docs/technical-prd-2026-04-06.md`: current-state technical snapshot (update the version line when it diverges).
+- `docs/practica-master-spec.md`: current product requirements and roadmap direction.
+- `docs/habits.md`: behavior and product loop memo.
+- `docs/revenue-brief.md`: revenue and buyer prompt.
+- `docs/tdd-strategy.md`: core-loop protection strategy.
 
 ## Project Structure & Module Organization
 
@@ -55,8 +54,8 @@ Use 4-space indentation in Python and standard React/JS formatting already prese
 
 For product terminology and naming in new code or docs:
 
-- Prefer identity terms like `member`, `session owner`, and `reviewer` for global product language.
-- Prefer workflow terms like `teacher`, `student`, `review request`, `teacher inbox`, and `roster` when discussing structured teaching workflows.
+- Prefer identity terms like `member`, `skill owner`, and `proof archive` for global product language.
+- Prefer workflow terms like `teacher`, `student`, `review request`, `teacher inbox`, and `roster` only when touching legacy review flows.
 - Keep `review link` or `share link` terminology only where you are explicitly touching the shipped v1 access flow.
 
 ## Testing Guidelines
@@ -65,8 +64,8 @@ Backend tests use Django’s test runner and live in `apps/backend/videos/tests/
 
 ## TDD Expectations
 
-- Protect the core product loop first: `upload -> playback-ready -> trusted feedback request -> reviewer inbox -> response -> follow-up take`.
-- Treat the following as protected flows: upload reliability, playback, private-link access, formal review requests, reviewer inbox, feedback submission, follow-up continuation, and permissions.
+- Protect the core product loop first: `pick -> do -> record -> playback-ready -> progress -> repeat`.
+- Treat the following as protected flows: upload reliability, playback, proof history, progress calculation, private-share access, and permissions.
 - For bugs in protected flows, write or update a focused regression test before or alongside the fix.
 - Before refactoring a protected area, add characterization coverage for the current behavior you intend to preserve.
 - Do not mix unrelated refactors with bug fixes in protected flows.

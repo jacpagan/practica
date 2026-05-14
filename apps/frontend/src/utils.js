@@ -120,6 +120,61 @@ export const fmtDate = (d) => {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+const toLocalDayNumber = (value) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000)
+}
+
+const toLocalDateKey = (value) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+export const calculatePracticeProgress = (sessions = []) => {
+  const sorted = Array.isArray(sessions)
+    ? sessions
+      .filter(Boolean)
+      .slice()
+      .sort((left, right) => new Date(right.recorded_at || right.created_at || 0) - new Date(left.recorded_at || left.created_at || 0))
+    : []
+
+  const proofDays = new Set()
+  const skillCounts = new Map()
+  const recentProofs = sorted.slice(0, 6)
+
+  sorted.forEach((session) => {
+    const dateValue = session?.recorded_at || session?.created_at
+    const dayNumber = toLocalDayNumber(dateValue)
+    if (dayNumber !== null) {
+      proofDays.add(toLocalDateKey(dateValue))
+    }
+
+    const skill = String(session?.practice_series || '').trim()
+    if (skill) {
+      skillCounts.set(skill, (skillCounts.get(skill) || 0) + 1)
+    }
+  })
+
+  const activeSkill = sorted.find((session) => String(session?.practice_series || '').trim())?.practice_series?.trim() || 'Your skill'
+  const uniqueDays = Array.from(proofDays).filter(Boolean)
+  const proofCount = sorted.length
+
+  return {
+    activeSkill,
+    proofCount,
+    uniqueDayCount: uniqueDays.length,
+    skillCount: Array.from(skillCounts.keys()).length,
+    recentProofs,
+    proofDays: uniqueDays,
+    latestProofAt: sorted[0]?.recorded_at || sorted[0]?.created_at || '',
+  }
+}
+
 export const feedbackCategoryOptions = () => ([
   { value: '', label: 'Uncategorized' },
   { value: 'timing', label: 'Timing' },

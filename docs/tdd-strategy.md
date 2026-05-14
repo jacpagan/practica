@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Practica should evolve by protecting the core learner and trusted-feedback loop with tests before widening scope.
+Practica should evolve by protecting the core proof and progress loop with tests before widening scope.
 
 The rule is simple:
 
@@ -17,13 +17,12 @@ The following flows are product-critical and should be treated as protected:
 
 - private upload and recording
 - playback-ready session processing
-- private review-link access
-- formal `ReviewRequest` creation
-- reviewer inbox triage
-- feedback submission and playback
-- `submission -> feedback -> follow-up take`
+- proof archive history
+- progress summary calculation
+- private-share access
 - learner ownership and permissions
 - multipart upload recovery for long videos
+- any legacy review flows that are still touched
 
 ## Repo Gate
 
@@ -31,7 +30,7 @@ Use `scripts/test-core-loop.sh` as the default local test gate for core-loop wor
 
 That script currently checks:
 
-- focused backend regression suites around onboarding, review requests, feedback, and multipart uploads
+- focused backend regression suites around proof capture, playback, history, permissions, legacy review flows, and multipart uploads
 - frontend production build integrity
 
 ## Working Rules

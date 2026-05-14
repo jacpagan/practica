@@ -1,6 +1,6 @@
 """
 ASGI config for practica project.
-Private video practice mirror with trusted feedback.
+Private skill game for proof and progress.
 
 It exposes the ASGI callable as a module-level variable named ``application``.
 

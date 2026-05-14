@@ -12,8 +12,8 @@ function PrivacyPage({ onBack = null, signedIn = false }) {
 
         <div className="space-y-3">
           <p className="text-xs uppercase tracking-wide text-gray-500">Privacy</p>
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Your private evidence archive</h1>
-          <p className="text-sm text-gray-600">Practica is built to keep your takes private by default. You control what gets recorded, organized, and shared.</p>
+          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Your private proof archive</h1>
+          <p className="text-sm text-gray-600">Practica is built to keep your proofs private by default. You control what gets recorded, organized, and shared.</p>
         </div>
 
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
@@ -76,7 +76,7 @@ function PrivacyPage({ onBack = null, signedIn = false }) {
         </div>
 
         {!signedIn ? (
-          <p className="text-xs text-gray-500">Use invite-only signup if you want access to the private archive.</p>
+          <p className="text-xs text-gray-500">Use invite-only signup if you want access to the private proof archive.</p>
         ) : null}
       </div>
     </div>

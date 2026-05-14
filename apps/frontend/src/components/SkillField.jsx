@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 
-function PracticeThreadField({
+function SkillField({
   value = '',
   onChange,
   options = [],
   disabled = false,
-  placeholder = 'Choose a routine or make a new one',
+  placeholder = 'Choose a skill or make a new one',
   inputRef = null,
 }) {
   const wrapperRef = useRef(null)
@@ -68,7 +68,7 @@ function PracticeThreadField({
         <div className="absolute z-20 w-full rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
           {filteredOptions.length > 0 ? (
             <div className="px-3 py-2 border-b border-gray-100">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Saved routines</p>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Saved skills</p>
             </div>
           ) : null}
 
@@ -95,13 +95,13 @@ function PracticeThreadField({
               }}
               className="w-full px-3 py-3 text-left border-t border-gray-100 hover:bg-gray-50 transition-colors"
             >
-              <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">New routine</p>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">New skill</p>
               <p className="text-sm text-gray-900 mt-1">Create “{normalizedValue}”</p>
             </button>
           ) : null}
 
           {!normalizedValue && filteredOptions.length === 0 ? (
-            <div className="px-3 py-3 text-sm text-gray-500">Start typing to create a new routine.</div>
+            <div className="px-3 py-3 text-sm text-gray-500">Start typing to create a new skill.</div>
           ) : null}
         </div>
       )}
@@ -125,4 +125,4 @@ function PracticeThreadField({
   )
 }
 
-export default PracticeThreadField
+export default SkillField

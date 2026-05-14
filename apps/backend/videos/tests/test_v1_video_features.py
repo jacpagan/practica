@@ -30,6 +30,19 @@ class V1VideoFeaturesTests(APITestCase):
             processing_status=Session.STATUS_READY,
         )
 
+    def test_sessions_list_returns_only_authenticated_owner_items(self):
+        own_session = self._create_session(user=self.owner, title='Owner session')
+        self._create_session(user=self.viewer, title='Viewer session')
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.get('/api/sessions/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data if isinstance(response.data, list) else response.data.get('results', [])
+        self.assertEqual(len(payload), 1)
+        self.assertEqual(payload[0]['id'], own_session.id)
+        self.assertTrue(payload[0]['can_edit'])
+
     def test_video_feedback_requires_video(self):
         session = self._create_session(user=self.owner)
         self.client.force_authenticate(user=self.owner)

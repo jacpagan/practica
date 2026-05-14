@@ -1,16 +1,16 @@
 import React, { useMemo, useState, useEffect } from 'react'
-import PracticeThreadField from './PracticeThreadField'
+import SkillField from './SkillField'
 
-export default function ThreadPickerModal({
+export default function SkillPickerModal({
   open = false,
-  title = 'Add to routine',
+  title = 'Add to skill',
   initialValue = '',
   options = [],
   onSave,
   onClose,
   saving = false,
   onClear = null,
-  clearLabel = 'Remove from routine',
+  clearLabel = 'Remove from skill',
 }) {
   const [value, setValue] = useState(initialValue || '')
   const [inputRef, setInputRef] = useState(null)
@@ -22,20 +22,20 @@ export default function ThreadPickerModal({
   }, [open, inputRef])
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-[120]" role="dialog" aria-modal="true" aria-labelledby="routine-modal-title">
+    <div className="fixed inset-0 z-[120]" role="dialog" aria-modal="true" aria-labelledby="skill-modal-title">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="absolute inset-0 flex items-center justify-center px-4">
         <div className="w-full max-w-md rounded-2xl bg-white border border-gray-200 shadow-2xl p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <p id="routine-modal-title" className="text-sm font-semibold text-gray-900">{title}</p>
+            <p id="skill-modal-title" className="text-sm font-semibold text-gray-900">{title}</p>
             <button type="button" onClick={onClose} className="text-xs text-gray-500 hover:text-gray-900">Close</button>
           </div>
-          <PracticeThreadField
+          <SkillField
             inputRef={setInputRef}
             value={value}
             onChange={setValue}
             options={normalizedOptions}
-            placeholder="Choose or create a routine"
+            placeholder="Choose or create a skill"
           />
           <div className="flex items-center justify-end gap-2">
             {onClear && String(value || '').trim() ? (

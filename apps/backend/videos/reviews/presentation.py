@@ -32,7 +32,7 @@ def resolve_session_resolution(session, user=None):
             'code': 'ready_for_review',
             'phase': 'complete',
             'summary': 'Ready for review',
-            'detail': 'This take is ready to watch, share, or request feedback.',
+            'detail': 'This proof is ready to watch, share, or request feedback.',
             'awaiting_actor': 'owner' if can_edit else 'none',
         }
 
@@ -41,7 +41,7 @@ def resolve_session_resolution(session, user=None):
             'code': 'playback_failed',
             'phase': 'blocked',
             'summary': 'Playback processing failed',
-            'detail': str(getattr(session, 'processing_error', '') or 'This take is not ready for browser playback yet.').strip(),
+            'detail': str(getattr(session, 'processing_error', '') or 'This proof is not ready for browser playback yet.').strip(),
             'awaiting_actor': 'owner' if can_edit else 'none',
         }
 
@@ -50,7 +50,7 @@ def resolve_session_resolution(session, user=None):
             'code': 'processing',
             'phase': 'waiting',
             'summary': 'Preparing playback',
-            'detail': 'Your take is saved. You can request feedback once playback is ready.',
+            'detail': 'Your proof is saved. You can request feedback once playback is ready.',
             'awaiting_actor': 'system',
         },
         getattr(session, 'created_at', None),
@@ -70,7 +70,7 @@ def resolve_review_request_resolution(review_request, user=None):
                     'code': 'respond_now',
                     'phase': 'action_required',
                     'summary': 'Your response is next',
-                    'detail': 'Watch the take, then send one response video to keep this private thread moving.',
+                    'detail': 'Watch the proof, then send one response video to keep this private review moving.',
                     'awaiting_actor': 'reviewer',
                 },
                 review_request.opened_at or review_request.created_at,
@@ -82,7 +82,7 @@ def resolve_review_request_resolution(review_request, user=None):
                     'code': 'waiting_on_owner',
                     'phase': 'waiting',
                     'summary': 'Waiting on creator',
-                    'detail': 'Your response is in the thread. The creator has not reviewed it yet.',
+                    'detail': 'Your response is in the review. The creator has not reviewed it yet.',
                     'awaiting_actor': 'owner',
                 },
                 review_request.responded_at,
@@ -105,8 +105,8 @@ def resolve_review_request_resolution(review_request, user=None):
                 {
                     'code': 'waiting_on_owner',
                     'phase': 'waiting',
-                    'summary': 'Waiting for a new take',
-                    'detail': 'You asked the creator to send another take before continuing.',
+                    'summary': 'Waiting for a new proof',
+                    'detail': 'You asked the creator to send another proof before continuing.',
                     'awaiting_actor': 'owner',
                 },
                 review_request.updated_at,
@@ -140,7 +140,7 @@ def resolve_review_request_resolution(review_request, user=None):
                     'code': 'feedback_ready',
                     'phase': 'action_required',
                     'summary': 'Feedback is ready',
-                    'detail': f'Open the response from {reviewer_name}, then decide whether to continue or close the thread.',
+                    'detail': f'Open the response from {reviewer_name}, then decide whether to continue or close the review.',
                     'awaiting_actor': 'owner',
                 },
                 review_request.responded_at,
@@ -151,8 +151,8 @@ def resolve_review_request_resolution(review_request, user=None):
                 {
                     'code': 'record_next_take',
                     'phase': 'action_required',
-                    'summary': 'Ready for the next take',
-                    'detail': 'You have seen the feedback. Record the next take when you are ready.',
+                    'summary': 'Ready for the next proof',
+                    'detail': 'You have seen the feedback. Record the next proof when you are ready.',
                     'awaiting_actor': 'owner',
                 },
                 review_request.viewed_at,
@@ -162,8 +162,8 @@ def resolve_review_request_resolution(review_request, user=None):
             return {
                 'code': 'record_new_take',
                 'phase': 'action_required',
-                'summary': 'New take requested',
-                'detail': 'Record a new take to continue this thread.',
+                'summary': 'New proof requested',
+                'detail': 'Record a new proof to continue this review.',
                 'awaiting_actor': 'owner',
             }
         if status_value == 'declined_unrelated':
@@ -171,23 +171,23 @@ def resolve_review_request_resolution(review_request, user=None):
                 'code': 'record_matching_take',
                 'phase': 'action_required',
                 'summary': 'Matching take needed',
-                'detail': 'Record the matching take to continue this thread.',
+                'detail': 'Record the matching proof to continue this review.',
                 'awaiting_actor': 'owner',
             }
         if status_value in {'closed', 'revoked'}:
             return {
                 'code': status_value,
                 'phase': 'complete',
-                'summary': 'Thread closed',
-                'detail': 'This review thread is no longer active.',
+                'summary': 'Review closed',
+                'detail': 'This review is no longer active.',
                 'awaiting_actor': 'none',
             }
 
     return {
         'code': status_value or 'unknown',
         'phase': 'waiting',
-        'summary': 'Private review thread',
-        'detail': 'Open the thread to review the current state.',
+        'summary': 'Private review',
+        'detail': 'Open the review to see the current state.',
         'awaiting_actor': 'none',
     }
 
@@ -195,7 +195,7 @@ def resolve_review_request_resolution(review_request, user=None):
 def resolve_reviewer_invite_resolution(reviewer_invite, user=None):
     status_value = str(getattr(reviewer_invite, 'status', '') or '').strip().lower()
     claim_name = _display_name(getattr(reviewer_invite, 'claimed_by', None)) or 'your reviewer'
-    session_title = str(getattr(getattr(reviewer_invite, 'session', None), 'title', '') or 'this take').strip()
+    session_title = str(getattr(getattr(reviewer_invite, 'session', None), 'title', '') or 'this proof').strip()
 
     viewer_is_creator = bool(
         user and getattr(user, 'is_authenticated', False)

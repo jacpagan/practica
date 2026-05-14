@@ -8,47 +8,46 @@ If any other Practica doc conflicts with this one, this file wins.
 
 ## One-Line Thesis
 
-Practica is a private video practice mirror where learners lead their own progress and bring in trusted feedback when they want it.
+Practica is a private skill game where one person does a tiny action, records proof, and sees progress over time.
 
 ## What Practica Is
 
 - private by default
-- learner-led
-- member-owned archive
+- member-led
+- member-owned proof archive
 - video-first
-- feedback is optional and secondary
-- teacher and reviewer workflows sit on top of the learner-owned archive
+- progress-first
+- one active skill or habit at a time
 
 ## What Practica Is Not
 
 - a public social app
 - a public marketplace
 - a heavy LMS
-- a streak or practice-plan app
 - a school administration system
 - an AI-first revenue product
+- a teacher-first workflow product
 
 ## Revenue Truth
 
 Practica does not need AI or ML to start earning revenue.
 
-Revenue should come from the workflow itself:
+Revenue should come from the loop itself:
 
 - private capture
-- self-review
-- trusted review
-- reviewer inbox and response flow
-- repeat practice and follow-up takes
+- immediate proof
+- progress feedback
+- repeat usage over time
 
-If model-assisted features are added later, they should support the core loop by reducing friction or improving usefulness. They are not the commercial foundation.
+If model-assisted features are added later, they should support the loop by reducing friction or improving usefulness. They are not the commercial foundation.
 
 ## Wedge
 
 The initial wedge is:
 
-- independent drum teachers
-- using Practica with their existing students
-- for async between-lesson video review
+- one person
+- one habit or skill
+- one daily proof loop
 
 That wedge is narrow on purpose. It is easier to explain, recruit, and charge for than broad “all embodied learning” positioning.
 
@@ -59,15 +58,12 @@ That wedge is narrow on purpose. It is easier to explain, recruit, and charge fo
 - invite-only account creation
 - private session upload and recording
 - playback-ready media processing
-- learner-owned archive and calendar view
-- practice thread grouping
+- member-owned proof archive and history view
+- one active skill or habit label per member
 - session detail and metadata editing
-- private authenticated review links
-- structured `ReviewRequest` workflow
-- reviewer inbox
-- private video feedback replies
-- feedback templates for faster reviewer response
-- follow-up loop from feedback to next take
+- progress summaries from completed proof events
+- Today / Record / Progress navigation
+- private authenticated legacy review flows where already shipped
 
 ### Out of scope today
 
@@ -77,44 +73,42 @@ That wedge is narrow on purpose. It is easier to explain, recruit, and charge fo
 - school or institution administration
 - billing and subscriptions
 - public marketplace mechanics
-- practice-plan systems or streak systems
-- rich comparison tooling beyond thread/history organization
+- rich comparison tooling beyond proof/history organization
 - email or push-notification delivery infrastructure
 
 ## Core Loop
 
 The core loop is:
 
-1. record a private take
-2. watch it privately
-3. organize it into a thread
-4. optionally request trusted feedback
-5. receive a response
-6. record the next take
+1. pick one skill or habit
+2. do a tiny action
+3. record proof
+4. see progress
+5. repeat tomorrow
 
 This loop is the product. Everything else should support it.
 
 ## Product Goals Supported Today
 
-1. A learner can create a private video take reliably.
-2. A learner can revisit prior takes in a private archive.
-3. A learner can group repeated takes into a named practice thread.
-4. A learner can invite trusted feedback on a take.
-5. A reviewer can respond with private video feedback attached to the take.
-6. The learner can continue the loop with a follow-up take.
+1. A member can create a private proof take reliably.
+2. A member can revisit prior takes in a private archive.
+3. A member can keep one skill or habit visible.
+4. A member can see streak, XP, and level progress.
+5. A member can continue the loop with another take.
 
 ## Roles And Access Model
 
 - `member`: any authenticated person.
-- `learner` / `session owner` / `student`: the member who owns the take and archive artifact.
-- `reviewer`: a trusted person who can respond to a review link or assigned review request.
-- `teacher`: a workflow-context label, not a separate account type.
+- `skill owner`: the member who owns the proof archive and active skill.
+- `reviewer`: a dormant workflow-context label for legacy review flows.
+- `teacher`: a dormant workflow-context label, not a primary product identity.
 
 Rules:
 
 - sessions are private to their owner unless explicitly shared
-- structured review requests are visible only to the owner, the assigned reviewer, or staff
-- teacher and student language is workflow language, not global identity language
+- progress data is derived from the member’s own proof history
+- dormant review flows remain private to the owner, the assigned reviewer, or staff if they are touched
+- teacher and student language is legacy workflow language, not the primary product frame
 
 ## Current Technical Snapshot
 
@@ -122,30 +116,30 @@ Practica is already strongest at:
 
 - private capture
 - playback-ready takes
-- private review threads
-- structured async feedback loops
+- private proof history
+- repeatable progress tracking
+- quick record and save loops
 
 The current product does **not** require AI or ML to work or to generate revenue.
 
 The current delivery state is still `Now`, with the biggest risks centered on:
 
 - friction inside the proof loop
-- reviewer provisioning and invite reliability
+- clarity of the Today / Record / Progress surfaces
 - consistency and reliability
-- measurement
+- measurement of the habit loop
 
 Current shipped baseline:
 
-- reviewer invite lifecycle exists
-- structured review requests and reviewer inbox are active
-- response composer supports video-first feedback
-- in-app resolution cues are present
+- private upload and playback exist
+- legacy review flows still exist in the backend
+- session history and routing exist
+- the shell can be refocused around proof and progress
 
 Current gaps:
 
-- reviewer onboarding is still thinner than the learner flow
-- comparison and self-review can be stronger
-- reviewer operating leverage can improve
+- Today / Record / Progress surfaces are still being aligned
+- game-like progress needs clearer framing
 - billing and monetization do not exist yet
 - mobile native app does not exist
 
@@ -153,14 +147,14 @@ Current gaps:
 
 ### Now
 
-- remove friction from ask/join/respond/continue
-- measure the core loop
-- learn what reviewers will pay for
+- remove friction from pick/do/record/progress
+- measure the proof loop
+- learn what members will pay for
 
 ### Next
 
-- deepen self-review value
-- increase reviewer workflow leverage
+- deepen progress feedback
+- make the active skill clearer
 - shape pricing around real use
 
 ### Later
@@ -174,24 +168,23 @@ Current gaps:
 
 - private by default
 - video first
-- learner-led
-- mirror before marketplace
-- feedback attached to the artifact
+- member-led
+- proof before anything else
 - progress through repetition
 - low pressure
-- trusted network growth
+- tiny actions
+- fun enough to return tomorrow
 
 ## Naming Guidance
 
 Preferred language:
 
-- learner
 - member
-- take
-- practice thread
+- skill
+- proof
+- today
+- progress
 - private archive
-- practice mirror
-- trusted feedback
 
 Allowed workflow language:
 
@@ -206,6 +199,7 @@ Avoid:
 - public marketplace framing
 - role-heavy institutional framing
 - AI-first positioning for revenue
+- teacher-first positioning as the primary story
 
 ## Doc Policy
 

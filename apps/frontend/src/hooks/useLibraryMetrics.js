@@ -3,17 +3,22 @@ import { useMemo } from 'react'
 export const useLibraryMetrics = ({
   sessions,
 }) => {
-  const practiceThreadOptions = useMemo(
-    () => Array.from(new Set(
-      sessions
-        .filter((item) => item?.can_edit)
-        .map((item) => String(item?.practice_series || '').trim())
-        .filter(Boolean),
-    )).sort((left, right) => left.localeCompare(right)),
+  const skillOptions = useMemo(
+    () => {
+      const byCanonicalName = new Map()
+      ;(sessions || []).forEach((item) => {
+        const rawName = String(item?.practice_series || '').trim()
+        if (!rawName) return
+        const canonicalName = rawName.toLocaleLowerCase()
+        if (byCanonicalName.has(canonicalName)) return
+        byCanonicalName.set(canonicalName, rawName)
+      })
+      return Array.from(byCanonicalName.values()).sort((left, right) => left.localeCompare(right))
+    },
     [sessions],
   )
 
   return {
-    practiceThreadOptions,
+    skillOptions,
   }
 }

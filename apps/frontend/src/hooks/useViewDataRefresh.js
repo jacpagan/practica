@@ -7,7 +7,8 @@ export const useViewDataRefresh = ({
 }) => {
   useEffect(() => {
     if (!user) return
-    if (view === 'evidence' || view === 'series') loadSessions()
+    if (view === 'privacy') return
+    loadSessions()
   }, [
     loadSessions,
     user,
