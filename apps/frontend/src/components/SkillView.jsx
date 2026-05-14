@@ -19,7 +19,17 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
   const [saving, setSaving] = useState(false)
   const skillMenuRef = useRef(null)
   const toast = useToast()
-  const skillOptions = useMemo(() => Array.from(new Set(sessions.map(s => String(s.practice_series || '').trim()).filter(Boolean))).sort(), [sessions])
+  const skillOptions = useMemo(() => {
+    const byCanonicalName = new Map()
+    sessions.forEach((session) => {
+      const rawName = String(session?.practice_series || '').trim()
+      if (!rawName) return
+      const canonicalName = rawName.toLocaleLowerCase()
+      if (byCanonicalName.has(canonicalName)) return
+      byCanonicalName.set(canonicalName, rawName)
+    })
+    return Array.from(byCanonicalName.values()).sort((left, right) => left.localeCompare(right))
+  }, [sessions])
   const skillSessions = useMemo(() => {
     const filtered = sessions
       .filter((session) => session.can_edit && String(session.practice_series || '').trim() === String(skillName || '').trim())

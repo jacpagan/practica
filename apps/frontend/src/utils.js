@@ -144,7 +144,6 @@ export const calculatePracticeProgress = (sessions = []) => {
     : []
 
   const proofDays = new Set()
-  const dayNumbers = []
   const skillCounts = new Map()
   const recentProofs = sorted.slice(0, 6)
 
@@ -153,7 +152,6 @@ export const calculatePracticeProgress = (sessions = []) => {
     const dayNumber = toLocalDayNumber(dateValue)
     if (dayNumber !== null) {
       proofDays.add(toLocalDateKey(dateValue))
-      dayNumbers.push(dayNumber)
     }
 
     const skill = String(session?.practice_series || '').trim()
@@ -164,31 +162,11 @@ export const calculatePracticeProgress = (sessions = []) => {
 
   const activeSkill = sorted.find((session) => String(session?.practice_series || '').trim())?.practice_series?.trim() || 'Your skill'
   const uniqueDays = Array.from(proofDays).filter(Boolean)
-  const orderedDayNumbers = Array.from(new Set(dayNumbers)).sort((left, right) => right - left)
-
-  let streak = 0
-  for (let index = 0; index < orderedDayNumbers.length; index += 1) {
-    if (index === 0) {
-      streak = 1
-      continue
-    }
-    if (orderedDayNumbers[index - 1] - orderedDayNumbers[index] !== 1) break
-    streak += 1
-  }
-
   const proofCount = sorted.length
-  const xp = (proofCount * 25) + Math.max(0, streak - 1) * 5
-  const level = Math.max(1, Math.floor(xp / 100) + 1)
-  const nextLevelAt = level * 100
 
   return {
     activeSkill,
     proofCount,
-    xp,
-    level,
-    streak,
-    nextLevelAt,
-    nextLevelRemaining: Math.max(0, nextLevelAt - xp),
     uniqueDayCount: uniqueDays.length,
     skillCount: Array.from(skillCounts.keys()).length,
     recentProofs,

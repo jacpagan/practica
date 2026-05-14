@@ -19,8 +19,8 @@ export const useRoutineRenamedListener = ({
       try {
         await loadSessions()
       } catch {}
-      if (view === 'series' && oldSeriesName && routeSeriesName === oldSeriesName && newSeriesName) {
-        navigate({ view: 'series', sessionId: null, seriesName: newSeriesName }, { replace: true })
+      if (view === 'skill' && oldSeriesName && routeSeriesName === oldSeriesName && newSeriesName) {
+        navigate({ view: 'skill', sessionId: null, seriesName: newSeriesName }, { replace: true })
       }
       if (selectedSessionId) {
         try {
@@ -32,8 +32,8 @@ export const useRoutineRenamedListener = ({
         } catch {}
       }
     }
-    window.addEventListener('practica:routine-renamed', handler)
-    return () => window.removeEventListener('practica:routine-renamed', handler)
+    window.addEventListener('practica:skill-renamed', handler)
+    return () => window.removeEventListener('practica:skill-renamed', handler)
   }, [
     calendarMonthCacheRef,
     loadSessions,

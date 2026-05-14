@@ -2,23 +2,22 @@
 
 Practica is a Django + React application built around one idea:
 
-> Practica is a private video practice mirror where learners lead their own progress and bring in trusted feedback when they want it.
+> Practica is a private skill game where one person does a tiny action, records proof, and sees progress over time.
 
 The product is strongest when it helps someone:
 
-- record a private take,
-- watch themselves clearly,
-- notice posture, timing, expression, alignment, or movement,
-- organize repeated attempts over time,
-- and invite trusted feedback only when it helps.
+- pick one habit or skill,
+- do one small action today,
+- record proof quickly,
+- see streaks, XP, and level progress,
+- and come back tomorrow.
 
 ## Product Docs
 
-- `docs/role-path-story-map.md`: canonical implemented map of user roles, route paths, stories, and end-to-end data flow
-- `docs/practica-v2-prd.md`: strategic source of truth for Practica v2
-- `docs/platform-effects-mvp-playbook.md`: shipped v1 baseline
-- `docs/flow-audit.md`: current flow audit and product gaps
-- `docs/platform-revolution-audit.md`: platform and interaction analysis
+- `docs/practica-master-spec.md`: single source of truth for product direction, current-state product behavior, and roadmap
+- `docs/habits.md`: distilled habits memo for product decisions and daily skill loops
+- `docs/revenue-brief.md`: business prompt for who pays, why, and what to build for revenue
+- `docs/tdd-strategy.md`: focused test strategy for the proof and progress loop
 - `docs/local-dev-playbook.md`: cheapest safe day-to-day local development workflow
 - `docs/release-checklist.md`: step-by-step release checklist from local change to production verification
 - `docs/README.md`: documentation index
@@ -27,19 +26,19 @@ The product is strongest when it helps someone:
 
 ### Core product truth
 
-Practica is a private practice mirror.
+Practica is a private skill game.
 
-The archive belongs to the learner, the video stays central, and trusted feedback is an optional layer on top of self-led progress.
+The archive belongs to the member, the video stays central, and progress is the main product.
 
-### Go-to-market wedge
+### Commercial shape
 
-The first commercial wedge can still stay narrow:
+The first commercial offer should stay narrow:
 
-- independent drum teachers,
-- working with existing students,
-- using Practica for async between-lesson review.
+- one member,
+- one habit or skill,
+- one daily proof loop.
 
-That wedge does not change the broader product truth.
+That shape is the simplest path to a paid product.
 
 ## Quick Start
 
@@ -125,7 +124,7 @@ cd apps/frontend && npm run build
 
 - React 18 + Vite
 - Tailwind CSS
-- Route-driven SPA around archive, upload, session detail, and trusted feedback surfaces
+- Route-driven SPA around Today, Record, Progress, and proof detail surfaces
 
 ### Infrastructure
 

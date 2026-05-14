@@ -24,7 +24,7 @@ function AuthForm({
   const [loading, setLoading] = useState(false)
 
   const title = contextTitle || 'Practica'
-  const subtitle = contextSubtitle || 'A private evidence archive for self-led learning.'
+  const subtitle = contextSubtitle || 'A private proof loop for practice and progress.'
 
   const handleSubmit = async (e) => {
     e.preventDefault()

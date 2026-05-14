@@ -140,7 +140,7 @@ class Tag(models.Model):
 
 
 class Session(models.Model):
-    """A learner-owned private take inside the practice mirror."""
+    """A learner-owned private proof inside the skill game."""
     STATUS_UPLOADED = 'uploaded'
     STATUS_PROCESSING = 'processing'
     STATUS_READY = 'ready'

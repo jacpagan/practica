@@ -1,4 +1,5 @@
 import secrets
+import logging
 from datetime import timedelta
 
 from django.shortcuts import get_object_or_404
@@ -19,6 +20,8 @@ from videos.serializers import ChapterSerializer, ReviewLinkSerializer, ReviewVi
 from videos.services.feedback_video_processing import prepare_feedback_video_upload
 from videos.telemetry import record_product_event
 from videos.video_uploads import is_allowed_video_upload
+
+logger = logging.getLogger(__name__)
 
 
 def _first_error_message(errors):
@@ -112,17 +115,41 @@ class SessionViewSet(SessionMediaActionsMixin, viewsets.ModelViewSet):
         return SessionSerializer
 
     def list(self, request, *args, **kwargs):
+        logger.info(
+            'sessions_list_requested user_id=%s username=%s query=%s',
+            getattr(request.user, 'id', None),
+            getattr(request.user, 'username', ''),
+            dict(request.query_params),
+        )
         queryset = self.filter_queryset(self.get_queryset())
         processing_sessions = list(queryset.filter(processing_status=Session.STATUS_PROCESSING).exclude(processing_job_id='')[:5])
         for session in processing_sessions:
             maybe_refresh_session_processing(session)
-        return super().list(request, *args, **kwargs)
+        response = super().list(request, *args, **kwargs)
+        if isinstance(response.data, list):
+            result_count = len(response.data)
+        else:
+            result_count = len(response.data.get('results', [])) if isinstance(response.data, dict) else -1
+        logger.info(
+            'sessions_list_resolved user_id=%s username=%s count=%s',
+            getattr(request.user, 'id', None),
+            getattr(request.user, 'username', ''),
+            result_count,
+        )
+        return response
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         maybe_refresh_session_processing(instance)
         instance.refresh_from_db()
         serializer = self.get_serializer(instance)
+        logger.info(
+            'sessions_retrieve_resolved user_id=%s username=%s session_id=%s owner_id=%s',
+            getattr(request.user, 'id', None),
+            getattr(request.user, 'username', ''),
+            instance.id,
+            instance.user_id,
+        )
         return Response(serializer.data)
 
     def create(self, request, *args, **kwargs):
@@ -169,6 +196,14 @@ class SessionViewSet(SessionMediaActionsMixin, viewsets.ModelViewSet):
     def perform_create(self, serializer, *, client_upload_id=''):
         session = serializer.save(user=self.request.user, client_upload_id=client_upload_id)
         attach_tags_to_session(session, self.request.data.get('tags', ''))
+        logger.info(
+            'sessions_create_resolved user_id=%s username=%s session_id=%s owner_id=%s client_upload_id=%s',
+            getattr(self.request.user, 'id', None),
+            getattr(self.request.user, 'username', ''),
+            session.id,
+            session.user_id,
+            client_upload_id,
+        )
         start_processing_pipeline(session)
 
     def perform_update(self, serializer):

@@ -320,7 +320,7 @@ ReviewerRosterMembership.objects.update_or_create(
   `)
 })
 
-test('signed-in upload -> request -> feedback loop works', async ({ browser, request }) => {
+test('signed-in proof upload -> optional review loop works', async ({ browser, request }) => {
   test.setTimeout(120000)
   const studentVideo = writeFixtureVideo('practica-e2e-student.mp4')
   const teacherVideo = writeFixtureVideo('practica-e2e-teacher.mp4')
@@ -333,10 +333,10 @@ test('signed-in upload -> request -> feedback loop works', async ({ browser, req
   const studentPage = await studentContext.newPage()
 
   await studentPage.goto('/upload')
-  await expect(studentPage.getByRole('heading', { name: 'New take' })).toBeVisible({ timeout: 10000 })
+  await expect(studentPage.getByRole('heading', { name: 'New proof' })).toBeVisible({ timeout: 10000 })
   await studentPage.locator('[aria-label="Drop a video or browse files"] input[type=file]').first().setInputFiles(studentVideo)
   await studentPage.locator('input[type=text]').nth(0).fill(title)
-  await studentPage.getByRole('button', { name: /Save to (archive|library)/ }).click()
+  await studentPage.getByRole('button', { name: 'Save proof' }).click()
   await studentPage.waitForURL(/\/sessions\/\d+/, { timeout: 30000 })
 
   const sessionId = Number(studentPage.url().match(/\/sessions\/(\d+)/)?.[1])
@@ -401,10 +401,10 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
   const studentPage = await studentContext.newPage()
 
   await studentPage.goto('/upload')
-  await expect(studentPage.getByRole('heading', { name: 'New take' })).toBeVisible({ timeout: 10000 })
+  await expect(studentPage.getByRole('heading', { name: 'New proof' })).toBeVisible({ timeout: 10000 })
   await studentPage.locator('[aria-label="Drop a video or browse files"] input[type=file]').first().setInputFiles(firstTakeVideo)
   await studentPage.locator('input[type=text]').nth(0).fill(initialTitle)
-  await studentPage.getByRole('button', { name: /Save to (archive|library)/ }).click()
+  await studentPage.getByRole('button', { name: 'Save proof' }).click()
   await studentPage.waitForURL(/\/sessions\/\d+/, { timeout: 30000 })
 
   const initialSessionId = Number(studentPage.url().match(/\/sessions\/(\d+)/)?.[1])
@@ -444,11 +444,11 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
 
   await studentPage.goto('/upload')
   await expect(studentPage).toHaveURL(/\/upload$/)
-  await expect(studentPage.getByRole('heading', { name: 'New take' })).toBeVisible()
+  await expect(studentPage.getByRole('heading', { name: 'New proof' })).toBeVisible()
 
   await studentPage.locator('[aria-label="Drop a video or browse files"] input[type=file]').first().setInputFiles(secondTakeVideo)
   await studentPage.locator('input[type=text]').nth(0).fill(followupTitle)
-  await studentPage.getByRole('button', { name: /Save to (archive|library)/ }).click()
+  await studentPage.getByRole('button', { name: 'Save proof' }).click()
   await studentPage.waitForURL(/\/sessions\/\d+/, { timeout: 30000 })
 
   const followupSessionId = Number(studentPage.url().match(/\/sessions\/(\d+)/)?.[1])
@@ -487,10 +487,10 @@ test('long upload interruption auto-resumes and saves successfully', async ({ br
   const mocks = await installSignedInUploadMocks(page)
 
   await page.goto('/upload')
-  await expect(page.getByRole('heading', { name: 'New take' })).toBeVisible({ timeout: 10000 })
+  await expect(page.getByRole('heading', { name: 'New proof' })).toBeVisible({ timeout: 10000 })
   await page.locator('[aria-label="Drop a video or browse files"] input[type=file]').first().setInputFiles(longFilePath)
   await page.locator('input[type=text]').nth(0).fill('Mock long take')
-  await page.getByRole('button', { name: /Save to (archive|library)/ }).click()
+  await page.getByRole('button', { name: 'Save proof' }).click()
 
   await expect(page).toHaveURL(/\/sessions\/999$/, { timeout: 30000 })
   await expect(page.getByText('Mock long take')).toBeVisible({ timeout: 10000 })

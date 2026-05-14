@@ -6,8 +6,8 @@ test.beforeAll(async ({ request }) => {
 
 test('Privacy page renders without API and shows content', async ({ page }) => {
   await page.goto('/privacy')
-  await expect(page.getByRole('heading', { name: 'Your private evidence archive' })).toBeVisible()
-  await expect(page.locator('text=keep your takes private by default').first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Your private proof archive' })).toBeVisible()
+  await expect(page.locator('text=keep your proofs private by default').first()).toBeVisible()
 })
 
 test('Library route (signed-out) shows Auth form without crashing', async ({ page }) => {
@@ -22,7 +22,7 @@ test('Library route (signed-out) shows Auth form without crashing', async ({ pag
   await expect(page).toHaveURL(/\/?\?date=/)
 })
 
-test('Signed-in home shell renders without crashing', async ({ page }) => {
+test('Progress view shows grouped proofs for signed-in members', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('token', 'smoke-token')
   })
@@ -69,10 +69,99 @@ test('Signed-in home shell renders without crashing', async ({ page }) => {
   await page.route('**/api/sessions/**', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(sessions) })
   })
-  await page.goto('/')
+  await page.goto('/progress')
 
-  await expect(page.getByRole('button', { name: 'Today' }).first()).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Record' }).first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Proof history' })).toBeVisible()
+  await expect(page.getByText('Groove Lab')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Add to skill' }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Add proof' }).first()).toBeVisible()
+})
+
+test('Today view keeps a plain core-loop UI without gamification', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('token', 'smoke-token')
+  })
+
+  await page.route('**/api/auth/me/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 1, username: 'smoke_member', display_name: 'Smoke Member' }),
+    })
+  })
+
+  const sessions = [
+    {
+      id: 201,
+      title: 'Daily groove check',
+      practice_series: 'Groove Lab',
+      description: '',
+      video_file: null,
+      duration_seconds: 12,
+      recorded_at: '2099-01-03T00:00:00Z',
+      created_at: '2099-01-03T00:00:00Z',
+      processing_status: 'ready',
+      can_edit: true,
+      local_preview_url: '',
+      video_feedback_count: 0,
+    },
+  ]
+
+  await page.route('**/api/sessions/', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(sessions) })
+  })
+
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'One small proof. One more step.' })).toBeVisible()
+  await expect(page.getByText('XP', { exact: true })).toHaveCount(0)
+  await expect(page.getByText(/streak/i)).toHaveCount(0)
+  await expect(page.getByText(/level/i)).toHaveCount(0)
+})
+
+test('Upload view shows existing skills loaded from prior proofs', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('token', 'smoke-token')
+    window.localStorage.setItem('practica.last_series.v1', 'Groove Lab')
+  })
+
+  await page.route('**/api/auth/me/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 1, username: 'smoke_member', display_name: 'Smoke Member' }),
+    })
+  })
+
+  await page.route('**/api/review-requests/**', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  const sessions = [
+    {
+      id: 301,
+      title: 'Pocket check',
+      practice_series: 'Groove Lab',
+      description: '',
+      video_file: null,
+      duration_seconds: 18,
+      recorded_at: '2099-01-05T00:00:00Z',
+      created_at: '2099-01-05T00:00:00Z',
+      processing_status: 'ready',
+      can_edit: true,
+      local_preview_url: '',
+      video_feedback_count: 0,
+    },
+  ]
+
+  await page.route('**/api/sessions/', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(sessions) })
+  })
+
+  await page.goto('/upload')
+  await expect(page.getByRole('heading', { name: 'New proof' })).toBeVisible()
+  await expect(page.getByPlaceholder('Choose a skill or create a new one')).toBeVisible()
+  await page.getByPlaceholder('Choose a skill or create a new one').click()
+  await expect(page.getByRole('button', { name: 'Groove Lab' }).first()).toBeVisible()
 })
 
 test('Record route shows camera and microphone selectors for signed-in members', async ({ page }) => {
@@ -578,7 +667,7 @@ test('Upload retries once after network interruption and reuses idempotency key'
   })
 
   await page.goto('/upload')
-  await expect(page.getByRole('heading', { name: 'New take' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'New proof' })).toBeVisible()
 
   await page.locator('[aria-label="Drop a video or browse files"] input[type=file]').first().setInputFiles({
     name: 'retry-safe.mp4',
@@ -586,7 +675,7 @@ test('Upload retries once after network interruption and reuses idempotency key'
     buffer: Buffer.from('smoke-video-bytes'),
   })
   await page.locator('input[type=text]').first().fill('Retry-safe take')
-  await page.getByRole('button', { name: /Save to (archive|library)/ }).click()
+  await page.getByRole('button', { name: 'Save proof' }).click()
 
   await page.waitForURL(/\/sessions\/777$/)
   expect(uploadPostAttempts).toBe(2)

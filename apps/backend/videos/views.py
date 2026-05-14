@@ -70,6 +70,12 @@ def login_view(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def me_view(request):
+    logger.info(
+        'auth_me_resolved user_id=%s username=%s path=%s',
+        getattr(request.user, 'id', None),
+        getattr(request.user, 'username', ''),
+        request.path,
+    )
     return Response(UserSerializer(request.user).data)
 
 

@@ -11,7 +11,7 @@ const formatCompactDateTime = (value) => {
   return `${dayPart} · ${timePart}`
 }
 
-export default function SessionListItem({ session, onOpen, showSeries = false, highlight = false, onChangeThread = null, prefetch = true, minimal = false }) {
+export default function SessionListItem({ session, onOpen, showSeries = false, highlight = false, onChangeSkill = null, prefetch = true, minimal = false }) {
   const prefetchSession = usePrefetchSession()
   if (!session) return null
   const recordedAt = new Date(session.recorded_at || session.created_at)
@@ -45,13 +45,13 @@ export default function SessionListItem({ session, onOpen, showSeries = false, h
           </div>
             </div>
             <div className="text-right shrink-0 space-y-2">
-              {onChangeThread ? (
+              {onChangeSkill ? (
                 <button
                   type="button"
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChangeThread?.() }}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChangeSkill?.() }}
                   className="text-[11px] px-2.5 py-1.5 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50"
                 >
-                  {session.practice_series ? 'Change routine' : 'Add to routine'}
+                  {session.practice_series ? 'Change skill' : 'Add to skill'}
                 </button>
               ) : null}
             </div>

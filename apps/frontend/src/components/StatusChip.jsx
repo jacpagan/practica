@@ -1,7 +1,7 @@
 import React from 'react'
 
 const LABELS = {
-  needs_new_take: 'Needs new take',
+  needs_new_take: 'Needs new proof',
   wrong_take: 'Wrong take',
   requested: 'Open',
   opened: 'Open',
