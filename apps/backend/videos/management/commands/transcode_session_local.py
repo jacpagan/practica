@@ -14,6 +14,19 @@ from videos.services.media_pipeline import apply_processing_update, local_transc
 class Command(BaseCommand):
     help = 'Transcode a session video locally with ffmpeg into a browser-friendly MP4 proxy.'
 
+    @staticmethod
+    def _poster_seek_seconds(session):
+        duration = session.duration_seconds
+        if duration is None:
+            return 1.0
+        try:
+            duration_value = float(duration)
+        except (TypeError, ValueError):
+            return 1.0
+        if duration_value <= 0:
+            return 1.0
+        return max(0.25, min(duration_value * 0.1, 3.0))
+
     def add_arguments(self, parser):
         parser.add_argument('session_id', type=int)
 
@@ -29,6 +42,7 @@ class Command(BaseCommand):
             tmp_path = Path(tmpdir)
             source_path = tmp_path / Path(session.video_file.name or 'source').name
             output_path = tmp_path / f'session-{session.id}-proxy.mp4'
+            poster_path = tmp_path / f'session-{session.id}-poster.jpg'
 
             with default_storage.open(session.video_file.name, 'rb') as source_file:
                 with open(source_path, 'wb') as local_source:
@@ -80,23 +94,58 @@ class Command(BaseCommand):
                 )
                 raise CommandError(error)
 
+            poster_command = [
+                'ffmpeg',
+                '-y',
+                '-ss',
+                str(self._poster_seek_seconds(session)),
+                '-i',
+                str(source_path),
+                '-frames:v',
+                '1',
+                '-vf',
+                'scale=320:180:force_original_aspect_ratio=decrease,pad=320:180:(ow-iw)/2:(oh-ih)/2:black',
+                '-q:v',
+                '4',
+                str(poster_path),
+            ]
+            poster_result = subprocess.run(poster_command, capture_output=True, text=True)
+
             proxy_key = f'processed/sessions/{session.id}/proxy/{output_path.name}'
             with open(output_path, 'rb') as built_file:
                 saved_key = default_storage.save(proxy_key, File(built_file, name=output_path.name))
+
+            poster_key = ''
+            if poster_result.returncode == 0 and poster_path.exists():
+                poster_storage_key = f'processed/sessions/{session.id}/thumbs/{poster_path.name}'
+                with open(poster_path, 'rb') as poster_file:
+                    poster_key = default_storage.save(poster_storage_key, File(poster_file, name=poster_path.name))
 
             metadata = {
                 'source': 'local_ffmpeg',
                 'original_object_key': session.video_file.name,
                 'bytes': output_path.stat().st_size,
             }
+            assets = [{
+                'asset_type': SessionAsset.TYPE_PROXY_MP4,
+                'object_key': saved_key,
+                'content_type': 'video/mp4',
+                'metadata_json': metadata,
+            }]
+            if poster_key:
+                assets.append({
+                    'asset_type': SessionAsset.TYPE_THUMB_SPRITE,
+                    'object_key': poster_key,
+                    'content_type': 'image/jpeg',
+                    'metadata_json': {
+                        'source': 'local_ffmpeg',
+                        'original_object_key': session.video_file.name,
+                        'seek_seconds': self._poster_seek_seconds(session),
+                    },
+                })
             apply_processing_update(
                 session,
                 Session.STATUS_READY,
-                assets=[{
-                    'asset_type': SessionAsset.TYPE_PROXY_MP4,
-                    'object_key': saved_key,
-                    'content_type': 'video/mp4',
-                    'metadata_json': metadata,
-                }],
+                assets=assets,
             )
             self.stdout.write(json.dumps({'session_id': session.id, 'status': 'ready', 'proxy_key': saved_key}))

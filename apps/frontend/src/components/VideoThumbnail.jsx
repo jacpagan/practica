@@ -1,7 +1,21 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { sessionVideoSources } from '../utils'
+import { sessionPosterUrl, sessionVideoSources } from '../utils'
 
-function PosterThumbnail({ className = '' }) {
+function PosterThumbnail({ className = '', session = null, eager = false }) {
+  const posterUrl = sessionPosterUrl(session)
+  if (posterUrl && session?.processing_status === 'ready') {
+    return (
+      <div className={`relative bg-gray-950 overflow-hidden ${className}`}>
+        <img
+          src={posterUrl}
+          alt=""
+          loading={eager ? 'eager' : 'lazy'}
+          decoding="async"
+          className="h-full w-full object-cover"
+        />
+      </div>
+    )
+  }
   return (
     <div className={`relative bg-gray-950 overflow-hidden ${className}`}>
       <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-950 to-black" />
@@ -16,11 +30,7 @@ function PosterThumbnail({ className = '' }) {
   )
 }
 
-function VideoThumbnail({ session, className = '', variant = 'video' }) {
-  if (variant === 'poster') {
-    return <PosterThumbnail className={className} />
-  }
-
+function VideoFrameThumbnail({ session, className = '' }) {
   const videoRef = useRef(null)
   const wrapperRef = useRef(null)
   const [frameReady, setFrameReady] = useState(false)
@@ -104,6 +114,19 @@ function VideoThumbnail({ session, className = '', variant = 'video' }) {
       ) : null}
     </div>
   )
+}
+
+function VideoThumbnail({ session, className = '', variant = 'video' }) {
+  const posterUrl = sessionPosterUrl(session)
+  if (variant === 'poster') {
+    return <PosterThumbnail className={className} session={session} />
+  }
+
+  if (posterUrl && session?.processing_status === 'ready') {
+    return <PosterThumbnail className={className} session={session} eager />
+  }
+
+  return <VideoFrameThumbnail session={session} className={className} />
 }
 
 export default VideoThumbnail

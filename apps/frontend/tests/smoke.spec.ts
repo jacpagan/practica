@@ -46,6 +46,7 @@ test('Progress view shows grouped proofs for signed-in members', async ({ page }
       recorded_at: '2099-01-01T00:00:00Z',
       created_at: '2099-01-01T00:00:00Z',
       processing_status: 'ready',
+      poster_image_url: '/media/processed/sessions/101/thumbs/poster.jpg',
       can_edit: true,
       local_preview_url: '',
       video_feedback_count: 0,
@@ -79,6 +80,7 @@ test('Progress view shows grouped proofs for signed-in members', async ({ page }
   await expect(page.getByText('Groove Lab')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Add to skill' }).first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'Add proof' }).first()).toBeVisible()
+  await expect(page.locator('img').first()).toBeVisible()
 })
 
 test('Today view keeps a plain core-loop UI without gamification', async ({ page }) => {

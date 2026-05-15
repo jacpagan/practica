@@ -78,6 +78,12 @@ export const assetByType = (session, assetType) => {
   return assets.find((asset) => asset.asset_type === assetType) || null
 }
 
+export const sessionPosterUrl = (session) => {
+  const explicitPoster = videoUrl(session?.poster_image_url)
+  if (explicitPoster) return explicitPoster
+  return assetUrl(assetByType(session, 'thumb_sprite'))
+}
+
 export const preferredSessionVideoUrl = (session) => {
   const proxy = assetByType(session, 'proxy_mp4')
   return assetUrl(proxy) || videoUrl(session?.video_file)

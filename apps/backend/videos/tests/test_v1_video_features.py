@@ -1,6 +1,9 @@
+import tempfile
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.core.files.base import ContentFile
+from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from rest_framework import status
@@ -42,6 +45,25 @@ class V1VideoFeaturesTests(APITestCase):
         self.assertEqual(len(payload), 1)
         self.assertEqual(payload[0]['id'], own_session.id)
         self.assertTrue(payload[0]['can_edit'])
+
+    def test_sessions_list_includes_poster_image_url_when_thumb_asset_exists(self):
+        session = self._create_session(user=self.owner, title='Poster session')
+        SessionAsset.objects.create(
+            session=session,
+            asset_type=SessionAsset.TYPE_THUMB_SPRITE,
+            object_key='processed/sessions/1/thumbs/poster.jpg',
+            content_type='image/jpeg',
+        )
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.get('/api/sessions/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data if isinstance(response.data, list) else response.data.get('results', [])
+        self.assertEqual(
+            payload[0]['poster_image_url'],
+            '/media/processed/sessions/1/thumbs/poster.jpg',
+        )
 
     def test_video_feedback_requires_video(self):
         session = self._create_session(user=self.owner)
@@ -617,6 +639,15 @@ class V1VideoFeaturesTests(APITestCase):
                             },
                         ],
                     },
+                    {
+                        'OutputDetails': [
+                            {
+                                'OutputFilePaths': [
+                                    's3://test-bucket/processed/sessions/1/thumbs/uploaded_thumb.0000000.jpg',
+                                ],
+                            },
+                        ],
+                    },
                 ],
             },
         }
@@ -627,6 +658,12 @@ class V1VideoFeaturesTests(APITestCase):
         self.assertEqual(session.processing_status, Session.STATUS_READY)
         self.assertEqual(session.processing_job_id, '')
         self.assertTrue(session.assets.filter(asset_type=SessionAsset.TYPE_PROXY_MP4).exists())
+        self.assertTrue(
+            session.assets.filter(
+                asset_type=SessionAsset.TYPE_THUMB_SPRITE,
+                object_key='processed/sessions/1/thumbs/uploaded_thumb.0000000.jpg',
+            ).exists()
+        )
 
     @override_settings(
         AWS_STORAGE_BUCKET_NAME='test-bucket',
@@ -672,6 +709,46 @@ class V1VideoFeaturesTests(APITestCase):
         session.refresh_from_db()
         self.assertEqual(session.processing_status, Session.STATUS_READY)
         self.assertTrue(session.assets.filter(asset_type=SessionAsset.TYPE_PROXY_MP4, object_key='processed/sessions/1/proxy/uploaded_proxy.mp4').exists())
+
+    @override_settings(MEDIA_ROOT=tempfile.gettempdir())
+    @patch('videos.management.commands.transcode_session_local.local_transcode_enabled', return_value=True)
+    @patch('videos.management.commands.transcode_session_local.subprocess.run')
+    def test_local_transcode_command_stores_proxy_and_poster_assets(self, subprocess_run, _local_transcode_enabled):
+        session = Session.objects.create(
+            user=self.owner,
+            title='Local transcode',
+            description='',
+            video_file='sessions/uploaded.mp4',
+            duration_seconds=20,
+            processing_status=Session.STATUS_PROCESSING,
+        )
+
+        source_bytes = b'video-data'
+
+        def fake_run(command, capture_output=True, text=True):
+            output_path = command[-1]
+            with open(output_path, 'wb') as generated:
+                generated.write(b'generated-output')
+
+            class Result:
+                returncode = 0
+                stderr = ''
+                stdout = ''
+
+            return Result()
+
+        subprocess_run.side_effect = fake_run
+
+        with patch('videos.management.commands.transcode_session_local.default_storage.open') as storage_open:
+            storage_open.return_value.__enter__.return_value = ContentFile(source_bytes)
+            storage_open.return_value.__exit__.return_value = False
+            with patch('videos.management.commands.transcode_session_local.default_storage.save', side_effect=lambda key, _: key):
+                call_command('transcode_session_local', str(session.id))
+
+        session.refresh_from_db()
+        self.assertEqual(session.processing_status, Session.STATUS_READY)
+        self.assertTrue(session.assets.filter(asset_type=SessionAsset.TYPE_PROXY_MP4).exists())
+        self.assertTrue(session.assets.filter(asset_type=SessionAsset.TYPE_THUMB_SPRITE).exists())
 
     @override_settings(AWS_STORAGE_BUCKET_NAME='test-bucket')
     def test_mediaconvert_job_settings_include_h264_max_bitrate(self):
