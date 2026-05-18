@@ -31,7 +31,7 @@ It is not a transcript and it does not include timestamps.
 - Every reward should be immediate enough to keep the loop alive.
 - Every habit should feel easy to return to after a bad day.
 - Every feature should help the user continue the system, not just chase an outcome.
-- The app should feel like a game: proof, points, streak, level, repeat.
+- The app should feel like a game without streak anxiety: proof, points, effort, level, repeat.
 
 ## Product Manager Lens
 

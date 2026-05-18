@@ -54,7 +54,7 @@ The paid value is:
 
 - private archive
 - quick proof capture
-- streak and level feedback
+- effort-based progress feedback
 - progress history
 - repeat usage over time
 

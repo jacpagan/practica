@@ -93,7 +93,7 @@ This loop is the product. Everything else should support it.
 1. A member can create a private proof take reliably.
 2. A member can revisit prior takes in a private archive.
 3. A member can keep one skill or habit visible.
-4. A member can see streak, XP, and level progress.
+4. A member can see effort-based progress where each saved proof counts.
 5. A member can continue the loop with another take.
 
 ## Roles And Access Model
@@ -173,6 +173,8 @@ Current gaps:
 - progress through repetition
 - low pressure
 - tiny actions
+- every effort matters
+- no streak pressure
 - fun enough to return tomorrow
 
 ## Naming Guidance

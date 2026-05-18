@@ -9,7 +9,7 @@ The product is strongest when it helps someone:
 - pick one habit or skill,
 - do one small action today,
 - record proof quickly,
-- see streaks, XP, and level progress,
+- see effort-based progress where each saved proof matters,
 - and come back tomorrow.
 
 ## Product Docs
