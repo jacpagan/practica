@@ -23,6 +23,7 @@ export default function ProgressView({
   const toast = useToast()
   const [editingSession, setEditingSession] = useState(null)
   const [draftSkill, setDraftSkill] = useState('')
+  const [renamingSkillName, setRenamingSkillName] = useState('')
   const [saving, setSaving] = useState(false)
 
   const skillOptions = useMemo(() => {
@@ -105,6 +106,52 @@ export default function ProgressView({
 
   const clearSkill = useCallback(() => saveSkill(''), [saveSkill])
 
+  const closeSkillRename = useCallback(() => {
+    if (saving) return
+    setRenamingSkillName('')
+  }, [saving])
+
+  const saveSkillRename = useCallback(async (nextName) => {
+    if (!token || !renamingSkillName) return
+    const newName = String(nextName || '').trim()
+    if (!newName) {
+      toast.error('Enter a skill name')
+      return
+    }
+    if (newName === renamingSkillName) {
+      setRenamingSkillName('')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/sessions/threads/rename/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Token ${token}`,
+        },
+        body: JSON.stringify({
+          old_practice_series: renamingSkillName,
+          new_practice_series: newName,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Could not rename skill')
+      try {
+        window.dispatchEvent(new CustomEvent('practica:skill-renamed', {
+          detail: { oldSeriesName: renamingSkillName, newSeriesName: newName },
+        }))
+      } catch {}
+      toast.success('Skill renamed')
+      setRenamingSkillName('')
+    } catch (error) {
+      toast.error(error?.message || 'Could not rename skill')
+    } finally {
+      setSaving(false)
+    }
+  }, [renamingSkillName, toast, token])
+
+
   if (sessionsLoading) {
     return (
       <div className="px-4 sm:px-6 py-6">
@@ -165,13 +212,13 @@ export default function ProgressView({
                         {latest ? ` · latest ${formatCompactDateTime(latest.recorded_at || latest.created_at)}` : ''}
                       </p>
                     </div>
-                    {latest ? (
+                    {group.skillName !== UNGROUPED_KEY ? (
                       <button
                         type="button"
-                        onClick={() => onOpenSession?.(latest, { view: 'progress', sessionId: null, seriesName: '' })}
+                        onClick={() => setRenamingSkillName(group.skillName)}
                         className="text-sm text-gray-600 hover:text-gray-900 shrink-0 transition-colors"
                       >
-                        Open latest →
+                        Rename skill
                       </button>
                     ) : null}
                   </div>
@@ -206,6 +253,16 @@ export default function ProgressView({
         onClear={editingSession?.practice_series ? clearSkill : null}
         clearLabel="Remove from skill"
       />
+      <SkillPickerModal
+        open={Boolean(renamingSkillName)}
+        title="Rename skill"
+        initialValue={renamingSkillName}
+        options={skillOptions}
+        saving={saving}
+        onClose={closeSkillRename}
+        onSave={saveSkillRename}
+      />
+
     </div>
   )
 }
