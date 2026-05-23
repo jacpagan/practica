@@ -76,7 +76,7 @@ test('Progress view shows grouped proofs for signed-in members', async ({ page }
   })
   await page.goto('/progress')
 
-  await expect(page.getByRole('heading', { name: 'Skill timelines' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Your proof archive' })).toBeVisible()
   await expect(page.getByText('Groove Lab')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Open latest' }).first()).toBeVisible()
   await expect(page.locator('img').first()).toBeVisible()
@@ -118,7 +118,7 @@ test('Progress is the default home without gamification chrome', async ({ page }
 
   await page.goto('/')
   await expect(page).toHaveURL(/\/progress/)
-  await expect(page.getByRole('heading', { name: 'Skill timelines' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Your proof archive' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Today' })).toHaveCount(0)
   await expect(page.getByText('XP', { exact: true })).toHaveCount(0)
   await expect(page.getByText(/streak/i)).toHaveCount(0)

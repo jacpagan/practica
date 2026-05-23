@@ -124,21 +124,24 @@ export default function ProgressView({
   const totalSkills = skillGroups.length
   const totalProofs = sessions.length
   const ungroupedCount = sessions.filter((item) => !String(item?.practice_series || '').trim()).length
+  const summaryParts = [
+    `${totalProofs} ${totalProofs === 1 ? 'proof' : 'proofs'}`,
+    `${totalSkills} ${totalSkills === 1 ? 'skill' : 'skills'}`,
+  ]
+  if (ungroupedCount > 0) summaryParts.push(`${ungroupedCount} ungrouped`)
 
   return (
     <div className="px-4 sm:px-6 py-6">
       <div className="max-w-4xl mx-auto space-y-6">
-        <div className="space-y-3">
+        <div className="space-y-2">
           <div>
             <p className="text-xs uppercase tracking-wide text-gray-500">Progress</p>
-            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">Skill timelines</h2>
-            <p className="text-sm text-gray-500 mt-2">Each skill is a simple timeline of proofs. Add the next proof to the right skill, move it when needed, or leave it ungrouped if it stands alone.</p>
+            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">Your proof archive</h2>
+            <p className="text-sm text-gray-500 mt-2">Proofs grouped by skill. Use Record above to add another.</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2.5 py-1.5 rounded-full">{totalSkills} {totalSkills === 1 ? 'skill' : 'skills'}</span>
-            <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2.5 py-1.5 rounded-full">{totalProofs} {totalProofs === 1 ? 'proof' : 'proofs'}</span>
-            <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2.5 py-1.5 rounded-full">{ungroupedCount} ungrouped</span>
-          </div>
+          {sessions.length > 0 ? (
+            <p className="text-xs text-gray-500">{summaryParts.join(' · ')}</p>
+          ) : null}
         </div>
 
         {sessions.length === 0 ? (
@@ -162,17 +165,15 @@ export default function ProgressView({
                         {latest ? ` · latest ${formatCompactDateTime(latest.recorded_at || latest.created_at)}` : ''}
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {latest ? (
-                        <button
-                          type="button"
-                          onClick={() => onOpenSession?.(latest, { view: 'progress', sessionId: null, seriesName: '' })}
-                          className="rounded-full border border-gray-200 bg-white text-gray-900 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors"
-                        >
-                          Open latest
-                        </button>
-                      ) : null}
-                    </div>
+                    {latest ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpenSession?.(latest, { view: 'progress', sessionId: null, seriesName: '' })}
+                        className="text-sm text-gray-600 hover:text-gray-900 shrink-0 transition-colors"
+                      >
+                        Open latest →
+                      </button>
+                    ) : null}
                   </div>
 
                   <div className="p-4 space-y-3">
