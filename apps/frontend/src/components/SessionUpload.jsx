@@ -392,55 +392,72 @@ function SessionUpload({
         <div className="mb-6 space-y-3">
           <div>
             <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">New proof</h2>
-            <p className="text-sm text-gray-500 mt-1">Add or upload a private proof for your archive.</p>
+            <p className="text-sm text-gray-500 mt-1">Record or upload a private proof for your archive.</p>
           </div>
 
-          <div className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-4">
-            <div className="grid grid-cols-1 gap-3 items-stretch">
-              <div
-                ref={dropRef}
-                onClick={() => { if (!videoFile) openFiles() }}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => { if (!videoFile && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openFiles() } }}
-                onPaste={(e) => {
-                  try {
-                    const file = e.clipboardData?.files?.[0]
-                    if (file && isLikelyVideoFile(file)) { acceptVideoFile(file, { source: 'paste' }); e.preventDefault() }
-                  } catch {}
-                }}
-                aria-label={videoFile ? 'Replace or remove selected video' : 'Drop a video or browse files'}
-                className={`sm:col-span-2 rounded-2xl border ${videoFile ? 'border-gray-200 bg-white' : 'border-dashed border-gray-300 bg-white cursor-pointer hover:bg-gray-50'} p-6 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300`}
+          {!showRecorder && !videoFile ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={startRecording}
+                disabled={isUploading}
+                className="rounded-2xl bg-gray-900 text-white px-4 py-4 text-sm font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors"
               >
-                {videoFile ? (
-                  <div className="rounded-xl bg-white px-1 text-left">
-                    <p className="text-xs text-gray-500">Selected video</p>
-                    <p className="text-sm text-gray-900 font-medium mt-0.5 break-words">{videoFile.name}</p>
-                    <div className="flex items-center gap-2 mt-3">
-                      <button type="button" onClick={openFiles} disabled={isUploading} className="text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 disabled:opacity-50 transition-colors">
-                        Replace
-                      </button>
-                      <button type="button" onClick={clearSelectedVideo} disabled={isUploading} className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50 transition-colors">
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center">
-                    <p className="text-sm font-medium text-gray-900">Drop a video here</p>
-                    <p className="text-xs text-gray-500 mt-1">or tap to browse files</p>
-                  </div>
-                )}
-                <input ref={inputRef} type="file" accept={videoFileAccept()} className="hidden" onChange={handleFilePick} />
-                <input ref={captureInputRef} type="file" accept={videoFileAccept()} capture="environment" className="hidden" onChange={handleFilePick} />
-              </div>
+                Record video
+              </button>
+              <button
+                type="button"
+                onClick={openFiles}
+                disabled={isUploading}
+                className="rounded-2xl border border-gray-200 bg-white text-gray-900 px-4 py-4 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              >
+                Choose file
+              </button>
             </div>
-            <div className="mt-3 space-y-1">
-              <p className="text-xs text-gray-500">Supports `.mov`, `.mp4`, `.m4v`, `.webm`, `.avi`, `.mkv`, `.3gp`, `.3gpp`, and `.3gpp2`.</p>
-              <p className="text-xs text-gray-500">Built-in recording is limited to {Math.round(MAX_RECORDER_DURATION_SECONDS / 60)} minutes. File uploads are limited to {Math.round(MAX_VIDEO_UPLOAD_BYTES / (1024 * 1024 * 1024))}GB.</p>
-              <p className="text-xs text-gray-500">Playback may take a moment to prepare.</p>
-              <p className="text-xs text-gray-500">Camera and mic access are used only while the recorder is open.</p>
+          ) : null}
+
+          <div className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-4">
+            <div
+              ref={dropRef}
+              onClick={() => { if (!videoFile && !isUploading) openFiles() }}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (!videoFile && !isUploading && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openFiles() } }}
+              onPaste={(e) => {
+                try {
+                  const file = e.clipboardData?.files?.[0]
+                  if (file && isLikelyVideoFile(file)) { acceptVideoFile(file, { source: 'paste' }); e.preventDefault() }
+                } catch {}
+              }}
+              aria-label={videoFile ? 'Selected video' : 'Drop a video or browse files'}
+              className={`rounded-2xl border ${videoFile ? 'border-gray-200 bg-white' : 'border-dashed border-gray-300 bg-white cursor-pointer hover:bg-gray-50'} p-5 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300`}
+            >
+              {videoFile ? (
+                <div className="text-left">
+                  <p className="text-xs text-gray-500">Selected video</p>
+                  <p className="text-sm text-gray-900 font-medium mt-0.5 break-words">{videoFile.name}</p>
+                  <div className="flex flex-wrap items-center gap-2 mt-3">
+                    <button type="button" onClick={(e) => { e.stopPropagation(); startRecording() }} disabled={isUploading} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 disabled:opacity-50 transition-colors">
+                      Re-record
+                    </button>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); openFiles() }} disabled={isUploading} className="text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 disabled:opacity-50 transition-colors">
+                      Replace
+                    </button>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); clearSelectedVideo() }} disabled={isUploading} className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50 transition-colors">
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <p className="text-sm font-medium text-gray-900">Or drop a video here</p>
+                  <p className="text-xs text-gray-500 mt-1">Paste from clipboard also works</p>
+                </div>
+              )}
+              <input ref={inputRef} type="file" accept={videoFileAccept()} className="hidden" onChange={handleFilePick} />
+              <input ref={captureInputRef} type="file" accept={videoFileAccept()} capture="environment" className="hidden" onChange={handleFilePick} />
             </div>
+            <p className="text-xs text-gray-500 mt-3">Up to {Math.round(MAX_RECORDER_DURATION_SECONDS / 60)} min recording · {Math.round(MAX_VIDEO_UPLOAD_BYTES / (1024 * 1024 * 1024))}GB file uploads</p>
           </div>
         </div>
 
