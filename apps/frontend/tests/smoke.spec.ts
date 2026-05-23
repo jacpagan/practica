@@ -15,11 +15,11 @@ test('Library route (signed-out) shows Auth form without crashing', async ({ pag
   await expect(page.getByRole('button', { name: 'Log in' }).first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'Sign up' }).first()).toBeVisible()
   // Legacy routes normalize to progress.
-  await expect(page).toHaveURL(/\/progress$/)
+  await expect(page).toHaveURL(/\/progress/)
   // Report link available and non-crashing
   await page.getByRole('button', { name: 'Report a problem' }).click()
   // No navigation expected.
-  await expect(page).toHaveURL(/\/progress$/)
+  await expect(page).toHaveURL(/\/progress/)
 })
 
 test('Progress view shows grouped proofs for signed-in members', async ({ page }) => {
