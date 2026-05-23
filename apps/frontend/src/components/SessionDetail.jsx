@@ -26,6 +26,7 @@ function SessionDetail({
   const videoRef = useRef(null)
   const [session, setSession] = useState(initialSession)
   const swipeRef = useRef(null)
+  const railWheelRef = useRef(0)
   const authHeaders = useMemo(() => (token ? { Authorization: `Token ${token}` } : {}), [token])
   const canEdit = Boolean(session?.can_edit)
   const returnRouteView = String(returnRoute?.view || '').trim()
@@ -123,10 +124,9 @@ function SessionDetail({
     swipeRef.current = { x: clientX, y: clientY }
   }
 
-  const finishSwipe = (clientX, clientY) => {
+  const resolveSwipeTarget = (clientX, clientY) => {
     const start = swipeRef.current
-    swipeRef.current = null
-    if (!start || !hasThreadNavigation) return
+    if (!start || !hasThreadNavigation) return null
 
     const deltaX = clientX - start.x
     const deltaY = clientY - start.y
@@ -135,15 +135,18 @@ function SessionDetail({
     const swipeThreshold = 50
 
     if (absY >= swipeThreshold && absY >= absX * 1.1) {
-      if (deltaY < 0) openThreadSession(threadNavigation.next)
-      else openThreadSession(threadNavigation.previous)
-      return
+      return deltaY < 0 ? threadNavigation.next : threadNavigation.previous
     }
 
-    if (absX < swipeThreshold || absX < absY * 1.25) return
+    if (absX < swipeThreshold || absX < absY * 1.25) return null
 
-    if (deltaX < 0) openThreadSession(threadNavigation.next)
-    else openThreadSession(threadNavigation.previous)
+    return deltaX < 0 ? threadNavigation.next : threadNavigation.previous
+  }
+
+  const finishSwipe = (clientX, clientY) => {
+    const targetSession = resolveSwipeTarget(clientX, clientY)
+    swipeRef.current = null
+    openThreadSession(targetSession)
   }
 
   const handleSwipeStart = (event) => {
@@ -172,6 +175,65 @@ function SessionDetail({
       event.currentTarget.releasePointerCapture?.(event.pointerId)
     } catch {}
     finishSwipe(event.clientX, event.clientY)
+  }
+
+  const handleRailTouchStart = (event) => {
+    event.stopPropagation()
+    handleSwipeStart(event)
+  }
+
+  const handleRailTouchEnd = (event) => {
+    event.stopPropagation()
+    handleSwipeEnd(event)
+  }
+
+  const handleRailPointerDown = (event) => {
+    event.stopPropagation()
+    handlePointerDown(event)
+  }
+
+  const handleRailPointerUp = (event) => {
+    event.stopPropagation()
+    handlePointerUp(event)
+  }
+
+  const handleRailPointerMove = (event) => {
+    event.stopPropagation()
+    const targetSession = resolveSwipeTarget(event.clientX, event.clientY)
+    if (!targetSession) return
+    swipeRef.current = null
+    openThreadSession(targetSession)
+  }
+
+  const handleRailMouseDown = (event) => {
+    event.stopPropagation()
+    beginSwipe(event.clientX, event.clientY)
+  }
+
+  const handleRailMouseUp = (event) => {
+    event.stopPropagation()
+    finishSwipe(event.clientX, event.clientY)
+  }
+
+  const handleRailMouseMove = (event) => {
+    event.stopPropagation()
+    const targetSession = resolveSwipeTarget(event.clientX, event.clientY)
+    if (!targetSession) return
+    swipeRef.current = null
+    openThreadSession(targetSession)
+  }
+
+  const handleRailWheel = (event) => {
+    if (!hasThreadNavigation) return
+    const deltaY = Number(event.deltaY || 0)
+    if (Math.abs(deltaY) < 25) return
+    event.preventDefault()
+    event.stopPropagation()
+    const now = Date.now()
+    if (now - railWheelRef.current < 500) return
+    railWheelRef.current = now
+    if (deltaY > 0) openThreadSession(threadNavigation.next)
+    else openThreadSession(threadNavigation.previous)
   }
 
   useEffect(() => {
@@ -230,12 +292,17 @@ function SessionDetail({
           {hasThreadNavigation ? (
             <>
             <div
-              className="sm:hidden absolute right-3 top-1/2 z-30 flex w-10 -translate-y-1/2 flex-col items-center gap-2 rounded-full border border-white/40 bg-white/15 px-2 py-4 text-xs font-semibold text-white shadow-lg backdrop-blur touch-none"
-              onTouchStart={handleSwipeStart}
-              onTouchEnd={handleSwipeEnd}
-              onPointerDown={handlePointerDown}
-              onPointerUp={handlePointerUp}
+              className="pointer-events-auto absolute right-3 sm:right-4 top-1/2 z-50 flex w-10 sm:w-11 -translate-y-1/2 flex-col items-center gap-2 rounded-full border border-white/40 bg-white/15 px-2 py-4 text-xs font-semibold text-white shadow-lg backdrop-blur touch-none"
+              onTouchStart={handleRailTouchStart}
+              onTouchEnd={handleRailTouchEnd}
+              onPointerDown={handleRailPointerDown}
+              onPointerMove={handleRailPointerMove}
+              onPointerUp={handleRailPointerUp}
+              onMouseDown={handleRailMouseDown}
+              onMouseMove={handleRailMouseMove}
+              onMouseUp={handleRailMouseUp}
               onPointerCancel={() => { swipeRef.current = null }}
+              onWheel={handleRailWheel}
               aria-label="Swipe rail: up for next proof, down for previous proof"
             >
               <span aria-hidden="true">↑</span>
