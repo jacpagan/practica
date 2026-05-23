@@ -31,6 +31,7 @@ export default function TodayView({
   }
 
   const hasProofs = progress.proofCount > 0
+  const doneToday = progress.proofRecordedToday
 
   return (
     <div className="px-4 sm:px-6 py-6">
@@ -39,10 +40,16 @@ export default function TodayView({
           <div>
             <p className="text-xs uppercase tracking-wide text-gray-500">Today</p>
             <h2 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">
-              {hasProofs ? 'One small proof. One more step.' : 'Start small. Prove it once.'}
+              {doneToday
+                ? "Today's proof is in."
+                : hasProofs
+                  ? 'One small proof for today.'
+                  : 'Start small. Prove it once.'}
             </h2>
             <p className="text-sm text-gray-500 mt-2">
-              Practica is your private proof loop. Keep today short enough to finish and easy to repeat.
+              {doneToday
+                ? 'You closed the loop for today. Come back tomorrow, or record another take if you want extra practice.'
+                : 'Pick one tiny action, record proof, then check Progress so you can see it land.'}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -52,12 +59,10 @@ export default function TodayView({
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <p className="text-xs uppercase tracking-wide text-gray-500">{doneToday ? 'Active skill' : 'Next proof'}</p>
+          <p className="text-xs uppercase tracking-wide text-gray-500">Next proof</p>
           <h3 className="text-xl font-semibold text-gray-900 mt-1 truncate">{progress.activeSkill}</h3>
           <p className="text-sm text-gray-600 mt-2">
-            {doneToday
-              ? 'Your latest proof is saved privately. Open Progress to review the timeline or record another take.'
-              : 'Record one short proof for this skill. Processing usually takes a minute — you can leave and come back.'}
+            Pick one action, record one proof, then finish in Progress so you can see it land in the right skill timeline.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <button
@@ -65,7 +70,7 @@ export default function TodayView({
               onClick={onRecordProof}
               className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
             >
-              {doneToday ? 'Record another proof' : 'Record proof'}
+              Record proof
             </button>
             <button
               type="button"
