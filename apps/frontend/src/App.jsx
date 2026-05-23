@@ -376,6 +376,7 @@ function AppContent() {
         {view === 'detail' && selectedSession && (
           <SessionDetail
             session={selectedSession}
+            sessions={sessions}
             token={token}
             skillOptions={skillOptions}
             onBack={goBack}
@@ -383,6 +384,7 @@ function AppContent() {
             returnRoute={detailReturnRoute}
             justUploaded={selectedSession.id === justUploadedSessionId}
             onRecordAnother={(draft = null) => handleRecordAnother(draft || { practiceSeries: selectedSession.practice_series || '' })}
+            onOpenSession={openSession}
             onOpenSeries={goSkill}
             onSessionUpdate={onDetailSessionUpdate}
             onSessionDelete={onDetailSessionDelete}

@@ -8,6 +8,7 @@ import useSessionDetailMediaActions from '../hooks/useSessionDetailMediaActions'
 
 function SessionDetail({
   session: initialSession,
+  sessions = [],
   token,
   onBack,
   onOpenProgress,
@@ -15,6 +16,7 @@ function SessionDetail({
   onSessionDelete,
   justUploaded = false,
   onRecordAnother,
+  onOpenSession,
   onOpenSeries,
   skillOptions = [],
   returnRoute = null,
@@ -23,6 +25,7 @@ function SessionDetail({
   const confirm = useConfirm()
   const videoRef = useRef(null)
   const [session, setSession] = useState(initialSession)
+  const swipeRef = useRef(null)
   const authHeaders = useMemo(() => (token ? { Authorization: `Token ${token}` } : {}), [token])
   const canEdit = Boolean(session?.can_edit)
   const returnRouteView = String(returnRoute?.view || '').trim()
@@ -73,6 +76,73 @@ function SessionDetail({
     videoRef,
   })
   const playableUrl = playbackSources[playbackSourceIndex] || null
+  const threadNavigation = useMemo(() => {
+    const currentId = Number(session?.id)
+    if (!currentId) return { items: [], index: -1, previous: null, next: null }
+
+    const currentSeries = String(session?.practice_series || '').trim()
+    const sourceItems = Array.isArray(sessions) ? sessions : []
+    const byId = new Map()
+    sourceItems.forEach((item) => {
+      if (item?.id) byId.set(Number(item.id), item)
+    })
+    byId.set(currentId, session)
+
+    const items = Array.from(byId.values())
+      .filter((item) => {
+        const itemSeries = String(item?.practice_series || '').trim()
+        return currentSeries ? itemSeries === currentSeries : !itemSeries
+      })
+      .sort((left, right) => {
+        const leftTime = new Date(left.recorded_at || left.created_at || 0).getTime() || 0
+        const rightTime = new Date(right.recorded_at || right.created_at || 0).getTime() || 0
+        return leftTime - rightTime
+      })
+
+    const index = items.findIndex((item) => Number(item?.id) === currentId)
+    return {
+      items,
+      index,
+      previous: index > 0 ? items[index - 1] : null,
+      next: index >= 0 && index < items.length - 1 ? items[index + 1] : null,
+    }
+  }, [session, sessions])
+  const hasThreadNavigation = threadNavigation.items.length > 1
+  const threadLabel = session?.practice_series ? session.practice_series : 'Ungrouped'
+  const threadPositionLabel = hasThreadNavigation && threadNavigation.index >= 0
+    ? `Proof ${threadNavigation.index + 1} of ${threadNavigation.items.length}`
+    : ''
+
+  const openThreadSession = (targetSession) => {
+    if (!targetSession?.id) return
+    onOpenSession?.(targetSession, returnRoute || { view: 'progress', sessionId: null, seriesName: '' })
+  }
+
+  const handleSwipeStart = (event) => {
+    const touch = event.touches?.[0]
+    if (!touch || !hasThreadNavigation) return
+    swipeRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+    }
+  }
+
+  const handleSwipeEnd = (event) => {
+    const start = swipeRef.current
+    swipeRef.current = null
+    const touch = event.changedTouches?.[0]
+    if (!start || !touch || !hasThreadNavigation) return
+
+    const deltaX = touch.clientX - start.x
+    const deltaY = touch.clientY - start.y
+    const absX = Math.abs(deltaX)
+    const absY = Math.abs(deltaY)
+    if (absX < 70 || absX < absY * 1.25) return
+
+    if (deltaX < 0) openThreadSession(threadNavigation.next)
+    else openThreadSession(threadNavigation.previous)
+  }
+
   useEffect(() => {
     setSession(initialSession)
   }, [initialSession])
@@ -111,7 +181,11 @@ function SessionDetail({
         >
           Back
         </button>
-        <div className="h-[100dvh] sm:h-auto sm:aspect-video bg-black">
+        <div
+          className="relative h-[100dvh] sm:h-auto sm:aspect-video bg-black"
+          onTouchStart={handleSwipeStart}
+          onTouchEnd={handleSwipeEnd}
+        >
           {playableUrl && !playbackFailed ? (
             <video key={playableUrl} ref={videoRef} src={playableUrl} controls playsInline onError={handlePlaybackError} className="w-full h-full bg-black" />
           ) : (
@@ -121,6 +195,32 @@ function SessionDetail({
                 : 'Video is still preparing for playback.'}
             </div>
           )}
+          {hasThreadNavigation ? (
+            <div className="pointer-events-none absolute inset-x-0 bottom-[max(5.5rem,env(safe-area-inset-bottom))] sm:bottom-4 z-20 flex items-center justify-between px-3 sm:px-4">
+              <button
+                type="button"
+                onClick={() => openThreadSession(threadNavigation.previous)}
+                disabled={!threadNavigation.previous}
+                className="pointer-events-auto rounded-full border border-white/25 bg-black/50 px-3 py-2 text-xs font-medium text-white/90 backdrop-blur disabled:opacity-30 disabled:cursor-not-allowed"
+                aria-label="Open previous proof in this thread"
+              >
+                ← Previous
+              </button>
+              <div className="rounded-full bg-black/50 px-3 py-2 text-center text-[11px] font-medium text-white/80 backdrop-blur">
+                <span className="block max-w-[9rem] truncate">{threadLabel}</span>
+                <span className="block text-white/60">{threadPositionLabel}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => openThreadSession(threadNavigation.next)}
+                disabled={!threadNavigation.next}
+                className="pointer-events-auto rounded-full border border-white/25 bg-black/50 px-3 py-2 text-xs font-medium text-white/90 backdrop-blur disabled:opacity-30 disabled:cursor-not-allowed"
+                aria-label="Open next proof in this thread"
+              >
+                Next →
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <div className="p-4 sm:p-4 space-y-3 bg-white rounded-t-3xl sm:rounded-none -mt-8 sm:mt-0 relative z-30">
@@ -201,6 +301,36 @@ function SessionDetail({
               </div>
 
               {session.description ? <p className="text-sm text-gray-600">{session.description}</p> : null}
+
+              {hasThreadNavigation ? (
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs uppercase tracking-wide text-gray-500">{threadLabel}</p>
+                      <p className="text-sm font-medium text-gray-900 mt-1">{threadPositionLabel}</p>
+                      <p className="text-xs text-gray-500 mt-1">Swipe the video sideways or use the buttons to move through this thread.</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => openThreadSession(threadNavigation.previous)}
+                        disabled={!threadNavigation.previous}
+                        className="rounded-full border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Prev
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openThreadSession(threadNavigation.next)}
+                        disabled={!threadNavigation.next}
+                        className="rounded-full border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
 
               {(session.recorded_at || session.duration_seconds) ? (
                 <details className="text-xs text-gray-500">
