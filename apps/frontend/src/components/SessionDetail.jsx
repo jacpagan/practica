@@ -132,7 +132,15 @@ function SessionDetail({
     const deltaY = clientY - start.y
     const absX = Math.abs(deltaX)
     const absY = Math.abs(deltaY)
-    if (absX < 70 || absX < absY * 1.25) return
+    const swipeThreshold = 70
+
+    if (absY >= swipeThreshold && absY >= absX * 1.1) {
+      if (deltaY < 0) openThreadSession(threadNavigation.next)
+      else openThreadSession(threadNavigation.previous)
+      return
+    }
+
+    if (absX < swipeThreshold || absX < absY * 1.25) return
 
     if (deltaX < 0) openThreadSession(threadNavigation.next)
     else openThreadSession(threadNavigation.previous)
@@ -205,7 +213,7 @@ function SessionDetail({
           Back
         </button>
         <div
-          className="relative h-[100dvh] sm:h-auto sm:aspect-video bg-black"
+          className="relative h-[100dvh] sm:h-auto sm:aspect-video bg-black touch-none"
           onTouchStart={handleSwipeStart}
           onTouchEnd={handleSwipeEnd}
           onPointerDown={handlePointerDown}
@@ -334,7 +342,7 @@ function SessionDetail({
                     <div className="min-w-0">
                       <p className="text-xs uppercase tracking-wide text-gray-500">{threadLabel}</p>
                       <p className="text-sm font-medium text-gray-900 mt-1">{threadPositionLabel}</p>
-                      <p className="text-xs text-gray-500 mt-1">Swipe the video sideways or use the buttons to move through this thread.</p>
+                      <p className="text-xs text-gray-500 mt-1">Swipe up for next, down for previous, or use the buttons.</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <button
