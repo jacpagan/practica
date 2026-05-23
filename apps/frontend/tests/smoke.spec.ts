@@ -166,6 +166,11 @@ test('Upload view shows existing skills loaded from prior proofs', async ({ page
 
   await page.goto('/upload')
   await expect(page.getByRole('heading', { name: 'New proof' })).toBeVisible()
+  await page.locator('input[type=file]').first().setInputFiles({
+    name: 'smoke.mp4',
+    mimeType: 'video/mp4',
+    buffer: Buffer.from('smoke-video-bytes'),
+  })
   await expect(page.getByPlaceholder('Choose a skill or create a new one')).toBeVisible()
   await page.getByPlaceholder('Choose a skill or create a new one').click()
   await expect(page.getByRole('button', { name: 'Groove Lab' }).first()).toBeVisible()
