@@ -152,11 +152,17 @@ function SessionDetail({
 
   const handlePointerDown = (event) => {
     if (event.pointerType === 'touch') return
+    try {
+      event.currentTarget.setPointerCapture?.(event.pointerId)
+    } catch {}
     beginSwipe(event.clientX, event.clientY)
   }
 
   const handlePointerUp = (event) => {
     if (event.pointerType === 'touch') return
+    try {
+      event.currentTarget.releasePointerCapture?.(event.pointerId)
+    } catch {}
     finishSwipe(event.clientX, event.clientY)
   }
 
