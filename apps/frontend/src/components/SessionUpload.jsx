@@ -32,7 +32,7 @@ function SessionUpload({
   const [uploadProgress, setUploadProgress] = useState(null)
   const [uploadPhase, setUploadPhase] = useState('saving')
   const [showNotes, setShowNotes] = useState(false)
-  const [showVideoDetails, setShowVideoDetails] = useState(false)
+  const [showOptionalDetails, setShowOptionalDetails] = useState(false)
   const [showRecorder, setShowRecorder] = useState(false)
   const dropRef = useRef(null)
   const inputRef = useRef(null)
@@ -88,7 +88,6 @@ function SessionUpload({
   useEffect(() => {
     if (!initialPracticeSeries) return
     setPracticeSeries(initialPracticeSeries)
-    setShowVideoDetails(true)
     onPracticeSeriesHandled?.()
   }, [initialPracticeSeries, onPracticeSeriesHandled])
 
@@ -102,7 +101,6 @@ function SessionUpload({
       setTitle(hasSkill ? seriesBasedTitle(practiceSeries) : defaultPracticeTitle())
     }
     replaceOwnedPreviewUrl(URL.createObjectURL(prefillFile))
-    setShowVideoDetails(true)
     onPrefillUsed?.()
   }, [isUploading, practiceSeries, prefillFile, seriesBasedTitle, titleManuallyEdited, videoFile, onPrefillUsed])
 
@@ -132,12 +130,6 @@ function SessionUpload({
     setShowRecorder(true)
     onRecorderOpenHandled?.()
   }, [initialRecorderOpen, onRecorderOpenHandled])
-
-  useEffect(() => {
-    if (videoFile || description.trim() || practiceSeries.trim() || titleManuallyEdited) {
-      setShowVideoDetails(true)
-    }
-  }, [description, practiceSeries, titleManuallyEdited, videoFile])
 
   useEffect(() => {
     const el = dropRef.current
@@ -395,69 +387,52 @@ function SessionUpload({
             <p className="text-sm text-gray-500 mt-1">Record or upload a private proof for your archive.</p>
           </div>
 
-          {!showRecorder && !videoFile ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={startRecording}
-                disabled={isUploading}
-                className="rounded-2xl bg-gray-900 text-white px-4 py-4 text-sm font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors"
-              >
-                Record video
-              </button>
-              <button
-                type="button"
-                onClick={openFiles}
-                disabled={isUploading}
-                className="rounded-2xl border border-gray-200 bg-white text-gray-900 px-4 py-4 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 transition-colors"
-              >
-                Choose file
-              </button>
-            </div>
-          ) : null}
-
           <div className="rounded-3xl border border-gray-200 bg-gray-50 px-4 py-4">
-            <div
-              ref={dropRef}
-              onClick={() => { if (!videoFile && !isUploading) openFiles() }}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => { if (!videoFile && !isUploading && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openFiles() } }}
-              onPaste={(e) => {
-                try {
-                  const file = e.clipboardData?.files?.[0]
-                  if (file && isLikelyVideoFile(file)) { acceptVideoFile(file, { source: 'paste' }); e.preventDefault() }
-                } catch {}
-              }}
-              aria-label={videoFile ? 'Selected video' : 'Drop a video or browse files'}
-              className={`rounded-2xl border ${videoFile ? 'border-gray-200 bg-white' : 'border-dashed border-gray-300 bg-white cursor-pointer hover:bg-gray-50'} p-5 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300`}
-            >
-              {videoFile ? (
-                <div className="text-left">
-                  <p className="text-xs text-gray-500">Selected video</p>
-                  <p className="text-sm text-gray-900 font-medium mt-0.5 break-words">{videoFile.name}</p>
-                  <div className="flex flex-wrap items-center gap-2 mt-3">
-                    <button type="button" onClick={(e) => { e.stopPropagation(); startRecording() }} disabled={isUploading} className="text-xs text-gray-700 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 disabled:opacity-50 transition-colors">
-                      Re-record
-                    </button>
-                    <button type="button" onClick={(e) => { e.stopPropagation(); openFiles() }} disabled={isUploading} className="text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 disabled:opacity-50 transition-colors">
-                      Replace
-                    </button>
-                    <button type="button" onClick={(e) => { e.stopPropagation(); clearSelectedVideo() }} disabled={isUploading} className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50 transition-colors">
-                      Remove
-                    </button>
+            <div className="grid grid-cols-1 gap-3 items-stretch">
+              <div
+                ref={dropRef}
+                onClick={() => { if (!videoFile) openFiles() }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (!videoFile && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openFiles() } }}
+                onPaste={(e) => {
+                  try {
+                    const file = e.clipboardData?.files?.[0]
+                    if (file && isLikelyVideoFile(file)) { acceptVideoFile(file, { source: 'paste' }); e.preventDefault() }
+                  } catch {}
+                }}
+                aria-label={videoFile ? 'Replace or remove selected video' : 'Drop a video or browse files'}
+                className={`sm:col-span-2 rounded-2xl border ${videoFile ? 'border-gray-200 bg-white' : 'border-dashed border-gray-300 bg-white cursor-pointer hover:bg-gray-50'} p-6 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300`}
+              >
+                {videoFile ? (
+                  <div className="rounded-xl bg-white px-1 text-left">
+                    <p className="text-xs text-gray-500">Selected video</p>
+                    <p className="text-sm text-gray-900 font-medium mt-0.5 break-words">{videoFile.name}</p>
+                    <div className="flex items-center gap-2 mt-3">
+                      <button type="button" onClick={openFiles} disabled={isUploading} className="text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 disabled:opacity-50 transition-colors">
+                        Replace
+                      </button>
+                      <button type="button" onClick={clearSelectedVideo} disabled={isUploading} className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50 transition-colors">
+                        Remove
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="text-center">
-                  <p className="text-sm font-medium text-gray-900">Or drop a video here</p>
-                  <p className="text-xs text-gray-500 mt-1">Paste from clipboard also works</p>
-                </div>
-              )}
-              <input ref={inputRef} type="file" accept={videoFileAccept()} className="hidden" onChange={handleFilePick} />
-              <input ref={captureInputRef} type="file" accept={videoFileAccept()} capture="environment" className="hidden" onChange={handleFilePick} />
+                ) : (
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-gray-900">Drop a video here</p>
+                    <p className="text-xs text-gray-500 mt-1">or tap to browse files</p>
+                  </div>
+                )}
+                <input ref={inputRef} type="file" accept={videoFileAccept()} className="hidden" onChange={handleFilePick} />
+                <input ref={captureInputRef} type="file" accept={videoFileAccept()} capture="environment" className="hidden" onChange={handleFilePick} />
+              </div>
             </div>
-            <p className="text-xs text-gray-500 mt-3">Up to {Math.round(MAX_RECORDER_DURATION_SECONDS / 60)} min recording · {Math.round(MAX_VIDEO_UPLOAD_BYTES / (1024 * 1024 * 1024))}GB file uploads</p>
+            <div className="mt-3 space-y-1">
+              <p className="text-xs text-gray-500">Supports `.mov`, `.mp4`, `.m4v`, `.webm`, `.avi`, `.mkv`, `.3gp`, `.3gpp`, and `.3gpp2`.</p>
+              <p className="text-xs text-gray-500">Built-in recording is limited to {Math.round(MAX_RECORDER_DURATION_SECONDS / 60)} minutes. File uploads are limited to {Math.round(MAX_VIDEO_UPLOAD_BYTES / (1024 * 1024 * 1024))}GB.</p>
+              <p className="text-xs text-gray-500">Playback may take a moment to prepare.</p>
+              <p className="text-xs text-gray-500">Camera and mic access are used only while the recorder is open.</p>
+            </div>
           </div>
         </div>
 
@@ -507,66 +482,73 @@ function SessionUpload({
             </div>
           ) : null}
 
-          <details className="rounded-2xl border border-gray-200 bg-white px-4 py-4" open={showVideoDetails}>
-            <summary onClick={() => setShowVideoDetails((current) => !current)} className="cursor-pointer list-none flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-gray-900">Video details</p>
-                <p className="text-xs text-gray-500 mt-1">Optional.</p>
-              </div>
-              <span className="text-xs text-gray-500">{showVideoDetails ? 'Hide' : 'Show'}</span>
-            </summary>
-            <div className="space-y-4 pt-4">
-              <div>
-                <label className="block text-sm text-gray-600 mb-1.5">Skill</label>
-                <SkillField
-                  value={practiceSeries}
-                  onChange={setPracticeSeries}
-                  options={skillOptions}
-                  disabled={isUploading}
-                  placeholder="Choose a skill or create a new one"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm text-gray-600 mb-1.5">Title</label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(event) => {
-                    setTitle(event.target.value)
-                    setTitleManuallyEdited(true)
-                  }}
-                  disabled={isUploading}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
-                  placeholder={videoFile ? 'Give it a name' : 'Title'}
-                  required
-                />
-              </div>
-
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setShowNotes((current) => !current)}
-                  disabled={isUploading}
-                  className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
-                >
-                  {showNotes ? 'Hide note' : 'Add note (optional)'}
-                </button>
-                {showNotes ? (
-                  <textarea
-                    value={description}
-                    onChange={(event) => setDescription(event.target.value)}
-                    disabled={isUploading}
-                    rows={3}
-                    className="w-full mt-2 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
-                    placeholder="Optional note"
-                  />
-                ) : null}
-              </div>
+          {videoFile ? (
+            <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-2">
+              <label className="block text-sm font-medium text-gray-900">Skill</label>
+              <p className="text-xs text-gray-500">Group this proof in your archive (optional).</p>
+              <SkillField
+                value={practiceSeries}
+                onChange={setPracticeSeries}
+                options={skillOptions}
+                disabled={isUploading}
+                placeholder="Choose a skill or create a new one"
+              />
             </div>
-          </details>
+          ) : null}
 
-          {/* Upload drop zone merged into the top section for simplicity */}
+          {videoFile ? (
+            <details className="rounded-2xl border border-gray-200 bg-white px-4 py-4" open={showOptionalDetails}>
+              <summary
+                onClick={(event) => {
+                  event.preventDefault()
+                  setShowOptionalDetails((current) => !current)
+                }}
+                className="cursor-pointer list-none flex items-center justify-between gap-3"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Title and note</p>
+                  <p className="text-xs text-gray-500 mt-1">Optional — a default title is used if you skip this.</p>
+                </div>
+                <span className="text-xs text-gray-500">{showOptionalDetails ? 'Hide' : 'Show'}</span>
+              </summary>
+              <div className="space-y-4 pt-4">
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1.5">Title</label>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(event) => {
+                      setTitle(event.target.value)
+                      setTitleManuallyEdited(true)
+                    }}
+                    disabled={isUploading}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+                    placeholder="Give it a name"
+                  />
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowNotes((current) => !current)}
+                    disabled={isUploading}
+                    className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
+                  >
+                    {showNotes ? 'Hide note' : 'Add note (optional)'}
+                  </button>
+                  {showNotes ? (
+                    <textarea
+                      value={description}
+                      onChange={(event) => setDescription(event.target.value)}
+                      disabled={isUploading}
+                      rows={3}
+                      className="w-full mt-2 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 resize-none"
+                      placeholder="Optional note"
+                    />
+                  ) : null}
+                </div>
+              </div>
+            </details>
+          ) : null}
 
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={handleCancel} className="flex-1 text-sm text-gray-600 border border-gray-200 rounded-lg py-2.5 hover:bg-gray-50 transition-colors">{isUploading ? 'Abort upload' : 'Cancel'}</button>
@@ -575,24 +557,20 @@ function SessionUpload({
             </button>
           </div>
 
-          {isUploading ? (
-            <div className="space-y-2">
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-gray-900 transition-all" style={{ width: `${Math.max(uploadProgress ?? 5, 5)}%` }} />
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                {uploadPhase === 'resuming'
-                  ? 'Resuming your upload automatically. Keep this tab open while we reconnect and continue.'
-                  : `Saving video${uploadProgress !== null ? ` (${uploadProgress}%)` : ''}. Keep this tab open until it finishes.`}
-              </p>
-              <p className="text-xs text-amber-700">
-                {uploadPhase === 'resuming'
-                  ? 'No extra click needed unless the upload fully expires.'
-                  : 'Stay on this page until the upload finishes.'}
-              </p>
-            </div>
-          ) : null}
         </form>
+
+        {isUploading ? (
+          <div className="sticky bottom-0 left-0 right-0 mt-4 -mx-4 sm:-mx-6 px-4 sm:px-6 py-4 bg-white/95 backdrop-blur border-t border-gray-200 space-y-2">
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden max-w-lg mx-auto">
+              <div className="h-full bg-gray-900 transition-all" style={{ width: `${Math.max(uploadProgress ?? 5, 5)}%` }} />
+            </div>
+            <p className="text-xs text-gray-600 text-center max-w-lg mx-auto">
+              {uploadPhase === 'resuming'
+                ? 'Resuming upload… keep this tab open.'
+                : `Saving${uploadProgress !== null ? ` ${uploadProgress}%` : ''}… keep this tab open.`}
+            </p>
+          </div>
+        ) : null}
       </div>
     </div>
   )

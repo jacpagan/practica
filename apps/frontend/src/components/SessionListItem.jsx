@@ -19,21 +19,26 @@ export default function SessionListItem({ session, onOpen, showSeries = false, h
   const hasDuration = Number.isFinite(durationSeconds) && durationSeconds > 0
   const recordedAtLabel = formatCompactDateTime(recordedAt)
   const metadataLabel = hasDuration ? `${recordedAtLabel} • ${fmtTimer(durationSeconds)}` : recordedAtLabel
-  const isProcessing = session.processing_status === 'processing'
   return (
     <button
       type="button"
       onClick={onOpen}
       onMouseEnter={() => { if (prefetch) prefetchSession(session.id) }}
-      className={`w-full text-left rounded-2xl border border-gray-200 px-4 py-4 hover:bg-gray-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 ${highlight ? 'ring-1 ring-gray-300' : ''} ${isProcessing ? 'border-amber-200 bg-amber-50/40' : ''}`}
+      className={`w-full text-left rounded-2xl border border-gray-200 px-4 py-4 hover:bg-gray-50 transition-colors ${highlight ? 'ring-1 ring-gray-300' : ''}`}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3 min-w-0">
-          <VideoThumbnail session={session} variant="poster" className={`relative w-24 h-16 rounded-xl shrink-0 ${isProcessing ? 'ring-2 ring-amber-300 ring-offset-1' : ''}`} />
+          <VideoThumbnail session={session} variant="poster" className="relative w-24 h-16 rounded-xl shrink-0" />
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               {session.processing_status === 'ready' ? (
                 <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-600 px-2 py-1 rounded-full">Ready</span>
+              ) : null}
+              {session.processing_status === 'processing' ? (
+                <span className="text-[11px] uppercase tracking-wide bg-amber-100 text-amber-800 px-2 py-1 rounded-full">Processing</span>
+              ) : null}
+              {session.processing_status === 'failed' ? (
+                <span className="text-[11px] uppercase tracking-wide bg-rose-100 text-rose-800 px-2 py-1 rounded-full">Needs retry</span>
               ) : null}
               {showSeries && session.practice_series ? (
                 <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
