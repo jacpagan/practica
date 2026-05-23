@@ -132,7 +132,7 @@ function SessionDetail({
     const deltaY = clientY - start.y
     const absX = Math.abs(deltaX)
     const absY = Math.abs(deltaY)
-    const swipeThreshold = 70
+    const swipeThreshold = 50
 
     if (absY >= swipeThreshold && absY >= absX * 1.1) {
       if (deltaY < 0) openThreadSession(threadNavigation.next)
@@ -213,9 +213,7 @@ function SessionDetail({
           Back
         </button>
         <div
-          className="relative h-[100dvh] sm:h-auto sm:aspect-video bg-black touch-none"
-          onTouchStart={handleSwipeStart}
-          onTouchEnd={handleSwipeEnd}
+          className="relative h-[100dvh] sm:h-auto sm:aspect-video bg-black"
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerUp}
           onPointerCancel={() => { swipeRef.current = null }}
@@ -230,6 +228,21 @@ function SessionDetail({
             </div>
           )}
           {hasThreadNavigation ? (
+            <>
+            <div
+              className="sm:hidden absolute right-3 top-1/2 z-30 flex w-10 -translate-y-1/2 flex-col items-center gap-2 rounded-full border border-white/40 bg-white/15 px-2 py-4 text-xs font-semibold text-white shadow-lg backdrop-blur touch-none"
+              onTouchStart={handleSwipeStart}
+              onTouchEnd={handleSwipeEnd}
+              onPointerDown={handlePointerDown}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={() => { swipeRef.current = null }}
+              aria-label="Swipe rail: up for next proof, down for previous proof"
+            >
+              <span aria-hidden="true">↑</span>
+              <span className="h-14 w-1 rounded-full bg-white/70" aria-hidden="true" />
+              <span className="[writing-mode:vertical-rl] text-[9px] uppercase tracking-widest text-white/80" aria-hidden="true">Swipe</span>
+              <span aria-hidden="true">↓</span>
+            </div>
             <div className="pointer-events-none absolute inset-x-0 bottom-[max(5.5rem,env(safe-area-inset-bottom))] sm:bottom-4 z-20 flex items-center justify-between px-3 sm:px-4">
               <button
                 type="button"
@@ -254,6 +267,7 @@ function SessionDetail({
                 Next →
               </button>
             </div>
+            </>
           ) : null}
         </div>
 
@@ -342,7 +356,7 @@ function SessionDetail({
                     <div className="min-w-0">
                       <p className="text-xs uppercase tracking-wide text-gray-500">{threadLabel}</p>
                       <p className="text-sm font-medium text-gray-900 mt-1">{threadPositionLabel}</p>
-                      <p className="text-xs text-gray-500 mt-1">Swipe up for next, down for previous, or use the buttons.</p>
+                      <p className="text-xs text-gray-500 mt-1">Scroll for details. Use the right swipe rail or buttons to change videos.</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <button
