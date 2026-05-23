@@ -5,13 +5,6 @@ import { useToast } from './Toast'
 
 const UNGROUPED_KEY = '__ungrouped__'
 
-const formatCompactDateTime = (value) => {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  const dayPart = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-  const timePart = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
-  return `${dayPart} · ${timePart}`
-}
 
 export default function ProgressView({
   sessions = [],
@@ -200,27 +193,27 @@ export default function ProgressView({
           <div className="space-y-4">
             {skillGroups.map((group) => {
               const skillName = group.skillName === UNGROUPED_KEY ? 'Ungrouped' : group.skillName
-              const latest = group.latest
               return (
                 <section key={group.skillName} className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
-                  <div className="border-b border-gray-100 px-4 py-4 flex items-start justify-between gap-4 flex-wrap">
+                  <div className="border-b border-gray-100 px-4 py-4">
                     <div className="min-w-0">
                       <p className="text-xs uppercase tracking-wide text-gray-500">Skill</p>
-                      <h3 className="text-lg font-semibold text-gray-900 mt-1 truncate">{skillName}</h3>
+                      <div className="mt-1 flex items-baseline gap-2 min-w-0 flex-wrap">
+                        <h3 className="text-lg font-semibold text-gray-900 truncate">{skillName}</h3>
+                        {group.skillName !== UNGROUPED_KEY ? (
+                          <button
+                            type="button"
+                            onClick={() => setRenamingSkillName(group.skillName)}
+                            className="text-sm text-gray-500 hover:text-gray-900 shrink-0 transition-colors"
+                          >
+                            Edit name
+                          </button>
+                        ) : null}
+                      </div>
                       <p className="text-sm text-gray-500 mt-1">
                         {group.items.length} {group.items.length === 1 ? 'proof' : 'proofs'}
-                        {latest ? ` · latest ${formatCompactDateTime(latest.recorded_at || latest.created_at)}` : ''}
                       </p>
                     </div>
-                    {group.skillName !== UNGROUPED_KEY ? (
-                      <button
-                        type="button"
-                        onClick={() => setRenamingSkillName(group.skillName)}
-                        className="text-sm text-gray-600 hover:text-gray-900 shrink-0 transition-colors"
-                      >
-                        Rename skill
-                      </button>
-                    ) : null}
                   </div>
 
                   <div className="p-4 space-y-3">
@@ -255,7 +248,7 @@ export default function ProgressView({
       />
       <SkillPickerModal
         open={Boolean(renamingSkillName)}
-        title="Rename skill"
+        title="Edit skill name"
         initialValue={renamingSkillName}
         options={skillOptions}
         saving={saving}
