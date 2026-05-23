@@ -118,7 +118,9 @@ test('Today view keeps a plain core-loop UI without gamification', async ({ page
   })
 
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'One small proof for today.' })).toBeVisible()
+  await expect(page).toHaveURL(/\/progress/)
+  await expect(page.getByRole('heading', { name: 'Skill timelines' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Today' })).toHaveCount(0)
   await expect(page.getByText('XP', { exact: true })).toHaveCount(0)
   await expect(page.getByText(/streak/i)).toHaveCount(0)
   await expect(page.getByText(/level/i)).toHaveCount(0)

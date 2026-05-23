@@ -31,7 +31,6 @@ import AuthForm from './components/AuthForm'
 import SessionUpload from './components/SessionUpload'
 // Inline header create buttons to avoid any chance of circular init
 const SessionDetail = React.lazy(() => import('./components/SessionDetail'))
-const TodayView = React.lazy(() => import('./components/TodayView'))
 const ProgressView = React.lazy(() => import('./components/ProgressView'))
 const SkillView = React.lazy(() => import('./components/SkillView'))
 import PrivacyPage from './components/PrivacyPage'
@@ -42,22 +41,22 @@ function AppContent() {
   const toast = useToast()
   const confirm = useConfirm()
   const initialRoute = useMemo(() => parseRoute(window.location.pathname, window.location.search), [])
-  const [view, setView] = useState(initialRoute.view)
+  const [view, setView] = useState(initialRoute.view === 'today' ? 'progress' : initialRoute.view)
   const [routeSessionId, setRouteSessionId] = useState(initialRoute.sessionId)
   const [routeSeriesName, setRouteSeriesName] = useState(initialRoute.seriesName || '')
   const [routeDate, setRouteDate] = useState(initialRoute.date || '')
   const [selectedSession, setSelectedSession] = useState(null)
   const [sessions, setSessions] = useState([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
-  const [detailReturnRoute, setDetailReturnRoute] = useState({ view: 'today', sessionId: null, seriesName: '' })
+  const [detailReturnRoute, setDetailReturnRoute] = useState({ view: 'progress', sessionId: null, seriesName: '' })
   const [openRecorderOnUpload, setOpenRecorderOnUpload] = useState(false)
   const [justUploadedSessionId, setJustUploadedSessionId] = useState(null)
   const [pendingPracticeSeries, setPendingPracticeSeries] = useState(initialRoute.seriesName || '')
   const [pendingUploadReturnRoute, setPendingUploadReturnRoute] = useState({
-    view: initialRoute.view === 'skill' && initialRoute.seriesName ? 'skill' : (initialRoute.view === 'progress' ? 'progress' : 'today'),
+    view: initialRoute.view === 'skill' && initialRoute.seriesName ? 'skill' : 'progress',
     sessionId: null,
     seriesName: initialRoute.view === 'skill' ? (initialRoute.seriesName || '') : '',
-    date: initialRoute.view === 'today' || initialRoute.view === 'progress' ? (initialRoute.date || '') : '',
+    date: initialRoute.view === 'progress' ? (initialRoute.date || '') : '',
   })
   const calendarMonthCacheRef = useRef(new Map())
   const calendarMonthRequestRef = useRef('')
@@ -219,11 +218,12 @@ function AppContent() {
   })
 
   const {
-    goToday,
     goProgress,
     goPrivacy,
     goSkill,
   } = usePrimaryNavigation({ navigate })
+
+  const progressNavActive = view === 'progress' || view === 'skill' || view === 'detail'
 
   const {
     onDetailSessionDelete,
@@ -263,18 +263,12 @@ function AppContent() {
       <header className={`${isImmersiveMobileView ? 'hidden sm:block' : ''} border-b border-gray-100 bg-white px-4 py-4 sm:px-6`}>
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-4 min-w-0">
-            <button onClick={goToday} className="text-lg font-semibold text-gray-900 tracking-tight">
+            <button onClick={goProgress} className="text-lg font-semibold text-gray-900 tracking-tight">
               Practica
             </button>
             <button
-              onClick={goToday}
-            className={`hidden sm:inline-flex text-sm px-3 py-1.5 rounded-full border transition-colors ${view === 'today' || view === 'detail' ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:text-gray-900'}`}
-          >
-              Today
-            </button>
-            <button
               onClick={goProgress}
-              className={`hidden sm:inline-flex text-sm px-3 py-1.5 rounded-full border transition-colors ${view === 'progress' || view === 'skill' ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:text-gray-900'}`}
+              className={`hidden sm:inline-flex text-sm px-3 py-1.5 rounded-full border transition-colors ${progressNavActive ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:text-gray-900'}`}
             >
               Progress
             </button>
@@ -299,14 +293,8 @@ function AppContent() {
         </div>
         <div className="max-w-4xl mx-auto mt-3 space-y-2 sm:hidden">
           <button
-            onClick={goToday}
-            className={`w-full text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'today' || view === 'detail' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
-          >
-            Today
-          </button>
-          <button
             onClick={goProgress}
-            className={`w-full text-sm px-3 py-2.5 rounded-xl transition-colors ${view === 'progress' || view === 'skill' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+            className={`w-full text-sm px-3 py-2.5 rounded-xl transition-colors ${progressNavActive ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
           >
             Progress
           </button>
@@ -330,18 +318,9 @@ function AppContent() {
             </div>
           </div>
         }>
-        {view === 'today' && (
-          <TodayView
-            sessions={sessions}
-            sessionsLoading={sessionsLoading}
-            onOpenSession={(session, returnRoute) => openSession(session, returnRoute || { view: 'today', sessionId: null, seriesName: '' })}
-            onRecordProof={() => openGlobalRecorder()}
-            onOpenProgress={() => navigate({ view: 'progress', sessionId: null })}
-          />
-        )}
 
         {view === 'privacy' && (
-          <PrivacyPage signedIn onBack={goToday} />
+          <PrivacyPage signedIn onBack={goProgress} />
         )}
 
         {view === 'progress' && (
@@ -349,7 +328,6 @@ function AppContent() {
             sessions={sessions}
             sessionsLoading={sessionsLoading}
             token={token}
-            onRecordProof={(skillName = '') => handleRecordAnother(skillName ? { practiceSeries: skillName } : null)}
             onOpenSession={openSession}
             onSessionUpdate={onDetailSessionUpdate}
           />
@@ -363,7 +341,6 @@ function AppContent() {
             token={token}
             onBack={goProgress}
             onOpenSession={openSession}
-            onRecordProof={() => handleRecordAnother(routeSeriesName ? { practiceSeries: routeSeriesName } : null)}
           />
         )}
 
@@ -377,8 +354,8 @@ function AppContent() {
                 ? pendingUploadReturnRoute
                 : (pendingPracticeSeries
                     ? { view: 'skill', sessionId: null, seriesName: pendingPracticeSeries }
-                    : { view: 'today', sessionId: null })
-              setPendingUploadReturnRoute({ view: 'today', sessionId: null })
+                    : { view: 'progress', sessionId: null })
+              setPendingUploadReturnRoute({ view: 'progress', sessionId: null })
               navigate(nextRoute, { bypassUploadGuard })
             }}
             initialRecorderOpen={openRecorderOnUpload}
@@ -391,7 +368,7 @@ function AppContent() {
 
         {view === 'record' && (
           <RecorderPage
-            onCancel={goToday}
+            onCancel={goProgress}
             onComplete={handleUploadComplete}
           />
         )}

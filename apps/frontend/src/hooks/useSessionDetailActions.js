@@ -31,7 +31,11 @@ export const useSessionDetailActions = ({
   }, [openSessionById, routeSeriesName, setDetailReturnRoute, setOpenRecorderOnUpload, view])
 
   const goBack = useCallback(() => {
-    navigate(detailReturnRoute?.view ? detailReturnRoute : { view: 'today', sessionId: null, seriesName: '' })
+    const fallback = { view: 'progress', sessionId: null, seriesName: '' }
+    const route = detailReturnRoute?.view
+      ? (detailReturnRoute.view === 'today' ? fallback : detailReturnRoute)
+      : fallback
+    navigate(route)
     setSelectedSession(null)
     setJustUploadedSessionId(null)
   }, [detailReturnRoute, navigate, setJustUploadedSessionId, setSelectedSession])

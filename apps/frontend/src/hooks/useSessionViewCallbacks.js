@@ -15,7 +15,7 @@ export const useSessionViewCallbacks = ({
   const onDetailSessionDelete = useCallback((sessionId) => {
     setSessions((current) => current.filter((item) => item.id !== sessionId))
     setSelectedSession(null)
-    navigate({ view: 'today', sessionId: null }, { replace: true })
+    navigate({ view: 'progress', sessionId: null }, { replace: true })
   }, [navigate, setSelectedSession, setSessions])
 
   return {

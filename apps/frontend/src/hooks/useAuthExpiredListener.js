@@ -10,7 +10,7 @@ export const useAuthExpiredListener = ({ logout, navigate, toast }) => {
       } catch {}
       try { toast.error('Session expired. Please sign in again.') } catch {}
       try { logout() } catch {}
-      try { navigate({ view: 'today', sessionId: null }, { replace: true }) } catch {}
+      try { navigate({ view: 'progress', sessionId: null }, { replace: true }) } catch {}
     }
     window.addEventListener('practica:auth-expired', onAuthExpired, { once: true })
     return () => window.removeEventListener('practica:auth-expired', onAuthExpired)

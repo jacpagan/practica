@@ -18,7 +18,6 @@ export default function ProgressView({
   sessionsLoading = false,
   token = '',
   onOpenSession,
-  onRecordProof,
   onSessionUpdate,
 }) {
   const toast = useToast()
@@ -145,12 +144,7 @@ export default function ProgressView({
         {sessions.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
               <p className="text-sm text-gray-700">No proofs yet.</p>
-            <p className="text-xs text-gray-500 mt-1">Record or upload a first proof. It will show up here as soon as it is saved.</p>
-            <div className="mt-4">
-              <button type="button" onClick={onRecordProof} className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors">
-                Record proof
-              </button>
-            </div>
+            <p className="text-xs text-gray-500 mt-1">Use Record above to add or upload a proof. It will show up here as soon as it is saved.</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -169,13 +163,6 @@ export default function ProgressView({
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => onRecordProof?.(group.skillName === UNGROUPED_KEY ? '' : group.skillName)}
-                        className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
-                      >
-                        {group.skillName === UNGROUPED_KEY ? 'Add proof' : 'Add to skill'}
-                      </button>
                       {latest ? (
                         <button
                           type="button"

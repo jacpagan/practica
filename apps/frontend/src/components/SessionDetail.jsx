@@ -173,36 +173,29 @@ function SessionDetail({
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => onRecordAnother?.({ practiceSeries: session.practice_series || '' })}
+                  onClick={onBack}
                   className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
                 >
-                  Record next proof
+                  {returnsToSkill ? `View in ${session.practice_series}` : 'View in Progress'}
                 </button>
-                <button
-                  type="button"
-                  onClick={onBack}
-                  className="rounded-full border border-gray-200 bg-white text-gray-900 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors"
-                >
-                  {backLabel}
-                </button>
-                {!returnsToSkill ? (
+                {returnsToSkill && session.practice_series ? (
                   <button
                     type="button"
-                    onClick={onOpenProgress}
+                    onClick={() => onOpenSeries?.(session.practice_series)}
                     className="rounded-full border border-gray-200 bg-white text-gray-900 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors"
                   >
-                    Open progress
+                    Open skill timeline
                   </button>
                 ) : null}
               </div>
 
               {justUploaded ? (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-                  <p className="text-sm font-medium text-emerald-900">This proof is saved.</p>
+                  <p className="text-sm font-medium text-emerald-900">Proof saved to your private archive.</p>
                   <p className="text-sm text-emerald-800 mt-1">
                     {returnsToSkill
-                      ? 'Go back to the skill timeline to see where it landed, or record the next proof now.'
-                      : 'Go to Progress to see it land in your archive, or record the next proof now.'}
+                      ? `Stored under ${session.practice_series}. Use the button above to open that skill timeline and find this proof again.`
+                      : 'Stored in Progress. Use the button above to open your archive and find this proof again.'}
                   </p>
                 </div>
               ) : null}

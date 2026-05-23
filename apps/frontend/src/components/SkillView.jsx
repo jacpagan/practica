@@ -101,13 +101,6 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
                   Open latest proof
                 </button>
               ) : null}
-              <button
-                type="button"
-                onClick={onRecordProof}
-                className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
-              >
-                Record next proof
-              </button>
             </div>
           </div>
         </div>
@@ -115,7 +108,7 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
         {skillSessions.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
             <p className="text-sm text-gray-700">No proofs in this skill yet.</p>
-            <p className="text-xs text-gray-500 mt-1">Create a new video and save it into this skill.</p>
+            <p className="text-xs text-gray-500 mt-1">Use Record above, then choose this skill when you save.</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -141,13 +134,6 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
                     className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
                   >
                     Open latest proof
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onRecordProof}
-                    className="rounded-full border border-gray-200 bg-white text-gray-900 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors"
-                  >
-                    Record next proof
                   </button>
                 </div>
               </div>
