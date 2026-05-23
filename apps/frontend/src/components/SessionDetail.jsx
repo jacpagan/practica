@@ -118,29 +118,46 @@ function SessionDetail({
     onOpenSession?.(targetSession, returnRoute || { view: 'progress', sessionId: null, seriesName: '' })
   }
 
-  const handleSwipeStart = (event) => {
-    const touch = event.touches?.[0]
-    if (!touch || !hasThreadNavigation) return
-    swipeRef.current = {
-      x: touch.clientX,
-      y: touch.clientY,
-    }
+  const beginSwipe = (clientX, clientY) => {
+    if (!hasThreadNavigation) return
+    swipeRef.current = { x: clientX, y: clientY }
   }
 
-  const handleSwipeEnd = (event) => {
+  const finishSwipe = (clientX, clientY) => {
     const start = swipeRef.current
     swipeRef.current = null
-    const touch = event.changedTouches?.[0]
-    if (!start || !touch || !hasThreadNavigation) return
+    if (!start || !hasThreadNavigation) return
 
-    const deltaX = touch.clientX - start.x
-    const deltaY = touch.clientY - start.y
+    const deltaX = clientX - start.x
+    const deltaY = clientY - start.y
     const absX = Math.abs(deltaX)
     const absY = Math.abs(deltaY)
     if (absX < 70 || absX < absY * 1.25) return
 
     if (deltaX < 0) openThreadSession(threadNavigation.next)
     else openThreadSession(threadNavigation.previous)
+  }
+
+  const handleSwipeStart = (event) => {
+    const touch = event.touches?.[0]
+    if (!touch) return
+    beginSwipe(touch.clientX, touch.clientY)
+  }
+
+  const handleSwipeEnd = (event) => {
+    const touch = event.changedTouches?.[0]
+    if (!touch) return
+    finishSwipe(touch.clientX, touch.clientY)
+  }
+
+  const handlePointerDown = (event) => {
+    if (event.pointerType === 'touch') return
+    beginSwipe(event.clientX, event.clientY)
+  }
+
+  const handlePointerUp = (event) => {
+    if (event.pointerType === 'touch') return
+    finishSwipe(event.clientX, event.clientY)
   }
 
   useEffect(() => {
@@ -185,6 +202,9 @@ function SessionDetail({
           className="relative h-[100dvh] sm:h-auto sm:aspect-video bg-black"
           onTouchStart={handleSwipeStart}
           onTouchEnd={handleSwipeEnd}
+          onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={() => { swipeRef.current = null }}
         >
           {playableUrl && !playbackFailed ? (
             <video key={playableUrl} ref={videoRef} src={playableUrl} controls playsInline onError={handlePlaybackError} className="w-full h-full bg-black" />
