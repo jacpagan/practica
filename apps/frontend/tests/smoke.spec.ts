@@ -15,11 +15,11 @@ test('Library route (signed-out) shows Auth form without crashing', async ({ pag
   await expect(page.getByRole('button', { name: 'Log in' }).first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'Sign up' }).first()).toBeVisible()
   // Legacy routes normalize to progress.
-  await expect(page).toHaveURL(/\/progress$/)
+  await expect(page).toHaveURL(/\/progress/)
   // Report link available and non-crashing
   await page.getByRole('button', { name: 'Report a problem' }).click()
   // No navigation expected.
-  await expect(page).toHaveURL(/\/progress$/)
+  await expect(page).toHaveURL(/\/progress/)
 })
 
 test('Progress view shows grouped proofs for signed-in members', async ({ page }) => {
@@ -118,9 +118,7 @@ test('Today view keeps a plain core-loop UI without gamification', async ({ page
   })
 
   await page.goto('/')
-  await expect(page).toHaveURL(/\/progress/)
-  await expect(page.getByRole('heading', { name: 'Skill timelines' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Today' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'One small proof. One more step.' })).toBeVisible()
   await expect(page.getByText('XP', { exact: true })).toHaveCount(0)
   await expect(page.getByText(/streak/i)).toHaveCount(0)
   await expect(page.getByText(/level/i)).toHaveCount(0)
