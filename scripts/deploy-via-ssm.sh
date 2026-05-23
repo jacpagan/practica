@@ -114,6 +114,22 @@ if updates:
         if key not in seen:
             out.append(f'{key}={value}')
     p.write_text('\n'.join(out) + '\n')
+
+# Production uses the EC2 instance profile for AWS API access — never static IAM user keys.
+strip_keys = {'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'}
+lines = p.read_text().splitlines()
+filtered = []
+removed = []
+for line in lines:
+    if '=' in line:
+        key = line.split('=', 1)[0].strip()
+        if key in strip_keys:
+            removed.append(key)
+            continue
+    filtered.append(line)
+if removed:
+    print('Removed static AWS access keys from .env.production (use instance profile): ' + ', '.join(sorted(set(removed))))
+    p.write_text('\n'.join(filtered) + ('\n' if filtered else ''))
 PY
 set -a; source .env.production; set +a
 BACKEND_IMAGE=$(printf '%s' "__BACKEND_IMAGE_B64__" | base64 -d)

@@ -52,10 +52,12 @@ export default function TodayView({
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <p className="text-xs uppercase tracking-wide text-gray-500">Next proof</p>
+          <p className="text-xs uppercase tracking-wide text-gray-500">{doneToday ? 'Active skill' : 'Next proof'}</p>
           <h3 className="text-xl font-semibold text-gray-900 mt-1 truncate">{progress.activeSkill}</h3>
           <p className="text-sm text-gray-600 mt-2">
-            Pick one action, record one proof, then finish in Progress so you can see it land in the right skill timeline.
+            {doneToday
+              ? 'Your latest proof is saved privately. Open Progress to review the timeline or record another take.'
+              : 'Record one short proof for this skill. Processing usually takes a minute — you can leave and come back.'}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <button
@@ -63,7 +65,7 @@ export default function TodayView({
               onClick={onRecordProof}
               className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
             >
-              Record proof
+              {doneToday ? 'Record another proof' : 'Record proof'}
             </button>
             <button
               type="button"

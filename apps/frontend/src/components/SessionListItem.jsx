@@ -34,6 +34,12 @@ export default function SessionListItem({ session, onOpen, showSeries = false, h
               {session.processing_status === 'ready' ? (
                 <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-600 px-2 py-1 rounded-full">Ready</span>
               ) : null}
+              {session.processing_status === 'processing' ? (
+                <span className="text-[11px] uppercase tracking-wide bg-amber-100 text-amber-800 px-2 py-1 rounded-full">Processing</span>
+              ) : null}
+              {session.processing_status === 'failed' ? (
+                <span className="text-[11px] uppercase tracking-wide bg-rose-100 text-rose-800 px-2 py-1 rounded-full">Needs retry</span>
+              ) : null}
               {showSeries && session.practice_series ? (
                 <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
                   {String(session.practice_series).trim()}

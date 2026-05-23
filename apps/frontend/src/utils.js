@@ -169,6 +169,8 @@ export const calculatePracticeProgress = (sessions = []) => {
   const activeSkill = sorted.find((session) => String(session?.practice_series || '').trim())?.practice_series?.trim() || 'Your skill'
   const uniqueDays = Array.from(proofDays).filter(Boolean)
   const proofCount = sorted.length
+  const todayKey = toLocalDateKey(new Date())
+  const proofRecordedToday = Boolean(todayKey && uniqueDays.includes(todayKey))
 
   return {
     activeSkill,
@@ -177,6 +179,7 @@ export const calculatePracticeProgress = (sessions = []) => {
     skillCount: Array.from(skillCounts.keys()).length,
     recentProofs,
     proofDays: uniqueDays,
+    proofRecordedToday,
     latestProofAt: sorted[0]?.recorded_at || sorted[0]?.created_at || '',
   }
 }
