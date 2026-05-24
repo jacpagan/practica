@@ -1604,7 +1604,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                   </div>
 
                   {/* ── Camera / Mic inputs (secondary) ── */}
-                  <details className="rounded-2xl bg-white/5 px-3 py-3">
+                  <details open className="rounded-2xl bg-white/5 px-3 py-3">
                     <summary className="cursor-pointer text-[11px] uppercase tracking-wide text-white/60">Camera & microphone</summary>
                     <div className="grid grid-cols-1 gap-3 pt-3">
                       {renderVideoInputPicker('')}
