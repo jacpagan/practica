@@ -5,6 +5,8 @@ import { createBeatClock } from '../metronome/beatClock'
 import { createOnsetDetector } from '../metronome/onsetDetector'
 import { matchOnsetToBeat } from '../metronome/matchHit'
 import { buildTimingMetadata } from '../metronome/timingMetadata'
+import { computeTimingStats } from '../metronome/timingScore'
+import TimingScoreSummary from './TimingScoreSummary'
 import { clampBpm as clampBpmValue, MIN_BPM, MAX_BPM } from '../metronome/constants'
 
 const STATES = {
@@ -70,6 +72,8 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   const [showTimingTools, setShowTimingTools] = useState(false)
   const [timingFeedbackEnabled, setTimingFeedbackEnabled] = useState(true)
   const [hitFlash, setHitFlash] = useState(null)
+  const [beatTickFlash, setBeatTickFlash] = useState(null)
+  const [timingLiveStats, setTimingLiveStats] = useState(null)
   const [showPipControls, setShowPipControls] = useState(false)
   const [musicMode, setMusicMode] = useState(true)
   const [micGain, setMicGain] = useState(1)
@@ -676,7 +680,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       period: beatClockRef.current.getPeriod(),
       beatsPerBar,
     })
-    if (!match || match.tier === 'off') return
+    if (!match) return
     if (match.beatIndex === lastMatchedBeatRef.current) return
 
     lastMatchedBeatRef.current = match.beatIndex
@@ -686,11 +690,13 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       deltaMs: match.deltaMs,
       tier: match.tier,
       beatIndex: match.beatIndex,
+      beatInBar: match.beatInBar,
     })
+    setTimingLiveStats(computeTimingStats(hitsRef.current))
     setHitFlash({ ...match, at: performance.now() })
     window.setTimeout(() => {
       setHitFlash((current) => (current?.beatIndex === match.beatIndex ? null : current))
-    }, 450)
+    }, 520)
   }, [beatsPerBar, timingFeedbackEnabled])
 
   const startTimingLoop = useCallback(() => {
@@ -703,6 +709,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
 
       if (audioContext && beatClock?.isRunning()) {
         beatClock.processTicks(audioContext.currentTime, (tick) => {
+          setBeatTickFlash({ at: performance.now(), isAccent: tick.isAccent })
           playTickAt(tick)
         })
       }
@@ -970,6 +977,9 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     }
     setShowOptions(false)
     setShowTimingTools(false)
+    setTimingLiveStats(null)
+    setBeatTickFlash(null)
+    setHitFlash(null)
 
     const mimeType = pickRecorderMimeType()
     const recorderStream = mixedStreamRef.current || streamRef.current
@@ -1316,9 +1326,14 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
             <BeatTimingOverlay
               active={metronomeEnabled}
               getPhase={getBeatPhase}
-              hitFlash={hitFlash}
+              hitFlash={timingFeedbackEnabled ? hitFlash : null}
+              beatTick={beatTickFlash}
+              beatsPerBar={beatsPerBar}
+              liveStats={timingLiveStats}
               showProximity={timingFeedbackEnabled}
+              showLiveScore={timingFeedbackEnabled && isRecording}
               compactTop={isRecording}
+              large={isRecording}
             />
 
             {isRecording ? (
@@ -1791,6 +1806,9 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
               <p className="text-sm font-medium text-white">Recording ready</p>
               <p className="text-xs text-white/50 mt-1">{fmtTimer(elapsed)} · {(recordedFile.size / 1024 / 1024).toFixed(1)} MB</p>
             </div>
+            {timingSnapshotRef.current ? (
+              <TimingScoreSummary timingMetadata={timingSnapshotRef.current} />
+            ) : null}
             <div className="flex items-center gap-2">
               <button onClick={handleReRecord}
                 className="flex-1 text-sm text-white/70 hover:text-white px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all">

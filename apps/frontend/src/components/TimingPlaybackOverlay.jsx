@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { parseTimingMetadata } from '../metronome/timingMetadata'
+import TimingScoreSummary from './TimingScoreSummary'
 
 const tierClass = {
   perfect: 'bg-emerald-400',
@@ -64,7 +65,11 @@ export default function TimingPlaybackOverlay({ timingMetadata, videoRef, durati
           })}
         </div>
       ) : null}
-      {(summary.on_beat || summary.close) ? (
+      {meta.score != null ? (
+        <div className="absolute top-[max(3.5rem,env(safe-area-inset-top))] right-4 max-w-[200px]">
+          <TimingScoreSummary timingMetadata={meta} compact />
+        </div>
+      ) : (summary.on_beat || summary.close) ? (
         <div className="absolute top-[max(3.5rem,env(safe-area-inset-top))] right-4 rounded-full bg-black/50 px-3 py-1.5 text-[11px] text-white/85 backdrop-blur">
           {summary.on_beat || 0} on beat · {summary.close || 0} close
         </div>

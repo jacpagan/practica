@@ -1,4 +1,5 @@
 import { MAX_TIMING_HITS, TIMING_METADATA_VERSION } from './constants'
+import { computeTimingStats } from './timingScore'
 
 export function summarizeTimingHits(hits = []) {
   const summary = { on_beat: 0, close: 0, off: 0 }
@@ -25,6 +26,11 @@ export function buildTimingMetadata({
     beat: hit.beatIndex,
   })).filter((hit) => Number.isFinite(hit.t))
 
+  const stats = computeTimingStats(trimmed.map((hit) => ({
+    tier: hit.tier,
+    deltaMs: hit.delta_ms,
+  })))
+
   return {
     version: TIMING_METADATA_VERSION,
     bpm: Number(bpm),
@@ -32,6 +38,9 @@ export function buildTimingMetadata({
     sync_offset_ms: Number(syncOffsetMs) || 0,
     hits: trimmed,
     summary: summarizeTimingHits(trimmed),
+    score: stats.score,
+    grade: stats.grade,
+    max_streak: stats.maxStreak,
   }
 }
 

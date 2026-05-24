@@ -1,4 +1,4 @@
-export const TIMING_METADATA_VERSION = 1
+export const TIMING_METADATA_VERSION = 2
 
 export const MIN_BPM = 40
 export const MAX_BPM = 240
