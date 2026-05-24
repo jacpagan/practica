@@ -38,6 +38,7 @@ function SessionDetail({
   const threadTransitionRef = useRef(null)
   const [threadTransition, setThreadTransition] = useState(null)
   const [pagerDrag, setPagerDrag] = useState({ active: false, animating: false, offsetY: 0 })
+  const [videoPlaying, setVideoPlaying] = useState(false)
   const authHeaders = useMemo(() => (token ? { Authorization: `Token ${token}` } : {}), [token])
   const canEdit = Boolean(session?.can_edit)
   const returnRouteView = String(returnRoute?.view || '').trim()
@@ -292,6 +293,14 @@ function SessionDetail({
     detailsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
   }
 
+  const togglePlayback = (event) => {
+    event?.stopPropagation?.()
+    const video = videoRef.current
+    if (!video) return
+    if (video.paused) video.play?.().catch?.(() => {})
+    else video.pause?.()
+  }
+
   const handleSwipeStart = (event) => {
     const touch = event.touches?.[0]
     if (!touch) return
@@ -396,16 +405,22 @@ function SessionDetail({
     const now = Date.now()
     if (now - railWheelRef.current < 500) return
     railWheelRef.current = now
-    if (deltaY > 0) openThreadSession(threadNavigation.next)
-    else openThreadSession(threadNavigation.previous)
+    const currentNavigation = threadNavigationRef.current || threadNavigation
+    if (deltaY > 0) openThreadSession(currentNavigation.next)
+    else openThreadSession(currentNavigation.previous)
   }
 
   const handlePlayerWheel = (event) => {
-    const rect = event.currentTarget.getBoundingClientRect()
-    const isInRailZone = rect.right - event.clientX <= 96
-    if (!isInRailZone) return
     handleRailWheel(event)
   }
+
+  useEffect(() => {
+    const node = playerRef.current
+    if (!node) return undefined
+    const handleNativeWheel = (event) => handlePlayerWheel(event)
+    node.addEventListener('wheel', handleNativeWheel, { capture: true, passive: false })
+    return () => node.removeEventListener('wheel', handleNativeWheel, { capture: true })
+  })
 
   useEffect(() => {
     setSession(initialSession)
@@ -417,6 +432,10 @@ function SessionDetail({
     if (transitionFinishTimerRef.current) window.clearTimeout(transitionFinishTimerRef.current)
     stopRailMouseTracking()
   }, [])
+
+  useEffect(() => {
+    setVideoPlaying(false)
+  }, [playableUrl])
 
   useEffect(() => {
     if (!token || !session?.id) return undefined
@@ -476,10 +495,9 @@ function SessionDetail({
             Video is still preparing for playback.
           </div>
         )}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-24 text-white">
-          <p className="text-xs uppercase tracking-[0.22em] text-white/60">{threadLabel}</p>
-          <p className="mt-1 text-lg font-semibold leading-tight">{item?.title || session?.title || 'Proof'}</p>
-          <p className="mt-1 text-xs text-white/70">{label}</p>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-20 text-white">
+          <p className="text-base font-semibold leading-tight drop-shadow">{item?.title || session?.title || 'Proof'}</p>
+          <p className="mt-1 text-[11px] text-white/60">{label}</p>
         </div>
       </div>
     )
@@ -509,10 +527,21 @@ function SessionDetail({
           onPointerMove={handlePlayerPointerMove}
           onPointerUp={handlePlayerPointerUp}
           onPointerCancel={handlePlayerPointerUp}
-          onWheel={handlePlayerWheel}
+          onWheelCapture={handlePlayerWheel}
         >
           {playableUrl && !playbackFailed ? (
-            <video key={playableUrl} ref={videoRef} src={playableUrl} controls playsInline onError={handlePlaybackError} className="w-full h-full bg-black" />
+            <video
+              key={playableUrl}
+              ref={videoRef}
+              src={playableUrl}
+              playsInline
+              onClick={togglePlayback}
+              onPlay={() => setVideoPlaying(true)}
+              onPause={() => setVideoPlaying(false)}
+              onEnded={() => setVideoPlaying(false)}
+              onError={handlePlaybackError}
+              className="w-full h-full bg-black"
+            />
           ) : (
             <div className="w-full h-full flex items-center justify-center px-6 text-center text-sm text-white/70">
               {session?.processing_status === 'ready'
@@ -555,27 +584,27 @@ function SessionDetail({
           ) : null}
           {hasThreadNavigation ? (
             <>
-            <div className="pointer-events-none absolute right-3 top-1/2 z-30 flex -translate-y-1/2 flex-col gap-1.5">
-              {threadNavigation.items.map((item, index) => (
-                <span
-                  key={item.id || index}
-                  className={`block rounded-full transition-all ${index === threadNavigation.index ? 'h-6 w-1.5 bg-white' : 'h-1.5 w-1.5 bg-white/35'}`}
-                />
-              ))}
-            </div>
-            <div className="pointer-events-none absolute inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-20 flex items-end justify-between gap-3 px-4 text-white">
-              <div className="max-w-[68%]">
-                <p className="text-xs uppercase tracking-[0.22em] text-white/55">{threadLabel}</p>
-                <p className="mt-1 text-lg font-semibold leading-tight drop-shadow">{session.title}</p>
-                <p className="mt-1 text-xs text-white/70">{threadPositionLabel} · Drag up/down</p>
+            <div className="pointer-events-none absolute inset-x-0 bottom-[max(0.9rem,env(safe-area-inset-bottom))] z-20 flex items-end justify-between gap-3 px-4 text-white">
+              <div className="max-w-[72%]">
+                <p className="text-base font-semibold leading-tight drop-shadow">{session.title}</p>
+                <p className="mt-1 text-[11px] text-white/60">{threadPositionLabel}</p>
               </div>
-              <button
-                type="button"
-                onClick={handleOpenDetails}
-                className="pointer-events-auto rounded-full border border-white/25 bg-white/15 px-3 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur transition-colors hover:bg-white/25"
-              >
-                Details
-              </button>
+              <div className="pointer-events-auto flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={togglePlayback}
+                  className="rounded-full border border-white/15 bg-black/25 px-3 py-2 text-xs font-medium text-white/85 shadow-lg backdrop-blur transition-colors hover:bg-white/15"
+                >
+                  {videoPlaying ? 'Pause' : 'Play'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenDetails}
+                  className="rounded-full border border-white/15 bg-black/25 px-3 py-2 text-xs font-medium text-white/85 shadow-lg backdrop-blur transition-colors hover:bg-white/15"
+                >
+                  Details
+                </button>
+              </div>
             </div>
             <div className="pointer-events-none absolute inset-x-0 top-1/2 z-20 hidden -translate-y-1/2 items-center justify-between px-3 opacity-0 transition-opacity hover:opacity-100 sm:flex">
               <button
