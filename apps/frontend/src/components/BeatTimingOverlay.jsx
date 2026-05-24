@@ -1,38 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { getHitLabel, puckOffsetPx } from '../metronome/timingScore'
+import { getHitLabel } from '../metronome/timingScore'
 
-function tierStyles(tier) {
-  if (tier === 'perfect') {
-    return {
-      ring: 'border-emerald-400/90 shadow-[0_0_28px_rgba(52,211,153,0.5)]',
-      fill: 'bg-emerald-400/40',
-      text: 'text-emerald-100',
-    }
-  }
-  if (tier === 'good') {
-    return {
-      ring: 'border-amber-300/85 shadow-[0_0_22px_rgba(252,211,77,0.4)]',
-      fill: 'bg-amber-300/30',
-      text: 'text-amber-50',
-    }
-  }
-  return null
+const softHitStyle = {
+  ring: 'border-white/40 shadow-[0_0_20px_rgba(255,255,255,0.12)]',
+  fill: 'bg-white/20',
+  text: 'text-white/90',
 }
 
 function MetronomeDial({ pulse, beatsPerBar, hitFlash, beatTick, large = false }) {
-  const size = large ? 168 : 120
+  const size = large ? 152 : 108
   const radius = size / 2 - 10
   const beatInBar = pulse.beatIndex % Math.max(1, beatsPerBar)
   const tickAge = beatTick ? performance.now() - beatTick.at : 9999
-  const tickFlash = tickAge < 120
+  const tickFlash = tickAge < 100
   const hitAge = hitFlash ? performance.now() - (hitFlash.at || 0) : 9999
-  const hitActive = hitAge < 520
-  const hitStyle = hitActive && hitFlash ? tierStyles(hitFlash.tier) : null
-  const puckX = hitActive && hitFlash && hitStyle ? puckOffsetPx(hitFlash.deltaMs) : 0
-  const scale = 0.92 + pulse.phase * 0.14
-  const hitLabel = hitActive && hitFlash && hitStyle
-    ? getHitLabel(hitFlash.tier, hitFlash.deltaMs)
-    : ''
+  const hitActive = hitAge < 700
+  const scale = 0.94 + pulse.phase * 0.08
 
   const segments = Array.from({ length: Math.max(1, beatsPerBar) }, (_, index) => {
     const angle = (index / beatsPerBar) * Math.PI * 2 - Math.PI / 2
@@ -40,19 +23,19 @@ function MetronomeDial({ pulse, beatsPerBar, hitFlash, beatTick, large = false }
     const y = 50 + (Math.sin(angle) * radius * 100) / size
     const isDownbeat = index === 0
     const isCurrent = beatInBar === index
-    const isHitBeat = hitActive && hitFlash && hitFlash.beatInBar === index && hitStyle
+    const isHitBeat = hitActive && hitFlash && hitFlash.beatInBar === index
 
     return (
       <span
         key={index}
-        className={`absolute rounded-full -translate-x-1/2 -translate-y-1/2 transition-all duration-75 ${
-          isHitBeat ? hitStyle.fill : isCurrent ? 'bg-white/90' : isDownbeat ? 'bg-white/55' : 'bg-white/30'
-        } ${isCurrent && tickFlash ? 'scale-150 bg-white' : ''} ${isHitBeat ? 'scale-125' : ''}`}
+        className={`absolute rounded-full -translate-x-1/2 -translate-y-1/2 transition-all duration-200 ${
+          isHitBeat ? softHitStyle.fill : isCurrent ? 'bg-white/70' : isDownbeat ? 'bg-white/45' : 'bg-white/22'
+        } ${isCurrent && tickFlash ? 'scale-125' : ''} ${isHitBeat ? 'scale-110' : ''}`}
         style={{
           left: `${x}%`,
           top: `${y}%`,
-          width: isDownbeat ? 10 : 8,
-          height: isDownbeat ? 10 : 8,
+          width: isDownbeat ? 9 : 7,
+          height: isDownbeat ? 9 : 7,
         }}
       />
     )
@@ -61,28 +44,16 @@ function MetronomeDial({ pulse, beatsPerBar, hitFlash, beatTick, large = false }
   return (
     <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
       <div
-        className={`absolute inset-0 rounded-full border-2 transition-none ${
-          tickFlash ? 'border-white/80 bg-white/15' : pulse.isAccent ? 'border-white/50' : 'border-white/25'
-        } ${hitActive && hitStyle ? hitStyle.ring : ''}`}
-        style={{ transform: `scale(${scale})`, opacity: tickFlash ? 0.95 : 0.75 }}
+        className={`absolute inset-0 rounded-full border transition-all duration-300 ${
+          tickFlash ? 'border-white/50 bg-white/8' : 'border-white/20'
+        } ${hitActive ? softHitStyle.ring : ''}`}
+        style={{ transform: `scale(${scale})`, opacity: 0.7 }}
       />
-      <div className="absolute inset-2 rounded-full border border-white/10" />
       {segments}
-      {hitActive && hitStyle ? (
-        <div
-          className={`absolute inset-0 rounded-full animate-ping opacity-40 ${hitStyle.fill}`}
-          style={{ animationDuration: '0.55s' }}
-        />
-      ) : null}
-      <div
-        className={`absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/70 bg-white/25 transition-transform duration-150 ${
-          hitActive && hitStyle ? hitStyle.fill : ''
-        }`}
-        style={{ transform: `translate(calc(-50% + ${puckX}px), -50%)` }}
-      />
-      {hitLabel ? (
-        <div className={`absolute left-1/2 top-[14%] -translate-x-1/2 text-center text-sm font-semibold drop-shadow-md ${hitStyle.text}`}>
-          {hitLabel}
+      <div className="absolute left-1/2 top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/20 border border-white/30" />
+      {hitActive && hitFlash ? (
+        <div className={`absolute left-1/2 top-[12%] -translate-x-1/2 text-center text-xs font-medium tracking-wide ${softHitStyle.text}`}>
+          {getHitLabel()}
         </div>
       ) : null}
     </div>
@@ -96,13 +67,14 @@ export default function BeatTimingOverlay({
   beatTick,
   beatsPerBar = 4,
   liveStats,
-  showProximity = true,
+  showProximity = false,
   showLiveScore = true,
   compactTop = false,
   large = false,
 }) {
   const [pulse, setPulse] = useState({ beatIndex: 0, phase: 0, msToNext: 0, isAccent: true })
   const rafRef = useRef(null)
+  const [visibleCheer, setVisibleCheer] = useState('')
 
   useEffect(() => {
     if (!active) {
@@ -125,13 +97,23 @@ export default function BeatTimingOverlay({
     }
   }, [active, getPhase])
 
-  if (!active) return null
+  useEffect(() => {
+    const next = liveStats?.liveCheer || ''
+    if (!next) {
+      setVisibleCheer('')
+      return undefined
+    }
+    if (liveStats?.streak >= 3 || liveStats?.landed === 1) {
+      setVisibleCheer(next)
+    }
+    return undefined
+  }, [liveStats?.liveCheer, liveStats?.streak, liveStats?.landed])
 
-  const cheer = liveStats?.liveCheer || (liveStats?.landed > 0 ? `${liveStats.landed} locked in` : '')
+  if (!active) return null
 
   return (
     <div className="pointer-events-none absolute inset-0 z-[15] overflow-hidden">
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
         <MetronomeDial
           pulse={pulse}
           beatsPerBar={beatsPerBar}
@@ -140,24 +122,17 @@ export default function BeatTimingOverlay({
           large={large}
         />
         {showProximity ? (
-          <p className="text-[11px] text-white/75">
-            Feel the next beat coming
-          </p>
+          <p className="mt-3 text-[11px] text-white/50">Breathe with the beat</p>
         ) : null}
       </div>
 
-      {showLiveScore && cheer ? (
+      {showLiveScore && visibleCheer ? (
         <div
-          className={`absolute left-1/2 -translate-x-1/2 rounded-full border border-emerald-400/30 bg-emerald-950/70 px-4 py-2 text-center backdrop-blur ${
-            compactTop ? 'bottom-24' : 'bottom-8'
+          className={`absolute left-1/2 -translate-x-1/2 rounded-full bg-white/10 px-4 py-1.5 text-center backdrop-blur-sm ${
+            compactTop ? 'bottom-24' : 'bottom-10'
           }`}
         >
-          <p className="text-sm font-semibold text-emerald-50">{cheer}</p>
-          {liveStats?.perfect > 0 ? (
-            <p className="mt-0.5 text-[11px] text-emerald-200/80">
-              {liveStats.perfect} locked in{liveStats.good > 0 ? ` · ${liveStats.good} close` : ''}
-            </p>
-          ) : null}
+          <p className="text-xs text-white/80">{visibleCheer}</p>
         </div>
       ) : null}
     </div>

@@ -1345,7 +1345,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                 </div>
                 {metronomeEnabled ? (
                   <div className="rounded-full bg-black/50 px-3 py-1.5 text-xs text-white/90 backdrop-blur">
-                    {bpm} BPM{timingFeedbackEnabled ? ' · groove on' : ''}
+                    {bpm} BPM{timingFeedbackEnabled ? ' · soft cheers on' : ''}
                   </div>
                 ) : null}
               </div>
@@ -1591,7 +1591,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-[11px] uppercase tracking-wide text-white/60">Celebrate hits</p>
+                      <p className="text-[11px] uppercase tracking-wide text-white/60">Soft beat cheers</p>
                       <p className="text-sm font-medium text-white">{timingFeedbackEnabled ? 'On' : 'Off'}</p>
                     </div>
                     <button
@@ -1647,7 +1647,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                   <p className="text-[11px] text-white/55">If playback sounds late, move this left. If playback sounds early, move it right.</p>
                 </div>
 
-                <p className="text-[11px] text-white/55">Turn metronome on for a count-in, the beat pulse, and encouraging on-beat flashes. Headphones help the mic hear your playing, not the click.</p>
+                <p className="text-[11px] text-white/55">Turn metronome on for a gentle pulse and a quiet “with the beat” glow when you land. Headphones help the mic hear you, not the click.</p>
               </div>
                 ) : null}
                   </>

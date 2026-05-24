@@ -4,7 +4,7 @@ import { parseTimingMetadata } from '../metronome/timingMetadata'
 
 export default function TimingScoreSummary({ timingMetadata, compact = false }) {
   const meta = parseTimingMetadata(timingMetadata)
-  if (!meta?.hits?.length && meta?.score == null) return null
+  if (!meta?.hits?.length && !meta?.encouragement) return null
 
   const stats = computeTimingStats(
     (meta.hits || []).map((hit) => ({
@@ -13,42 +13,24 @@ export default function TimingScoreSummary({ timingMetadata, compact = false }) 
     })),
   )
   const landed = stats.landed || stats.perfect + stats.good
-  if (!landed && stats.score == null) return null
-
   const encouragement = meta.encouragement || stats.encouragement
+
+  if (!encouragement && !landed) return null
 
   if (compact) {
     return (
-      <div className="rounded-xl bg-emerald-950/60 px-3 py-2 text-xs text-emerald-50 backdrop-blur border border-emerald-400/25">
-        <span className="font-semibold">{landed} locked in</span>
-        {stats.maxStreak > 1 ? <span className="text-emerald-200/80"> · best streak {stats.maxStreak}</span> : null}
+      <div className="rounded-xl bg-white/10 px-3 py-2 text-xs text-white/85 backdrop-blur-sm border border-white/15">
+        {encouragement || 'Nice take'}
       </div>
     )
   }
 
   return (
-    <div className="rounded-2xl border border-emerald-400/25 bg-emerald-950/50 backdrop-blur px-4 py-3 space-y-3">
-      <div>
-        <p className="text-[11px] uppercase tracking-wide text-emerald-200/70">Your groove this take</p>
-        <p className="mt-1 text-3xl font-semibold text-white tabular-nums">{landed}</p>
-        <p className="text-sm text-emerald-100/90">on-beat moments</p>
-      </div>
-      {encouragement ? (
-        <p className="text-sm leading-snug text-emerald-50/95">{encouragement}</p>
-      ) : null}
-      <div className="flex flex-wrap gap-3 text-xs text-emerald-100/85">
-        {stats.perfect > 0 ? (
-          <span><span className="font-semibold text-white">{stats.perfect}</span> locked in</span>
-        ) : null}
-        {stats.good > 0 ? (
-          <span><span className="font-semibold text-white">{stats.good}</span> close (still counts)</span>
-        ) : null}
-        {stats.maxStreak > 1 ? (
-          <span>Best streak <span className="font-semibold text-white">{stats.maxStreak}</span></span>
-        ) : null}
-      </div>
-      {meta.bpm ? (
-        <p className="text-[11px] text-emerald-200/50">{meta.bpm} BPM · {meta.beats_per_bar || 4}/4</p>
+    <div className="rounded-2xl border border-white/15 bg-white/8 backdrop-blur-sm px-4 py-4 space-y-2">
+      <p className="text-[11px] uppercase tracking-wide text-white/45">After this take</p>
+      <p className="text-base leading-relaxed text-white/90">{encouragement}</p>
+      {landed > 0 ? (
+        <p className="text-xs text-white/50">You met the beat {landed} {landed === 1 ? 'time' : 'times'}. Every one counts.</p>
       ) : null}
     </div>
   )
