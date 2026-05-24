@@ -20,7 +20,7 @@ export const useSessionDetailActions = ({
     if (practiceSeries) {
       return { view: 'skill', sessionId: null, seriesName: practiceSeries }
     }
-    return { view: 'today', sessionId: null, seriesName: '' }
+    return { view: 'progress', sessionId: null, seriesName: '' }
   }, [])
 
   const openSession = useCallback((session, returnRoute = { view, sessionId: null, seriesName: routeSeriesName }) => {
@@ -31,7 +31,7 @@ export const useSessionDetailActions = ({
   }, [openSessionById, routeSeriesName, setDetailReturnRoute, setOpenRecorderOnUpload, view])
 
   const goBack = useCallback(() => {
-    const fallback = { view: 'today', sessionId: null, seriesName: '' }
+    const fallback = { view: 'progress', sessionId: null, seriesName: '' }
     const route = detailReturnRoute?.view
       ? detailReturnRoute
       : fallback

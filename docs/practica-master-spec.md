@@ -62,7 +62,7 @@ That wedge is narrow on purpose. It is easier to explain, recruit, and charge fo
 - optional skill or habit tags per proof
 - session detail and metadata editing
 - progress summaries from completed proof events
-- Today / Record / Progress navigation
+- Record / Progress navigation
 - private authenticated legacy review flows where already shipped
 
 ### Out of scope today
@@ -126,7 +126,7 @@ The current product does **not** require AI or ML to work or to generate revenue
 The current delivery state is still `Now`, with the biggest risks centered on:
 
 - friction inside the proof loop
-- clarity of the Today / Record / Progress surfaces
+- clarity of the Record / Progress surfaces
 - consistency and reliability
 - measurement of the habit loop
 
@@ -139,7 +139,7 @@ Current shipped baseline:
 
 Current gaps:
 
-- Today / Record / Progress surfaces are still being aligned
+- Record / Progress surfaces are still being aligned
 - game-like progress needs clearer framing
 - billing and monetization do not exist yet
 - mobile native app does not exist
@@ -185,7 +185,7 @@ Preferred language:
 - member
 - skill
 - proof
-- today
+- daily proof
 - progress
 - private archive
 
