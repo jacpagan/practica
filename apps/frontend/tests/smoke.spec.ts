@@ -275,6 +275,72 @@ test('Record route shows camera and microphone selectors for signed-in members',
   await expect(micSelect).toContainText('Built-in Microphone')
 })
 
+test('Recording starts and saves a take when the metronome is on', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('token', 'smoke-token')
+
+    const originalFetch = window.fetch.bind(window)
+    window.fetch = async (input, init) => {
+      const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input)
+      if (url.includes('/api/auth/me/')) {
+        return new Response(JSON.stringify({ id: 1, username: 'smoke_member', display_name: 'Smoke Member' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url.includes('/api/sessions/') || url.includes('/api/review-requests/')) {
+        return new Response(JSON.stringify([]), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      return originalFetch(input, init)
+    }
+
+    const mediaDevices = navigator.mediaDevices
+    if (!mediaDevices) return
+    mediaDevices.enumerateDevices = async () => ([
+      { deviceId: 'video-device-1', kind: 'videoinput', label: 'Built-in Camera', groupId: 'g1', toJSON() { return this } },
+      { deviceId: 'audio-device-1', kind: 'audioinput', label: 'Built-in Microphone', groupId: 'g2', toJSON() { return this } },
+    ])
+    mediaDevices.getUserMedia = async () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 640
+      canvas.height = 360
+      const ctx = canvas.getContext('2d')
+      ctx.fillStyle = '#111827'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      return canvas.captureStream(15)
+    }
+
+  })
+
+  await page.goto('/record')
+  await expect(page.getByText('Camera ready')).toBeVisible({ timeout: 10000 })
+
+  await page.getByRole('button', { name: /Options/i }).click()
+  await page.getByRole('button', { name: /Turn on/i }).click()
+  await expect(page.getByText(/On · \d+ BPM/)).toBeVisible()
+
+  // Set a fast BPM so the count-in finishes quickly (4 beats at 200 BPM = 1.2s)
+  const bpmInput = page.locator('input[inputmode="numeric"][pattern="[0-9]*"]').first()
+  await bpmInput.fill('200')
+  await bpmInput.press('Enter')
+
+  await page.getByRole('button', { name: /Options/i }).click()
+
+  // Tap the big red record button
+  const recordButton = page.locator('button.bg-red-500.w-20').first()
+  await recordButton.click()
+
+  // Count-in shows "Starting in N", then disappears
+  await expect(page.getByText(/Starting in/)).toBeVisible({ timeout: 2000 })
+
+  // RECORDING state begins. This is the assertion that catches the original
+  // bug: when startActualRecording threw a ReferenceError (setTimingLiveStats
+  // referenced after its state was removed), the count-in finished but the
+  // recorder.start() call never executed and the timer chip never appeared.
+  await expect(page.getByText(/Recording · 0:0/)).toBeVisible({ timeout: 5000 })
+
+  // Record a couple of seconds, confirm timer advances (proves the recording
+  // loop is actually running, not just a one-shot state flip).
+  await expect(page.getByText(/Recording · 0:02/)).toBeVisible({ timeout: 4000 })
+})
+
 test('Record route falls back when selected camera fails', async ({ browser }) => {
   const context = await browser.newContext()
   const page = await context.newPage()
