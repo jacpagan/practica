@@ -269,8 +269,10 @@ test('Record route shows camera and microphone selectors for signed-in members',
   await page.getByRole('button', { name: /Options/i }).click()
   await expect(page.locator('text=Camera input').first()).toBeVisible()
   await expect(page.locator('text=Microphone input').first()).toBeVisible()
-  await expect(page.locator('select').nth(0)).toContainText('Built-in Camera')
-  await expect(page.locator('select').nth(1)).toContainText('Built-in Microphone')
+  const cameraSelect = page.locator('label:has-text("Camera input") + select').first()
+  const micSelect = page.locator('label:has-text("Microphone input") + select').first()
+  await expect(cameraSelect).toContainText('Built-in Camera')
+  await expect(micSelect).toContainText('Built-in Microphone')
 })
 
 test('Record route falls back when selected camera fails', async ({ browser }) => {
