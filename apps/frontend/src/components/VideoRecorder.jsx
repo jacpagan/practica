@@ -102,6 +102,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   const hitsRef = useRef([])
   const lastMatchedBeatRef = useRef(-1)
   const timingSnapshotRef = useRef(null)
+  const lastClickAtRef = useRef(null)
   const countInIntervalRef = useRef(null)
   const countInTimeoutRef = useRef(null)
   const blobUrlRef = useRef(null)
@@ -248,6 +249,8 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
 
   const stopMetronome = useCallback(() => {
     beatClockRef.current?.stop()
+    lastClickAtRef.current = null
+    lastMatchedBeatRef.current = -1
     setIsMetronomeRunning(false)
   }, [])
 
@@ -639,6 +642,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     recordDelay.connect(destination)
     oscillator.start(startTime)
     oscillator.stop(startTime + 0.055)
+    lastClickAtRef.current = { audioTime: startTime, gain: base * mult }
   }, [metronomeRecordDelaySeconds, clickGain])
 
   const getBeatPhase = useCallback(() => {
@@ -667,28 +671,43 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     try { onRecorded?.(file, previewUrl, timingMetadata) } catch {}
   }, [buildRecordedTimingMetadata, onRecorded])
 
-  const handleDetectedOnset = useCallback((onset, audioContext) => {
-    const recordEpoch = beatClockRef.current?.getRecordEpoch?.()
-    if (recordEpoch == null || !timingFeedbackEnabled) return
+  const handleDetectedOnset = useCallback((onset) => {
+    if (!timingFeedbackEnabled) return
+    const beatClock = beatClockRef.current
+    if (!beatClock) return
+
+    const recordEpoch = beatClock.getRecordEpoch?.()
+    const epoch = recordEpoch ?? beatClock.getEpoch?.()
+    if (epoch == null) return
+
+    const lastClick = lastClickAtRef.current
+    if (lastClick && lastClick.gain > 0.02) {
+      const secondsSinceClick = onset.onsetTime - lastClick.audioTime
+      if (secondsSinceClick >= 0 && secondsSinceClick <= 0.05) {
+        return
+      }
+    }
 
     const match = matchOnsetToBeat({
       onsetTime: onset.onsetTime,
-      epoch: recordEpoch,
-      period: beatClockRef.current.getPeriod(),
+      epoch,
+      period: beatClock.getPeriod(),
       beatsPerBar,
     })
     if (!match) return
     if (match.beatIndex === lastMatchedBeatRef.current) return
 
     lastMatchedBeatRef.current = match.beatIndex
-    const t = onset.onsetTime - recordEpoch
-    hitsRef.current.push({
-      t,
-      deltaMs: match.deltaMs,
-      tier: match.tier,
-      beatIndex: match.beatIndex,
-      beatInBar: match.beatInBar,
-    })
+    if (recordEpoch != null) {
+      const t = onset.onsetTime - recordEpoch
+      hitsRef.current.push({
+        t,
+        deltaMs: match.deltaMs,
+        tier: match.tier,
+        beatIndex: match.beatIndex,
+        beatInBar: match.beatInBar,
+      })
+    }
     setHitFlash({ ...match, at: performance.now() })
   }, [beatsPerBar, timingFeedbackEnabled])
 
@@ -712,11 +731,11 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
         && analyser
         && metronomeEnabled
         && timingFeedbackEnabled
-        && state === STATES.RECORDING
+        && (state === STATES.RECORDING || state === STATES.PREVIEWING)
         && onsetDetectorRef.current
       ) {
         const onset = onsetDetectorRef.current.tick(audioContext.currentTime)
-        if (onset) handleDetectedOnset(onset, audioContext)
+        if (onset) handleDetectedOnset(onset)
       }
 
       timingRafRef.current = requestAnimationFrame(loop)
@@ -731,6 +750,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     if (!audioContext) return
 
     stopMetronome()
+    onsetDetectorRef.current?.reset?.()
     beatClockRef.current.configure({ bpm, beatsPerBar })
     beatClockRef.current.start(audioContext.currentTime + 0.02)
     setIsMetronomeRunning(true)
@@ -1322,8 +1342,8 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
               hitFlash={timingFeedbackEnabled ? hitFlash : null}
               beatTick={beatTickFlash}
               beatsPerBar={beatsPerBar}
-              showProximity={timingFeedbackEnabled && isRecording}
-              large={isRecording}
+              bpm={bpm}
+              showProximity={timingFeedbackEnabled && !isRecording}
             />
 
             {isRecording ? (
