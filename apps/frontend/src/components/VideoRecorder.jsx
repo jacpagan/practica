@@ -6,8 +6,20 @@ import { createBeatClock } from '../metronome/beatClock'
 import { createOnsetDetector } from '../metronome/onsetDetector'
 import { matchOnsetToBeat } from '../metronome/matchHit'
 import { buildTimingMetadata } from '../metronome/timingMetadata'
-import { clampBpm as clampBpmValue, MIN_BPM, MAX_BPM, ONSET_ANALYSER_FFT } from '../metronome/constants'
-import { estimateTapLatencyMs } from '../metronome/tapLatency'
+import {
+  clampBpm as clampBpmValue,
+  MIN_BPM,
+  MAX_BPM,
+  ONSET_ANALYSER_FFT,
+  SPEAKER_CLICK_BLEED_MS,
+} from '../metronome/constants'
+import { estimateTapLatencyMs, screenTapLatencyMs } from '../metronome/tapLatency'
+import {
+  readSpeakerPractice,
+  readTimingInputMode,
+  SPEAKER_PRACTICE_STORAGE_KEY,
+  TIMING_INPUT_STORAGE_KEY,
+} from '../metronome/timingInput'
 
 const STATES = {
   IDLE: 'idle',
@@ -70,6 +82,8 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     return 1
   })
   const [timingFeedbackEnabled, setTimingFeedbackEnabled] = useState(true)
+  const [timingInputMode, setTimingInputMode] = useState(readTimingInputMode)
+  const [speakerPractice, setSpeakerPractice] = useState(readSpeakerPractice)
   const [hitFlash, setHitFlash] = useState(null)
   const [beatTickFlash, setBeatTickFlash] = useState(null)
   const [showPipControls, setShowPipControls] = useState(false)
@@ -297,6 +311,14 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   useEffect(() => {
     try { window.localStorage.setItem(CLICK_GAIN_STORAGE_KEY, String(clickGain)) } catch {}
   }, [clickGain])
+
+  useEffect(() => {
+    try { window.localStorage.setItem(TIMING_INPUT_STORAGE_KEY, timingInputMode) } catch {}
+  }, [timingInputMode])
+
+  useEffect(() => {
+    try { window.localStorage.setItem(SPEAKER_PRACTICE_STORAGE_KEY, speakerPractice ? '1' : '0') } catch {}
+  }, [speakerPractice])
 
   // Attach stream to video element whenever the ref or stream changes
   const attachStream = useCallback(() => {
@@ -629,6 +651,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
 
     const startTime = Number.isFinite(Number(scheduledTime)) ? Number(scheduledTime) : audioContext.currentTime
     const mult = Math.max(0, Math.min(2, Number(clickGain) || 0))
+    const monitorMult = speakerPractice ? Math.min(mult, 0.4) : mult
     const recordDelay = audioContext.createDelay(1)
     recordDelay.delayTime.value = metronomeRecordDelaySeconds()
     recordDelay.connect(destination)
@@ -640,7 +663,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     oscillator.type = 'square'
     oscillator.frequency.value = isAccent ? 1568 : 988
     const base = isAccent ? 0.18 : 0.11
-    gain.gain.setValueAtTime(base * mult, startTime)
+    gain.gain.setValueAtTime(base * monitorMult, startTime)
     gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.05)
     oscillator.connect(gain)
     gain.connect(audioContext.destination)
@@ -656,7 +679,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       const tailGain = audioContext.createGain()
       tail.type = 'triangle'
       tail.frequency.value = 784
-      tailGain.gain.setValueAtTime(0.12 * mult, startTime)
+      tailGain.gain.setValueAtTime(0.12 * monitorMult, startTime)
       tailGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.11)
       tail.connect(tailGain)
       tailGain.connect(audioContext.destination)
@@ -665,8 +688,8 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       tail.stop(startTime + 0.12)
     }
 
-    lastClickAtRef.current = { audioTime: startTime, gain: base * mult }
-  }, [metronomeRecordDelaySeconds, clickGain])
+    lastClickAtRef.current = { audioTime: startTime, gain: base * monitorMult }
+  }, [metronomeRecordDelaySeconds, clickGain, speakerPractice])
 
   const getBeatPhase = useCallback(() => {
     const ctx = audioContextRef.current
@@ -694,7 +717,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     try { onRecorded?.(file, previewUrl, timingMetadata) } catch {}
   }, [buildRecordedTimingMetadata, onRecorded])
 
-  const handleDetectedOnset = useCallback((onset) => {
+  const handleTimingHit = useCallback((hit) => {
     if (!timingFeedbackEnabled) return
     const beatClock = beatClockRef.current
     if (!beatClock) return
@@ -703,25 +726,26 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     const epoch = beatClock.getEpoch?.()
     if (epoch == null) return
 
+    const source = hit.source === 'screen' ? 'screen' : 'mic'
     const lastClick = lastClickAtRef.current
-    if (lastClick && lastClick.gain > 0.02) {
-      const secondsSinceClick = onset.onsetTime - lastClick.audioTime
-      // Suppress baked-in click bleed only — intentional on-beat claps are louder.
-      if (
-        secondsSinceClick >= 0
-        && secondsSinceClick <= 0.04
-        && onset.strength < Math.max(0.1, lastClick.gain * 1.8)
-      ) {
-        return
+    if (source === 'mic' && lastClick && lastClick.gain > 0.02) {
+      const msSinceClick = (hit.onsetTime - lastClick.audioTime) * 1000
+      const bleedMs = speakerPractice ? SPEAKER_CLICK_BLEED_MS : 45
+      if (msSinceClick >= 0 && msSinceClick <= bleedMs) {
+        if (speakerPractice || hit.strength < Math.max(0.1, lastClick.gain * 1.8)) {
+          return
+        }
       }
     }
 
     const audioContext = audioContextRef.current
     const analyser = analyserRef.current
-    const latencyCompensationMs = estimateTapLatencyMs(audioContext, analyser?.fftSize)
+    const latencyCompensationMs = source === 'screen'
+      ? screenTapLatencyMs()
+      : estimateTapLatencyMs(audioContext, analyser?.fftSize, { speakerPractice })
 
     const match = matchOnsetToBeat({
-      onsetTime: onset.onsetTime,
+      onsetTime: hit.onsetTime,
       epoch,
       period: beatClock.getPeriod(),
       beatsPerBar,
@@ -732,7 +756,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
 
     lastMatchedBeatRef.current = match.beatIndex
     if (recordEpoch != null) {
-      const t = onset.onsetTime - recordEpoch
+      const t = hit.onsetTime - recordEpoch
       hitsRef.current.push({
         t,
         deltaMs: match.deltaMs,
@@ -742,7 +766,17 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       })
     }
     setHitFlash({ ...match, at: performance.now() })
-  }, [beatsPerBar, timingFeedbackEnabled])
+  }, [beatsPerBar, speakerPractice, timingFeedbackEnabled])
+
+  const handleScreenHit = useCallback(() => {
+    const audioContext = audioContextRef.current
+    if (!audioContext) return
+    handleTimingHit({ onsetTime: audioContext.currentTime, strength: 1, source: 'screen' })
+  }, [handleTimingHit])
+
+  const handleDetectedOnset = useCallback((onset) => {
+    handleTimingHit({ ...onset, source: 'mic' })
+  }, [handleTimingHit])
 
   const startTimingLoop = useCallback(() => {
     if (timingRafRef.current) return
@@ -759,8 +793,10 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
         })
       }
 
+      const micTimingActive = timingInputMode === 'mic' || timingInputMode === 'both'
       if (
-        audioContext
+        micTimingActive
+        && audioContext
         && analyser
         && metronomeEnabled
         && timingFeedbackEnabled
@@ -774,7 +810,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       timingRafRef.current = requestAnimationFrame(loop)
     }
     timingRafRef.current = requestAnimationFrame(loop)
-  }, [handleDetectedOnset, metronomeEnabled, playTickAt, state, timingFeedbackEnabled])
+  }, [handleDetectedOnset, metronomeEnabled, playTickAt, state, timingFeedbackEnabled, timingInputMode])
 
   const startMetronome = useCallback(async () => {
     if (!streamRef.current) return
@@ -1381,6 +1417,12 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
               bpm={bpm}
               countInRemaining={countInRemaining}
               isRecording={isRecording}
+              screenTapEnabled={
+                timingFeedbackEnabled
+                && (timingInputMode === 'screen' || timingInputMode === 'both')
+                && (state === STATES.RECORDING || state === STATES.PREVIEWING)
+              }
+              onScreenHit={handleScreenHit}
             />
 
             {isRecording ? (
@@ -1547,8 +1589,8 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
 
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-[11px] uppercase tracking-wide text-white/60">Clap feedback</p>
-                        <p className="text-[11px] text-white/55">Show where your tap lands on the rail.</p>
+                        <p className="text-[11px] uppercase tracking-wide text-white/60">Beat feedback</p>
+                        <p className="text-[11px] text-white/55">Show where your hit lands on the rail.</p>
                       </div>
                       <button
                         type="button"
@@ -1556,6 +1598,36 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                         className={`rounded-xl px-3 py-1.5 text-xs transition-colors ${timingFeedbackEnabled ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
                       >
                         {timingFeedbackEnabled ? 'On' : 'Off'}
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-[11px] uppercase tracking-wide text-white/60">How to register hits</p>
+                      <select
+                        value={timingInputMode}
+                        onChange={(e) => setTimingInputMode(e.target.value)}
+                        className="w-full bg-white/10 text-white text-sm rounded-lg px-2 py-2 border border-white/10"
+                      >
+                        <option value="both" className="text-gray-900">Screen tap + microphone (recommended on phone)</option>
+                        <option value="screen" className="text-gray-900">Screen tap only (most accurate)</option>
+                        <option value="mic" className="text-gray-900">Microphone only (drums / claps)</option>
+                      </select>
+                      <p className="text-[11px] text-white/55 leading-relaxed">
+                        Tap the beat rail with your finger when each note hits the white line. The mic listens for loud transients (stick hits, claps) and is easy to confuse with the metronome click from your phone speaker.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-white/60">Phone speaker mode</p>
+                        <p className="text-[11px] text-white/55">No headphones — metronome plays on speaker.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSpeakerPractice((current) => !current)}
+                        className={`rounded-xl px-3 py-1.5 text-xs transition-colors ${speakerPractice ? 'bg-amber-500 text-white' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
+                      >
+                        {speakerPractice ? 'On' : 'Off'}
                       </button>
                     </div>
 
@@ -1585,7 +1657,9 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                       </div>
                     </details>
 
-                    <p className="text-[11px] text-white/55">Headphones recommended so the mic hears your tap, not the click.</p>
+                    <p className="text-[11px] text-white/55 leading-relaxed">
+                      Without headphones, use <span className="text-white/75">screen tap</span> on the rail or turn on phone speaker mode. Image recognition is not used — timing comes from audio or your touch, matched to the same clock as the scrolling notes.
+                    </p>
                   </div>
 
                   {/* ── Mic level / gain ── */}

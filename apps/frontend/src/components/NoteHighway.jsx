@@ -82,6 +82,8 @@ export default function NoteHighway({
   countInRemaining,
   isRecording,
   hapticEnabled = true,
+  onScreenHit,
+  screenTapEnabled = false,
 }) {
   const stripRef = useRef(null)
   const notesContainerRef = useRef(null)
@@ -218,9 +220,22 @@ export default function NoteHighway({
     tickFlash ? 'border-white/60 shadow-[0_0_30px_rgba(255,255,255,0.18)]' : 'border-white/12'
   }`
 
+  const handlePointerDown = (event) => {
+    if (!screenTapEnabled || typeof onScreenHit !== 'function') return
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    event.preventDefault()
+    onScreenHit()
+  }
+
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[15] flex flex-col items-center gap-2 px-3 pb-[max(5.75rem,env(safe-area-inset-bottom))]">
-      <div ref={stripRef} className={stripClass}>
+      <div
+        ref={stripRef}
+        className={`${stripClass} ${screenTapEnabled ? 'pointer-events-auto touch-manipulation cursor-pointer' : ''}`}
+        onPointerDown={screenTapEnabled ? handlePointerDown : undefined}
+        role={screenTapEnabled ? 'button' : undefined}
+        aria-label={screenTapEnabled ? 'Tap on the beat when the note hits the line' : undefined}
+      >
         {/* Soft tolerance zones around the hit zone */}
         <div
           className="absolute top-0 bottom-0 bg-emerald-400/8"
@@ -263,7 +278,9 @@ export default function NoteHighway({
         <CountInBadge countInRemaining={countInRemaining} beatsPerBar={beatsPerBar} />
 
         {/* Corner labels (subtle) */}
-        <span className="absolute left-3 top-2 text-[9px] uppercase tracking-[0.18em] text-white/35">tap when on the line</span>
+        <span className="absolute left-3 top-2 text-[9px] uppercase tracking-[0.18em] text-white/35">
+          {screenTapEnabled ? 'tap the rail on the line' : 'tap when on the line'}
+        </span>
         {bpm ? (
           <span className="absolute right-3 bottom-2 text-[9px] uppercase tracking-[0.18em] text-white/45 tabular-nums">
             {bpm} BPM
