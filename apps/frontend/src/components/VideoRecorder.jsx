@@ -5,8 +5,6 @@ import { createBeatClock } from '../metronome/beatClock'
 import { createOnsetDetector } from '../metronome/onsetDetector'
 import { matchOnsetToBeat } from '../metronome/matchHit'
 import { buildTimingMetadata } from '../metronome/timingMetadata'
-import { computeTimingStats } from '../metronome/timingScore'
-import TimingScoreSummary from './TimingScoreSummary'
 import { clampBpm as clampBpmValue, MIN_BPM, MAX_BPM } from '../metronome/constants'
 
 const STATES = {
@@ -73,7 +71,6 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   const [timingFeedbackEnabled, setTimingFeedbackEnabled] = useState(true)
   const [hitFlash, setHitFlash] = useState(null)
   const [beatTickFlash, setBeatTickFlash] = useState(null)
-  const [timingLiveStats, setTimingLiveStats] = useState(null)
   const [showPipControls, setShowPipControls] = useState(false)
   const [musicMode, setMusicMode] = useState(true)
   const [micGain, setMicGain] = useState(1)
@@ -692,13 +689,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       beatIndex: match.beatIndex,
       beatInBar: match.beatInBar,
     })
-    setTimingLiveStats(computeTimingStats(hitsRef.current))
-    if (match.tier === 'perfect' || match.tier === 'good') {
-      setHitFlash({ ...match, at: performance.now() })
-      window.setTimeout(() => {
-        setHitFlash((current) => (current?.beatIndex === match.beatIndex ? null : current))
-      }, 520)
-    }
+    setHitFlash({ ...match, at: performance.now() })
   }, [beatsPerBar, timingFeedbackEnabled])
 
   const startTimingLoop = useCallback(() => {
@@ -1331,10 +1322,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
               hitFlash={timingFeedbackEnabled ? hitFlash : null}
               beatTick={beatTickFlash}
               beatsPerBar={beatsPerBar}
-              liveStats={timingLiveStats}
-              showProximity={timingFeedbackEnabled}
-              showLiveScore={timingFeedbackEnabled && isRecording}
-              compactTop={isRecording}
+              showProximity={timingFeedbackEnabled && isRecording}
               large={isRecording}
             />
 
@@ -1345,7 +1333,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                 </div>
                 {metronomeEnabled ? (
                   <div className="rounded-full bg-black/50 px-3 py-1.5 text-xs text-white/90 backdrop-blur">
-                    {bpm} BPM{timingFeedbackEnabled ? ' · soft cheers on' : ''}
+                    {bpm} BPM
                   </div>
                 ) : null}
               </div>
@@ -1808,9 +1796,6 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
               <p className="text-sm font-medium text-white">Recording ready</p>
               <p className="text-xs text-white/50 mt-1">{fmtTimer(elapsed)} · {(recordedFile.size / 1024 / 1024).toFixed(1)} MB</p>
             </div>
-            {timingSnapshotRef.current ? (
-              <TimingScoreSummary timingMetadata={timingSnapshotRef.current} />
-            ) : null}
             <div className="flex items-center gap-2">
               <button onClick={handleReRecord}
                 className="flex-1 text-sm text-white/70 hover:text-white px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all">
