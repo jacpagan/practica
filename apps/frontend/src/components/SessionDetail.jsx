@@ -26,14 +26,18 @@ function SessionDetail({
   const toast = useToast()
   const confirm = useConfirm()
   const videoRef = useRef(null)
+  const playerRef = useRef(null)
+  const detailsRef = useRef(null)
   const [session, setSession] = useState(initialSession)
   const swipeRef = useRef(null)
+  const pagerFinishTimerRef = useRef(null)
   const railWheelRef = useRef(0)
   const transitionStartTimerRef = useRef(null)
   const transitionFinishTimerRef = useRef(null)
   const threadNavigationRef = useRef(null)
   const threadTransitionRef = useRef(null)
   const [threadTransition, setThreadTransition] = useState(null)
+  const [pagerDrag, setPagerDrag] = useState({ active: false, animating: false, offsetY: 0 })
   const authHeaders = useMemo(() => (token ? { Authorization: `Token ${token}` } : {}), [token])
   const canEdit = Boolean(session?.can_edit)
   const returnRouteView = String(returnRoute?.view || '').trim()
@@ -192,6 +196,102 @@ function SessionDetail({
     openThreadSession(targetSession)
   }
 
+  const playerHeight = () => {
+    const height = playerRef.current?.clientHeight || window.innerHeight || 1
+    return Math.max(1, height)
+  }
+
+  const completePagerNavigation = (targetSession, direction) => {
+    if (!targetSession?.id) return
+    if (pagerFinishTimerRef.current) window.clearTimeout(pagerFinishTimerRef.current)
+    const finalOffset = direction === 'next' ? -playerHeight() : playerHeight()
+    setPagerDrag({ active: true, animating: true, offsetY: finalOffset })
+    pagerFinishTimerRef.current = window.setTimeout(() => {
+      setPagerDrag({ active: false, animating: false, offsetY: 0 })
+      onOpenSession?.(targetSession, returnRoute || { view: 'progress', sessionId: null, seriesName: '' })
+    }, THREAD_SLIDE_TRANSITION_MS)
+  }
+
+  const resetPagerDrag = () => {
+    if (pagerFinishTimerRef.current) window.clearTimeout(pagerFinishTimerRef.current)
+    setPagerDrag({ active: true, animating: true, offsetY: 0 })
+    pagerFinishTimerRef.current = window.setTimeout(() => {
+      setPagerDrag({ active: false, animating: false, offsetY: 0 })
+    }, THREAD_SLIDE_TRANSITION_MS)
+  }
+
+  const beginPlayerDrag = (clientX, clientY) => {
+    if (!hasThreadNavigation || threadTransitionRef.current) return
+    swipeRef.current = { x: clientX, y: clientY, player: true }
+    setPagerDrag({ active: true, animating: false, offsetY: 0 })
+  }
+
+  const updatePlayerDrag = (clientX, clientY) => {
+    const start = swipeRef.current
+    if (!start?.player || !hasThreadNavigation) return
+    const deltaX = clientX - start.x
+    const deltaY = clientY - start.y
+    if (Math.abs(deltaX) > Math.abs(deltaY) * 1.2) return
+    let offsetY = deltaY
+    if ((offsetY < 0 && !threadNavigation.next) || (offsetY > 0 && !threadNavigation.previous)) {
+      offsetY *= 0.22
+    }
+    const limit = playerHeight() * 0.92
+    offsetY = Math.max(-limit, Math.min(limit, offsetY))
+    setPagerDrag({ active: true, animating: false, offsetY })
+  }
+
+  const finishPlayerDrag = () => {
+    const start = swipeRef.current
+    swipeRef.current = null
+    if (!start?.player || !hasThreadNavigation) return
+    const offsetY = pagerDrag.offsetY
+    const threshold = Math.min(140, playerHeight() * 0.22)
+    if (offsetY <= -threshold && threadNavigation.next) {
+      completePagerNavigation(threadNavigation.next, 'next')
+      return
+    }
+    if (offsetY >= threshold && threadNavigation.previous) {
+      completePagerNavigation(threadNavigation.previous, 'previous')
+      return
+    }
+    resetPagerDrag()
+  }
+
+  const handlePlayerTouchStart = (event) => {
+    const touch = event.touches?.[0]
+    if (!touch) return
+    beginPlayerDrag(touch.clientX, touch.clientY)
+  }
+
+  const handlePlayerTouchMove = (event) => {
+    const touch = event.touches?.[0]
+    if (!touch) return
+    updatePlayerDrag(touch.clientX, touch.clientY)
+  }
+
+  const handlePlayerTouchEnd = () => finishPlayerDrag()
+
+  const handlePlayerPointerDown = (event) => {
+    if (event.pointerType === 'touch') return
+    beginPlayerDrag(event.clientX, event.clientY)
+  }
+
+  const handlePlayerPointerMove = (event) => {
+    if (event.pointerType === 'touch') return
+    updatePlayerDrag(event.clientX, event.clientY)
+  }
+
+  const handlePlayerPointerUp = (event) => {
+    if (event.pointerType === 'touch') return
+    finishPlayerDrag()
+  }
+
+  const handleOpenDetails = (event) => {
+    event.stopPropagation()
+    detailsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+  }
+
   const handleSwipeStart = (event) => {
     const touch = event.touches?.[0]
     if (!touch) return
@@ -312,6 +412,7 @@ function SessionDetail({
   }, [initialSession])
 
   useEffect(() => () => {
+    if (pagerFinishTimerRef.current) window.clearTimeout(pagerFinishTimerRef.current)
     if (transitionStartTimerRef.current) window.clearTimeout(transitionStartTimerRef.current)
     if (transitionFinishTimerRef.current) window.clearTimeout(transitionFinishTimerRef.current)
     stopRailMouseTracking()
@@ -348,6 +449,41 @@ function SessionDetail({
   const targetSlideClass = threadTransition?.active
     ? 'translate-y-0'
     : (threadTransition?.direction === 'next' ? 'translate-y-full' : '-translate-y-full')
+  const pagerActive = pagerDrag.active || pagerDrag.animating
+  const pagerTransitionClass = pagerDrag.animating ? 'transition-transform duration-300 ease-out' : ''
+  const previousPagerSources = threadNavigation.previous
+    ? sessionVideoSources(threadNavigation.previous, threadNavigation.previous?.local_preview_url || '')
+    : []
+  const nextPagerSources = threadNavigation.next
+    ? sessionVideoSources(threadNavigation.next, threadNavigation.next?.local_preview_url || '')
+    : []
+  const previousPagerUrl = previousPagerSources[0] || null
+  const nextPagerUrl = nextPagerSources[0] || null
+  const pagerCardStyle = (slot) => ({
+    transform: `translateY(calc(${slot * 100}% + ${pagerDrag.offsetY}px))`,
+  })
+  const renderPagerCard = (item, url, label, slot) => {
+    if (!item && slot !== 0) return null
+    return (
+      <div
+        className={`absolute inset-0 ${pagerTransitionClass}`}
+        style={pagerCardStyle(slot)}
+      >
+        {url ? (
+          <video src={url} muted playsInline className="h-full w-full bg-black object-contain" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-black px-6 text-center text-sm text-white/70">
+            Video is still preparing for playback.
+          </div>
+        )}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-24 text-white">
+          <p className="text-xs uppercase tracking-[0.22em] text-white/60">{threadLabel}</p>
+          <p className="mt-1 text-lg font-semibold leading-tight">{item?.title || session?.title || 'Proof'}</p>
+          <p className="mt-1 text-xs text-white/70">{label}</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="sm:px-6 sm:py-4 sm:pb-28 sm:max-w-3xl sm:mx-auto">
@@ -363,7 +499,16 @@ function SessionDetail({
           Back
         </button>
         <div
-          className="relative h-[100dvh] sm:h-auto sm:aspect-video bg-black"
+          ref={playerRef}
+          className="relative h-[100dvh] cursor-grab overflow-hidden bg-black touch-none active:cursor-grabbing sm:h-auto sm:aspect-video"
+          onTouchStart={handlePlayerTouchStart}
+          onTouchMove={handlePlayerTouchMove}
+          onTouchEnd={handlePlayerTouchEnd}
+          onTouchCancel={handlePlayerTouchEnd}
+          onPointerDown={handlePlayerPointerDown}
+          onPointerMove={handlePlayerPointerMove}
+          onPointerUp={handlePlayerPointerUp}
+          onPointerCancel={handlePlayerPointerUp}
           onWheel={handlePlayerWheel}
         >
           {playableUrl && !playbackFailed ? (
@@ -375,6 +520,13 @@ function SessionDetail({
                 : 'Video is still preparing for playback.'}
             </div>
           )}
+          {pagerActive ? (
+            <div className="pointer-events-none absolute inset-0 z-50 overflow-hidden bg-black">
+              {renderPagerCard(threadNavigation.previous, previousPagerUrl, threadNavigation.index > 0 ? `Proof ${threadNavigation.index} of ${threadNavigation.items.length}` : '', -1)}
+              {renderPagerCard(session, playableUrl, threadPositionLabel, 0)}
+              {renderPagerCard(threadNavigation.next, nextPagerUrl, threadNavigation.index >= 0 ? `Proof ${threadNavigation.index + 2} of ${threadNavigation.items.length}` : '', 1)}
+            </div>
+          ) : null}
           {threadTransition ? (
             <div className="pointer-events-none absolute inset-0 z-40 overflow-hidden bg-black">
               <div className={`absolute inset-0 transform transition-transform duration-300 ease-out ${currentSlideClass}`}>
@@ -403,54 +555,53 @@ function SessionDetail({
           ) : null}
           {hasThreadNavigation ? (
             <>
-            <div
-              className="pointer-events-auto absolute right-3 sm:right-4 top-1/2 z-50 flex w-10 sm:w-11 -translate-y-1/2 flex-col items-center gap-2 rounded-full border border-white/40 bg-white/15 px-2 py-4 text-xs font-semibold text-white shadow-lg backdrop-blur touch-none"
-              onTouchStart={handleRailTouchStart}
-              onTouchEnd={handleRailTouchEnd}
-              onPointerDown={handleRailPointerDown}
-              onPointerMove={handleRailPointerMove}
-              onPointerUp={handleRailPointerUp}
-              onMouseDown={handleRailMouseDown}
-              onMouseMove={handleRailMouseMove}
-              onMouseUp={handleRailMouseUp}
-              onPointerCancel={() => { swipeRef.current = null }}
-              onWheel={handleRailWheel}
-              aria-label="Swipe rail: up for next proof, down for previous proof"
-            >
-              <span aria-hidden="true">↑</span>
-              <span className="h-14 w-1 rounded-full bg-white/70" aria-hidden="true" />
-              <span className="[writing-mode:vertical-rl] text-[9px] uppercase tracking-widest text-white/80" aria-hidden="true">Swipe</span>
-              <span aria-hidden="true">↓</span>
+            <div className="pointer-events-none absolute right-3 top-1/2 z-30 flex -translate-y-1/2 flex-col gap-1.5">
+              {threadNavigation.items.map((item, index) => (
+                <span
+                  key={item.id || index}
+                  className={`block rounded-full transition-all ${index === threadNavigation.index ? 'h-6 w-1.5 bg-white' : 'h-1.5 w-1.5 bg-white/35'}`}
+                />
+              ))}
             </div>
-            <div className="pointer-events-none absolute inset-x-0 bottom-[max(5.5rem,env(safe-area-inset-bottom))] sm:bottom-4 z-20 flex items-center justify-between px-3 sm:px-4">
+            <div className="pointer-events-none absolute inset-x-0 bottom-[max(1rem,env(safe-area-inset-bottom))] z-20 flex items-end justify-between gap-3 px-4 text-white">
+              <div className="max-w-[68%]">
+                <p className="text-xs uppercase tracking-[0.22em] text-white/55">{threadLabel}</p>
+                <p className="mt-1 text-lg font-semibold leading-tight drop-shadow">{session.title}</p>
+                <p className="mt-1 text-xs text-white/70">{threadPositionLabel} · Drag up/down</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleOpenDetails}
+                className="pointer-events-auto rounded-full border border-white/25 bg-white/15 px-3 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur transition-colors hover:bg-white/25"
+              >
+                Details
+              </button>
+            </div>
+            <div className="pointer-events-none absolute inset-x-0 top-1/2 z-20 hidden -translate-y-1/2 items-center justify-between px-3 opacity-0 transition-opacity hover:opacity-100 sm:flex">
               <button
                 type="button"
                 onClick={() => openThreadSession(threadNavigation.previous)}
                 disabled={!threadNavigation.previous}
-                className="pointer-events-auto rounded-full border border-white/25 bg-black/50 px-3 py-2 text-xs font-medium text-white/90 backdrop-blur disabled:opacity-30 disabled:cursor-not-allowed"
+                className="pointer-events-auto rounded-full border border-white/20 bg-black/30 px-3 py-2 text-xs font-medium text-white/85 backdrop-blur disabled:opacity-0 disabled:cursor-not-allowed"
                 aria-label="Open previous proof in this thread"
               >
-                ← Previous
+                ↑ Previous
               </button>
-              <div className="rounded-full bg-black/50 px-3 py-2 text-center text-[11px] font-medium text-white/80 backdrop-blur">
-                <span className="block max-w-[9rem] truncate">{threadLabel}</span>
-                <span className="block text-white/60">{threadPositionLabel}</span>
-              </div>
               <button
                 type="button"
                 onClick={() => openThreadSession(threadNavigation.next)}
                 disabled={!threadNavigation.next}
-                className="pointer-events-auto rounded-full border border-white/25 bg-black/50 px-3 py-2 text-xs font-medium text-white/90 backdrop-blur disabled:opacity-30 disabled:cursor-not-allowed"
+                className="pointer-events-auto rounded-full border border-white/20 bg-black/30 px-3 py-2 text-xs font-medium text-white/85 backdrop-blur disabled:opacity-0 disabled:cursor-not-allowed"
                 aria-label="Open next proof in this thread"
               >
-                Next →
+                Next ↓
               </button>
             </div>
             </>
           ) : null}
         </div>
 
-        <div className="p-4 sm:p-4 space-y-3 bg-white rounded-t-3xl sm:rounded-none -mt-8 sm:mt-0 relative z-30">
+        <div ref={detailsRef} className="p-4 sm:p-4 space-y-3 bg-white rounded-t-3xl sm:rounded-none -mt-8 sm:mt-0 relative z-30">
           {editing ? (
             <div className="space-y-4">
               <input
@@ -535,7 +686,7 @@ function SessionDetail({
                     <div className="min-w-0">
                       <p className="text-xs uppercase tracking-wide text-gray-500">{threadLabel}</p>
                       <p className="text-sm font-medium text-gray-900 mt-1">{threadPositionLabel}</p>
-                      <p className="text-xs text-gray-500 mt-1">Scroll for details. Use the right swipe rail or buttons to change videos.</p>
+                      <p className="text-xs text-gray-500 mt-1">Drag the video up or down to move through this thread.</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <button
