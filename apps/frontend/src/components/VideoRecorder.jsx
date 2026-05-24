@@ -67,12 +67,10 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     } catch {}
     return 1
   })
-  const [showTimingTools, setShowTimingTools] = useState(false)
   const [timingFeedbackEnabled, setTimingFeedbackEnabled] = useState(true)
   const [hitFlash, setHitFlash] = useState(null)
   const [beatTickFlash, setBeatTickFlash] = useState(null)
   const [showPipControls, setShowPipControls] = useState(false)
-  const [musicMode, setMusicMode] = useState(true)
   const [micGain, setMicGain] = useState(1)
   const [micLevel, setMicLevel] = useState(0)
   const [countInRemaining, setCountInRemaining] = useState(null)
@@ -316,14 +314,16 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   }, [])
 
   const getAudioConstraints = useCallback((audioInputId = selectedAudioInputId) => {
-    const constraints = musicMode
-      ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
-      : {}
+    const constraints = {
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
+    }
     if (audioInputId) {
       constraints.deviceId = { exact: audioInputId }
     }
-    return Object.keys(constraints).length ? constraints : true
-  }, [musicMode, selectedAudioInputId])
+    return constraints
+  }, [selectedAudioInputId])
 
   const getVideoConstraints = useCallback((size = 'default', videoInputId = selectedVideoInputId) => {
     const constraints = size === 'pip'
@@ -994,8 +994,6 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       beatClockRef.current?.setRecordAnchor?.(audioContextRef.current.currentTime)
     }
     setShowOptions(false)
-    setShowTimingTools(false)
-    setTimingLiveStats(null)
     setBeatTickFlash(null)
     setHitFlash(null)
 
@@ -1113,29 +1111,12 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     if (recorderRef.current?.state === 'recording') recorderRef.current.stop()
   }
 
-  // ── Music mode & mic controls ──
+  // ── Mic gain ──
   useEffect(() => {
     if (micGainNodeRef.current) {
       try { micGainNodeRef.current.gain.value = micGain } catch {}
     }
   }, [micGain])
-
-  const applyMicProcessing = useCallback(async (enabled) => {
-    // Try to flip browser DSP on the mic track without restarting streams
-    const track = camStreamRef.current?.getAudioTracks?.()[0]
-    if (!track || !track.applyConstraints) return
-    try {
-      await track.applyConstraints({
-        echoCancellation: !enabled,
-        noiseSuppression: !enabled,
-        autoGainControl: !enabled,
-      })
-    } catch {}
-  }, [])
-
-  useEffect(() => {
-    applyMicProcessing(Boolean(musicMode))
-  }, [applyMicProcessing, musicMode])
 
   useEffect(() => {
     if (error || warning) {
@@ -1455,112 +1436,26 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
               >
                 {showOptions ? (
                   <>
-                  <div className="grid grid-cols-1 gap-3">
-                    {renderVideoInputPicker('rounded-2xl bg-white/5 px-3 py-3')}
-                    {renderAudioInputPicker('rounded-2xl bg-white/5 px-3 py-3')}
-                  </div>
-
+                  {/* ── Metronome (primary) ── */}
                   <div className="rounded-2xl bg-white/5 px-3 py-3 space-y-3">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-[11px] uppercase tracking-wide text-white/60">Audio</p>
-                        <p className="text-sm text-white/85">{musicMode ? 'Music mode on' : 'Standard mode'}</p>
+                        <p className="text-[11px] uppercase tracking-wide text-white/60">Metronome</p>
+                        <p className="text-sm font-medium text-white">{metronomeEnabled ? `On · ${bpm} BPM · ${beatsPerBar}/4` : 'Off'}</p>
                       </div>
                       <button
                         type="button"
-                        onClick={() => setMusicMode((current) => !current)}
-                        title="Music mode (disables noise suppression/AGC/echo cancel)"
-                        className={`rounded-full px-3 py-1.5 text-xs transition-colors ${musicMode ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
+                        onClick={toggleMetronome}
+                        className={`rounded-xl px-4 py-2 text-sm transition-colors ${metronomeEnabled ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
                       >
-                        {musicMode ? 'Music' : 'Standard'}
+                        {metronomeEnabled ? 'Turn off' : 'Turn on'}
                       </button>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-[11px] text-white/55">
-                        <span>Mic level</span>
-                        <span>{Math.min(100, Math.round((micLevel * 3) * 100))}%</span>
-                      </div>
-                      <div title="Mic level" className="h-1.5 rounded bg-white/10 overflow-hidden">
-                        <div className="h-full bg-white/80" style={{ width: `${Math.min(100, Math.round((micLevel * 3) * 100))}%` }} />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-[11px] text-white/55">
-                        <span>Mic gain</span>
-                        <span>{Math.round(micGain * 100)}%</span>
-                      </div>
-                      <input
-                        title="Mic gain"
-                        type="range"
-                        min="0.5"
-                        max="2"
-                        step="0.01"
-                        value={micGain}
-                        onChange={(e) => setMicGain(Number(e.target.value))}
-                        className="w-full accent-white/90"
-                      />
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowOptions(true)
-                          setShowTimingTools((current) => !current)
-                        }}
-                        className={`rounded-full px-3 py-1.5 text-xs transition-colors ${showTimingTools ? 'bg-white text-gray-900' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
-                      >
-                        {showTimingTools ? 'Hide timing' : 'Timing & metronome'}
-                      </button>
-                      {mode === 'screen_cam' && (
-                        <button
-                          type="button"
-                          onClick={() => setShowPipControls((current) => !current)}
-                          className="rounded-full px-3 py-1.5 text-xs transition-colors bg-white/10 text-white/80 hover:bg-white/20"
-                        >
-                          {showPipControls ? 'Hide PiP' : 'PiP'}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                {showTimingTools ? (
-              <div className="space-y-3 border-t border-white/10 pt-3">
-                <div className="rounded-2xl bg-white/5 px-3 py-3 space-y-3">
-                    <div className="flex items-start justify-between gap-3 flex-wrap">
-                      <div className="min-w-0">
-                        <p className="text-[11px] uppercase tracking-wide text-white/60">Tempo</p>
-                        <p className="text-sm font-medium text-white">Dial in the click precisely on phone.</p>
-                      </div>
-                      <select
-                        value={beatsPerBar}
-                        onChange={(e) => setBeatsPerBar(Number(e.target.value))}
-                        className="bg-white/10 text-white text-sm rounded-lg px-2 py-2 border border-white/10"
-                      >
-                        {[2, 3, 4, 6].map((beats) => (
-                          <option key={beats} value={beats} className="text-gray-900">{beats}/4</option>
-                        ))}
-                      </select>
                     </div>
 
                     <div className="rounded-2xl border border-white/10 bg-black/10 px-3 py-3 space-y-3">
                       <div className="flex items-center justify-between gap-2">
-                        <button
-                          type="button"
-                          onClick={() => nudgeBpm(-5)}
-                          className="rounded-xl px-3 py-2 text-sm bg-white/10 text-white/80 hover:bg-white/20 transition-colors"
-                        >
-                          -5
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => nudgeBpm(-1)}
-                          className="rounded-xl px-3 py-2 text-sm bg-white/10 text-white/80 hover:bg-white/20 transition-colors"
-                        >
-                          -1
-                        </button>
+                        <button type="button" onClick={() => nudgeBpm(-5)} className="rounded-xl px-3 py-2 text-sm bg-white/10 text-white/80 hover:bg-white/20 transition-colors">-5</button>
+                        <button type="button" onClick={() => nudgeBpm(-1)} className="rounded-xl px-3 py-2 text-sm bg-white/10 text-white/80 hover:bg-white/20 transition-colors">-1</button>
                         <div className="flex-1 min-w-[128px] text-center">
                           <label className="block text-[11px] uppercase tracking-wide text-white/50">BPM</label>
                           <input
@@ -1578,21 +1473,19 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                             className="mt-1 w-full rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-center text-xl font-semibold text-white focus:outline-none focus:border-white/30"
                           />
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => nudgeBpm(1)}
-                          className="rounded-xl px-3 py-2 text-sm bg-white/10 text-white/80 hover:bg-white/20 transition-colors"
-                        >
-                          +1
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => nudgeBpm(5)}
-                          className="rounded-xl px-3 py-2 text-sm bg-white/10 text-white/80 hover:bg-white/20 transition-colors"
-                        >
-                          +5
-                        </button>
+                        <button type="button" onClick={() => nudgeBpm(1)} className="rounded-xl px-3 py-2 text-sm bg-white/10 text-white/80 hover:bg-white/20 transition-colors">+1</button>
+                        <button type="button" onClick={() => nudgeBpm(5)} className="rounded-xl px-3 py-2 text-sm bg-white/10 text-white/80 hover:bg-white/20 transition-colors">+5</button>
                       </div>
+
+                      <input
+                        type="range"
+                        min={String(MIN_BPM)}
+                        max={String(MAX_BPM)}
+                        step="1"
+                        value={bpm}
+                        onChange={(e) => updateBpm(e.target.value)}
+                        className="w-full"
+                      />
 
                       <div className="flex flex-wrap gap-2">
                         {BPM_PRESETS.map((preset) => (
@@ -1606,100 +1499,128 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                           </button>
                         ))}
                       </div>
+                    </div>
 
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between text-[11px] text-white/50">
-                          <span>Fine tune</span>
-                          <span>{bpm} BPM</span>
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="text-[11px] uppercase tracking-wide text-white/60">Time signature</label>
+                      <select
+                        value={beatsPerBar}
+                        onChange={(e) => setBeatsPerBar(Number(e.target.value))}
+                        className="bg-white/10 text-white text-sm rounded-lg px-2 py-2 border border-white/10"
+                      >
+                        {[2, 3, 4, 6].map((beats) => (
+                          <option key={beats} value={beats} className="text-gray-900">{beats}/4</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="text-[11px] uppercase tracking-wide text-white/60">Click volume</label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="range"
+                          min="0"
+                          max="2"
+                          step="0.01"
+                          value={clickGain}
+                          onChange={(e) => setClickGain(Number(e.target.value))}
+                          className="w-40"
+                          aria-label="Click volume"
+                        />
+                        <span className="text-xs text-white/70 w-10 text-right">{Math.round(clickGain * 100)}%</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-white/60">Clap feedback</p>
+                        <p className="text-[11px] text-white/55">Show where your tap lands on the rail.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setTimingFeedbackEnabled((current) => !current)}
+                        className={`rounded-xl px-3 py-1.5 text-xs transition-colors ${timingFeedbackEnabled ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
+                      >
+                        {timingFeedbackEnabled ? 'On' : 'Off'}
+                      </button>
+                    </div>
+
+                    <details className="text-[11px] text-white/55">
+                      <summary className="cursor-pointer text-white/65">Advanced: sync recorded click</summary>
+                      <div className="mt-2 space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <span>{syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs} ms</span>
+                          <button
+                            type="button"
+                            onClick={() => setSyncOffsetMs(0)}
+                            className="text-xs text-white/70 border border-white/10 rounded-lg px-2 py-1 hover:bg-white/10 transition-colors"
+                          >
+                            Reset
+                          </button>
                         </div>
                         <input
                           type="range"
-                          min={String(MIN_BPM)}
-                          max={String(MAX_BPM)}
-                          step="1"
-                          value={bpm}
-                          onChange={(e) => updateBpm(e.target.value)}
+                          min="-120"
+                          max="180"
+                          step="5"
+                          value={syncOffsetMs}
+                          onChange={(e) => setSyncOffsetMs(Number(e.target.value))}
                           className="w-full"
                         />
+                        <p>If playback sounds late, drag left. If early, drag right.</p>
+                      </div>
+                    </details>
+
+                    <p className="text-[11px] text-white/55">Headphones recommended so the mic hears your tap, not the click.</p>
+                  </div>
+
+                  {/* ── Mic level / gain ── */}
+                  <div className="rounded-2xl bg-white/5 px-3 py-3 space-y-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-[11px] text-white/55">
+                        <span>Mic level</span>
+                        <span>{Math.min(100, Math.round((micLevel * 3) * 100))}%</span>
+                      </div>
+                      <div title="Mic level" className="h-1.5 rounded bg-white/10 overflow-hidden">
+                        <div className="h-full bg-white/80" style={{ width: `${Math.min(100, Math.round((micLevel * 3) * 100))}%` }} />
                       </div>
                     </div>
-                </div>
-
-                <div className="rounded-2xl bg-white/5 px-3 py-3 space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[11px] uppercase tracking-wide text-white/60">Metronome</p>
-                      <p className="text-sm font-medium text-white">{metronomeEnabled ? 'On' : 'Off'}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={toggleMetronome}
-                      className={`rounded-xl px-4 py-2 text-sm transition-colors ${metronomeEnabled ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
-                    >
-                      {metronomeEnabled ? 'Turn off' : 'Turn on'}
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[11px] uppercase tracking-wide text-white/60">Soft beat cheers</p>
-                      <p className="text-sm font-medium text-white">{timingFeedbackEnabled ? 'On' : 'Off'}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setTimingFeedbackEnabled((current) => !current)}
-                      className={`rounded-xl px-4 py-2 text-sm transition-colors ${timingFeedbackEnabled ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
-                    >
-                      {timingFeedbackEnabled ? 'On' : 'Off'}
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-white/55">Use headphones so the mic hears your strike, not the metronome click.</p>
-                  <div className="flex items-center justify-between gap-3">
-                    <label className="text-[11px] uppercase tracking-wide text-white/60">Click volume</label>
-                    <div className="flex items-center gap-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-[11px] text-white/55">
+                        <span>Mic gain</span>
+                        <span>{Math.round(micGain * 100)}%</span>
+                      </div>
                       <input
+                        title="Mic gain"
                         type="range"
-                        min="0"
+                        min="0.5"
                         max="2"
                         step="0.01"
-                        value={clickGain}
-                        onChange={(e) => setClickGain(Number(e.target.value))}
-                        className="w-40"
-                        aria-label="Click volume"
+                        value={micGain}
+                        onChange={(e) => setMicGain(Number(e.target.value))}
+                        className="w-full accent-white/90"
                       />
-                      <span className="text-xs text-white/70 w-10 text-right">{Math.round(clickGain * 100)}%</span>
                     </div>
                   </div>
-                </div>
 
-                <div className="rounded-2xl bg-white/5 px-3 py-3 space-y-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[11px] uppercase tracking-wide text-white/60">Sync recorded click</p>
-                      <p className="text-sm font-medium text-white">{syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs} ms</p>
+                  {/* ── Camera / Mic inputs (secondary) ── */}
+                  <details className="rounded-2xl bg-white/5 px-3 py-3">
+                    <summary className="cursor-pointer text-[11px] uppercase tracking-wide text-white/60">Camera & microphone</summary>
+                    <div className="grid grid-cols-1 gap-3 pt-3">
+                      {renderVideoInputPicker('')}
+                      {renderAudioInputPicker('')}
                     </div>
+                  </details>
+
+                  {mode === 'screen_cam' ? (
                     <button
                       type="button"
-                      onClick={() => setSyncOffsetMs(0)}
-                      className="text-xs text-white/70 border border-white/10 rounded-lg px-3 py-2 hover:bg-white/10 transition-colors"
+                      onClick={() => setShowPipControls((current) => !current)}
+                      className="w-full rounded-2xl bg-white/5 px-3 py-2.5 text-xs uppercase tracking-wide text-white/65 hover:bg-white/10 transition-colors"
                     >
-                      Reset
+                      {showPipControls ? 'Hide PiP controls' : 'PiP controls'}
                     </button>
-                  </div>
-                  <input
-                    type="range"
-                    min="-120"
-                    max="180"
-                    step="5"
-                    value={syncOffsetMs}
-                    onChange={(e) => setSyncOffsetMs(Number(e.target.value))}
-                    className="w-full"
-                  />
-                  <p className="text-[11px] text-white/55">If playback sounds late, move this left. If playback sounds early, move it right.</p>
-                </div>
-
-                <p className="text-[11px] text-white/55">Turn metronome on for a gentle pulse and a quiet “with the beat” glow when you land. Headphones help the mic hear you, not the click.</p>
-              </div>
-                ) : null}
+                  ) : null}
                   </>
                 ) : null}
               </div>
