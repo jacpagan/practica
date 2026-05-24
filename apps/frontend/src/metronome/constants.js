@@ -6,7 +6,7 @@ export const MAX_BPM = 240
 export const PERFECT_MS = 25
 export const GOOD_MS = 55
 export const ONSET_REFRACTORY_S = 0.12
-export const ONSET_ANALYSER_FFT = 512
+export const ONSET_ANALYSER_FFT = 256
 export const SPEAKER_CLICK_BLEED_MS = 95
 export const MAX_TIMING_HITS = 200
 

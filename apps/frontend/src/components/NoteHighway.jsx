@@ -82,8 +82,7 @@ export default function NoteHighway({
   countInRemaining,
   isRecording,
   hapticEnabled = true,
-  onScreenHit,
-  screenTapEnabled = false,
+  speakerPractice = false,
 }) {
   const stripRef = useRef(null)
   const notesContainerRef = useRef(null)
@@ -120,6 +119,8 @@ export default function NoteHighway({
         return
       }
 
+      const outputLag = speakerPractice ? Math.max(0, Number(ctx.outputLatency) || 0) : 0
+
       const rect = container.getBoundingClientRect()
       const width = rect.width || 320
       const hitX = (HIT_ZONE_LEFT_PCT / 100) * width
@@ -129,7 +130,7 @@ export default function NoteHighway({
 
       const seen = new Set()
       beats.forEach((beat) => {
-        const dt = beat.scheduledTime - now
+        const dt = beat.scheduledTime + outputLag - now
         // Cull beats that have passed the fade window or are too far in the future.
         if (dt < -period * PAST_FADE_BEATS) return
         if (dt > lookAheadSeconds * 1.05) return
@@ -179,7 +180,7 @@ export default function NoteHighway({
       noteElsRef.current.forEach((node) => node.remove())
       noteElsRef.current.clear()
     }
-  }, [active, audioContextRef, beatClockRef])
+  }, [active, audioContextRef, beatClockRef, speakerPractice])
 
   // Beat tick flash — pulses the hit zone & strip border briefly on each tick.
   useEffect(() => {
@@ -220,22 +221,9 @@ export default function NoteHighway({
     tickFlash ? 'border-white/60 shadow-[0_0_30px_rgba(255,255,255,0.18)]' : 'border-white/12'
   }`
 
-  const handlePointerDown = (event) => {
-    if (!screenTapEnabled || typeof onScreenHit !== 'function') return
-    if (event.pointerType === 'mouse' && event.button !== 0) return
-    event.preventDefault()
-    onScreenHit()
-  }
-
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[15] flex flex-col items-center gap-2 px-3 pb-[max(5.75rem,env(safe-area-inset-bottom))]">
-      <div
-        ref={stripRef}
-        className={`${stripClass} ${screenTapEnabled ? 'pointer-events-auto touch-manipulation cursor-pointer' : ''}`}
-        onPointerDown={screenTapEnabled ? handlePointerDown : undefined}
-        role={screenTapEnabled ? 'button' : undefined}
-        aria-label={screenTapEnabled ? 'Tap on the beat when the note hits the line' : undefined}
-      >
+      <div ref={stripRef} className={stripClass}>
         {/* Soft tolerance zones around the hit zone */}
         <div
           className="absolute top-0 bottom-0 bg-emerald-400/8"
@@ -278,9 +266,7 @@ export default function NoteHighway({
         <CountInBadge countInRemaining={countInRemaining} beatsPerBar={beatsPerBar} />
 
         {/* Corner labels (subtle) */}
-        <span className="absolute left-3 top-2 text-[9px] uppercase tracking-[0.18em] text-white/35">
-          {screenTapEnabled ? 'tap the rail on the line' : 'tap when on the line'}
-        </span>
+        <span className="absolute left-3 top-2 text-[9px] uppercase tracking-[0.18em] text-white/35">hit when on the line</span>
         {bpm ? (
           <span className="absolute right-3 bottom-2 text-[9px] uppercase tracking-[0.18em] text-white/45 tabular-nums">
             {bpm} BPM

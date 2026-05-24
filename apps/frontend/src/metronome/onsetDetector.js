@@ -34,16 +34,16 @@ export function createOnsetDetector(analyser) {
       : release * envelope + (1 - release) * peak
 
     noiseFloor = Math.min(0.12, Math.max(0.012, noiseFloor * 0.98 + rms * 0.02))
-    const aboveFloor = peak > Math.max(0.05, noiseFloor * 3.5)
-    const rising = peak > lastPeak * 1.35
-    const strong = aboveFloor && rising
+    const hitThreshold = Math.max(0.04, noiseFloor * 3)
+    const aboveFloor = peak > hitThreshold
+    const rising = peak > lastPeak * 1.2 || envelope > hitThreshold * 1.4
+    const strong = aboveFloor && (rising || peak > hitThreshold * 1.8)
     lastPeak = peak
 
     if (!strong || now - lastHitAt < ONSET_REFRACTORY_S) return null
 
     // Backdate to the first sample in this window that crosses the hit threshold
     // (attack onset), not the peak — peaks arrive after you actually tap/clap.
-    const hitThreshold = Math.max(0.05, noiseFloor * 3.5)
     let onsetIdx = peakIdx
     for (let i = 0; i <= peakIdx; i += 1) {
       if (Math.abs(buffer[i]) >= hitThreshold) {
