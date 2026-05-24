@@ -24,7 +24,7 @@ function AuthForm({
   const [loading, setLoading] = useState(false)
 
   const title = contextTitle || 'Practica'
-  const subtitle = contextSubtitle || 'A private proof loop for practice and progress.'
+  const subtitle = contextSubtitle || 'Record private proof of any skill you practice.'
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -56,8 +56,31 @@ function AuthForm({
   }
 
   return (
-    <div className={embedded ? 'w-full' : 'min-h-screen bg-white flex items-center justify-center px-4'}>
-      <div className={`w-full max-w-sm ${embedded ? 'rounded-2xl border border-gray-200 bg-white px-6 py-6 shadow-sm' : ''}`}>
+    <div className={embedded ? 'w-full' : 'min-h-screen bg-white px-4 py-8 flex items-center justify-center'}>
+      <div className={`w-full ${embedded ? 'max-w-sm rounded-2xl border border-gray-200 bg-white px-6 py-6 shadow-sm' : 'max-w-5xl grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-center'}`}>
+        {!embedded ? (
+          <section className="rounded-[2rem] border border-gray-200 bg-gradient-to-br from-gray-950 to-gray-800 px-6 py-8 text-white shadow-sm sm:px-8 sm:py-10">
+            <p className="text-xs uppercase tracking-[0.22em] text-white/50">Private by default</p>
+            <div className="mt-5 space-y-3">
+              <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">Record proof of anything you practice.</h1>
+              <p className="max-w-xl text-sm leading-6 text-white/70 sm:text-base">
+                Practica is a private video archive for your skills. Capture a short proof, tag the skill if useful, and watch your progress build over time.
+              </p>
+            </div>
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              {['Record privately', 'Tag any skill', 'See progress'].map((step) => (
+                <div key={step} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                  <p className="text-sm font-medium text-white">{step}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3">
+              <p className="text-sm text-emerald-50">No public feed, no third-party trackers, no background surveillance.</p>
+            </div>
+          </section>
+        ) : null}
+
+        <section className={embedded ? '' : 'w-full max-w-sm mx-auto'}>
         <h1 className="text-2xl font-semibold text-gray-900 text-center mb-1">{title}</h1>
 
         <p className="text-sm text-gray-400 text-center mb-8">{subtitle}</p>
@@ -129,6 +152,11 @@ function AuthForm({
               )}
             </div>
           )}
+          {mode === 'register' ? (
+            <p className="text-xs leading-5 text-gray-500">
+              Practica is invite-only while it is early. Ask for an invite if you want access to the private proof archive.
+            </p>
+          ) : null}
 
           {error && <p className="text-xs text-red-500">{error}</p>}
 
@@ -137,6 +165,7 @@ function AuthForm({
             {loading ? 'Loading...' : mode === 'login' ? 'Log in' : 'Create account'}
           </button>
         </form>
+        </section>
       </div>
     </div>
   )

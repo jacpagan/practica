@@ -33,6 +33,7 @@ import SessionUpload from './components/SessionUpload'
 const SessionDetail = React.lazy(() => import('./components/SessionDetail'))
 const ProgressView = React.lazy(() => import('./components/ProgressView'))
 const SkillView = React.lazy(() => import('./components/SkillView'))
+const TodayView = React.lazy(() => import('./components/TodayView'))
 import PrivacyPage from './components/PrivacyPage'
 const RecorderPage = React.lazy(() => import('./components/RecorderPage'))
 
@@ -41,7 +42,7 @@ function AppContent() {
   const toast = useToast()
   const confirm = useConfirm()
   const initialRoute = useMemo(() => parseRoute(window.location.pathname, window.location.search), [])
-  const [view, setView] = useState(initialRoute.view === 'today' ? 'progress' : initialRoute.view)
+  const [view, setView] = useState(initialRoute.view)
   const [routeSessionId, setRouteSessionId] = useState(initialRoute.sessionId)
   const [routeSeriesName, setRouteSeriesName] = useState(initialRoute.seriesName || '')
   const [routeDate, setRouteDate] = useState(initialRoute.date || '')
@@ -218,11 +219,29 @@ function AppContent() {
   })
 
   const {
+    goToday,
     goProgress,
     goPrivacy,
     goSkill,
   } = usePrimaryNavigation({ navigate })
 
+  const openGlobalUpload = useCallback(() => {
+    setSelectedSession(null)
+    setJustUploadedSessionId(null)
+    setOpenRecorderOnUpload(false)
+    setPendingPracticeSeries('')
+    setPendingUploadReturnRoute({ view: 'today', sessionId: null, seriesName: '' })
+    navigate({ view: 'upload', sessionId: null })
+  }, [
+    navigate,
+    setJustUploadedSessionId,
+    setOpenRecorderOnUpload,
+    setPendingPracticeSeries,
+    setPendingUploadReturnRoute,
+    setSelectedSession,
+  ])
+
+  const todayNavActive = view === 'today'
   const progressNavActive = view === 'progress' || view === 'skill' || view === 'detail'
 
   const {
@@ -263,8 +282,14 @@ function AppContent() {
       <header className={`${isImmersiveMobileView ? 'hidden sm:block' : ''} border-b border-gray-100 bg-white px-4 py-4 sm:px-6`}>
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-4 min-w-0">
-            <button onClick={goProgress} className="text-lg font-semibold text-gray-900 tracking-tight">
+            <button onClick={goToday} className="text-lg font-semibold text-gray-900 tracking-tight">
               Practica
+            </button>
+            <button
+              onClick={goToday}
+              className={`hidden sm:inline-flex text-sm px-3 py-1.5 rounded-full border transition-colors ${todayNavActive ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:text-gray-900'}`}
+            >
+              Today
             </button>
             <button
               onClick={goProgress}
@@ -291,25 +316,9 @@ function AppContent() {
             </div>
           </div>
         </div>
-        <div className="max-w-4xl mx-auto mt-3 space-y-2 sm:hidden">
-          <button
-            onClick={goProgress}
-            className={`w-full text-sm px-3 py-2.5 rounded-xl transition-colors ${progressNavActive ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
-          >
-            Progress
-          </button>
-          <div className="grid grid-cols-1 gap-2">
-            <button
-              onClick={openGlobalRecorder}
-              className="w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
-            >
-              Record
-            </button>
-          </div>
-        </div>
       </header>
 
-      <main className={`${isImmersiveMobileView ? 'w-full sm:max-w-4xl sm:mx-auto sm:pb-24' : 'max-w-4xl mx-auto pb-24'}`}>
+      <main className={`${isImmersiveMobileView ? 'w-full sm:max-w-4xl sm:mx-auto sm:pb-24' : 'max-w-4xl mx-auto pb-32 sm:pb-24'}`}>
         <React.Suspense fallback={
           <div className="px-4 sm:px-6 py-6 text-sm text-gray-500">
             <div className="flex items-center gap-2">
@@ -320,7 +329,18 @@ function AppContent() {
         }>
 
         {view === 'privacy' && (
-          <PrivacyPage signedIn onBack={goProgress} />
+          <PrivacyPage signedIn onBack={goToday} />
+        )}
+
+        {view === 'today' && (
+          <TodayView
+            sessions={sessions}
+            sessionsLoading={sessionsLoading}
+            onRecord={openGlobalRecorder}
+            onUpload={openGlobalUpload}
+            onOpenSession={openSession}
+            onOpenSkill={goSkill}
+          />
         )}
 
         {view === 'progress' && (
@@ -349,13 +369,13 @@ function AppContent() {
             token={token}
             skillOptions={skillOptions}
             onComplete={handleUploadComplete}
-                onCancel={({ bypassUploadGuard = false } = {}) => {
+            onCancel={({ bypassUploadGuard = false } = {}) => {
               const nextRoute = pendingUploadReturnRoute?.view
                 ? pendingUploadReturnRoute
                 : (pendingPracticeSeries
                     ? { view: 'skill', sessionId: null, seriesName: pendingPracticeSeries }
-                    : { view: 'progress', sessionId: null })
-              setPendingUploadReturnRoute({ view: 'progress', sessionId: null })
+                    : { view: 'today', sessionId: null })
+              setPendingUploadReturnRoute({ view: 'today', sessionId: null })
               navigate(nextRoute, { bypassUploadGuard })
             }}
             initialRecorderOpen={openRecorderOnUpload}
@@ -368,7 +388,7 @@ function AppContent() {
 
         {view === 'record' && (
           <RecorderPage
-            onCancel={goProgress}
+            onCancel={goToday}
             onComplete={handleUploadComplete}
           />
         )}
@@ -392,6 +412,33 @@ function AppContent() {
         )}
         </React.Suspense>
       </main>
+      {!isImmersiveMobileView ? (
+        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-4 py-2 shadow-[0_-12px_30px_rgba(15,23,42,0.08)] backdrop-blur safe-bottom sm:hidden" aria-label="Primary">
+          <div className="mx-auto grid max-w-md grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={goToday}
+              className={`rounded-2xl px-3 py-2.5 text-xs font-medium transition-colors ${todayNavActive ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'}`}
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              onClick={openGlobalRecorder}
+              className="rounded-2xl bg-gray-900 px-3 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-gray-800 transition-colors"
+            >
+              Record
+            </button>
+            <button
+              type="button"
+              onClick={goProgress}
+              className={`rounded-2xl px-3 py-2.5 text-xs font-medium transition-colors ${progressNavActive ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'}`}
+            >
+              Progress
+            </button>
+          </div>
+        </nav>
+      ) : null}
     </div>
   )
 }

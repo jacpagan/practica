@@ -161,8 +161,14 @@ export default function ProgressView({
     )
   }
 
-  const totalSkills = skillGroups.length
+  const totalSkills = skillGroups.filter((group) => group.skillName !== UNGROUPED_KEY).length
   const totalProofs = sessions.length
+  const weekAgo = new Date()
+  weekAgo.setDate(weekAgo.getDate() - 7)
+  const proofsThisWeek = sessions.filter((item) => {
+    const recordedAt = new Date(item?.recorded_at || item?.created_at)
+    return !Number.isNaN(recordedAt.getTime()) && recordedAt >= weekAgo
+  }).length
   const ungroupedCount = sessions.filter((item) => !String(item?.practice_series || '').trim()).length
   const summaryParts = [
     `${totalProofs} ${totalProofs === 1 ? 'proof' : 'proofs'}`,
@@ -176,8 +182,8 @@ export default function ProgressView({
         <div className="space-y-2">
           <div>
             <p className="text-xs uppercase tracking-wide text-gray-500">Progress</p>
-            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">Your proof archive</h2>
-            <p className="text-sm text-gray-500 mt-2">Proofs grouped by skill. Use Record above to add another.</p>
+            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">Your private progress</h2>
+            <p className="text-sm text-gray-500 mt-2">Every saved proof counts. Skills stay organized without forcing one active focus.</p>
           </div>
           {sessions.length > 0 ? (
             <p className="text-xs text-gray-500">{summaryParts.join(' · ')}</p>
@@ -187,10 +193,24 @@ export default function ProgressView({
         {sessions.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
               <p className="text-sm text-gray-700">No proofs yet.</p>
-            <p className="text-xs text-gray-500 mt-1">Use Record above to add or upload a proof. It will show up here as soon as it is saved.</p>
+            <p className="text-xs text-gray-500 mt-1">Record or upload one private proof. It will show up here as soon as it is saved.</p>
           </div>
         ) : (
           <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4">
+                <p className="text-2xl font-semibold text-gray-900">{totalProofs}</p>
+                <p className="text-xs text-gray-500 mt-1">total proofs</p>
+              </div>
+              <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4">
+                <p className="text-2xl font-semibold text-gray-900">{totalSkills}</p>
+                <p className="text-xs text-gray-500 mt-1">skills tagged</p>
+              </div>
+              <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4">
+                <p className="text-2xl font-semibold text-gray-900">{proofsThisWeek}</p>
+                <p className="text-xs text-gray-500 mt-1">this week</p>
+              </div>
+            </div>
             {skillGroups.map((group) => {
               const skillName = group.skillName === UNGROUPED_KEY ? 'Ungrouped' : group.skillName
               return (
@@ -212,6 +232,7 @@ export default function ProgressView({
                       </div>
                       <p className="text-sm text-gray-500 mt-1">
                         {group.items.length} {group.items.length === 1 ? 'proof' : 'proofs'}
+                        {group.skillName === UNGROUPED_KEY ? ' ready to tag when useful' : ''}
                       </p>
                     </div>
                   </div>

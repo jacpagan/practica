@@ -2,7 +2,7 @@ export const parseRoute = (pathname, search = '') => {
   const params = new URLSearchParams(search || '')
   const date = (params.get('date') || '').trim()
   if (pathname === '/' || pathname === '/today') {
-    return { view: 'progress', sessionId: null, date }
+    return { view: 'today', sessionId: null, date }
   }
   if (pathname.startsWith('/requests') || pathname.startsWith('/review/')) {
     return { view: 'progress', sessionId: null, date }
@@ -22,6 +22,7 @@ export const parseRoute = (pathname, search = '') => {
 
 export const routePath = ({ view, sessionId, seriesName, date }) => {
   if (view === 'privacy') return '/privacy'
+  if (view === 'today') return '/'
   if (view === 'progress' || view === 'archive' || view === 'evidence' || view === 'threads' || view === 'today') {
     return date ? `/progress?date=${encodeURIComponent(date)}` : '/progress'
   }
@@ -37,7 +38,7 @@ export const resolveUploadReturnRouteDraft = (draft = null, routeDate = '') => {
   const explicit = draft?.returnRoute
   if (explicit?.view) {
     return {
-      view: explicit.view === 'today' ? 'progress' : explicit.view,
+      view: explicit.view,
       sessionId: explicit.sessionId ?? null,
       seriesName: explicit.seriesName || '',
       date: explicit.date || '',
@@ -49,5 +50,5 @@ export const resolveUploadReturnRouteDraft = (draft = null, routeDate = '') => {
     return { view: 'skill', sessionId: null, seriesName: practiceSeries }
   }
 
-  return { view: 'progress', sessionId: null, date: routeDate || '' }
+  return { view: 'today', sessionId: null, date: routeDate || '' }
 }

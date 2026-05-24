@@ -17,7 +17,7 @@ Practica is a private skill game where one person does a tiny action, records pr
 - member-owned proof archive
 - video-first
 - progress-first
-- one active skill or habit at a time
+- many skills or habits over time, one proof at a time
 
 ## What Practica Is Not
 
@@ -46,8 +46,8 @@ If model-assisted features are added later, they should support the loop by redu
 The initial wedge is:
 
 - one person
-- one habit or skill
-- one daily proof loop
+- any habit or skill
+- one proof loop at a time
 
 That wedge is narrow on purpose. It is easier to explain, recruit, and charge for than broad “all embodied learning” positioning.
 
@@ -59,7 +59,7 @@ That wedge is narrow on purpose. It is easier to explain, recruit, and charge fo
 - private session upload and recording
 - playback-ready media processing
 - member-owned proof archive and history view
-- one active skill or habit label per member
+- optional skill or habit tags per proof
 - session detail and metadata editing
 - progress summaries from completed proof events
 - Today / Record / Progress navigation
@@ -80,11 +80,12 @@ That wedge is narrow on purpose. It is easier to explain, recruit, and charge fo
 
 The core loop is:
 
-1. pick one skill or habit
+1. pick what to record
 2. do a tiny action
 3. record proof
-4. see progress
-5. repeat tomorrow
+4. tag the skill if useful
+5. see progress
+6. repeat tomorrow
 
 This loop is the product. Everything else should support it.
 
@@ -92,14 +93,14 @@ This loop is the product. Everything else should support it.
 
 1. A member can create a private proof take reliably.
 2. A member can revisit prior takes in a private archive.
-3. A member can keep one skill or habit visible.
+3. A member can tag proofs across multiple skills or habits.
 4. A member can see effort-based progress where each saved proof counts.
 5. A member can continue the loop with another take.
 
 ## Roles And Access Model
 
 - `member`: any authenticated person.
-- `skill owner`: the member who owns the proof archive and active skill.
+- `skill owner`: the member who owns the proof archive and skill tags.
 - `reviewer`: a dormant workflow-context label for legacy review flows.
 - `teacher`: a dormant workflow-context label, not a primary product identity.
 
@@ -154,7 +155,7 @@ Current gaps:
 ### Next
 
 - deepen progress feedback
-- make the active skill clearer
+- make recent skills and proof tagging clearer
 - shape pricing around real use
 
 ### Later
