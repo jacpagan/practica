@@ -2,6 +2,7 @@ import { ONSET_REFRACTORY_S } from './constants'
 
 export function createOnsetDetector(analyser) {
   const buffer = new Float32Array(analyser.fftSize)
+  const sampleRate = analyser.context?.sampleRate || 48000
   let envelope = 0
   let lastPeak = 0
   let lastHitAt = -ONSET_REFRACTORY_S
@@ -13,11 +14,15 @@ export function createOnsetDetector(analyser) {
 
     analyser.getFloatTimeDomainData(buffer)
     let peak = 0
+    let peakIdx = 0
     let sumSq = 0
     for (let i = 0; i < buffer.length; i += 1) {
       const v = buffer[i]
       const a = Math.abs(v)
-      if (a > peak) peak = a
+      if (a > peak) {
+        peak = a
+        peakIdx = i
+      }
       sumSq += v * v
     }
     const rms = Math.sqrt(sumSq / buffer.length)
@@ -36,8 +41,22 @@ export function createOnsetDetector(analyser) {
 
     if (!strong || now - lastHitAt < ONSET_REFRACTORY_S) return null
 
+    // Backdate to the attack within the analyser window so hits line up with
+    // the note highway instead of reporting ~1 frame + buffer latency late.
+    const attackThreshold = peak * 0.35
+    let onsetIdx = peakIdx
+    for (let i = peakIdx; i >= 0; i -= 1) {
+      if (Math.abs(buffer[i]) < attackThreshold) {
+        onsetIdx = Math.min(buffer.length - 1, i + 1)
+        break
+      }
+      if (i === 0) onsetIdx = 0
+    }
+    const samplesAgo = buffer.length - 1 - onsetIdx
+    const onsetTime = now - samplesAgo / sampleRate
+
     lastHitAt = now
-    return { onsetTime: now, strength: peak }
+    return { onsetTime, strength: peak }
   }
 
   const reset = () => {

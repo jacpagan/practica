@@ -62,7 +62,9 @@ export function createBeatClock() {
   }
 
   const getPhase = (now) => {
-    const anchor = recordEpoch ?? epoch
+    // Visual phase always follows the running metronome grid. recordEpoch is
+    // only for exported timing metadata (seconds since recording started).
+    const anchor = epoch
     if (anchor == null) {
       return { beatIndex: 0, phase: 0, msToNext: period * 1000, isAccent: true }
     }
