@@ -1123,7 +1123,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
         value={selectedVideoInputId}
         onChange={(e) => setSelectedVideoInputId(e.target.value)}
         disabled={state === STATES.RECORDING}
-        className="w-full max-w-sm bg-white/10 text-white text-sm rounded-xl px-3 py-2 border border-white/10 disabled:opacity-60"
+        className="w-full bg-white/10 text-white text-sm rounded-xl px-3 py-2 border border-white/10 disabled:opacity-60"
       >
         <option value="" className="text-gray-900">System default camera</option>
         {videoInputs.map((device, index) => (
@@ -1151,7 +1151,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
         value={selectedAudioInputId}
         onChange={(e) => setSelectedAudioInputId(e.target.value)}
         disabled={state === STATES.RECORDING}
-        className="w-full max-w-sm bg-white/10 text-white text-sm rounded-xl px-3 py-2 border border-white/10 disabled:opacity-60"
+        className="w-full bg-white/10 text-white text-sm rounded-xl px-3 py-2 border border-white/10 disabled:opacity-60"
       >
         <option value="" className="text-gray-900">System default microphone</option>
         {audioInputs.map((device, index) => (
@@ -1205,7 +1205,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                   </div>
                 </button>
                 {showOptions ? (
-                  <div className="grid gap-3 pt-3 md:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 pt-3">
                     {renderVideoInputPicker()}
                     {renderAudioInputPicker()}
                   </div>
@@ -1267,7 +1267,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                   </div>
                 </button>
                 {showOptions ? (
-                  <div className="grid gap-3 pt-3 md:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 pt-3">
                     {renderVideoInputPicker()}
                     {renderAudioInputPicker()}
                   </div>
@@ -1361,9 +1361,12 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                 </div>
               </button>
 
-              {showOptions ? (
-                <div className="space-y-3">
-                  <div className="grid gap-3 md:grid-cols-2">
+              <div
+                className={`space-y-3 ${showOptions ? 'max-h-[min(46dvh,24rem)] overflow-y-auto overscroll-contain pr-0.5' : ''}`}
+              >
+                {showOptions ? (
+                  <>
+                  <div className="grid grid-cols-1 gap-3">
                     {renderVideoInputPicker('rounded-2xl bg-white/5 px-3 py-3')}
                     {renderAudioInputPicker('rounded-2xl bg-white/5 px-3 py-3')}
                   </div>
@@ -1414,10 +1417,13 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => setShowTimingTools((current) => !current)}
-                        className="rounded-full px-3 py-1.5 text-xs transition-colors bg-white/10 text-white/80 hover:bg-white/20"
+                        onClick={() => {
+                          setShowOptions(true)
+                          setShowTimingTools((current) => !current)
+                        }}
+                        className={`rounded-full px-3 py-1.5 text-xs transition-colors ${showTimingTools ? 'bg-white text-gray-900' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
                       >
-                        {showTimingTools ? 'Hide timing' : 'Timing'}
+                        {showTimingTools ? 'Hide timing' : 'Timing & metronome'}
                       </button>
                       {mode === 'screen_cam' && (
                         <button
@@ -1430,21 +1436,10 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                       )}
                     </div>
                   </div>
-                </div>
-              ) : null}
-            </div>
 
-            {warning ? (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Microphone warning</p>
-                <p className="mt-1 text-sm text-amber-900">{warning}</p>
-              </div>
-            ) : null}
-
-            {showTimingTools ? (
-              <div className="space-y-3">
-                <div className="rounded-2xl bg-white/5 px-3 py-3 flex items-center gap-3">
-                  <div className="w-full space-y-3">
+                {showTimingTools ? (
+              <div className="space-y-3 border-t border-white/10 pt-3">
+                <div className="rounded-2xl bg-white/5 px-3 py-3 space-y-3">
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div className="min-w-0">
                         <p className="text-[11px] uppercase tracking-wide text-white/60">Tempo</p>
@@ -1539,7 +1534,6 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                         />
                       </div>
                     </div>
-                  </div>
                 </div>
 
                 <div className="rounded-2xl bg-white/5 px-3 py-3 space-y-3">
@@ -1614,7 +1608,18 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                   <p className="text-[11px] text-white/55">If playback sounds late, move this left. If playback sounds early, move it right.</p>
                 </div>
 
-                <p className="text-[11px] text-white/55">Timing tools are optional. When the metronome is on, recording starts after a one-bar count-in and strike feedback flashes when you land on the beat.</p>
+                <p className="text-[11px] text-white/55">Turn metronome on for a count-in, beat pulse, and strike flashes. Use headphones.</p>
+              </div>
+                ) : null}
+                  </>
+                ) : null}
+              </div>
+            </div>
+
+            {warning ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-amber-800">Microphone warning</p>
+                <p className="mt-1 text-sm text-amber-900">{warning}</p>
               </div>
             ) : null}
 

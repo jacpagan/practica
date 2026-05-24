@@ -122,7 +122,9 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           IMAGE_URI="$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          docker build -f apps/backend/Dockerfile -t "$IMAGE_URI" .
+          docker build -f apps/backend/Dockerfile \
+            --build-arg FRONTEND_BUILD_SHA="$IMAGE_TAG" \
+            -t "$IMAGE_URI" .
           docker push "$IMAGE_URI"
           echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
 

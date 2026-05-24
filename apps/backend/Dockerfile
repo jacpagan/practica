@@ -10,6 +10,8 @@ COPY apps/frontend/ .
 ENV VITE_MINIFY=terser
 # Do not emit sourcemaps by default in prod image; can be toggled per-env
 ENV VITE_SOURCEMAP=
+ARG FRONTEND_BUILD_SHA=dev
+ENV FRONTEND_BUILD_SHA=$FRONTEND_BUILD_SHA
 RUN npm run build
 
 # 2) Build backend image with Python
