@@ -1,3 +1,4 @@
+import json
 import math
 import uuid
 
@@ -79,3 +80,17 @@ def attach_tags_to_session(session, raw_tags):
     for name in parse_tag_names(raw_tags):
         tag, _ = Tag.objects.get_or_create(name__iexact=name, defaults={'name': name})
         session.tags.add(tag)
+
+
+def parse_timing_metadata(raw_value):
+    if raw_value in (None, '', {}, []):
+        return None
+    if isinstance(raw_value, dict):
+        return raw_value
+    if isinstance(raw_value, str):
+        try:
+            parsed = json.loads(raw_value)
+        except json.JSONDecodeError:
+            return None
+        return parsed if isinstance(parsed, dict) else None
+    return None

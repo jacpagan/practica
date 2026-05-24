@@ -15,6 +15,7 @@ export default function RecorderPage({ onCancel, onComplete }) {
   const [saveError, setSaveError] = useState('')
   const ownedPreviewUrlRef = useRef('')
   const shouldAutoSaveRef = useRef(false)
+  const timingMetadataRef = useRef(null)
   const fileInputRef = useRef(null)
 
   useEffect(() => () => {
@@ -30,7 +31,8 @@ export default function RecorderPage({ onCancel, onComplete }) {
     return `proof - ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
   }
 
-  const handleRecorded = (nextFile) => {
+  const handleRecorded = (nextFile, _blobUrl, timingMetadata) => {
+    timingMetadataRef.current = timingMetadata || null
     setFile(nextFile)
     setTitle(defaultTitle())
     setSaveError('')
@@ -61,7 +63,12 @@ export default function RecorderPage({ onCancel, onComplete }) {
     try {
       const res = await createSessionUpload({
         token,
-        payload: { title: title.trim(), practice_series: '', description: '' },
+        payload: {
+          title: title.trim(),
+          practice_series: '',
+          description: '',
+          timing_metadata: timingMetadataRef.current,
+        },
         videoFile: file,
         onProgress: (p) => setProgress(p),
       })
@@ -119,7 +126,7 @@ export default function RecorderPage({ onCancel, onComplete }) {
             </div>
             <div className="overflow-hidden sm:rounded-[28px] sm:shadow-2xl sm:border sm:border-gray-200">
               <VideoRecorder
-                onRecorded={(f) => handleRecorded(f)}
+                onRecorded={(f, blobUrl, timingMetadata) => handleRecorded(f, blobUrl, timingMetadata)}
                 onCancel={onCancel}
                 maxDuration={MAX_RECORDER_DURATION_SECONDS}
                 autoUseOnStop={true}

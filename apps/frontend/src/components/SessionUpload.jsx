@@ -40,6 +40,7 @@ function SessionUpload({
   const ownedPreviewUrlRef = useRef('')
   const abortControllerRef = useRef(null)
   const abortRequestedRef = useRef(false)
+  const timingMetadataRef = useRef(null)
 
   const replaceOwnedPreviewUrl = (nextUrl = '') => {
     if (ownedPreviewUrlRef.current) {
@@ -191,8 +192,9 @@ function SessionUpload({
 
   
 
-  const handleRecorded = (file) => {
+  const handleRecorded = (file, _blobUrl, timingMetadata) => {
     if (isUploading) return
+    timingMetadataRef.current = timingMetadata || null
     setShowRecorder(false)
     if (!isLikelyVideoFile(file)) {
       toast.error('Recorded file is not in a supported video format')
@@ -268,6 +270,7 @@ function SessionUpload({
           title: title.trim(),
           practice_series: practiceSeries.trim(),
           description: description.trim(),
+          timing_metadata: timingMetadataRef.current,
         },
         videoFile,
         onProgress: (percent) => setUploadProgress(percent),

@@ -18,6 +18,7 @@ from .models import (
 from .reviews.presentation import resolve_review_request_resolution, resolve_reviewer_invite_resolution, resolve_session_resolution
 from .services.feedback_video_processing import feedback_video_playback_url
 from .video_uploads import is_allowed_video_upload
+from videos.media.uploads import parse_timing_metadata
 
 
 def _media_url_for_key(key):
@@ -236,12 +237,13 @@ class SessionSerializer(serializers.ModelSerializer):
     poster_image_url = serializers.SerializerMethodField()
     resolution = serializers.SerializerMethodField()
     client_upload_id = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    timing_metadata = serializers.JSONField(required=False, allow_null=True)
 
     class Meta:
         model = Session
         fields = ['id', 'title', 'practice_series', 'description', 'video_file',
                   'reference_title', 'reference_url',
-                  'duration_seconds', 'recorded_at', 'created_at', 'updated_at',
+                  'duration_seconds', 'timing_metadata', 'recorded_at', 'created_at', 'updated_at',
                   'processing_status', 'processing_job_id', 'processing_error',
                   'poster_image_url',
                   'resolution',
@@ -308,6 +310,9 @@ class SessionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Only video files allowed.')
         return value
 
+    def validate_timing_metadata(self, value):
+        return parse_timing_metadata(value)
+
 class SessionListSerializer(serializers.ModelSerializer):
     video_feedback_count = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
@@ -322,7 +327,7 @@ class SessionListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Session
         fields = ['id', 'title', 'practice_series', 'description', 'video_file',
-                  'duration_seconds', 'recorded_at', 'created_at',
+                  'duration_seconds', 'timing_metadata', 'recorded_at', 'created_at',
                   'processing_status', 'processing_job_id', 'processing_error',
                   'poster_image_url', 'resolution', 'assets', 'video_feedback_count',
                   'can_edit']

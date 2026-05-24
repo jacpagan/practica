@@ -5,6 +5,7 @@ import { useToast } from './Toast'
 import SkillField from './SkillField'
 import useSessionDetailEditActions from '../hooks/useSessionDetailEditActions'
 import useSessionDetailMediaActions from '../hooks/useSessionDetailMediaActions'
+import TimingPlaybackOverlay from './TimingPlaybackOverlay'
 
 const THREAD_SLIDE_TRANSITION_MS = 280
 
@@ -542,13 +543,21 @@ function SessionDetail({
               onError={handlePlaybackError}
               className="w-full h-full bg-black"
             />
-          ) : (
+          ) : null}
+          {playableUrl && !playbackFailed ? (
+            <TimingPlaybackOverlay
+              timingMetadata={session?.timing_metadata}
+              videoRef={videoRef}
+              durationSeconds={session?.duration_seconds}
+            />
+          ) : null}
+          {!playableUrl || playbackFailed ? (
             <div className="w-full h-full flex items-center justify-center px-6 text-center text-sm text-white/70">
               {session?.processing_status === 'ready'
                 ? 'This video is marked ready, but playback failed. Try downloading the original below.'
                 : 'Video is still preparing for playback.'}
             </div>
-          )}
+          ) : null}
           {pagerActive ? (
             <div className="pointer-events-none absolute inset-0 z-50 overflow-hidden bg-black">
               {renderPagerCard(threadNavigation.previous, previousPagerUrl, threadNavigation.index > 0 ? `Proof ${threadNavigation.index} of ${threadNavigation.items.length}` : '', -1)}

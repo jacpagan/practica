@@ -846,6 +846,11 @@ const createSessionViaSingleUpload = async ({ token, payload, videoFile, onProgr
     fd.append('duration_seconds', payload.duration_seconds)
   }
   if (payload.tags?.length) fd.append('tags', payload.tags.join(','))
+  if (payload.timing_metadata) {
+    fd.append('timing_metadata', typeof payload.timing_metadata === 'string'
+      ? payload.timing_metadata
+      : JSON.stringify(payload.timing_metadata))
+  }
 
   let attempt = 0
   let lastResponse = null

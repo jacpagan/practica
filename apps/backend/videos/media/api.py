@@ -22,6 +22,7 @@ from .uploads import (
     list_uploaded_parts,
     opaque_video_storage_key,
     parse_tag_names,
+    parse_timing_metadata,
     recommended_part_size,
     s3_client,
     sanitize_filename,
@@ -124,6 +125,7 @@ class SessionMediaActionsMixin:
             return _upload_error('Invalid duration', code='upload_invalid_duration', http_status=status.HTTP_400_BAD_REQUEST)
 
         tags_csv = ','.join(parse_tag_names(request.data.get('tags', [])))
+        timing_metadata = parse_timing_metadata(request.data.get('timing_metadata'))
         expires_at = timezone.now() + timezone.timedelta(hours=24)
 
         try:
@@ -148,6 +150,7 @@ class SessionMediaActionsMixin:
                 reference_url=str(request.data.get('reference_url', '')).strip(),
                 tags_csv=tags_csv,
                 duration_seconds=duration_seconds,
+                timing_metadata=timing_metadata,
                 original_filename=filename,
                 content_type=content_type,
                 client_upload_id=client_upload_id,
@@ -325,6 +328,7 @@ class SessionMediaActionsMixin:
                 reference_url=upload.reference_url,
                 video_file=upload.s3_key,
                 duration_seconds=upload.duration_seconds,
+                timing_metadata=upload.timing_metadata,
             )
             attach_tags_to_session(session, upload.tags_csv)
 

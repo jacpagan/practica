@@ -1,3 +1,4 @@
+import json
 import tempfile
 from unittest.mock import patch
 
@@ -295,6 +296,46 @@ class V1VideoFeaturesTests(APITestCase):
         event_names = set(ProductEventLog.objects.values_list('event_name', flat=True))
         self.assertIn('session_processing_started', event_names)
         self.assertIn('session_processing_failed', event_names)
+
+    @override_settings(
+        AWS_STORAGE_BUCKET_NAME='',
+        AWS_MEDIA_CONVERT_ROLE_ARN='',
+        AWS_MEDIA_CONVERT_ENDPOINT_URL='',
+    )
+    @override_settings(
+        AWS_STORAGE_BUCKET_NAME='',
+        AWS_MEDIA_CONVERT_ROLE_ARN='',
+        AWS_MEDIA_CONVERT_ENDPOINT_URL='',
+    )
+    @patch('videos.media.services.enqueue_local_session_transcode', return_value=(True, ''))
+    def test_session_create_accepts_timing_metadata(self, enqueue_local_transcode):
+        self.client.force_authenticate(user=self.owner)
+        timing_metadata = {
+            'version': 1,
+            'bpm': 120,
+            'beats_per_bar': 4,
+            'hits': [{'t': 1.0, 'delta_ms': -8, 'tier': 'perfect', 'beat': 2}],
+            'summary': {'on_beat': 1, 'close': 0, 'off': 0},
+        }
+
+        res = self.client.post(
+            '/api/sessions/',
+            {
+                'title': 'Timed Session',
+                'description': 'desc',
+                'timing_metadata': json.dumps(timing_metadata),
+                'video_file': self._video_file('timed.mp4'),
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        created = Session.objects.get(id=res.data['id'])
+        self.assertEqual(created.timing_metadata['bpm'], 120)
+        self.assertEqual(created.timing_metadata['hits'][0]['tier'], 'perfect')
+        detail = self.client.get(f'/api/sessions/{created.id}/')
+        self.assertEqual(detail.data['timing_metadata']['summary']['on_beat'], 1)
+        enqueue_local_transcode.assert_called_once()
 
     @override_settings(
         AWS_STORAGE_BUCKET_NAME='',
