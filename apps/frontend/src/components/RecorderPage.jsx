@@ -100,7 +100,7 @@ export default function RecorderPage({ onCancel, onComplete }) {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white sm:bg-white sm:text-gray-900 px-0 sm:px-6 sm:py-6">
-      <main className="w-full sm:max-w-3xl sm:mx-auto space-y-4">
+      <main className="w-full sm:max-w-4xl sm:mx-auto space-y-4">
         <div className="flex items-center justify-between">
           <h1 className="hidden sm:block text-2xl font-semibold text-gray-900 tracking-tight">Record</h1>
           <button type="button" onClick={onCancel} className="fixed top-[max(0.75rem,env(safe-area-inset-top))] left-4 z-40 text-xs text-white/85 rounded-full border border-white/25 bg-black/45 px-3 py-1.5 backdrop-blur sm:static sm:rounded-none sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none sm:text-gray-500 sm:hover:text-gray-900">Close</button>
@@ -124,7 +124,7 @@ export default function RecorderPage({ onCancel, onComplete }) {
                 onChange={handlePickedFile}
               />
             </div>
-            <div className="overflow-hidden sm:rounded-[28px] sm:shadow-2xl sm:border sm:border-gray-200">
+            <div className="overflow-hidden sm:rounded-[28px] sm:shadow-2xl sm:border sm:border-gray-200 sm:min-h-[min(88vh,calc(100dvh-5rem))]">
               <VideoRecorder
                 onRecorded={(f, blobUrl, timingMetadata) => handleRecorded(f, blobUrl, timingMetadata)}
                 onCancel={onCancel}

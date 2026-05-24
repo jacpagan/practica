@@ -119,6 +119,8 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   const videoContainerRef = useRef(null)
   const draggingRef = useRef(null) // {type: 'move'|'resize', startX, startY, start}
   const isCaptureMode = state === STATES.PREVIEWING || state === STATES.RECORDING || state === STATES.RECORDED
+  const isLiveCapture = state === STATES.PREVIEWING || state === STATES.RECORDING
+  const isRecording = state === STATES.RECORDING
 
   useEffect(() => {
     setBpmInput(String(bpm))
@@ -966,6 +968,8 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     if (metronomeEnabled && audioContextRef.current) {
       beatClockRef.current?.setRecordAnchor?.(audioContextRef.current.currentTime)
     }
+    setShowOptions(false)
+    setShowTimingTools(false)
 
     const mimeType = pickRecorderMimeType()
     const recorderStream = mixedStreamRef.current || streamRef.current
@@ -1175,7 +1179,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   // ── Render ──
 
   return (
-    <div className={`overflow-hidden bg-gray-950 relative h-[100dvh] sm:h-auto ${isCaptureMode ? 'sm:rounded-[28px] sm:shadow-2xl' : 'sm:rounded-2xl'}`}>
+    <div className={`overflow-hidden bg-gray-950 relative h-[100dvh] ${isLiveCapture ? 'sm:h-[min(88vh,calc(100dvh-5rem))] sm:min-h-[32rem]' : 'sm:h-auto'} ${isCaptureMode ? 'sm:rounded-[28px] sm:shadow-2xl' : 'sm:rounded-2xl'}`}>
       {/* ── IDLE STATE ── */}
       {state === STATES.IDLE && (
         <div className="h-full sm:aspect-video flex flex-col items-center justify-center gap-3 px-4">
@@ -1288,40 +1292,58 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
 
       {/* ── LIVE PREVIEW / RECORDING ── */}
       {(state === STATES.PREVIEWING || state === STATES.RECORDING) && (
-        <div className="bg-gray-950 relative h-full sm:h-auto" ref={videoContainerRef}>
-          <video
-            ref={setLiveRef}
-            autoPlay
-            muted
-            playsInline
-            className="w-full h-full sm:h-auto sm:aspect-video object-cover"
-            style={{ transform: mode === 'camera' ? 'scaleX(-1)' : 'none' }}
-          />
-
-          {mode === 'screen_cam' && (
-            <PiPOverlay
-              videoContainerRef={videoContainerRef}
-              pipStateRef={pipStateRef}
-              canvasSizeRef={canvasSizeRef}
-              camAspectRef={camAspectRef}
-              draggingRef={draggingRef}
+        <div className="bg-gray-950 relative flex flex-col h-full min-h-0" ref={videoContainerRef}>
+          <div className="relative flex-1 min-h-0 w-full">
+            <video
+              ref={setLiveRef}
+              autoPlay
+              muted
+              playsInline
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ transform: mode === 'camera' ? 'scaleX(-1)' : 'none' }}
             />
-          )}
 
-          <BeatTimingOverlay
-            active={metronomeEnabled && (state === STATES.PREVIEWING || state === STATES.RECORDING)}
-            getPhase={getBeatPhase}
-            hitFlash={hitFlash}
-            showProximity={timingFeedbackEnabled}
-          />
+            {mode === 'screen_cam' && (
+              <PiPOverlay
+                videoContainerRef={videoContainerRef}
+                pipStateRef={pipStateRef}
+                canvasSizeRef={canvasSizeRef}
+                camAspectRef={camAspectRef}
+                draggingRef={draggingRef}
+              />
+            )}
 
-          <div className="absolute inset-x-0 bottom-0 z-20 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-black/90 via-black/70 to-transparent space-y-4">
+            <BeatTimingOverlay
+              active={metronomeEnabled}
+              getPhase={getBeatPhase}
+              hitFlash={hitFlash}
+              showProximity={timingFeedbackEnabled}
+              compactTop={isRecording}
+            />
+
+            {isRecording ? (
+              <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+                <div className="rounded-full bg-red-500/90 px-3 py-1.5 text-xs font-medium text-white shadow">
+                  Recording · {fmtTimer(elapsed)}
+                </div>
+                {metronomeEnabled ? (
+                  <div className="rounded-full bg-black/50 px-3 py-1.5 text-xs text-white/90 backdrop-blur">
+                    {bpm} BPM{timingFeedbackEnabled ? ' · timing on' : ''}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
+          <div className={`shrink-0 z-20 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-black/90 via-black/70 to-transparent ${isRecording ? 'space-y-3' : 'space-y-4'}`}>
+            {!isRecording ? (
+            <>
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/90">
-                  {countInRemaining ? `Starting in ${countInRemaining}` : state === STATES.RECORDING ? 'Recording' : 'Camera ready'}
+                  {countInRemaining ? `Starting in ${countInRemaining}` : 'Camera ready'}
               </div>
               <div className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/70">
-                {state === STATES.RECORDING ? fmtTimer(elapsed) : `Max ${fmtTimer(maxDuration)}`}
+                {`Max ${fmtTimer(maxDuration)}`}
               </div>
             </div>
             <div className="space-y-3">
@@ -1623,7 +1645,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
               </div>
             ) : null}
 
-            {mode === 'screen_cam' && showPipControls ? (
+            {mode === 'screen_cam' && showPipControls && !isRecording ? (
               <div className="space-y-3">
                 <div className="rounded-2xl bg-white/5 px-3 py-3 flex items-center justify-between gap-3">
                   <div>
@@ -1707,9 +1729,16 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
               </div>
             ) : null}
 
-            {state === STATES.RECORDING ? (
+            </>
+            ) : (
+              countInRemaining ? (
+                <p className="text-center text-sm font-medium text-white/90">Starting in {countInRemaining}</p>
+              ) : null
+            )}
+
+            {isRecording ? (
               <div>
-                <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-red-500 transition-all duration-300 ease-linear"
                     style={{ width: `${timerProgress * 100}%` }}
@@ -1719,7 +1748,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
             ) : null}
 
             <div className="flex items-center justify-center gap-3">
-              {state === STATES.PREVIEWING ? (
+              {!isRecording ? (
                 <>
                   <button onClick={handleCancel}
                     className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">

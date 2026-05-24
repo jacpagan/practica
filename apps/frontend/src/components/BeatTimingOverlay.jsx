@@ -27,7 +27,7 @@ function HitBurst({ hitFlash }) {
   )
 }
 
-export default function BeatTimingOverlay({ active, getPhase, hitFlash, showProximity = true }) {
+export default function BeatTimingOverlay({ active, getPhase, hitFlash, showProximity = true, compactTop = false }) {
   const [pulse, setPulse] = useState({ phase: 0, msToNext: 0, isAccent: true })
   const rafRef = useRef(null)
 
