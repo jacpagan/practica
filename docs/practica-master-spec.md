@@ -89,6 +89,10 @@ The core loop is:
 
 This loop is the product. Everything else should support it.
 
+## Recorder Feel
+
+When the metronome is on, the recorder uses a rhythm-game presentation: a horizontal note highway shows the next few beats sliding into a glowing hit zone, the user claps or taps as each beat arrives, and an impact ring bursts at the hit zone — offset left for early and right for late — with no scores, streaks, combos, or judgment text. Downbeats are visually accented (larger amber notes, stronger frame pulse) and audibly heavier (square click layered with a brief triangle tail an octave lower). The flow itself is the feedback; every clap stands alone.
+
 ## Product Goals Supported Today
 
 1. A member can create a private proof take reliably.

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { pickRecorderMimeType } from '../utils'
-import BeatTimingOverlay from './BeatTimingOverlay'
+import NoteHighway from './NoteHighway'
+import BeatBackgroundPulse from './BeatBackgroundPulse'
 import { createBeatClock } from '../metronome/beatClock'
 import { createOnsetDetector } from '../metronome/onsetDetector'
 import { matchOnsetToBeat } from '../metronome/matchHit'
@@ -626,22 +627,43 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     }
 
     const startTime = Number.isFinite(Number(scheduledTime)) ? Number(scheduledTime) : audioContext.currentTime
+    const mult = Math.max(0, Math.min(2, Number(clickGain) || 0))
+    const recordDelay = audioContext.createDelay(1)
+    recordDelay.delayTime.value = metronomeRecordDelaySeconds()
+    recordDelay.connect(destination)
+
+    // Body of the click — square wave, short envelope. Same for accent and
+    // offbeat. Pitch shifts higher on the accent.
     const oscillator = audioContext.createOscillator()
     const gain = audioContext.createGain()
-    const recordDelay = audioContext.createDelay(1)
     oscillator.type = 'square'
     oscillator.frequency.value = isAccent ? 1568 : 988
-    const base = isAccent ? 0.16 : 0.11
-    const mult = Math.max(0, Math.min(2, Number(clickGain) || 0))
+    const base = isAccent ? 0.18 : 0.11
     gain.gain.setValueAtTime(base * mult, startTime)
     gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.05)
-    recordDelay.delayTime.value = metronomeRecordDelaySeconds()
     oscillator.connect(gain)
     gain.connect(audioContext.destination)
     gain.connect(recordDelay)
-    recordDelay.connect(destination)
     oscillator.start(startTime)
-    oscillator.stop(startTime + 0.055)
+    oscillator.stop(startTime + 0.06)
+
+    // On downbeats, layer a brief triangle-wave tail an octave lower so the
+    // downbeat feels heavier and you can hear "the start of the bar" without
+    // any extra latency or scheduling complexity.
+    if (isAccent) {
+      const tail = audioContext.createOscillator()
+      const tailGain = audioContext.createGain()
+      tail.type = 'triangle'
+      tail.frequency.value = 784
+      tailGain.gain.setValueAtTime(0.12 * mult, startTime)
+      tailGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.11)
+      tail.connect(tailGain)
+      tailGain.connect(audioContext.destination)
+      tailGain.connect(recordDelay)
+      tail.start(startTime)
+      tail.stop(startTime + 0.12)
+    }
+
     lastClickAtRef.current = { audioTime: startTime, gain: base * mult }
   }, [metronomeRecordDelaySeconds, clickGain])
 
@@ -1359,14 +1381,20 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
               />
             )}
 
-            <BeatTimingOverlay
+            <BeatBackgroundPulse
               active={metronomeEnabled}
-              getPhase={getBeatPhase}
+              beatTick={beatTickFlash}
+            />
+            <NoteHighway
+              active={metronomeEnabled}
+              beatClockRef={beatClockRef}
+              audioContextRef={audioContextRef}
               hitFlash={timingFeedbackEnabled ? hitFlash : null}
               beatTick={beatTickFlash}
               beatsPerBar={beatsPerBar}
               bpm={bpm}
-              showProximity={timingFeedbackEnabled && !isRecording}
+              countInRemaining={countInRemaining}
+              isRecording={isRecording}
             />
 
             {isRecording ? (
@@ -1388,7 +1416,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
             <>
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/90">
-                  {countInRemaining ? `Starting in ${countInRemaining}` : 'Camera ready'}
+                  {countInRemaining ? '' : 'Camera ready'}
               </div>
               <div className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/70">
                 {`Max ${fmtTimer(maxDuration)}`}

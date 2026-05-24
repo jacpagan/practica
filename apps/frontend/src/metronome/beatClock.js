@@ -79,12 +79,35 @@ export function createBeatClock() {
     }
   }
 
+  // Return the surrounding beats around `now`: a few in the past and several
+  // upcoming. Each beat is stable across calls (keyed by absolute beatIndex
+  // from the clock epoch), so the highway can position notes by their scheduled
+  // audio time and animate them smoothly toward the hit zone.
+  const getSurroundingBeats = (now, { past = 2, future = 6 } = {}) => {
+    const anchor = epoch
+    if (anchor == null || !Number.isFinite(Number(now))) return []
+    const t = Math.max(0, Number(now) - anchor)
+    const currentIndex = Math.floor(t / period)
+    const startIndex = Math.max(0, currentIndex - Math.max(0, Number(past) || 0))
+    const endIndex = currentIndex + Math.max(1, Number(future) || 1)
+    const beats = []
+    for (let i = startIndex; i <= endIndex; i += 1) {
+      beats.push({
+        beatIndex: i,
+        scheduledTime: anchor + i * period,
+        isAccent: i % beatsPerBar === 0,
+      })
+    }
+    return beats
+  }
+
   return {
     configure,
     start,
     stop,
     processTicks,
     getPhase,
+    getSurroundingBeats,
     setRecordAnchor,
     clearRecordAnchor,
     getPeriod: () => period,
