@@ -1,29 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { puckOffsetPx } from '../metronome/timingScore'
+import { getHitLabel, puckOffsetPx } from '../metronome/timingScore'
 
 function tierStyles(tier) {
   if (tier === 'perfect') {
     return {
-      ring: 'border-emerald-400/90 shadow-[0_0_24px_rgba(52,211,153,0.45)]',
-      fill: 'bg-emerald-400/35',
-      text: 'text-emerald-200',
-      label: 'On beat',
+      ring: 'border-emerald-400/90 shadow-[0_0_28px_rgba(52,211,153,0.5)]',
+      fill: 'bg-emerald-400/40',
+      text: 'text-emerald-100',
     }
   }
   if (tier === 'good') {
     return {
-      ring: 'border-amber-400/90 shadow-[0_0_20px_rgba(251,191,36,0.35)]',
-      fill: 'bg-amber-400/25',
-      text: 'text-amber-100',
-      label: null,
+      ring: 'border-amber-300/85 shadow-[0_0_22px_rgba(252,211,77,0.4)]',
+      fill: 'bg-amber-300/30',
+      text: 'text-amber-50',
     }
   }
-  return {
-    ring: 'border-red-400/80 shadow-[0_0_18px_rgba(248,113,113,0.35)]',
-    fill: 'bg-red-500/20',
-    text: 'text-red-200',
-    label: 'Off beat',
-  }
+  return null
 }
 
 function MetronomeDial({ pulse, beatsPerBar, hitFlash, beatTick, large = false }) {
@@ -33,10 +26,13 @@ function MetronomeDial({ pulse, beatsPerBar, hitFlash, beatTick, large = false }
   const tickAge = beatTick ? performance.now() - beatTick.at : 9999
   const tickFlash = tickAge < 120
   const hitAge = hitFlash ? performance.now() - (hitFlash.at || 0) : 9999
-  const hitActive = hitAge < 500
+  const hitActive = hitAge < 520
   const hitStyle = hitActive && hitFlash ? tierStyles(hitFlash.tier) : null
-  const puckX = hitActive && hitFlash ? puckOffsetPx(hitFlash.deltaMs) : 0
+  const puckX = hitActive && hitFlash && hitStyle ? puckOffsetPx(hitFlash.deltaMs) : 0
   const scale = 0.92 + pulse.phase * 0.14
+  const hitLabel = hitActive && hitFlash && hitStyle
+    ? getHitLabel(hitFlash.tier, hitFlash.deltaMs)
+    : ''
 
   const segments = Array.from({ length: Math.max(1, beatsPerBar) }, (_, index) => {
     const angle = (index / beatsPerBar) * Math.PI * 2 - Math.PI / 2
@@ -44,14 +40,14 @@ function MetronomeDial({ pulse, beatsPerBar, hitFlash, beatTick, large = false }
     const y = 50 + (Math.sin(angle) * radius * 100) / size
     const isDownbeat = index === 0
     const isCurrent = beatInBar === index
-    const isHitBeat = hitActive && hitFlash && hitFlash.beatInBar === index
+    const isHitBeat = hitActive && hitFlash && hitFlash.beatInBar === index && hitStyle
 
     return (
       <span
         key={index}
         className={`absolute rounded-full -translate-x-1/2 -translate-y-1/2 transition-all duration-75 ${
-          isHitBeat && hitStyle ? hitStyle.fill : isCurrent ? 'bg-white/90' : isDownbeat ? 'bg-white/55' : 'bg-white/30'
-        } ${isCurrent && tickFlash ? 'scale-150 bg-white' : ''}`}
+          isHitBeat ? hitStyle.fill : isCurrent ? 'bg-white/90' : isDownbeat ? 'bg-white/55' : 'bg-white/30'
+        } ${isCurrent && tickFlash ? 'scale-150 bg-white' : ''} ${isHitBeat ? 'scale-125' : ''}`}
         style={{
           left: `${x}%`,
           top: `${y}%`,
@@ -72,15 +68,21 @@ function MetronomeDial({ pulse, beatsPerBar, hitFlash, beatTick, large = false }
       />
       <div className="absolute inset-2 rounded-full border border-white/10" />
       {segments}
+      {hitActive && hitStyle ? (
+        <div
+          className={`absolute inset-0 rounded-full animate-ping opacity-40 ${hitStyle.fill}`}
+          style={{ animationDuration: '0.55s' }}
+        />
+      ) : null}
       <div
         className={`absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/70 bg-white/25 transition-transform duration-150 ${
           hitActive && hitStyle ? hitStyle.fill : ''
         }`}
         style={{ transform: `translate(calc(-50% + ${puckX}px), -50%)` }}
       />
-      {hitActive && hitFlash ? (
-        <div className={`absolute left-1/2 top-[18%] -translate-x-1/2 text-center text-xs font-semibold drop-shadow ${hitStyle.text}`}>
-          {hitStyle.label || `${hitFlash.deltaMs > 0 ? '+' : ''}${hitFlash.deltaMs} ms`}
+      {hitLabel ? (
+        <div className={`absolute left-1/2 top-[14%] -translate-x-1/2 text-center text-sm font-semibold drop-shadow-md ${hitStyle.text}`}>
+          {hitLabel}
         </div>
       ) : null}
     </div>
@@ -125,6 +127,8 @@ export default function BeatTimingOverlay({
 
   if (!active) return null
 
+  const cheer = liveStats?.liveCheer || (liveStats?.landed > 0 ? `${liveStats.landed} locked in` : '')
+
   return (
     <div className="pointer-events-none absolute inset-0 z-[15] overflow-hidden">
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
@@ -136,24 +140,24 @@ export default function BeatTimingOverlay({
           large={large}
         />
         {showProximity ? (
-          <p className={`text-[11px] text-white/75 tabular-nums ${compactTop ? '' : ''}`}>
-            {Math.round(pulse.msToNext)} ms to next beat
+          <p className="text-[11px] text-white/75">
+            Feel the next beat coming
           </p>
         ) : null}
       </div>
 
-      {showLiveScore && liveStats?.total > 0 ? (
+      {showLiveScore && cheer ? (
         <div
-          className={`absolute left-1/2 -translate-x-1/2 rounded-full border border-white/15 bg-black/55 px-4 py-2 text-center backdrop-blur ${
+          className={`absolute left-1/2 -translate-x-1/2 rounded-full border border-emerald-400/30 bg-emerald-950/70 px-4 py-2 text-center backdrop-blur ${
             compactTop ? 'bottom-24' : 'bottom-8'
           }`}
         >
-          <p className="text-lg font-semibold text-white tabular-nums">{liveStats.score ?? '—'}</p>
-          <p className="text-[10px] uppercase tracking-wide text-white/50">timing score</p>
-          <p className="mt-1 text-[11px] text-white/70">
-            {liveStats.perfect} on · {liveStats.good} close
-            {liveStats.streak > 1 ? ` · streak ${liveStats.streak}` : ''}
-          </p>
+          <p className="text-sm font-semibold text-emerald-50">{cheer}</p>
+          {liveStats?.perfect > 0 ? (
+            <p className="mt-0.5 text-[11px] text-emerald-200/80">
+              {liveStats.perfect} locked in{liveStats.good > 0 ? ` · ${liveStats.good} close` : ''}
+            </p>
+          ) : null}
         </div>
       ) : null}
     </div>

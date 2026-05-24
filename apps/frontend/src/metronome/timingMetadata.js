@@ -39,8 +39,9 @@ export function buildTimingMetadata({
     hits: trimmed,
     summary: summarizeTimingHits(trimmed),
     score: stats.score,
-    grade: stats.grade,
+    landed: stats.landed,
     max_streak: stats.maxStreak,
+    encouragement: stats.encouragement,
   }
 }
 

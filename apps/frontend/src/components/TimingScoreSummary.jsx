@@ -12,47 +12,43 @@ export default function TimingScoreSummary({ timingMetadata, compact = false }) 
       deltaMs: hit.delta_ms,
     })),
   )
-  const score = meta.score ?? stats.score
-  if (score == null && stats.total === 0) return null
+  const landed = stats.landed || stats.perfect + stats.good
+  if (!landed && stats.score == null) return null
 
-  const grade = meta.grade || stats.grade
+  const encouragement = meta.encouragement || stats.encouragement
 
   if (compact) {
     return (
-      <div className="rounded-xl bg-black/55 px-3 py-2 text-xs text-white/90 backdrop-blur border border-white/10">
-        <span className="font-semibold text-white">{score}</span>
-        <span className="text-white/60"> timing · </span>
-        <span>{stats.perfect} on beat</span>
+      <div className="rounded-xl bg-emerald-950/60 px-3 py-2 text-xs text-emerald-50 backdrop-blur border border-emerald-400/25">
+        <span className="font-semibold">{landed} locked in</span>
+        {stats.maxStreak > 1 ? <span className="text-emerald-200/80"> · best streak {stats.maxStreak}</span> : null}
       </div>
     )
   }
 
   return (
-    <div className="rounded-2xl border border-white/15 bg-black/60 backdrop-blur px-4 py-3 space-y-2">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <p className="text-[11px] uppercase tracking-wide text-white/55">Timing score</p>
-          <p className="text-3xl font-semibold text-white tabular-nums">{score}</p>
-        </div>
-        {grade ? (
-          <div className="rounded-xl bg-white/10 px-3 py-2 text-center">
-            <p className="text-[10px] uppercase tracking-wide text-white/50">Grade</p>
-            <p className="text-xl font-bold text-white">{grade}</p>
-          </div>
-        ) : null}
+    <div className="rounded-2xl border border-emerald-400/25 bg-emerald-950/50 backdrop-blur px-4 py-3 space-y-3">
+      <div>
+        <p className="text-[11px] uppercase tracking-wide text-emerald-200/70">Your groove this take</p>
+        <p className="mt-1 text-3xl font-semibold text-white tabular-nums">{landed}</p>
+        <p className="text-sm text-emerald-100/90">on-beat moments</p>
       </div>
-      <div className="flex flex-wrap gap-3 text-xs text-white/75">
-        <span><span className="text-emerald-300 font-medium">{stats.perfect}</span> on beat</span>
-        <span><span className="text-amber-300 font-medium">{stats.good}</span> close</span>
-        {stats.off > 0 ? (
-          <span><span className="text-red-300 font-medium">{stats.off}</span> off</span>
+      {encouragement ? (
+        <p className="text-sm leading-snug text-emerald-50/95">{encouragement}</p>
+      ) : null}
+      <div className="flex flex-wrap gap-3 text-xs text-emerald-100/85">
+        {stats.perfect > 0 ? (
+          <span><span className="font-semibold text-white">{stats.perfect}</span> locked in</span>
+        ) : null}
+        {stats.good > 0 ? (
+          <span><span className="font-semibold text-white">{stats.good}</span> close (still counts)</span>
         ) : null}
         {stats.maxStreak > 1 ? (
-          <span>Best streak <span className="text-white font-medium">{stats.maxStreak}</span></span>
+          <span>Best streak <span className="font-semibold text-white">{stats.maxStreak}</span></span>
         ) : null}
       </div>
       {meta.bpm ? (
-        <p className="text-[11px] text-white/45">{meta.bpm} BPM · {meta.beats_per_bar || 4}/4</p>
+        <p className="text-[11px] text-emerald-200/50">{meta.bpm} BPM · {meta.beats_per_bar || 4}/4</p>
       ) : null}
     </div>
   )
