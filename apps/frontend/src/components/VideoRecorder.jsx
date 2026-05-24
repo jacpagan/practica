@@ -974,7 +974,12 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   // ── Recording ──
 
   const startActualRecording = () => {
-    if (!streamRef.current) return
+    if (!streamRef.current) {
+      // #region agent log
+      try { fetch('http://127.0.0.1:7816/ingest/4cf42864-5c58-4592-a71b-3d77266881dd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2c19e2'},body:JSON.stringify({sessionId:'2c19e2',hypothesisId:'H3',location:'VideoRecorder.jsx:startActualRecording',message:'early return: no streamRef',data:{},timestamp:Date.now()})}).catch(()=>{}) } catch(e){}
+      // #endregion
+      return
+    }
 
     if (!audioDestinationRef.current) {
       ensureAudioMix(streamRef.current)
@@ -996,15 +1001,34 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
 
     const mimeType = pickRecorderMimeType()
     const recorderStream = mixedStreamRef.current || streamRef.current
-    const recorder = mimeType
-      ? new MediaRecorder(recorderStream, { mimeType })
-      : new MediaRecorder(recorderStream)
+    // #region agent log
+    try { fetch('http://127.0.0.1:7816/ingest/4cf42864-5c58-4592-a71b-3d77266881dd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2c19e2'},body:JSON.stringify({sessionId:'2c19e2',hypothesisId:'H1,H2',location:'VideoRecorder.jsx:startActualRecording',message:'about to construct MediaRecorder',data:{mimeType,useMixed:Boolean(mixedStreamRef.current),audioCtxState:audioContextRef.current?.state||null,videoTracks:recorderStream?.getVideoTracks?.().length||0,audioTracks:recorderStream?.getAudioTracks?.().length||0,videoTrackStates:recorderStream?.getVideoTracks?.().map(t=>({readyState:t.readyState,muted:t.muted}))||[],audioTrackStates:recorderStream?.getAudioTracks?.().map(t=>({readyState:t.readyState,muted:t.muted,label:t.label?.slice(0,40)}))||[]},timestamp:Date.now()})}).catch(()=>{}) } catch(e){}
+    // #endregion
+    let recorder
+    try {
+      recorder = mimeType
+        ? new MediaRecorder(recorderStream, { mimeType })
+        : new MediaRecorder(recorderStream)
+    } catch (constructorError) {
+      // #region agent log
+      try { fetch('http://127.0.0.1:7816/ingest/4cf42864-5c58-4592-a71b-3d77266881dd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2c19e2'},body:JSON.stringify({sessionId:'2c19e2',hypothesisId:'H1',location:'VideoRecorder.jsx:startActualRecording',message:'MediaRecorder constructor threw',data:{name:String(constructorError?.name||''),message:String(constructorError?.message||''),mimeType},timestamp:Date.now()})}).catch(()=>{}) } catch(e){}
+      // #endregion
+      setError(`Recorder failed: ${constructorError?.name || 'error'} — ${constructorError?.message || ''}`)
+      setState(STATES.IDLE)
+      return
+    }
     recorderRef.current = recorder
     chunksRef.current = []
     setElapsed(0)
 
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) chunksRef.current.push(e.data)
+    }
+
+    recorder.onerror = (event) => {
+      // #region agent log
+      try { fetch('http://127.0.0.1:7816/ingest/4cf42864-5c58-4592-a71b-3d77266881dd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2c19e2'},body:JSON.stringify({sessionId:'2c19e2',hypothesisId:'H1,H2',location:'VideoRecorder.jsx:recorder.onerror',message:'MediaRecorder emitted error',data:{name:String(event?.error?.name||''),message:String(event?.error?.message||''),recorderState:recorder?.state||null},timestamp:Date.now()})}).catch(()=>{}) } catch(e){}
+      // #endregion
     }
 
     recorder.onstop = () => {
@@ -1027,7 +1051,19 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       setState(STATES.RECORDED)
     }
 
-    recorder.start(500)
+    try {
+      recorder.start(500)
+      // #region agent log
+      try { fetch('http://127.0.0.1:7816/ingest/4cf42864-5c58-4592-a71b-3d77266881dd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2c19e2'},body:JSON.stringify({sessionId:'2c19e2',hypothesisId:'H2',location:'VideoRecorder.jsx:startActualRecording',message:'recorder.start(500) returned',data:{recorderState:recorder.state,mimeType:recorder.mimeType},timestamp:Date.now()})}).catch(()=>{}) } catch(e){}
+      // #endregion
+    } catch (startError) {
+      // #region agent log
+      try { fetch('http://127.0.0.1:7816/ingest/4cf42864-5c58-4592-a71b-3d77266881dd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2c19e2'},body:JSON.stringify({sessionId:'2c19e2',hypothesisId:'H2',location:'VideoRecorder.jsx:startActualRecording',message:'recorder.start(500) threw',data:{name:String(startError?.name||''),message:String(startError?.message||'')},timestamp:Date.now()})}).catch(()=>{}) } catch(e){}
+      // #endregion
+      setError(`Recorder.start failed: ${startError?.name || 'error'} — ${startError?.message || ''}`)
+      setState(STATES.IDLE)
+      return
+    }
     setState(STATES.RECORDING)
 
     const startTime = Date.now()
@@ -1039,6 +1075,9 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   }
 
   const startRecording = () => {
+    // #region agent log
+    try { fetch('http://127.0.0.1:7816/ingest/4cf42864-5c58-4592-a71b-3d77266881dd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2c19e2'},body:JSON.stringify({sessionId:'2c19e2',hypothesisId:'H5',location:'VideoRecorder.jsx:startRecording',message:'tap recorder start',data:{metronomeEnabled,bpm,beatsPerBar,hasStream:Boolean(streamRef.current),hasMixedStream:Boolean(mixedStreamRef.current),audioCtxState:audioContextRef.current?.state||null,ua:navigator.userAgent.slice(0,120)},timestamp:Date.now()})}).catch(()=>{}) } catch(e){}
+    // #endregion
     if (!streamRef.current) return
     if (!metronomeEnabled) {
       startActualRecording()
@@ -1060,6 +1099,9 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     }, beatDurationMs)
 
     countInTimeoutRef.current = setTimeout(() => {
+      // #region agent log
+      try { fetch('http://127.0.0.1:7816/ingest/4cf42864-5c58-4592-a71b-3d77266881dd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2c19e2'},body:JSON.stringify({sessionId:'2c19e2',hypothesisId:'H3,H4,H5',location:'VideoRecorder.jsx:countInTimeout',message:'count-in timeout fired',data:{hasStream:Boolean(streamRef.current),hasMixedStream:Boolean(mixedStreamRef.current),audioCtxState:audioContextRef.current?.state||null,videoTracks:streamRef.current?.getVideoTracks?.().map(t=>({readyState:t.readyState,enabled:t.enabled,muted:t.muted}))||[],mixedAudioTracks:mixedStreamRef.current?.getAudioTracks?.().map(t=>({readyState:t.readyState,enabled:t.enabled,muted:t.muted}))||[]},timestamp:Date.now()})}).catch(()=>{}) } catch(e){}
+      // #endregion
       cancelCountIn()
       startActualRecording()
     }, beatDurationMs * beatsPerBar)
