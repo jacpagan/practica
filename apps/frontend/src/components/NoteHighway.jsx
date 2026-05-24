@@ -10,6 +10,7 @@ const NOTE_POOL_FUTURE = 6
 const IMPACT_FADE_MS = 700
 const MAX_IMPACTS = 6
 const POSITION_RANGE_MS = Math.round(GOOD_MS * 2.2)
+const noteSizePx = (isAccent) => (isAccent ? 18 : 12)
 
 const triggerHaptic = (deltaMs) => {
   if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return
@@ -43,7 +44,9 @@ function HitImpact({ deltaMs, at, id }) {
     : Math.abs(deltaMs) <= GOOD_MS
       ? 'good'
       : 'off'
-  const offsetPct = Math.max(-12, Math.min(12, (Math.max(-POSITION_RANGE_MS, Math.min(POSITION_RANGE_MS, deltaMs)) / POSITION_RANGE_MS) * 12))
+  // On-beat hits land on the line; only clearly early/late hits shift sideways.
+  const displayDeltaMs = tier === 'off' ? deltaMs : 0
+  const offsetPct = Math.max(-12, Math.min(12, (Math.max(-POSITION_RANGE_MS, Math.min(POSITION_RANGE_MS, displayDeltaMs)) / POSITION_RANGE_MS) * 12))
   const ringClass = tier === 'perfect'
     ? 'border-emerald-300/90 shadow-[0_0_28px_rgba(110,231,183,0.7)]'
     : tier === 'good'
@@ -136,7 +139,7 @@ export default function NoteHighway({
           node.className = beat.isAccent
             ? 'absolute top-1/2 -translate-y-1/2 rounded-full bg-amber-300 shadow-[0_0_14px_rgba(252,211,77,0.7)]'
             : 'absolute top-1/2 -translate-y-1/2 rounded-full bg-white/90 shadow-[0_0_8px_rgba(255,255,255,0.4)]'
-          const size = beat.isAccent ? 18 : 12
+          const size = noteSizePx(beat.isAccent)
           node.style.width = `${size}px`
           node.style.height = `${size}px`
           node.style.willChange = 'transform, opacity'
@@ -145,12 +148,13 @@ export default function NoteHighway({
           container.appendChild(node)
           noteElsRef.current.set(beat.beatIndex, node)
         }
-        // x relative to container left; ease past notes leftward with fade.
+        // x relative to container left; center the note on the line when dt === 0.
+        const size = noteSizePx(beat.isAccent)
         const x = hitX + dt * pxPerSecond
         const opacity = dt < 0
           ? Math.max(0, 1 + dt / (period * PAST_FADE_BEATS))
           : 1
-        node.style.transform = `translate3d(${x - (beat.isAccent ? 9 : 6)}px, -50%, 0)`
+        node.style.transform = `translate3d(${x - size / 2}px, -50%, 0)`
         node.style.opacity = String(opacity)
       })
 

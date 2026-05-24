@@ -6,7 +6,8 @@ import { createBeatClock } from '../metronome/beatClock'
 import { createOnsetDetector } from '../metronome/onsetDetector'
 import { matchOnsetToBeat } from '../metronome/matchHit'
 import { buildTimingMetadata } from '../metronome/timingMetadata'
-import { clampBpm as clampBpmValue, MIN_BPM, MAX_BPM } from '../metronome/constants'
+import { clampBpm as clampBpmValue, MIN_BPM, MAX_BPM, ONSET_ANALYSER_FFT } from '../metronome/constants'
+import { estimateTapLatencyMs } from '../metronome/tapLatency'
 
 const STATES = {
   IDLE: 'idle',
@@ -513,7 +514,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
         micGainNode.gain.value = micGain
         micGainNodeRef.current = micGainNode
         const analyser = audioContext.createAnalyser()
-        analyser.fftSize = 2048
+        analyser.fftSize = ONSET_ANALYSER_FFT
         analyserRef.current = analyser
         micSource.connect(micGainNode)
         micGainNode.connect(analyser)
@@ -522,7 +523,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
           onsetDetectorRef.current = createOnsetDetector(analyser)
         }
         if (!meterRafRef.current) {
-          const data = new Float32Array(analyser.frequencyBinCount)
+          const data = new Float32Array(analyser.fftSize)
           const tick = () => {
             try {
               analyser.getFloatTimeDomainData(data)
@@ -581,7 +582,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
             gain.gain.value = micGain
             micGainNodeRef.current = gain
             const analyser = audioContext.createAnalyser()
-            analyser.fftSize = 2048
+            analyser.fftSize = ONSET_ANALYSER_FFT
             analyserRef.current = analyser
             source.connect(gain)
             gain.connect(analyser)
@@ -590,7 +591,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
               onsetDetectorRef.current = createOnsetDetector(analyser)
             }
             if (!meterRafRef.current) {
-              const data = new Float32Array(analyser.frequencyBinCount)
+              const data = new Float32Array(analyser.fftSize)
               const tick = () => {
                 try {
                   analyser.getFloatTimeDomainData(data)
@@ -715,11 +716,16 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       }
     }
 
+    const audioContext = audioContextRef.current
+    const analyser = analyserRef.current
+    const latencyCompensationMs = estimateTapLatencyMs(audioContext, analyser?.fftSize)
+
     const match = matchOnsetToBeat({
       onsetTime: onset.onsetTime,
       epoch,
       period: beatClock.getPeriod(),
       beatsPerBar,
+      latencyCompensationMs,
     })
     if (!match) return
     if (match.beatIndex === lastMatchedBeatRef.current) return

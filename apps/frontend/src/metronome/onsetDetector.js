@@ -41,16 +41,15 @@ export function createOnsetDetector(analyser) {
 
     if (!strong || now - lastHitAt < ONSET_REFRACTORY_S) return null
 
-    // Backdate to the attack within the analyser window so hits line up with
-    // the note highway instead of reporting ~1 frame + buffer latency late.
-    const attackThreshold = peak * 0.35
+    // Backdate to the first sample in this window that crosses the hit threshold
+    // (attack onset), not the peak — peaks arrive after you actually tap/clap.
+    const hitThreshold = Math.max(0.05, noiseFloor * 3.5)
     let onsetIdx = peakIdx
-    for (let i = peakIdx; i >= 0; i -= 1) {
-      if (Math.abs(buffer[i]) < attackThreshold) {
-        onsetIdx = Math.min(buffer.length - 1, i + 1)
+    for (let i = 0; i <= peakIdx; i += 1) {
+      if (Math.abs(buffer[i]) >= hitThreshold) {
+        onsetIdx = i
         break
       }
-      if (i === 0) onsetIdx = 0
     }
     const samplesAgo = buffer.length - 1 - onsetIdx
     const onsetTime = now - samplesAgo / sampleRate
