@@ -6,6 +6,8 @@ import SkillField from './SkillField'
 import useSessionDetailEditActions from '../hooks/useSessionDetailEditActions'
 import useSessionDetailMediaActions from '../hooks/useSessionDetailMediaActions'
 
+const THREAD_SLIDE_TRANSITION_MS = 280
+
 function SessionDetail({
   session: initialSession,
   sessions = [],
@@ -27,6 +29,11 @@ function SessionDetail({
   const [session, setSession] = useState(initialSession)
   const swipeRef = useRef(null)
   const railWheelRef = useRef(0)
+  const transitionStartTimerRef = useRef(null)
+  const transitionFinishTimerRef = useRef(null)
+  const threadNavigationRef = useRef(null)
+  const threadTransitionRef = useRef(null)
+  const [threadTransition, setThreadTransition] = useState(null)
   const authHeaders = useMemo(() => (token ? { Authorization: `Token ${token}` } : {}), [token])
   const canEdit = Boolean(session?.can_edit)
   const returnRouteView = String(returnRoute?.view || '').trim()
@@ -108,6 +115,8 @@ function SessionDetail({
       next: index >= 0 && index < items.length - 1 ? items[index + 1] : null,
     }
   }, [session, sessions])
+  threadNavigationRef.current = threadNavigation
+  threadTransitionRef.current = threadTransition
   const hasThreadNavigation = threadNavigation.items.length > 1
   const threadLabel = session?.practice_series ? session.practice_series : 'Ungrouped'
   const threadPositionLabel = hasThreadNavigation && threadNavigation.index >= 0
@@ -116,7 +125,40 @@ function SessionDetail({
 
   const openThreadSession = (targetSession) => {
     if (!targetSession?.id) return
-    onOpenSession?.(targetSession, returnRoute || { view: 'progress', sessionId: null, seriesName: '' })
+    if (threadTransitionRef.current?.targetSession?.id === targetSession.id) return
+
+    const targetId = Number(targetSession.id)
+    const currentNavigation = threadNavigationRef.current || threadNavigation
+    const targetIndex = currentNavigation.items.findIndex((item) => Number(item?.id) === targetId)
+    const direction = targetIndex > currentNavigation.index ? 'next' : 'previous'
+    const shouldReduceMotion = (() => {
+      try {
+        return window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+      } catch {
+        return false
+      }
+    })()
+
+    if (shouldReduceMotion) {
+      onOpenSession?.(targetSession, returnRoute || { view: 'progress', sessionId: null, seriesName: '' })
+      return
+    }
+
+    if (transitionStartTimerRef.current) window.clearTimeout(transitionStartTimerRef.current)
+    if (transitionFinishTimerRef.current) window.clearTimeout(transitionFinishTimerRef.current)
+
+    threadTransitionRef.current = { targetSession, direction, active: false }
+    setThreadTransition(threadTransitionRef.current)
+    transitionStartTimerRef.current = window.setTimeout(() => {
+      setThreadTransition((current) => (
+        current?.targetSession?.id === targetSession.id ? { ...current, active: true } : current
+      ))
+    }, 20)
+    transitionFinishTimerRef.current = window.setTimeout(() => {
+      threadTransitionRef.current = null
+      setThreadTransition(null)
+      onOpenSession?.(targetSession, returnRoute || { view: 'progress', sessionId: null, seriesName: '' })
+    }, THREAD_SLIDE_TRANSITION_MS + 60)
   }
 
   const beginSwipe = (clientX, clientY) => {
@@ -133,14 +175,15 @@ function SessionDetail({
     const absX = Math.abs(deltaX)
     const absY = Math.abs(deltaY)
     const swipeThreshold = 50
+    const currentNavigation = threadNavigationRef.current || threadNavigation
 
     if (absY >= swipeThreshold && absY >= absX * 1.1) {
-      return deltaY < 0 ? threadNavigation.next : threadNavigation.previous
+      return deltaY < 0 ? currentNavigation.next : currentNavigation.previous
     }
 
     if (absX < swipeThreshold || absX < absY * 1.25) return null
 
-    return deltaX < 0 ? threadNavigation.next : threadNavigation.previous
+    return deltaX < 0 ? currentNavigation.next : currentNavigation.previous
   }
 
   const finishSwipe = (clientX, clientY) => {
@@ -205,13 +248,34 @@ function SessionDetail({
     openThreadSession(targetSession)
   }
 
+  function stopRailMouseTracking() {
+    window.removeEventListener('mousemove', handleWindowRailMouseMove)
+    window.removeEventListener('mouseup', handleWindowRailMouseUp)
+  }
+
+  function handleWindowRailMouseMove(event) {
+    const targetSession = resolveSwipeTarget(event.clientX, event.clientY)
+    if (!targetSession) return
+    swipeRef.current = null
+    stopRailMouseTracking()
+    openThreadSession(targetSession)
+  }
+
+  function handleWindowRailMouseUp(event) {
+    stopRailMouseTracking()
+    finishSwipe(event.clientX, event.clientY)
+  }
+
   const handleRailMouseDown = (event) => {
     event.stopPropagation()
     beginSwipe(event.clientX, event.clientY)
+    window.addEventListener('mousemove', handleWindowRailMouseMove)
+    window.addEventListener('mouseup', handleWindowRailMouseUp)
   }
 
   const handleRailMouseUp = (event) => {
     event.stopPropagation()
+    stopRailMouseTracking()
     finishSwipe(event.clientX, event.clientY)
   }
 
@@ -236,9 +300,22 @@ function SessionDetail({
     else openThreadSession(threadNavigation.previous)
   }
 
+  const handlePlayerWheel = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const isInRailZone = rect.right - event.clientX <= 96
+    if (!isInRailZone) return
+    handleRailWheel(event)
+  }
+
   useEffect(() => {
     setSession(initialSession)
   }, [initialSession])
+
+  useEffect(() => () => {
+    if (transitionStartTimerRef.current) window.clearTimeout(transitionStartTimerRef.current)
+    if (transitionFinishTimerRef.current) window.clearTimeout(transitionFinishTimerRef.current)
+    stopRailMouseTracking()
+  }, [])
 
   useEffect(() => {
     if (!token || !session?.id) return undefined
@@ -261,6 +338,17 @@ function SessionDetail({
     }
   }, [onSessionUpdate, refreshSession, session?.id, session?.processing_status, token])
 
+  const transitionTargetSources = threadTransition
+    ? sessionVideoSources(threadTransition.targetSession, threadTransition.targetSession?.local_preview_url || '')
+    : []
+  const transitionTargetUrl = transitionTargetSources[0] || null
+  const currentSlideClass = threadTransition?.active
+    ? (threadTransition.direction === 'next' ? '-translate-y-full' : 'translate-y-full')
+    : 'translate-y-0'
+  const targetSlideClass = threadTransition?.active
+    ? 'translate-y-0'
+    : (threadTransition?.direction === 'next' ? 'translate-y-full' : '-translate-y-full')
+
   return (
     <div className="sm:px-6 sm:py-4 sm:pb-28 sm:max-w-3xl sm:mx-auto">
       <div className="hidden sm:block mb-4">
@@ -276,9 +364,7 @@ function SessionDetail({
         </button>
         <div
           className="relative h-[100dvh] sm:h-auto sm:aspect-video bg-black"
-          onPointerDown={handlePointerDown}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={() => { swipeRef.current = null }}
+          onWheel={handlePlayerWheel}
         >
           {playableUrl && !playbackFailed ? (
             <video key={playableUrl} ref={videoRef} src={playableUrl} controls playsInline onError={handlePlaybackError} className="w-full h-full bg-black" />
@@ -289,6 +375,32 @@ function SessionDetail({
                 : 'Video is still preparing for playback.'}
             </div>
           )}
+          {threadTransition ? (
+            <div className="pointer-events-none absolute inset-0 z-40 overflow-hidden bg-black">
+              <div className={`absolute inset-0 transform transition-transform duration-300 ease-out ${currentSlideClass}`}>
+                {playableUrl && !playbackFailed ? (
+                  <video src={playableUrl} muted playsInline className="h-full w-full bg-black object-contain" />
+                ) : (
+                  <div className="h-full w-full bg-black" />
+                )}
+                <div className="absolute bottom-8 left-4 rounded-full bg-black/55 px-3 py-1.5 text-xs font-medium text-white/85 backdrop-blur">
+                  {threadPositionLabel}
+                </div>
+              </div>
+              <div className={`absolute inset-0 transform transition-transform duration-300 ease-out ${targetSlideClass}`}>
+                {transitionTargetUrl ? (
+                  <video src={transitionTargetUrl} muted playsInline className="h-full w-full bg-black object-contain" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-black px-6 text-center text-sm text-white/70">
+                    Video is still preparing for playback.
+                  </div>
+                )}
+                <div className="absolute bottom-8 left-4 max-w-[75%] rounded-full bg-black/55 px-3 py-1.5 text-xs font-medium text-white/85 backdrop-blur">
+                  <span className="block truncate">{threadTransition.targetSession?.title || 'Next proof'}</span>
+                </div>
+              </div>
+            </div>
+          ) : null}
           {hasThreadNavigation ? (
             <>
             <div
