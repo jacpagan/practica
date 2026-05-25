@@ -7,8 +7,7 @@
     "build": "vite build",
     "check:cycles": "madge --circular --extensions js,jsx src",
     "preview": "vite preview",
-    "test:e2e": "npx playwright test",
-    "test:timing": "node --test src/metronome/timingHit.test.mjs"
+    "test:e2e": "npx playwright test"
   },
   "dependencies": {
     "react": "^18.2.0",

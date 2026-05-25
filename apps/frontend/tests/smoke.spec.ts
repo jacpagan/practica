@@ -327,8 +327,7 @@ test('Recording starts and saves a take when the metronome is on', async ({ page
   const recordButton = page.locator('button.bg-red-500.w-20').first()
   await recordButton.click()
 
-  // Count-in shows a big number badge over the hit zone, then disappears.
-  await expect(page.locator('.count-badge').first()).toBeVisible({ timeout: 2000 })
+  await expect(page.getByText(/Starting in/)).toBeVisible({ timeout: 2000 })
 
   // RECORDING state begins. This is the assertion that catches the original
   // bug: when startActualRecording threw a ReferenceError (setTimingLiveStats
@@ -340,11 +339,6 @@ test('Recording starts and saves a take when the metronome is on', async ({ page
   // loop is actually running, not just a one-shot state flip).
   await expect(page.getByText(/Recording · 0:02/)).toBeVisible({ timeout: 4000 })
 
-  // Rhythm-game presentation: the note highway shows upcoming beats. With the
-  // metronome running, at least a couple of notes (each tagged with their
-  // beatIndex) should be on screen sliding toward the hit zone.
-  const noteCount = await page.locator('[data-beat-index]').count()
-  expect(noteCount).toBeGreaterThanOrEqual(2)
 })
 
 test('Record route falls back when selected camera fails', async ({ browser }) => {

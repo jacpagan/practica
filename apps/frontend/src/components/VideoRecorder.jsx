@@ -1,20 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { pickRecorderMimeType } from '../utils'
-import NoteHighway from './NoteHighway'
-import BeatBackgroundPulse from './BeatBackgroundPulse'
 import { createBeatClock } from '../metronome/beatClock'
-import { createOnsetDetector } from '../metronome/onsetDetector'
-import { buildTimingMetadata } from '../metronome/timingMetadata'
-import {
-  clampBpm as clampBpmValue,
-  MIN_BPM,
-  MAX_BPM,
-  ONSET_ANALYSER_FFT,
-} from '../metronome/constants'
-import { speakerVisualLagSeconds } from '../metronome/tapLatency'
-import { readSpeakerPractice, SPEAKER_PRACTICE_STORAGE_KEY } from '../metronome/speakerPractice'
-import { resolveTimingHit, shouldRejectClickBleed } from '../metronome/timingHit'
-import { wireOnsetProcessor } from '../metronome/wireOnsetProcessor'
+import { clampBpm as clampBpmValue, MIN_BPM, MAX_BPM } from '../metronome/constants'
 
 const STATES = {
   IDLE: 'idle',
@@ -76,10 +63,6 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     } catch {}
     return 1
   })
-  const [timingFeedbackEnabled, setTimingFeedbackEnabled] = useState(true)
-  const [speakerPractice, setSpeakerPractice] = useState(readSpeakerPractice)
-  const [hitFlash, setHitFlash] = useState(null)
-  const [beatTickFlash, setBeatTickFlash] = useState(null)
   const [showPipControls, setShowPipControls] = useState(false)
   const [micGain, setMicGain] = useState(1)
   const [micLevel, setMicLevel] = useState(0)
@@ -105,15 +88,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   const chunksRef = useRef([])
   const timerRef = useRef(null)
   const beatClockRef = useRef(null)
-  const onsetDetectorRef = useRef(null)
-  const onsetProcessorRef = useRef(null)
-  const resetOnsetProcessorRef = useRef(null)
-  const handleDetectedOnsetRef = useRef(null)
-  const timingRafRef = useRef(null)
-  const hitsRef = useRef([])
-  const lastMatchedBeatRef = useRef(-1)
-  const timingSnapshotRef = useRef(null)
-  const lastClickAtRef = useRef(null)
+  const metronomeRafRef = useRef(null)
   const countInIntervalRef = useRef(null)
   const countInTimeoutRef = useRef(null)
   const blobUrlRef = useRef(null)
@@ -251,37 +226,29 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     setCountInRemaining(null)
   }, [])
 
-  const stopTimingLoop = useCallback(() => {
-    if (timingRafRef.current) {
-      cancelAnimationFrame(timingRafRef.current)
-      timingRafRef.current = null
+  const stopMetronomeLoop = useCallback(() => {
+    if (metronomeRafRef.current) {
+      cancelAnimationFrame(metronomeRafRef.current)
+      metronomeRafRef.current = null
     }
   }, [])
 
   const stopMetronome = useCallback(() => {
     beatClockRef.current?.stop()
-    lastClickAtRef.current = null
-    lastMatchedBeatRef.current = -1
     setIsMetronomeRunning(false)
   }, [])
 
   const closeAudioContext = useCallback(() => {
-    stopTimingLoop()
+    stopMetronomeLoop()
     const ctx = audioContextRef.current
     audioContextRef.current = null
     audioDestinationRef.current = null
     micGainNodeRef.current = null
     analyserRef.current = null
-    onsetDetectorRef.current = null
-    if (onsetProcessorRef.current) {
-      try { onsetProcessorRef.current.disconnect() } catch {}
-      onsetProcessorRef.current = null
-    }
-    resetOnsetProcessorRef.current = null
     if (meterRafRef.current) { cancelAnimationFrame(meterRafRef.current); meterRafRef.current = null }
     if (!ctx) return
     try { ctx.close() } catch {}
-  }, [stopTimingLoop])
+  }, [stopMetronomeLoop])
 
   const cleanup = useCallback(() => {
     stopTimer()
@@ -313,10 +280,6 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   useEffect(() => {
     try { window.localStorage.setItem(CLICK_GAIN_STORAGE_KEY, String(clickGain)) } catch {}
   }, [clickGain])
-
-  useEffect(() => {
-    try { window.localStorage.setItem(SPEAKER_PRACTICE_STORAGE_KEY, speakerPractice ? '1' : '0') } catch {}
-  }, [speakerPractice])
 
   // Attach stream to video element whenever the ref or stream changes
   const attachStream = useCallback(() => {
@@ -513,30 +476,15 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     throw lastError || new Error('Could not access camera.')
   }, [getAudioConstraints, getVideoConstraints, refreshMediaDevices, selectedAudioInputId, selectedVideoInputId])
 
-  const setupMicTimingChain = useCallback((audioContext, micSource, destination) => {
+  const setupMicChain = useCallback((audioContext, micSource, destination) => {
     const micGainNode = audioContext.createGain()
     micGainNode.gain.value = micGain
     micGainNodeRef.current = micGainNode
     const analyser = audioContext.createAnalyser()
-    analyser.fftSize = ONSET_ANALYSER_FFT
+    analyser.fftSize = 256
     analyserRef.current = analyser
     micSource.connect(micGainNode)
-
-    if (onsetProcessorRef.current) {
-      try { onsetProcessorRef.current.disconnect() } catch {}
-      onsetProcessorRef.current = null
-    }
-    const wired = wireOnsetProcessor(audioContext, micGainNode, (onset) => {
-      handleDetectedOnsetRef.current?.(onset)
-    })
-    if (wired) {
-      onsetProcessorRef.current = wired.processor
-      resetOnsetProcessorRef.current = wired.reset
-      wired.processor.connect(analyser)
-    } else {
-      micGainNode.connect(analyser)
-      onsetDetectorRef.current = createOnsetDetector(analyser)
-    }
+    micGainNode.connect(analyser)
     analyser.connect(destination)
 
     if (!meterRafRef.current) {
@@ -574,7 +522,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       if (audioTracks.length) {
         const micStream = new MediaStream(audioTracks)
         const micSource = audioContext.createMediaStreamSource(micStream)
-        setupMicTimingChain(audioContext, micSource, destination)
+        setupMicChain(audioContext, micSource, destination)
       }
     }
 
@@ -587,7 +535,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     if (mixedAudioTrack) tracks.push(mixedAudioTrack)
     mixedStreamRef.current = new MediaStream(tracks)
     return mixedStreamRef.current
-  }, [setupMicTimingChain])
+  }, [setupMicChain])
 
   // Mix audio from multiple input streams (e.g., mic + system audio)
   const ensureAudioMixForStreams = useCallback(async (streams) => {
@@ -616,7 +564,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
           const source = audioContext.createMediaStreamSource(input)
           const gain = audioContext.createGain()
           if (idx === 0) {
-            setupMicTimingChain(audioContext, source, destination)
+            setupMicChain(audioContext, source, destination)
           } else {
             // Slightly lower system audio
             gain.gain.value = 0.8
@@ -628,7 +576,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     })
 
     return destination.stream
-  }, [setupMicTimingChain])
+  }, [setupMicChain])
 
   const playTickAt = useCallback(async ({ scheduledTime, isAccent }) => {
     const audioContext = audioContextRef.current
@@ -640,152 +588,45 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
 
     const startTime = Number.isFinite(Number(scheduledTime)) ? Number(scheduledTime) : audioContext.currentTime
     const mult = Math.max(0, Math.min(2, Number(clickGain) || 0))
-    const monitorMult = speakerPractice ? Math.min(mult, 0.4) : mult
     const recordDelay = audioContext.createDelay(1)
     recordDelay.delayTime.value = metronomeRecordDelaySeconds()
     recordDelay.connect(destination)
 
-    // Body of the click — square wave, short envelope. Same for accent and
-    // offbeat. Pitch shifts higher on the accent.
     const oscillator = audioContext.createOscillator()
     const gain = audioContext.createGain()
     oscillator.type = 'square'
     oscillator.frequency.value = isAccent ? 1568 : 988
     const base = isAccent ? 0.18 : 0.11
-    gain.gain.setValueAtTime(base * monitorMult, startTime)
+    gain.gain.setValueAtTime(base * mult, startTime)
     gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.05)
     oscillator.connect(gain)
     gain.connect(audioContext.destination)
     gain.connect(recordDelay)
     oscillator.start(startTime)
     oscillator.stop(startTime + 0.06)
-
-    // On downbeats, layer a brief triangle-wave tail an octave lower so the
-    // downbeat feels heavier and you can hear "the start of the bar" without
-    // any extra latency or scheduling complexity.
-    if (isAccent) {
-      const tail = audioContext.createOscillator()
-      const tailGain = audioContext.createGain()
-      tail.type = 'triangle'
-      tail.frequency.value = 784
-      tailGain.gain.setValueAtTime(0.12 * monitorMult, startTime)
-      tailGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.11)
-      tail.connect(tailGain)
-      tailGain.connect(audioContext.destination)
-      tailGain.connect(recordDelay)
-      tail.start(startTime)
-      tail.stop(startTime + 0.12)
-    }
-
-    lastClickAtRef.current = { audioTime: startTime, gain: base * monitorMult }
-  }, [metronomeRecordDelaySeconds, clickGain, speakerPractice])
-
-  const getBeatPhase = useCallback(() => {
-    const ctx = audioContextRef.current
-    if (!ctx || !beatClockRef.current) {
-      return { beatIndex: 0, phase: 0, msToNext: 0, isAccent: true }
-    }
-    return beatClockRef.current.getPhase(ctx.currentTime)
-  }, [])
-
-  const buildRecordedTimingMetadata = useCallback(() => {
-    if (!metronomeEnabled) return null
-    const recordEpoch = beatClockRef.current?.getRecordEpoch?.()
-    if (recordEpoch == null) return null
-    return buildTimingMetadata({
-      bpm,
-      beatsPerBar,
-      syncOffsetMs,
-      hits: hitsRef.current,
-      metronomeEnabled: true,
-    })
-  }, [beatsPerBar, bpm, metronomeEnabled, syncOffsetMs])
+  }, [metronomeRecordDelaySeconds, clickGain])
 
   const notifyRecorded = useCallback((file, previewUrl) => {
-    const timingMetadata = timingSnapshotRef.current || buildRecordedTimingMetadata()
-    try { onRecorded?.(file, previewUrl, timingMetadata) } catch {}
-  }, [buildRecordedTimingMetadata, onRecorded])
+    try { onRecorded?.(file, previewUrl) } catch {}
+  }, [onRecorded])
 
-  const handleTimingHit = useCallback((hit) => {
-    if (!timingFeedbackEnabled) return
-    const beatClock = beatClockRef.current
-    if (!beatClock) return
-
-    const recordEpoch = beatClock.getRecordEpoch?.()
-    const epoch = beatClock.getEpoch?.()
-    if (epoch == null) return
-
-    if (shouldRejectClickBleed(hit, lastClickAtRef.current, speakerPractice)) return
-
-    const audioContext = audioContextRef.current
-    const resolved = resolveTimingHit({
-      hit,
-      epoch,
-      period: beatClock.getPeriod(),
-      beatsPerBar,
-      speakerPractice,
-      syncOffsetMs,
-      audioContext,
-      analyserFftSize: analyserRef.current?.fftSize,
-      visualLagSeconds: speakerVisualLagSeconds(audioContext, speakerPractice),
-    })
-    if (!resolved) return
-    const { match } = resolved
-    if (match.beatIndex === lastMatchedBeatRef.current) return
-
-    lastMatchedBeatRef.current = match.beatIndex
-    if (recordEpoch != null) {
-      const t = hit.onsetTime - recordEpoch
-      hitsRef.current.push({
-        t,
-        deltaMs: match.deltaMs,
-        tier: match.tier,
-        beatIndex: match.beatIndex,
-        beatInBar: match.beatInBar,
-      })
-    }
-    setHitFlash({ ...match, at: performance.now() })
-  }, [beatsPerBar, speakerPractice, syncOffsetMs, timingFeedbackEnabled])
-
-  const handleDetectedOnset = useCallback((onset) => {
-    handleTimingHit(onset)
-  }, [handleTimingHit])
-
-  handleDetectedOnsetRef.current = handleDetectedOnset
-
-  const startTimingLoop = useCallback(() => {
-    if (timingRafRef.current) return
+  const startMetronomeLoop = useCallback(() => {
+    if (metronomeRafRef.current) return
 
     const loop = () => {
       const audioContext = audioContextRef.current
-      const analyser = analyserRef.current
       const beatClock = beatClockRef.current
 
       if (audioContext && beatClock?.isRunning()) {
         beatClock.processTicks(audioContext.currentTime, (tick) => {
-          setBeatTickFlash({ at: performance.now(), isAccent: tick.isAccent })
           playTickAt(tick)
         })
       }
 
-      // Onset detection runs on the audio thread (ScriptProcessor); rAF only drives beats.
-      if (
-        !onsetProcessorRef.current
-        && audioContext
-        && analyser
-        && metronomeEnabled
-        && timingFeedbackEnabled
-        && (state === STATES.RECORDING || state === STATES.PREVIEWING)
-        && onsetDetectorRef.current
-      ) {
-        const onset = onsetDetectorRef.current.tick(audioContext.currentTime)
-        if (onset) handleDetectedOnset(onset)
-      }
-
-      timingRafRef.current = requestAnimationFrame(loop)
+      metronomeRafRef.current = requestAnimationFrame(loop)
     }
-    timingRafRef.current = requestAnimationFrame(loop)
-  }, [handleDetectedOnset, metronomeEnabled, playTickAt, state, timingFeedbackEnabled])
+    metronomeRafRef.current = requestAnimationFrame(loop)
+  }, [playTickAt])
 
   const startMetronome = useCallback(async () => {
     if (!streamRef.current) return
@@ -794,8 +635,6 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     if (!audioContext) return
 
     stopMetronome()
-    onsetDetectorRef.current?.reset?.()
-    resetOnsetProcessorRef.current?.()
     beatClockRef.current.configure({ bpm, beatsPerBar })
     beatClockRef.current.start(audioContext.currentTime + 0.02)
     setIsMetronomeRunning(true)
@@ -823,12 +662,12 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   useEffect(() => {
     const captureActive = state === STATES.PREVIEWING || state === STATES.RECORDING
     if (captureActive && metronomeEnabled) {
-      startTimingLoop()
-      return () => stopTimingLoop()
+      startMetronomeLoop()
+      return () => stopMetronomeLoop()
     }
-    stopTimingLoop()
+    stopMetronomeLoop()
     return undefined
-  }, [metronomeEnabled, startTimingLoop, state, stopTimingLoop])
+  }, [metronomeEnabled, startMetronomeLoop, state, stopMetronomeLoop])
 
   // ── Camera ──
 
@@ -1027,17 +866,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       ensureAudioMix(streamRef.current)
     }
 
-    hitsRef.current = []
-    lastMatchedBeatRef.current = -1
-    timingSnapshotRef.current = null
-    onsetDetectorRef.current?.reset?.()
-    beatClockRef.current?.clearRecordAnchor?.()
-    if (metronomeEnabled && audioContextRef.current) {
-      beatClockRef.current?.setRecordAnchor?.(audioContextRef.current.currentTime)
-    }
     setShowOptions(false)
-    setBeatTickFlash(null)
-    setHitFlash(null)
 
     const mimeType = pickRecorderMimeType()
     const recorderStream = mixedStreamRef.current || streamRef.current
@@ -1072,8 +901,6 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       setRecordedFile(file)
       cancelCountIn()
       stopStream()
-      // Auto-select the recorded video for the parent (optional + guard for accidental short clips)
-      timingSnapshotRef.current = buildRecordedTimingMetadata()
       const shouldAutoUse = Boolean(autoUseOnStop) && (Number(minAutoUseSeconds) <= 0 || Number(elapsed) >= Number(minAutoUseSeconds))
       if (shouldAutoUse) {
         notifyRecorded(file, blobUrlRef.current)
@@ -1379,23 +1206,6 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
               />
             )}
 
-            <BeatBackgroundPulse
-              active={metronomeEnabled}
-              beatTick={beatTickFlash}
-            />
-            <NoteHighway
-              active={metronomeEnabled}
-              beatClockRef={beatClockRef}
-              audioContextRef={audioContextRef}
-              hitFlash={timingFeedbackEnabled ? hitFlash : null}
-              beatTick={beatTickFlash}
-              beatsPerBar={beatsPerBar}
-              bpm={bpm}
-              countInRemaining={countInRemaining}
-              isRecording={isRecording}
-              speakerPractice={speakerPractice}
-            />
-
             {isRecording ? (
               <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
                 <div className="rounded-full bg-red-500/90 px-3 py-1.5 text-xs font-medium text-white shadow">
@@ -1558,36 +1368,8 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-[11px] uppercase tracking-wide text-white/60">Beat feedback</p>
-                        <p className="text-[11px] text-white/55">Mic picks up your hits and shows where they land on the rail.</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setTimingFeedbackEnabled((current) => !current)}
-                        className={`rounded-xl px-3 py-1.5 text-xs transition-colors ${timingFeedbackEnabled ? 'bg-emerald-500 text-white' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
-                      >
-                        {timingFeedbackEnabled ? 'On' : 'Off'}
-                      </button>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-[11px] uppercase tracking-wide text-white/60">Phone speaker mode</p>
-                        <p className="text-[11px] text-white/55">No headphones — metronome plays on speaker.</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setSpeakerPractice((current) => !current)}
-                        className={`rounded-xl px-3 py-1.5 text-xs transition-colors ${speakerPractice ? 'bg-amber-500 text-white' : 'bg-white/10 text-white/80 hover:bg-white/20'}`}
-                      >
-                        {speakerPractice ? 'On' : 'Off'}
-                      </button>
-                    </div>
-
                     <details className="text-[11px] text-white/55">
-                      <summary className="cursor-pointer text-white/65">Advanced: timing calibration</summary>
+                      <summary className="cursor-pointer text-white/65">Advanced: sync recorded click</summary>
                       <div className="mt-2 space-y-2">
                         <div className="flex items-center justify-between gap-3">
                           <span>{syncOffsetMs > 0 ? '+' : ''}{syncOffsetMs} ms</span>
@@ -1608,12 +1390,12 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                           onChange={(e) => setSyncOffsetMs(Number(e.target.value))}
                           className="w-full"
                         />
-                        <p>Playback late → drag left. Playback early → drag right. Hits always late → drag right; always early → drag left.</p>
+                        <p>If playback sounds late, drag left. If early, drag right.</p>
                       </div>
                     </details>
 
                     <p className="text-[11px] text-white/55 leading-relaxed">
-                      Hits are detected from your microphone (stick hits, claps, rim shots). Without headphones, keep phone speaker mode on so the app can ignore the metronome click and line up the notes with what you hear.
+                      Click is mixed into your recording. Use headphones if you only want the click in playback, not bleeding into the mic.
                     </p>
                   </div>
 

@@ -20,11 +20,8 @@ env -u DATABASE_URL -u DB_NAME -u DB_USER -u DB_PASSWORD -u DB_HOST -u DB_PORT \
     videos.tests.test_review_feedback \
     -v 1
 
-echo "[core-loop] timing unit tests"
-cd ../frontend
-npm run test:timing
-
 echo "[core-loop] building frontend"
+cd ../frontend
 npm run build
 
 echo "[core-loop] pass"

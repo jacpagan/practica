@@ -5,7 +5,6 @@ import { useToast } from './Toast'
 import SkillField from './SkillField'
 import useSessionDetailEditActions from '../hooks/useSessionDetailEditActions'
 import useSessionDetailMediaActions from '../hooks/useSessionDetailMediaActions'
-import TimingPlaybackOverlay from './TimingPlaybackOverlay'
 
 const THREAD_SLIDE_TRANSITION_MS = 280
 
@@ -542,13 +541,6 @@ function SessionDetail({
               onEnded={() => setVideoPlaying(false)}
               onError={handlePlaybackError}
               className="w-full h-full bg-black"
-            />
-          ) : null}
-          {playableUrl && !playbackFailed ? (
-            <TimingPlaybackOverlay
-              timingMetadata={session?.timing_metadata}
-              videoRef={videoRef}
-              durationSeconds={session?.duration_seconds}
             />
           ) : null}
           {!playableUrl || playbackFailed ? (
