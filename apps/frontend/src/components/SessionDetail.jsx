@@ -544,14 +544,6 @@ function SessionDetail({
               className="w-full h-full bg-black"
             />
           ) : null}
-<<<<<<< HEAD
-=======
-          {playableUrl && !playbackFailed ? (
-            <TimingPlaybackOverlay
-              timingMetadata={session?.timing_metadata}
-              videoRef={videoRef}
-            />
-          ) : null}
           {playableUrl && !playbackFailed ? (
             <div
               className={`absolute inset-x-0 z-30 ${
@@ -567,7 +559,6 @@ function SessionDetail({
               />
             </div>
           ) : null}
->>>>>>> 207cf84 (Feature: interactive video scrub bar on proof playback)
           {!playableUrl || playbackFailed ? (
             <div className="w-full h-full flex items-center justify-center px-6 text-center text-sm text-white/70">
               {session?.processing_status === 'ready'
