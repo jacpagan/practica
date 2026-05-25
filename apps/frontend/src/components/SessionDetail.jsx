@@ -638,7 +638,7 @@ function SessionDetail({
     <div className="min-h-screen bg-black">
       <div
         ref={playerRef}
-        className="fixed inset-0 z-30 h-[100dvh] w-full overflow-hidden bg-black touch-none"
+        className="sticky top-0 z-30 h-[100dvh] w-full overflow-hidden bg-black touch-none"
         onTouchStart={handlePlayerTouchStart}
         onTouchMove={handlePlayerTouchMove}
         onTouchEnd={handlePlayerTouchEnd}
@@ -791,7 +791,7 @@ function SessionDetail({
         ) : null}
       </div>
 
-      <div ref={detailsRef} className="relative z-20 mt-[100dvh] space-y-3 rounded-t-3xl bg-white p-4 pb-28 sm:mx-auto sm:max-w-lg sm:pb-32">
+      <div ref={detailsRef} className="relative z-40 -mt-4 space-y-3 rounded-t-3xl bg-white p-4 pb-28 sm:mx-auto sm:max-w-lg sm:pb-32">
           {editing ? (
             <div className="space-y-4">
               <input
