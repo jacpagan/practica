@@ -199,8 +199,8 @@ export default function RecorderPage({
             </div>
             <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-4 sm:border-gray-200 sm:bg-white sm:text-gray-900">
               <div>
-                <h2 className="text-lg font-semibold text-white sm:text-gray-900">Which skill was this?</h2>
-                <p className="mt-1 text-sm text-white/70 sm:text-gray-500">Tap a recent skill or type a new one. No plan needed — just label this take.</p>
+                <h2 className="text-lg font-semibold text-white sm:text-gray-900">Label this take (optional)</h2>
+                <p className="mt-1 text-sm text-white/70 sm:text-gray-500">Pick a recent skill or type a new one — or save without one.</p>
               </div>
               {recentSkills.length > 0 ? (
                 <div className="flex flex-wrap gap-2">

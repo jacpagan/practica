@@ -21,12 +21,11 @@ export default function SkillSummaryCard({
 
   if (isUngrouped) {
     return (
-      <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-4 space-y-3">
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
         <div>
           <p className="text-sm font-medium text-gray-900">
-            {proofCount} untagged {proofCount === 1 ? 'proof' : 'proofs'}
+            {proofCount} {proofCount === 1 ? 'proof' : 'proofs'}
           </p>
-          <p className="text-xs text-gray-500 mt-1">Tag these to group them under a skill.</p>
         </div>
         <div className="space-y-2">
           {summary.items.slice(0, 3).map((session) => (

@@ -328,7 +328,6 @@ function AppContent() {
             highlightSession={justUploadedSession}
             onOpenSession={openSession}
             onOpenSkill={goSkill}
-            onSessionUpdate={onDetailSessionUpdate}
           />
         )}
 

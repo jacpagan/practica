@@ -1,12 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef } from 'react'
 import SessionListItem from './SessionListItem'
-import SkillPickerModal from './SkillPickerModal'
 import ActivityCalendar from './ActivityCalendar'
 import SkillSummaryCard from './SkillSummaryCard'
 import VideoThumbnail from './VideoThumbnail'
 import { buildSkillSummaries } from '../progressActivity'
 import { calculatePracticeProgress, fmtDate, toLocalDateKey } from '../utils'
-import { useToast } from './Toast'
 
 const formatCompactDateTime = (value) => {
   const date = new Date(value)
@@ -23,13 +21,8 @@ export default function ProgressView({
   highlightSession = null,
   onOpenSession,
   onOpenSkill,
-  onSessionUpdate,
 }) {
-  const toast = useToast()
   const highlightRef = useRef(null)
-  const [editingSession, setEditingSession] = useState(null)
-  const [draftSkill, setDraftSkill] = useState('')
-  const [saving, setSaving] = useState(false)
 
   const overview = useMemo(() => calculatePracticeProgress(sessions), [sessions])
   const skillSummaries = useMemo(() => buildSkillSummaries(sessions), [sessions])
@@ -57,60 +50,6 @@ export default function ProgressView({
     return sorted[0] || null
   }, [sessions])
 
-  const skillOptions = useMemo(() => {
-    const byCanonicalName = new Map()
-    sessions.forEach((item) => {
-      const rawName = String(item?.practice_series || '').trim()
-      if (!rawName) return
-      const canonicalName = rawName.toLocaleLowerCase()
-      if (byCanonicalName.has(canonicalName)) return
-      byCanonicalName.set(canonicalName, rawName)
-    })
-    return Array.from(byCanonicalName.values()).sort((left, right) => left.localeCompare(right))
-  }, [sessions])
-
-  const openSkillEditor = useCallback((session) => {
-    if (!session?.id) return
-    setEditingSession(session)
-    setDraftSkill(session.practice_series || '')
-  }, [])
-
-  const closeSkillEditor = useCallback(() => {
-    if (saving) return
-    setEditingSession(null)
-    setDraftSkill('')
-  }, [saving])
-
-  const saveSkill = useCallback(async (nextSkill) => {
-    if (!token || !editingSession?.id) return
-    setSaving(true)
-    try {
-      const res = await fetch(`/api/sessions/${editingSession.id}/`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Token ${token}`,
-        },
-        body: JSON.stringify({
-          practice_series: String(nextSkill || '').trim(),
-        }),
-      })
-      if (!res.ok) throw new Error('skill')
-      const data = await res.json()
-      const next = { ...data, local_preview_url: editingSession.local_preview_url || '' }
-      onSessionUpdate?.(next)
-      toast.success(nextSkill ? 'Skill updated' : 'Removed from skill')
-      setEditingSession(null)
-      setDraftSkill('')
-    } catch {
-      toast.error('Could not update the skill')
-    } finally {
-      setSaving(false)
-    }
-  }, [editingSession?.id, editingSession?.local_preview_url, onSessionUpdate, toast, token])
-
-  const clearSkill = useCallback(() => saveSkill(''), [saveSkill])
-
   const justSavedSession = useMemo(() => {
     if (!highlightSession?.id) return null
     return sessions.find((session) => session?.id === highlightSession.id) || highlightSession
@@ -136,7 +75,6 @@ export default function ProgressView({
     )
   }
 
-  const ungroupedCount = ungroupedSummary?.proofCount || 0
   const overviewParts = []
   if (overview.proofCount > 0) {
     overviewParts.push(`${overview.proofCount} ${overview.proofCount === 1 ? 'proof' : 'proofs'}`)
@@ -185,8 +123,8 @@ export default function ProgressView({
                   ? `${todaySessions.length} proofs logged today.`
                   : 'You showed up today.')
                 : sessions.length > 0
-                  ? 'No proof yet today. Tap Record when you are ready.'
-                  : 'Tap Record above when you are ready to practice.'}
+                  ? 'Ready when you are.'
+                  : 'Your archive starts with one take.'}
           </p>
         </div>
 
@@ -201,8 +139,7 @@ export default function ProgressView({
 
         {sessions.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
-            <p className="text-sm text-gray-700">Your proof archive starts with one take.</p>
-            <p className="text-xs text-gray-500 mt-1">Tap Record above to add your first proof.</p>
+            <p className="text-sm text-gray-700">Record your first proof whenever you are ready.</p>
           </div>
         ) : (
           <>
@@ -264,7 +201,6 @@ export default function ProgressView({
             <details className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
               <summary className="cursor-pointer list-none text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors">
                 Full archive
-                {ungroupedCount > 0 ? ` · ${ungroupedCount} untagged` : ''}
               </summary>
               <div className="mt-4 space-y-4 border-t border-gray-100 pt-4">
                 {overviewParts.length > 0 ? (
@@ -277,17 +213,13 @@ export default function ProgressView({
 
                 {ungroupedSummary ? (
                   <div className="space-y-3">
-                    <SkillSummaryCard
-                      summary={ungroupedSummary}
-                      onOpenSession={(session) => onOpenSession?.(session, { view: 'progress', sessionId: null, seriesName: '' })}
-                    />
+                    <p className="text-sm font-medium text-gray-900">Other proofs</p>
                     <div className="space-y-3">
                       {ungroupedSummary.items.map((session) => (
                         <SessionListItem
                           key={session.id}
                           session={session}
                           onOpen={() => onOpenSession?.(session, { view: 'progress', sessionId: null, seriesName: '' })}
-                          onChangeSkill={() => openSkillEditor(session)}
                           prefetch
                           minimal
                         />
@@ -300,18 +232,6 @@ export default function ProgressView({
           </>
         )}
       </div>
-
-      <SkillPickerModal
-        open={Boolean(editingSession)}
-        title={editingSession?.practice_series ? 'Move proof' : 'Add to skill'}
-        initialValue={draftSkill}
-        options={skillOptions}
-        saving={saving}
-        onClose={closeSkillEditor}
-        onSave={saveSkill}
-        onClear={editingSession?.practice_series ? clearSkill : null}
-        clearLabel="Remove from skill"
-      />
     </div>
   )
 }
