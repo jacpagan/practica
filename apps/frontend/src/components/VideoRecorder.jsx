@@ -1223,6 +1223,9 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
           <div className={`shrink-0 z-20 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-black/90 via-black/70 to-transparent ${isRecording ? 'space-y-3' : 'space-y-4'}`}>
             {!isRecording ? (
             <>
+            {countInRemaining ? (
+              <p className="text-center text-lg font-semibold text-white/95">Starting in {countInRemaining}</p>
+            ) : null}
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/90">
                   {countInRemaining ? '' : 'Camera ready'}
@@ -1543,11 +1546,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
             ) : null}
 
             </>
-            ) : (
-              countInRemaining ? (
-                <p className="text-center text-sm font-medium text-white/90">Starting in {countInRemaining}</p>
-              ) : null
-            )}
+            ) : null}
 
             {isRecording ? (
               <div>
