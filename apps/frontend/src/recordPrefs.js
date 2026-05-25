@@ -7,9 +7,6 @@ export const readVideoFitMode = () => {
     const raw = String(window.localStorage.getItem(VIDEO_FIT_KEY) || '').trim()
     if (raw === 'fill' || raw === 'fit') return raw
   } catch {}
-  if (typeof window !== 'undefined' && window.matchMedia?.('(min-width: 640px)')?.matches) {
-    return 'fit'
-  }
   return 'fill'
 }
 

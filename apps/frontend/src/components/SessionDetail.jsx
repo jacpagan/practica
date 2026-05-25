@@ -9,6 +9,9 @@ import VideoScrubBar from './VideoScrubBar'
 import { readVideoFitMode, saveVideoFitMode } from '../recordPrefs'
 
 const THREAD_SLIDE_TRANSITION_MS = 280
+const CONTROLS_HIDE_MS = 2600
+const GESTURE_TAP_MAX_PX = 14
+const GESTURE_DRAG_START_PX = 10
 const VIDEO_OBJECT_CLASS = {
   fill: 'object-cover',
   fit: 'object-contain',
@@ -88,7 +91,10 @@ function SessionDetail({
   const [pagerDrag, setPagerDrag] = useState({ active: false, animating: false, offsetY: 0 })
   const [videoPlaying, setVideoPlaying] = useState(false)
   const [videoFit, setVideoFit] = useState(() => readVideoFitMode())
-  const videoTapRef = useRef({ lastAt: 0, pendingTimer: null })
+  const [controlsVisible, setControlsVisible] = useState(true)
+  const gestureRef = useRef(null)
+  const pagerOffsetRef = useRef(0)
+  const controlsHideTimerRef = useRef(null)
   const authHeaders = useMemo(() => (token ? { Authorization: `Token ${token}` } : {}), [token])
   const canEdit = Boolean(session?.can_edit)
   const returnRouteView = String(returnRoute?.view || '').trim()
@@ -271,12 +277,6 @@ function SessionDetail({
     }, THREAD_SLIDE_TRANSITION_MS)
   }
 
-  const beginPlayerDrag = (clientX, clientY) => {
-    if (!hasThreadNavigation || threadTransitionRef.current) return
-    swipeRef.current = { x: clientX, y: clientY, player: true }
-    setPagerDrag({ active: true, animating: false, offsetY: 0 })
-  }
-
   const updatePlayerDrag = (clientX, clientY) => {
     const start = swipeRef.current
     if (!start?.player || !hasThreadNavigation) return
@@ -289,14 +289,14 @@ function SessionDetail({
     }
     const limit = playerHeight() * 0.92
     offsetY = Math.max(-limit, Math.min(limit, offsetY))
+    pagerOffsetRef.current = offsetY
     setPagerDrag({ active: true, animating: false, offsetY })
   }
 
   const finishPlayerDrag = () => {
-    const start = swipeRef.current
     swipeRef.current = null
-    if (!start?.player || !hasThreadNavigation) return
-    const offsetY = pagerDrag.offsetY
+    if (!hasThreadNavigation) return
+    const offsetY = pagerOffsetRef.current
     const threshold = Math.min(140, playerHeight() * 0.22)
     if (offsetY <= -threshold && threadNavigation.next) {
       completePagerNavigation(threadNavigation.next, 'next')
@@ -312,79 +312,118 @@ function SessionDetail({
   const handlePlayerTouchStart = (event) => {
     const touch = event.touches?.[0]
     if (!touch) return
-    beginPlayerDrag(touch.clientX, touch.clientY)
+    beginGesture(touch.clientX, touch.clientY)
   }
 
   const handlePlayerTouchMove = (event) => {
     const touch = event.touches?.[0]
     if (!touch) return
-    updatePlayerDrag(touch.clientX, touch.clientY)
+    updateGestureDrag(touch.clientX, touch.clientY)
   }
 
-  const handlePlayerTouchEnd = () => finishPlayerDrag()
+  const handlePlayerTouchEnd = () => finishGesture()
 
   const handlePlayerPointerDown = (event) => {
     if (event.pointerType === 'touch') return
-    beginPlayerDrag(event.clientX, event.clientY)
+    beginGesture(event.clientX, event.clientY)
   }
 
   const handlePlayerPointerMove = (event) => {
     if (event.pointerType === 'touch') return
-    updatePlayerDrag(event.clientX, event.clientY)
+    updateGestureDrag(event.clientX, event.clientY)
   }
 
   const handlePlayerPointerUp = (event) => {
     if (event.pointerType === 'touch') return
-    finishPlayerDrag()
+    finishGesture()
   }
 
-  const handleOpenDetails = (event) => {
+  const stopPlayerGesture = (event) => {
     event.stopPropagation()
-    detailsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
   }
 
-  const togglePlayback = (event) => {
+  const revealControls = useCallback(() => {
+    setControlsVisible(true)
+    if (controlsHideTimerRef.current) {
+      window.clearTimeout(controlsHideTimerRef.current)
+      controlsHideTimerRef.current = null
+    }
+  }, [])
+
+  const scheduleHideControls = useCallback(() => {
+    if (controlsHideTimerRef.current) window.clearTimeout(controlsHideTimerRef.current)
+    controlsHideTimerRef.current = window.setTimeout(() => {
+      setControlsVisible(false)
+      controlsHideTimerRef.current = null
+    }, CONTROLS_HIDE_MS)
+  }, [])
+
+  const togglePlayback = useCallback((event) => {
     event?.stopPropagation?.()
     const video = videoRef.current
     if (!video) return
+    revealControls()
     if (video.paused) video.play?.().catch?.(() => {})
     else video.pause?.()
-  }
+  }, [revealControls])
 
   const videoObjectClass = VIDEO_OBJECT_CLASS[videoFit] || VIDEO_OBJECT_CLASS.fill
-  const videoSurfaceClass = `absolute inset-0 h-full w-full bg-black ${videoObjectClass} sm:static sm:inset-auto`
+  const videoSurfaceClass = `absolute inset-0 h-full w-full bg-black ${videoObjectClass}`
 
   const toggleVideoFit = useCallback((event) => {
     event?.stopPropagation?.()
-    setVideoFit((current) => {
-      const next = saveVideoFitMode(current === 'fill' ? 'fit' : 'fill')
-      return next
-    })
-  }, [])
+    revealControls()
+    setVideoFit((current) => saveVideoFitMode(current === 'fill' ? 'fit' : 'fill'))
+  }, [revealControls])
 
-  const handleVideoClick = (event) => {
-    event?.stopPropagation?.()
-    const now = Date.now()
-    if (now - videoTapRef.current.lastAt < 320) {
-      if (videoTapRef.current.pendingTimer) {
-        window.clearTimeout(videoTapRef.current.pendingTimer)
-        videoTapRef.current.pendingTimer = null
-      }
-      videoTapRef.current.lastAt = 0
-      toggleVideoFit(event)
-      return
-    }
-    videoTapRef.current.lastAt = now
-    if (videoTapRef.current.pendingTimer) window.clearTimeout(videoTapRef.current.pendingTimer)
-    videoTapRef.current.pendingTimer = window.setTimeout(() => {
-      if (videoTapRef.current.lastAt === now) togglePlayback(event)
-      videoTapRef.current.pendingTimer = null
-    }, 320)
+  const handleOpenDetails = (event) => {
+    event.stopPropagation()
+    revealControls()
+    detailsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
   }
 
-  useEffect(() => () => {
-    if (videoTapRef.current.pendingTimer) window.clearTimeout(videoTapRef.current.pendingTimer)
-  }, [])
+  const resetGesture = () => {
+    gestureRef.current = null
+  }
+
+  const beginGesture = (clientX, clientY) => {
+    gestureRef.current = { x: clientX, y: clientY, dragging: false, moved: false }
+  }
+
+  const updateGestureDrag = (clientX, clientY) => {
+    const gesture = gestureRef.current
+    if (!gesture) return
+    const deltaX = clientX - gesture.x
+    const deltaY = clientY - gesture.y
+    if (Math.abs(deltaX) > GESTURE_TAP_MAX_PX || Math.abs(deltaY) > GESTURE_TAP_MAX_PX) {
+      gesture.moved = true
+    }
+    if (gesture.dragging) {
+      updatePlayerDrag(clientX, clientY)
+      return
+    }
+    if (!hasThreadNavigation || threadTransitionRef.current) return
+    if (Math.abs(deltaY) < GESTURE_DRAG_START_PX) return
+    if (Math.abs(deltaY) < Math.abs(deltaX) * 1.15) return
+    gesture.dragging = true
+    swipeRef.current = { x: gesture.x, y: gesture.y, player: true }
+    setPagerDrag({ active: true, animating: false, offsetY: 0 })
+    pagerOffsetRef.current = 0
+    updatePlayerDrag(clientX, clientY)
+  }
+
+  const finishGesture = () => {
+    const gesture = gestureRef.current
+    resetGesture()
+    if (!gesture) return
+    if (gesture.dragging) {
+      finishPlayerDrag()
+      return
+    }
+    if (!gesture.moved) {
+      togglePlayback()
+    }
+  }
 
   const handleSwipeStart = (event) => {
     const touch = event.touches?.[0]
@@ -515,12 +554,19 @@ function SessionDetail({
     if (pagerFinishTimerRef.current) window.clearTimeout(pagerFinishTimerRef.current)
     if (transitionStartTimerRef.current) window.clearTimeout(transitionStartTimerRef.current)
     if (transitionFinishTimerRef.current) window.clearTimeout(transitionFinishTimerRef.current)
+    if (controlsHideTimerRef.current) window.clearTimeout(controlsHideTimerRef.current)
     stopRailMouseTracking()
   }, [])
 
   useEffect(() => {
     setVideoPlaying(false)
-  }, [playableUrl])
+    revealControls()
+  }, [playableUrl, revealControls])
+
+  useEffect(() => {
+    if (videoPlaying) scheduleHideControls()
+    else revealControls()
+  }, [videoPlaying, revealControls, scheduleHideControls])
 
   useEffect(() => {
     if (!token || !session?.id) return undefined
@@ -554,7 +600,7 @@ function SessionDetail({
     ? 'translate-y-0'
     : (threadTransition?.direction === 'next' ? 'translate-y-full' : '-translate-y-full')
   const pagerActive = pagerDrag.active || pagerDrag.animating
-  const pagerTransitionClass = pagerDrag.animating ? 'transition-transform duration-300 ease-out' : ''
+  const pagerTransitionClass = pagerDrag.animating ? 'transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform' : ''
   const previousPagerSources = threadNavigation.previous
     ? sessionVideoSources(threadNavigation.previous, threadNavigation.previous?.local_preview_url || '')
     : []
@@ -589,164 +635,163 @@ function SessionDetail({
   }
 
   return (
-    <div className="sm:px-6 sm:py-4 sm:pb-28 sm:max-w-3xl sm:mx-auto">
-      <div className="hidden sm:block mb-4">
-        <button onClick={onBack} className="text-sm text-gray-500 hover:text-gray-900 transition-colors">← {backLabel}</button>
-      </div>
-
-      <div className="relative sm:rounded-2xl sm:border sm:border-gray-200 bg-black sm:bg-white overflow-hidden">
+    <div className="min-h-screen bg-black">
+      <div
+        ref={playerRef}
+        className="fixed inset-0 z-30 h-[100dvh] w-full overflow-hidden bg-black touch-none"
+        onTouchStart={handlePlayerTouchStart}
+        onTouchMove={handlePlayerTouchMove}
+        onTouchEnd={handlePlayerTouchEnd}
+        onTouchCancel={handlePlayerTouchEnd}
+        onPointerDown={handlePlayerPointerDown}
+        onPointerMove={handlePlayerPointerMove}
+        onPointerUp={handlePlayerPointerUp}
+        onPointerCancel={handlePlayerPointerUp}
+        onWheelCapture={handlePlayerWheel}
+      >
         <button
           onClick={onBack}
-          className="sm:hidden fixed top-[max(0.75rem,env(safe-area-inset-top))] left-4 z-50 text-xs text-white/85 rounded-full border border-white/25 bg-black/45 px-3 py-1.5 backdrop-blur"
+          onPointerDown={stopPlayerGesture}
+          className="absolute top-[max(0.75rem,env(safe-area-inset-top))] left-4 z-50 rounded-full border border-white/25 bg-black/45 px-3 py-1.5 text-xs text-white/85 backdrop-blur"
         >
-          Back
+          ← {backLabel}
         </button>
-        <div
-          ref={playerRef}
-          className="relative fixed inset-0 z-30 h-[100dvh] w-full cursor-grab overflow-hidden bg-black touch-none active:cursor-grabbing sm:static sm:z-auto sm:h-auto sm:aspect-video"
-          onTouchStart={handlePlayerTouchStart}
-          onTouchMove={handlePlayerTouchMove}
-          onTouchEnd={handlePlayerTouchEnd}
-          onTouchCancel={handlePlayerTouchEnd}
-          onPointerDown={handlePlayerPointerDown}
-          onPointerMove={handlePlayerPointerMove}
-          onPointerUp={handlePlayerPointerUp}
-          onPointerCancel={handlePlayerPointerUp}
-          onWheelCapture={handlePlayerWheel}
-        >
-          {playableUrl && !playbackFailed ? (
-            <video
-              key={playableUrl}
-              ref={videoRef}
-              src={playableUrl}
-              playsInline
-              preload="metadata"
-              onClick={handleVideoClick}
-              onDoubleClick={toggleVideoFit}
-              onPlay={() => setVideoPlaying(true)}
-              onPause={() => setVideoPlaying(false)}
-              onEnded={() => setVideoPlaying(false)}
-              onError={handlePlaybackError}
-              className={videoSurfaceClass}
+        {playableUrl && !playbackFailed ? (
+          <button
+            type="button"
+            onClick={toggleVideoFit}
+            onPointerDown={stopPlayerGesture}
+            aria-label={videoFit === 'fill' ? 'Switch to fit (show full frame)' : 'Switch to fill (full screen)'}
+            className="absolute top-[max(0.75rem,env(safe-area-inset-top))] right-4 z-50 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/25 bg-black/45 text-white backdrop-blur transition-colors hover:bg-white/10"
+          >
+            {videoFit === 'fill' ? <IconFitFrame className="h-5 w-5" /> : <IconFillFrame className="h-5 w-5" />}
+          </button>
+        ) : null}
+        {playableUrl && !playbackFailed ? (
+          <video
+            key={playableUrl}
+            ref={videoRef}
+            src={playableUrl}
+            playsInline
+            preload="metadata"
+            onPlay={() => setVideoPlaying(true)}
+            onPause={() => setVideoPlaying(false)}
+            onEnded={() => setVideoPlaying(false)}
+            onError={handlePlaybackError}
+            className={videoSurfaceClass}
+          />
+        ) : null}
+        {playableUrl && !playbackFailed && !videoPlaying ? (
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+            <div className="rounded-full bg-black/45 p-4 shadow-lg backdrop-blur-sm">
+              <IconPlay className="h-10 w-10 text-white" />
+            </div>
+          </div>
+        ) : null}
+        {playableUrl && !playbackFailed ? (
+          <div className="absolute inset-x-0 bottom-0 z-40 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
+            <VideoScrubBar
+              videoRef={videoRef}
+              durationSeconds={session?.duration_seconds}
+              timingMetadata={session?.timing_metadata}
             />
-          ) : null}
-          {playableUrl && !playbackFailed && !videoPlaying ? (
-            <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-              <div className="rounded-full bg-black/45 p-4 shadow-lg backdrop-blur-sm">
-                <IconPlay className="h-10 w-10 text-white" />
+            <div className="pointer-events-none px-4 pb-1">
+              <p className="truncate text-sm font-semibold leading-tight text-white drop-shadow">{session.title}</p>
+              {hasThreadNavigation ? (
+                <p className="mt-0.5 text-[11px] text-white/70">{threadPositionLabel}</p>
+              ) : null}
+            </div>
+            <div
+              className={`pointer-events-none bg-gradient-to-t from-black/70 via-black/25 to-transparent px-4 pt-2 transition-opacity duration-300 ${controlsVisible || !videoPlaying ? 'opacity-100' : 'opacity-0'}`}
+            >
+              <div className={`pointer-events-auto flex items-center justify-end gap-2 pb-2 ${controlsVisible || !videoPlaying ? '' : 'pointer-events-none'}`}>
+                <button
+                  type="button"
+                  onClick={togglePlayback}
+                  onPointerDown={stopPlayerGesture}
+                  aria-label={videoPlaying ? 'Pause video' : 'Play video'}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur transition-colors hover:bg-white/15"
+                >
+                  {videoPlaying ? <IconPause className="h-5 w-5" /> : <IconPlay className="h-5 w-5" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenDetails}
+                  onPointerDown={stopPlayerGesture}
+                  aria-label="Open proof details"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur transition-colors hover:bg-white/15"
+                >
+                  <IconChevronUp className="h-5 w-5" />
+                </button>
               </div>
             </div>
-          ) : null}
-          {playableUrl && !playbackFailed ? (
-            <div className="absolute inset-x-0 bottom-0 z-40 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pb-2">
-              <div className="pointer-events-none bg-gradient-to-t from-black/85 via-black/45 to-transparent pt-12 sm:pt-10">
-                <VideoScrubBar
-                  videoRef={videoRef}
-                  durationSeconds={session?.duration_seconds}
-                  timingMetadata={session?.timing_metadata}
-                />
-                <div className="pointer-events-auto flex items-end justify-between gap-3 px-4 pb-2 text-white">
-                  <div className="max-w-[55%] min-w-0">
-                    <p className="truncate text-sm font-semibold leading-tight drop-shadow">{session.title}</p>
-                    {hasThreadNavigation ? (
-                      <p className="mt-0.5 text-[11px] text-white/70">{threadPositionLabel}</p>
-                    ) : null}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={toggleVideoFit}
-                      aria-label={videoFit === 'fill' ? 'Switch to fit (show full frame)' : 'Switch to fill (full screen)'}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur transition-colors hover:bg-white/15"
-                    >
-                      {videoFit === 'fill' ? <IconFitFrame className="h-5 w-5" /> : <IconFillFrame className="h-5 w-5" />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={togglePlayback}
-                      aria-label={videoPlaying ? 'Pause video' : 'Play video'}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur transition-colors hover:bg-white/15"
-                    >
-                      {videoPlaying ? <IconPause className="h-5 w-5" /> : <IconPlay className="h-5 w-5" />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleOpenDetails}
-                      aria-label="Open proof details"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur transition-colors hover:bg-white/15"
-                    >
-                      <IconChevronUp className="h-5 w-5" />
-                    </button>
-                  </div>
+          </div>
+        ) : null}
+        {!playableUrl || playbackFailed ? (
+          <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm text-white/70">
+            {session?.processing_status === 'ready'
+              ? 'This video is marked ready, but playback failed. Try downloading the original below.'
+              : 'Video is still preparing for playback.'}
+          </div>
+        ) : null}
+        {pagerActive ? (
+          <div className="pointer-events-none absolute inset-0 z-50 overflow-hidden bg-black">
+            {renderPagerCard(threadNavigation.previous, previousPagerUrl, threadNavigation.index > 0 ? `Proof ${threadNavigation.index} of ${threadNavigation.items.length}` : '', -1)}
+            {renderPagerCard(session, playableUrl, threadPositionLabel, 0)}
+            {renderPagerCard(threadNavigation.next, nextPagerUrl, threadNavigation.index >= 0 ? `Proof ${threadNavigation.index + 2} of ${threadNavigation.items.length}` : '', 1)}
+          </div>
+        ) : null}
+        {threadTransition ? (
+          <div className="pointer-events-none absolute inset-0 z-40 overflow-hidden bg-black">
+            <div className={`absolute inset-0 transform transition-transform duration-300 ease-out ${currentSlideClass}`}>
+              {playableUrl && !playbackFailed ? (
+                <video src={playableUrl} muted playsInline className={videoSurfaceClass} />
+              ) : (
+                <div className="h-full w-full bg-black" />
+              )}
+              <div className="absolute bottom-8 left-4 rounded-full bg-black/55 px-3 py-1.5 text-xs font-medium text-white/85 backdrop-blur">
+                {threadPositionLabel}
+              </div>
+            </div>
+            <div className={`absolute inset-0 transform transition-transform duration-300 ease-out ${targetSlideClass}`}>
+              {transitionTargetUrl ? (
+                <video src={transitionTargetUrl} muted playsInline className={videoSurfaceClass} />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-black px-6 text-center text-sm text-white/70">
+                  Video is still preparing for playback.
                 </div>
+              )}
+              <div className="absolute bottom-8 left-4 max-w-[75%] rounded-full bg-black/55 px-3 py-1.5 text-xs font-medium text-white/85 backdrop-blur">
+                <span className="block truncate">{threadTransition.targetSession?.title || 'Next proof'}</span>
               </div>
             </div>
-          ) : null}
-          {!playableUrl || playbackFailed ? (
-            <div className="w-full h-full flex items-center justify-center px-6 text-center text-sm text-white/70">
-              {session?.processing_status === 'ready'
-                ? 'This video is marked ready, but playback failed. Try downloading the original below.'
-                : 'Video is still preparing for playback.'}
-            </div>
-          ) : null}
-          {pagerActive ? (
-            <div className="pointer-events-none absolute inset-0 z-50 overflow-hidden bg-black">
-              {renderPagerCard(threadNavigation.previous, previousPagerUrl, threadNavigation.index > 0 ? `Proof ${threadNavigation.index} of ${threadNavigation.items.length}` : '', -1)}
-              {renderPagerCard(session, playableUrl, threadPositionLabel, 0)}
-              {renderPagerCard(threadNavigation.next, nextPagerUrl, threadNavigation.index >= 0 ? `Proof ${threadNavigation.index + 2} of ${threadNavigation.items.length}` : '', 1)}
-            </div>
-          ) : null}
-          {threadTransition ? (
-            <div className="pointer-events-none absolute inset-0 z-40 overflow-hidden bg-black">
-              <div className={`absolute inset-0 transform transition-transform duration-300 ease-out ${currentSlideClass}`}>
-                {playableUrl && !playbackFailed ? (
-                  <video src={playableUrl} muted playsInline className={videoSurfaceClass} />
-                ) : (
-                  <div className="h-full w-full bg-black" />
-                )}
-                <div className="absolute bottom-8 left-4 rounded-full bg-black/55 px-3 py-1.5 text-xs font-medium text-white/85 backdrop-blur">
-                  {threadPositionLabel}
-                </div>
-              </div>
-              <div className={`absolute inset-0 transform transition-transform duration-300 ease-out ${targetSlideClass}`}>
-                {transitionTargetUrl ? (
-                  <video src={transitionTargetUrl} muted playsInline className={videoSurfaceClass} />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-black px-6 text-center text-sm text-white/70">
-                    Video is still preparing for playback.
-                  </div>
-                )}
-                <div className="absolute bottom-8 left-4 max-w-[75%] rounded-full bg-black/55 px-3 py-1.5 text-xs font-medium text-white/85 backdrop-blur">
-                  <span className="block truncate">{threadTransition.targetSession?.title || 'Next proof'}</span>
-                </div>
-              </div>
-            </div>
-          ) : null}
-          {hasThreadNavigation ? (
-            <div className="pointer-events-none absolute inset-x-0 top-1/2 z-20 hidden -translate-y-1/2 items-center justify-between px-3 opacity-0 transition-opacity hover:opacity-100 sm:flex">
-              <button
-                type="button"
-                onClick={() => openThreadSession(threadNavigation.previous)}
-                disabled={!threadNavigation.previous}
-                className="pointer-events-auto rounded-full border border-white/20 bg-black/30 px-3 py-2 text-xs font-medium text-white/85 backdrop-blur disabled:opacity-0 disabled:cursor-not-allowed"
-                aria-label="Open previous proof in this thread"
-              >
-                ↑ Previous
-              </button>
-              <button
-                type="button"
-                onClick={() => openThreadSession(threadNavigation.next)}
-                disabled={!threadNavigation.next}
-                className="pointer-events-auto rounded-full border border-white/20 bg-black/30 px-3 py-2 text-xs font-medium text-white/85 backdrop-blur disabled:opacity-0 disabled:cursor-not-allowed"
-                aria-label="Open next proof in this thread"
-              >
-                Next ↓
-              </button>
-            </div>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
+        {hasThreadNavigation ? (
+          <div className="pointer-events-none absolute inset-x-0 top-1/2 z-20 hidden -translate-y-1/2 items-center justify-between px-3 opacity-0 transition-opacity hover:opacity-100 sm:flex">
+            <button
+              type="button"
+              onClick={() => openThreadSession(threadNavigation.previous)}
+              disabled={!threadNavigation.previous}
+              className="pointer-events-auto rounded-full border border-white/20 bg-black/30 px-3 py-2 text-xs font-medium text-white/85 backdrop-blur disabled:opacity-0 disabled:cursor-not-allowed"
+              aria-label="Open previous proof in this thread"
+            >
+              ↑ Previous
+            </button>
+            <button
+              type="button"
+              onClick={() => openThreadSession(threadNavigation.next)}
+              disabled={!threadNavigation.next}
+              className="pointer-events-auto rounded-full border border-white/20 bg-black/30 px-3 py-2 text-xs font-medium text-white/85 backdrop-blur disabled:opacity-0 disabled:cursor-not-allowed"
+              aria-label="Open next proof in this thread"
+            >
+              Next ↓
+            </button>
+          </div>
+        ) : null}
+      </div>
 
-        <div ref={detailsRef} className="relative z-20 mt-[100dvh] p-4 sm:p-4 space-y-3 bg-white rounded-t-3xl sm:rounded-none sm:mt-0">
+      <div ref={detailsRef} className="relative z-20 mt-[100dvh] space-y-3 rounded-t-3xl bg-white p-4 pb-28 sm:mx-auto sm:max-w-lg sm:pb-32">
           {editing ? (
             <div className="space-y-4">
               <input
@@ -916,7 +961,6 @@ function SessionDetail({
             </>
           )}
         </div>
-      </div>
     </div>
   )
 }

@@ -134,15 +134,15 @@ export default function VideoScrubBar({ videoRef, durationSeconds = 0, timingMet
         aria-valuemax={ready ? Math.round(duration) : 0}
         aria-valuenow={ready ? Math.round(shownTime) : 0}
         aria-disabled={!ready}
-        className={`relative h-9 flex items-center touch-none select-none ${ready ? 'cursor-pointer' : 'cursor-default opacity-70'}`}
+        className={`relative h-7 flex items-center touch-none select-none ${ready ? 'cursor-pointer' : 'cursor-default opacity-70'}`}
         onPointerDown={ready ? handleTrackPointerDown : undefined}
         onPointerMove={ready ? handleTrackPointerMove : undefined}
         onPointerUp={ready ? handleTrackPointerUp : undefined}
         onPointerCancel={ready ? handleTrackPointerUp : undefined}
       >
-        <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/25 overflow-hidden sm:h-1.5">
+        <div className="absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2 rounded-full bg-white/30 overflow-hidden">
           <div
-            className="h-full rounded-full bg-white transition-none"
+            className="h-full rounded-full bg-white"
             style={{ width: `${progress * 100}%` }}
           />
         </div>
@@ -162,7 +162,7 @@ export default function VideoScrubBar({ videoRef, durationSeconds = 0, timingMet
         }) : null}
         {ready ? (
           <div
-            className="absolute top-1/2 z-20 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-lg ring-2 ring-black/30 sm:h-4 sm:w-4"
+            className="absolute top-1/2 z-20 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-md ring-2 ring-black/20"
             style={{ left: `${progress * 100}%` }}
           />
         ) : null}

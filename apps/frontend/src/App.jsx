@@ -261,7 +261,7 @@ function AppContent() {
           You are offline. We will retry actions when back online.
         </div>
       ) : null}
-      <header className={`${isImmersiveMobileView ? 'hidden sm:block' : ''} border-b border-gray-100 bg-white px-4 py-4 sm:px-6`}>
+      <header className={`${view === 'detail' ? 'hidden' : isImmersiveMobileView ? 'hidden sm:block' : ''} border-b border-gray-100 bg-white px-4 py-4 sm:px-6`}>
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-4 min-w-0">
             <button onClick={goProgress} className="text-lg font-semibold text-gray-900 tracking-tight">
@@ -294,7 +294,7 @@ function AppContent() {
         </div>
       </header>
 
-      <main className={`${isImmersiveMobileView ? 'w-full sm:max-w-4xl sm:mx-auto sm:pb-24' : 'max-w-4xl mx-auto pb-24'}`}>
+      <main className={view === 'detail' ? 'w-full' : isImmersiveMobileView ? 'w-full sm:max-w-4xl sm:mx-auto sm:pb-24' : 'max-w-4xl mx-auto pb-24'}>
         <React.Suspense fallback={
           <div className="px-4 sm:px-6 py-6 text-sm text-gray-500">
             <div className="flex items-center gap-2">
