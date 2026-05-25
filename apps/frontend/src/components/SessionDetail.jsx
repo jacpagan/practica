@@ -688,45 +688,49 @@ function SessionDetail({
             </div>
           </div>
         ) : null}
-        {playableUrl && !playbackFailed ? (
-          <div className="absolute inset-x-0 bottom-0 z-40 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
+        <div className="absolute inset-x-0 bottom-0 z-40 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
+          {playableUrl && !playbackFailed ? (
             <VideoScrubBar
               videoRef={videoRef}
               durationSeconds={session?.duration_seconds}
               timingMetadata={session?.timing_metadata}
             />
-            <div className="pointer-events-none px-4 pb-1">
-              <p className="truncate text-sm font-semibold leading-tight text-white drop-shadow">{session.title}</p>
-              {hasThreadNavigation ? (
-                <p className="mt-0.5 text-[11px] text-white/70">{threadPositionLabel}</p>
+          ) : null}
+          <div className="pointer-events-none px-4 pb-1">
+            <p className="truncate text-sm font-semibold leading-tight text-white drop-shadow">{session.title}</p>
+            {hasThreadNavigation ? (
+              <p className="mt-0.5 text-[11px] text-white/70">{threadPositionLabel}</p>
+            ) : null}
+          </div>
+          <div className="pointer-events-none bg-gradient-to-t from-black/70 via-black/25 to-transparent px-4 pt-2">
+            <div className="pointer-events-auto flex items-center justify-end gap-2 pb-2">
+              {playableUrl && !playbackFailed ? (
+                <div
+                  className={`flex items-center gap-2 transition-opacity duration-300 ${controlsVisible || !videoPlaying ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
+                >
+                  <button
+                    type="button"
+                    onClick={togglePlayback}
+                    onPointerDown={stopPlayerGesture}
+                    aria-label={videoPlaying ? 'Pause video' : 'Play video'}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur transition-colors hover:bg-white/15"
+                  >
+                    {videoPlaying ? <IconPause className="h-5 w-5" /> : <IconPlay className="h-5 w-5" />}
+                  </button>
+                </div>
               ) : null}
-            </div>
-            <div
-              className={`pointer-events-none bg-gradient-to-t from-black/70 via-black/25 to-transparent px-4 pt-2 transition-opacity duration-300 ${controlsVisible || !videoPlaying ? 'opacity-100' : 'opacity-0'}`}
-            >
-              <div className={`pointer-events-auto flex items-center justify-end gap-2 pb-2 ${controlsVisible || !videoPlaying ? '' : 'pointer-events-none'}`}>
-                <button
-                  type="button"
-                  onClick={togglePlayback}
-                  onPointerDown={stopPlayerGesture}
-                  aria-label={videoPlaying ? 'Pause video' : 'Play video'}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur transition-colors hover:bg-white/15"
-                >
-                  {videoPlaying ? <IconPause className="h-5 w-5" /> : <IconPlay className="h-5 w-5" />}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleOpenDetails}
-                  onPointerDown={stopPlayerGesture}
-                  aria-label="Open proof details"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur transition-colors hover:bg-white/15"
-                >
-                  <IconChevronUp className="h-5 w-5" />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleOpenDetails}
+                onPointerDown={stopPlayerGesture}
+                aria-label="Open proof details"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur transition-colors hover:bg-white/15"
+              >
+                <IconChevronUp className="h-5 w-5" />
+              </button>
             </div>
           </div>
-        ) : null}
+        </div>
         {!playableUrl || playbackFailed ? (
           <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm text-white/70">
             {session?.processing_status === 'ready'
