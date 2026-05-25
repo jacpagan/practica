@@ -83,7 +83,7 @@ test('Progress view shows grouped proofs for signed-in members', async ({ page }
   await expect(page.getByText("Today's proof").first()).toBeVisible()
   await expect(page.getByText('Activity & overview')).toHaveCount(0)
   await expect(page.getByText('Full archive')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Groove Lab' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Groove Lab 1 proof/ })).toBeVisible()
 })
 
 test('Progress is the default signed-in home without dashboard chrome', async ({ page }) => {
