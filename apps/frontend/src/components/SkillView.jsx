@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { fmtDate } from '../utils'
 import VideoThumbnail from './VideoThumbnail'
 import SessionListItem from './SessionListItem'
@@ -15,9 +15,7 @@ const formatCompactDateTime = (value) => {
 
 function SkillView({ skillName = '', sessions = [], sessionsLoading = false, token = '', onBack, onOpenSession, onRecordProof }) {
   const [renamingSkill, setRenamingSkill] = useState('')
-  const [skillMenuOpen, setSkillMenuOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const skillMenuRef = useRef(null)
   const toast = useToast()
   const skillOptions = useMemo(() => {
     const byCanonicalName = new Map()
@@ -43,16 +41,6 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
 
   const latestSession = skillSessions[skillSessions.length - 1] || null
   const previousSession = skillSessions.length > 1 ? skillSessions[skillSessions.length - 2] : null
-  useEffect(() => {
-    if (!skillMenuOpen) return undefined
-    const handlePointerDown = (event) => {
-      const node = skillMenuRef.current
-      if (!node || node.contains(event.target)) return
-      setSkillMenuOpen(false)
-    }
-    window.addEventListener('pointerdown', handlePointerDown)
-    return () => window.removeEventListener('pointerdown', handlePointerDown)
-  }, [skillMenuOpen])
   if (sessionsLoading) {
     return (
       <div className="px-4 sm:px-6 py-6">
@@ -88,7 +76,16 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
               <p className="text-xs uppercase tracking-wide text-gray-500">Skill</p>
-              <h2 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">{skillName}</h2>
+              <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">{skillName}</h2>
+                <button
+                  type="button"
+                  onClick={() => setRenamingSkill(skillName)}
+                  className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
+                >
+                  Rename
+                </button>
+              </div>
               <p className="text-sm text-gray-500 mt-2">{latestSession ? `Latest ${formatCompactDateTime(latestSession.recorded_at || latestSession.created_at)}` : 'No proofs yet'}</p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -160,37 +157,9 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
             ) : null}
 
             <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-3">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">Proof timeline</p>
-                  <p className="text-xs text-gray-500 mt-1">Oldest to newest, so the next proof has a clear place to land.</p>
-                </div>
-                <div className="relative" ref={skillMenuRef}>
-                  <button
-                    type="button"
-                    onClick={() => setSkillMenuOpen((open) => !open)}
-                    className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                    aria-expanded={skillMenuOpen ? 'true' : 'false'}
-                    aria-haspopup="menu"
-                  >
-                    •••
-                  </button>
-                  {skillMenuOpen ? (
-                    <div className="absolute right-0 mt-2 w-44 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg z-10" role="menu">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSkillMenuOpen(false)
-                          setRenamingSkill(skillName)
-                        }}
-                        className="w-full text-left rounded-lg px-2.5 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                        role="menuitem"
-                      >
-                        Rename skill
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Proof timeline</p>
+                <p className="text-xs text-gray-500 mt-1">Oldest to newest.</p>
               </div>
               <div className="space-y-3">
                 {skillSessions.map((session) => (
