@@ -1,12 +1,11 @@
 import { useCallback } from 'react'
 
-import { firstIncompleteSkill, loadDailyStack, resolveDefaultRecordSkill } from '../dailyStack'
+import { readLastSeries } from '../recordPrefs'
 
 export const useRecordingActions = ({
   currentReturnRoute,
   navigate,
   resolveUploadReturnRoute,
-  sessions = [],
   setJustUploadedSessionId,
   setOpenRecorderOnUpload,
   setPendingPracticeSeries,
@@ -14,18 +13,12 @@ export const useRecordingActions = ({
   setSelectedSession,
   skillOptions = [],
 }) => {
-  const startRecord = useCallback(({ skillName = '', fromTodayStack = false, returnRoute = null } = {}) => {
+  const startRecord = useCallback(({ skillName = '', returnRoute = null } = {}) => {
     setSelectedSession(null)
     setJustUploadedSessionId(null)
     setOpenRecorderOnUpload(false)
     setPendingPracticeSeries(String(skillName || '').trim())
-    if (returnRoute) {
-      setPendingUploadReturnRoute(returnRoute)
-    } else if (fromTodayStack) {
-      setPendingUploadReturnRoute({ view: 'progress', sessionId: null, seriesName: '', fromTodayStack: true })
-    } else {
-      setPendingUploadReturnRoute(resolveUploadReturnRoute({ practiceSeries: skillName }))
-    }
+    setPendingUploadReturnRoute(returnRoute || resolveUploadReturnRoute({ practiceSeries: skillName }))
     navigate({ view: 'record', sessionId: null })
   }, [
     navigate,
@@ -37,22 +30,11 @@ export const useRecordingActions = ({
     setSelectedSession,
   ])
 
-  const recordForSkill = useCallback((skillName, { fromTodayStack = true, returnRoute = null } = {}) => {
-    startRecord({ skillName, fromTodayStack, returnRoute })
-  }, [startRecord])
-
   const openGlobalRecorder = useCallback(() => {
-    const stack = loadDailyStack()
-    const nextInStack = firstIncompleteSkill(stack, sessions)
-    if (nextInStack) {
-      startRecord({ skillName: nextInStack, fromTodayStack: true })
-      return
-    }
-    startRecord({
-      skillName: resolveDefaultRecordSkill({ stack, sessions, skillOptions }),
-      fromTodayStack: false,
-    })
-  }, [sessions, skillOptions, startRecord])
+    const lastSeries = readLastSeries()
+    const fallback = String(skillOptions?.[0] || '').trim()
+    startRecord({ skillName: lastSeries || fallback })
+  }, [skillOptions, startRecord])
 
   const handleRecordAnother = useCallback((draft = null) => {
     const skillName = String(draft?.practiceSeries || '').trim()
@@ -82,7 +64,6 @@ export const useRecordingActions = ({
   return {
     handleRecordAnother,
     openGlobalRecorder,
-    recordForSkill,
     startQuickRecord,
     startRecord,
   }

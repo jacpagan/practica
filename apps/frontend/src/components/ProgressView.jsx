@@ -1,7 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react'
 import SessionListItem from './SessionListItem'
 import SkillPickerModal from './SkillPickerModal'
-import TodayStack from './TodayStack'
+import VideoThumbnail from './VideoThumbnail'
+import { calculatePracticeProgress, fmtDate } from '../utils'
 import { useToast } from './Toast'
 
 const UNGROUPED_KEY = '__ungrouped__'
@@ -12,14 +13,16 @@ export default function ProgressView({
   sessionsLoading = false,
   token = '',
   onOpenSession,
+  onOpenSkill,
   onSessionUpdate,
-  onRecordSkill,
 }) {
   const toast = useToast()
   const [editingSession, setEditingSession] = useState(null)
   const [draftSkill, setDraftSkill] = useState('')
   const [renamingSkillName, setRenamingSkillName] = useState('')
   const [saving, setSaving] = useState(false)
+
+  const overview = useMemo(() => calculatePracticeProgress(sessions), [sessions])
 
   const skillOptions = useMemo(() => {
     const byCanonicalName = new Map()
@@ -163,14 +166,15 @@ export default function ProgressView({
     )
   }
 
-  const totalSkills = skillGroups.length
-  const totalProofs = sessions.length
   const ungroupedCount = sessions.filter((item) => !String(item?.practice_series || '').trim()).length
-  const summaryParts = [
-    `${totalProofs} ${totalProofs === 1 ? 'proof' : 'proofs'}`,
-    `${totalSkills} ${totalSkills === 1 ? 'skill' : 'skills'}`,
-  ]
-  if (ungroupedCount > 0) summaryParts.push(`${ungroupedCount} ungrouped`)
+  const overviewParts = []
+  if (overview.proofCount > 0) {
+    overviewParts.push(`${overview.proofCount} ${overview.proofCount === 1 ? 'proof' : 'proofs'}`)
+    overviewParts.push(`${overview.uniqueDayCount} ${overview.uniqueDayCount === 1 ? 'day' : 'days'} with proof`)
+    if (overview.skillCount > 0) {
+      overviewParts.push(`${overview.skillCount} ${overview.skillCount === 1 ? 'skill' : 'skills'}`)
+    }
+  }
 
   return (
     <div className="px-4 sm:px-6 py-6">
@@ -179,19 +183,46 @@ export default function ProgressView({
           <div>
             <p className="text-xs uppercase tracking-wide text-gray-500">Progress</p>
             <h2 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">Your proof archive</h2>
-            <p className="text-sm text-gray-500 mt-2">Proofs grouped by skill.</p>
+            <p className="text-sm text-gray-500 mt-2">Everything you have shown up for, grouped by skill.</p>
           </div>
-          {sessions.length > 0 ? (
-            <p className="text-xs text-gray-500">{summaryParts.join(' · ')}</p>
-          ) : null}
         </div>
 
-        <TodayStack
-          sessions={sessions}
-          skillOptions={skillOptions}
-          onRecordSkill={onRecordSkill}
-          onOpenSession={(session) => onOpenSession?.(session, { view: 'progress', sessionId: null, seriesName: '' })}
-        />
+        {sessions.length > 0 ? (
+          <section className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-3">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-gray-500">Overall</p>
+              <p className="text-sm font-medium text-gray-900 mt-1">{overviewParts.join(' · ')}</p>
+              {overview.latestProofAt ? (
+                <p className="text-xs text-gray-500 mt-1">
+                  Latest proof {fmtDate(overview.latestProofAt)}
+                </p>
+              ) : null}
+            </div>
+            {overview.recentProofs.length > 0 ? (
+              <div>
+                <p className="text-xs text-gray-500 mb-2">Recent across all skills</p>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {overview.recentProofs.slice(0, 6).map((session) => (
+                    <button
+                      key={session.id}
+                      type="button"
+                      onClick={() => onOpenSession?.(session, { view: 'progress', sessionId: null, seriesName: '' })}
+                      className="shrink-0 w-28 text-left"
+                    >
+                      <VideoThumbnail session={session} className="w-28 aspect-video rounded-xl overflow-hidden bg-black" />
+                      <p className="text-[11px] text-gray-700 mt-1 truncate">{session.practice_series || session.title}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {ungroupedCount > 0 ? (
+              <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                {ungroupedCount} {ungroupedCount === 1 ? 'proof is' : 'proofs are'} not tagged to a skill yet.
+              </p>
+            ) : null}
+          </section>
+        ) : null}
 
         {sessions.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
@@ -202,13 +233,27 @@ export default function ProgressView({
           <div className="space-y-4">
             {skillGroups.map((group) => {
               const skillName = group.skillName === UNGROUPED_KEY ? 'Ungrouped' : group.skillName
+              const canOpenSkill = group.skillName !== UNGROUPED_KEY && onOpenSkill
+              const lastLabel = group.latest
+                ? fmtDate(group.latest.recorded_at || group.latest.created_at)
+                : ''
               return (
                 <section key={group.skillName} className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
                   <div className="border-b border-gray-100 px-4 py-4">
                     <div className="min-w-0">
                       <p className="text-xs uppercase tracking-wide text-gray-500">Skill</p>
                       <div className="mt-1 flex items-baseline gap-2 min-w-0 flex-wrap">
-                        <h3 className="text-lg font-semibold text-gray-900 truncate">{skillName}</h3>
+                        {canOpenSkill ? (
+                          <button
+                            type="button"
+                            onClick={() => onOpenSkill(group.skillName)}
+                            className="text-lg font-semibold text-gray-900 truncate text-left hover:text-gray-700 transition-colors"
+                          >
+                            {skillName}
+                          </button>
+                        ) : (
+                          <h3 className="text-lg font-semibold text-gray-900 truncate">{skillName}</h3>
+                        )}
                         {group.skillName !== UNGROUPED_KEY ? (
                           <button
                             type="button"
@@ -221,7 +266,17 @@ export default function ProgressView({
                       </div>
                       <p className="text-sm text-gray-500 mt-1">
                         {group.items.length} {group.items.length === 1 ? 'proof' : 'proofs'}
+                        {lastLabel ? ` · last ${lastLabel}` : ''}
                       </p>
+                      {canOpenSkill ? (
+                        <button
+                          type="button"
+                          onClick={() => onOpenSkill(group.skillName)}
+                          className="text-xs text-gray-500 hover:text-gray-900 mt-2 transition-colors"
+                        >
+                          Open skill timeline
+                        </button>
+                      ) : null}
                     </div>
                   </div>
 

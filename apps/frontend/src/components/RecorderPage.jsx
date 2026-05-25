@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import VideoRecorder from './VideoRecorder'
-import { LAST_SERIES_KEY } from '../dailyStack'
+import { LAST_SERIES_KEY } from '../recordPrefs'
 import { MAX_RECORDER_DURATION_SECONDS, createSessionUpload, isLikelyVideoFile, uploadErrorMessage, videoFileAccept } from '../utils'
 import { useAuth } from '../auth'
 import { useToast } from './Toast'

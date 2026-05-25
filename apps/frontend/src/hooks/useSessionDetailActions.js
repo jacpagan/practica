@@ -5,7 +5,6 @@ export const useSessionDetailActions = ({
   detailReturnRoute,
   navigate,
   openSessionById,
-  pendingUploadReturnRoute,
   routeSeriesName,
   setDetailReturnRoute,
   setJustUploadedSessionId,
@@ -14,7 +13,6 @@ export const useSessionDetailActions = ({
   setPendingUploadReturnRoute,
   setSelectedSession,
   setSessions,
-  toast,
   view,
 }) => {
   const buildProofReturnRoute = useCallback((session) => {
@@ -44,32 +42,19 @@ export const useSessionDetailActions = ({
 
   const handleUploadComplete = useCallback((session) => {
     calendarMonthCacheRef.current.clear()
-    const fromTodayStack = Boolean(pendingUploadReturnRoute?.fromTodayStack)
-    const nextReturnRoute = fromTodayStack
-      ? { view: 'progress', sessionId: null, seriesName: '' }
-      : buildProofReturnRoute(session)
+    const nextReturnRoute = buildProofReturnRoute(session)
     setSessions((current) => [session, ...current.filter((item) => item.id !== session.id)])
-    setOpenRecorderOnUpload(false)
-    setPendingPracticeSeries('')
-    setPendingUploadReturnRoute(nextReturnRoute)
-    if (fromTodayStack) {
-      setSelectedSession(null)
-      setDetailReturnRoute(nextReturnRoute)
-      setJustUploadedSessionId(null)
-      const skillLabel = String(session?.practice_series || '').trim()
-      toast?.success(skillLabel ? `Saved — ${skillLabel}` : 'Saved to your private archive')
-      navigate(nextReturnRoute)
-      return
-    }
     setSelectedSession(session)
     setDetailReturnRoute(nextReturnRoute)
     setJustUploadedSessionId(session.id)
+    setOpenRecorderOnUpload(false)
+    setPendingPracticeSeries('')
+    setPendingUploadReturnRoute(nextReturnRoute)
     navigate({ view: 'detail', sessionId: session.id })
   }, [
     buildProofReturnRoute,
     calendarMonthCacheRef,
     navigate,
-    pendingUploadReturnRoute,
     setDetailReturnRoute,
     setJustUploadedSessionId,
     setOpenRecorderOnUpload,
@@ -77,7 +62,6 @@ export const useSessionDetailActions = ({
     setPendingUploadReturnRoute,
     setSelectedSession,
     setSessions,
-    toast,
   ])
 
   return {

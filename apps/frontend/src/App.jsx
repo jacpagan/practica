@@ -163,7 +163,6 @@ function AppContent() {
     detailReturnRoute,
     navigate,
     openSessionById,
-    pendingUploadReturnRoute,
     routeSeriesName,
     setDetailReturnRoute,
     setJustUploadedSessionId,
@@ -172,7 +171,6 @@ function AppContent() {
     setPendingUploadReturnRoute,
     setSelectedSession,
     setSessions,
-    toast,
     view,
   })
 
@@ -183,12 +181,11 @@ function AppContent() {
   const {
     handleRecordAnother,
     openGlobalRecorder,
-    recordForSkill,
+    startRecord,
   } = useRecordingActions({
     currentReturnRoute,
     navigate,
     resolveUploadReturnRoute,
-    sessions,
     setJustUploadedSessionId,
     setOpenRecorderOnUpload,
     setPendingPracticeSeries,
@@ -318,8 +315,8 @@ function AppContent() {
             sessionsLoading={sessionsLoading}
             token={token}
             onOpenSession={openSession}
+            onOpenSkill={goSkill}
             onSessionUpdate={onDetailSessionUpdate}
-            onRecordSkill={recordForSkill}
           />
         )}
 
@@ -331,8 +328,8 @@ function AppContent() {
             token={token}
             onBack={goProgress}
             onOpenSession={openSession}
-            onRecordProof={() => recordForSkill(routeSeriesName, {
-              fromTodayStack: false,
+            onRecordProof={() => startRecord({
+              skillName: routeSeriesName,
               returnRoute: { view: 'skill', sessionId: null, seriesName: routeSeriesName },
             })}
           />
