@@ -316,6 +316,7 @@ function AppContent() {
             onOpenSession={openSession}
             onOpenSkill={goSkill}
             onSessionUpdate={onDetailSessionUpdate}
+            onRecordProof={openGlobalRecorder}
           />
         )}
 

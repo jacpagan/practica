@@ -3,10 +3,18 @@ import SessionListItem from './SessionListItem'
 import SkillPickerModal from './SkillPickerModal'
 import ActivityCalendar from './ActivityCalendar'
 import SkillSummaryCard from './SkillSummaryCard'
+import VideoThumbnail from './VideoThumbnail'
 import { buildSkillSummaries } from '../progressActivity'
 import { calculatePracticeProgress, fmtDate } from '../utils'
 import { useToast } from './Toast'
 
+const formatCompactDateTime = (value) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const dayPart = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  const timePart = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  return `${dayPart} · ${timePart}`
+}
 
 export default function ProgressView({
   sessions = [],
@@ -15,17 +23,27 @@ export default function ProgressView({
   onOpenSession,
   onOpenSkill,
   onSessionUpdate,
+  onRecordProof,
 }) {
   const toast = useToast()
   const [editingSession, setEditingSession] = useState(null)
   const [draftSkill, setDraftSkill] = useState('')
-  const [renamingSkillName, setRenamingSkillName] = useState('')
   const [saving, setSaving] = useState(false)
 
   const overview = useMemo(() => calculatePracticeProgress(sessions), [sessions])
   const skillSummaries = useMemo(() => buildSkillSummaries(sessions), [sessions])
   const taggedSummaries = useMemo(() => skillSummaries.filter((item) => !item.isUngrouped), [skillSummaries])
   const ungroupedSummary = useMemo(() => skillSummaries.find((item) => item.isUngrouped) || null, [skillSummaries])
+  const latestSession = useMemo(() => {
+    const sorted = [...sessions]
+      .filter((session) => session?.id)
+      .sort((left, right) => {
+        const leftTime = new Date(left.recorded_at || left.created_at || 0).getTime() || 0
+        const rightTime = new Date(right.recorded_at || right.created_at || 0).getTime() || 0
+        return rightTime - leftTime
+      })
+    return sorted[0] || null
+  }, [sessions])
 
   const skillOptions = useMemo(() => {
     const byCanonicalName = new Map()
@@ -81,58 +99,11 @@ export default function ProgressView({
 
   const clearSkill = useCallback(() => saveSkill(''), [saveSkill])
 
-  const closeSkillRename = useCallback(() => {
-    if (saving) return
-    setRenamingSkillName('')
-  }, [saving])
-
-  const saveSkillRename = useCallback(async (nextName) => {
-    if (!token || !renamingSkillName) return
-    const newName = String(nextName || '').trim()
-    if (!newName) {
-      toast.error('Enter a skill name')
-      return
-    }
-    if (newName === renamingSkillName) {
-      setRenamingSkillName('')
-      return
-    }
-    setSaving(true)
-    try {
-      const res = await fetch('/api/sessions/threads/rename/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Token ${token}`,
-        },
-        body: JSON.stringify({
-          old_practice_series: renamingSkillName,
-          new_practice_series: newName,
-        }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data?.error || 'Could not rename skill')
-      try {
-        window.dispatchEvent(new CustomEvent('practica:skill-renamed', {
-          detail: { oldSeriesName: renamingSkillName, newSeriesName: newName },
-        }))
-      } catch {}
-      toast.success('Skill renamed')
-      setRenamingSkillName('')
-    } catch (error) {
-      toast.error(error?.message || 'Could not rename skill')
-    } finally {
-      setSaving(false)
-    }
-  }, [renamingSkillName, toast, token])
-
-
   if (sessionsLoading) {
     return (
       <div className="px-4 sm:px-6 py-6">
         <div className="max-w-4xl mx-auto space-y-4">
           <div className="h-7 w-28 bg-gray-200 rounded animate-pulse" />
-          <div className="h-4 w-72 bg-gray-100 rounded animate-pulse" />
           <div className="h-24 w-full bg-gray-100 rounded-2xl animate-pulse" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="h-48 bg-gray-100 rounded-2xl animate-pulse" />
@@ -154,52 +125,70 @@ export default function ProgressView({
   }
 
   return (
-    <div className="px-4 sm:px-6 py-6">
+    <div className="px-4 sm:px-6 py-6 pb-28">
       <div className="max-w-4xl mx-auto space-y-6">
-        <div className="space-y-2">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <p className="text-xs uppercase tracking-wide text-gray-500">Progress</p>
-            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight mt-1">Your proof archive</h2>
-            <p className="text-sm text-gray-500 mt-2">Lifetime effort across skills — tap a skill for its full timeline.</p>
+            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Your archive</h2>
+            <p className="text-sm text-gray-500 mt-1">Tap a skill or your latest proof to keep going.</p>
           </div>
+          <button
+            type="button"
+            onClick={() => onRecordProof?.()}
+            className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors shrink-0"
+          >
+            Record
+          </button>
         </div>
-
-        {sessions.length > 0 ? (
-          <>
-            <section className="rounded-2xl border border-gray-200 bg-white px-4 py-4">
-              <p className="text-xs uppercase tracking-wide text-gray-500">Overall</p>
-              <p className="text-sm font-medium text-gray-900 mt-1">{overviewParts.join(' · ')}</p>
-              {overview.latestProofAt ? (
-                <p className="text-xs text-gray-500 mt-1">Latest proof {fmtDate(overview.latestProofAt)}</p>
-              ) : null}
-              {ungroupedCount > 0 ? (
-                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-3">
-                  {ungroupedCount} {ungroupedCount === 1 ? 'proof is' : 'proofs are'} not tagged to a skill yet.
-                </p>
-              ) : null}
-            </section>
-
-            <ActivityCalendar sessions={sessions} />
-          </>
-        ) : null}
 
         {sessions.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
             <p className="text-sm text-gray-700">No proofs yet.</p>
-            <p className="text-xs text-gray-500 mt-1">Use Record to add or upload a proof. It will show up here as soon as it is saved.</p>
+            <button
+              type="button"
+              onClick={() => onRecordProof?.()}
+              className="mt-4 rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
+            >
+              Record your first proof
+            </button>
           </div>
         ) : (
-          <div className="space-y-6">
+          <>
+            {latestSession ? (
+              <button
+                type="button"
+                onClick={() => onOpenSession?.(latestSession, { view: 'progress', sessionId: null, seriesName: '' })}
+                className="w-full rounded-2xl border border-gray-900 bg-gray-50/40 overflow-hidden text-left hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-stretch gap-0 sm:gap-4">
+                  <VideoThumbnail session={latestSession} variant="poster" className="relative w-28 shrink-0 bg-black sm:w-40 sm:rounded-l-2xl" />
+                  <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-4">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Latest proof</p>
+                    <p className="mt-1 truncate text-base font-semibold text-gray-900">{latestSession.title || 'Proof'}</p>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {formatCompactDateTime(latestSession.recorded_at || latestSession.created_at)}
+                      {latestSession.practice_series ? ` · ${latestSession.practice_series}` : ''}
+                    </p>
+                  </div>
+                </div>
+              </button>
+            ) : null}
+
+            {ungroupedCount > 0 ? (
+              <p className="text-sm text-amber-900 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                {ungroupedCount} {ungroupedCount === 1 ? 'proof needs' : 'proofs need'} a skill tag.
+              </p>
+            ) : null}
+
             {taggedSummaries.length > 0 ? (
               <div className="space-y-3">
-                <p className="text-xs uppercase tracking-wide text-gray-500">Skills</p>
+                <p className="text-sm font-medium text-gray-900">Skills</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {taggedSummaries.map((summary) => (
                     <SkillSummaryCard
                       key={summary.skillKey}
                       summary={summary}
                       onOpenSkill={onOpenSkill}
-                      onRenameSkill={setRenamingSkillName}
                     />
                   ))}
                 </div>
@@ -212,7 +201,7 @@ export default function ProgressView({
                   summary={ungroupedSummary}
                   onOpenSession={(session) => onOpenSession?.(session, { view: 'progress', sessionId: null, seriesName: '' })}
                 />
-                <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
+                <div className="space-y-3">
                   {ungroupedSummary.items.map((session) => (
                     <SessionListItem
                       key={session.id}
@@ -226,7 +215,22 @@ export default function ProgressView({
                 </div>
               </div>
             ) : null}
-          </div>
+
+            <details className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
+              <summary className="cursor-pointer list-none text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors">
+                Activity & overview
+              </summary>
+              <div className="mt-4 space-y-4 border-t border-gray-100 pt-4">
+                {overviewParts.length > 0 ? (
+                  <p className="text-sm text-gray-600">{overviewParts.join(' · ')}</p>
+                ) : null}
+                {overview.latestProofAt ? (
+                  <p className="text-xs text-gray-500">Latest proof {fmtDate(overview.latestProofAt)}</p>
+                ) : null}
+                <ActivityCalendar sessions={sessions} />
+              </div>
+            </details>
+          </>
         )}
       </div>
 
@@ -241,16 +245,6 @@ export default function ProgressView({
         onClear={editingSession?.practice_series ? clearSkill : null}
         clearLabel="Remove from skill"
       />
-      <SkillPickerModal
-        open={Boolean(renamingSkillName)}
-        title="Edit skill name"
-        initialValue={renamingSkillName}
-        options={skillOptions}
-        saving={saving}
-        onClose={closeSkillRename}
-        onSave={saveSkillRename}
-      />
-
     </div>
   )
 }

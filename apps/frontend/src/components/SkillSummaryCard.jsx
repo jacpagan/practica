@@ -15,7 +15,6 @@ export default function SkillSummaryCard({
   summary,
   onOpenSkill,
   onOpenSession,
-  onRenameSkill,
 }) {
   const { skillName, isUngrouped, proofCount, latest, earliest } = summary
   const spanLabel = formatSpan(earliest, latest)
@@ -24,11 +23,10 @@ export default function SkillSummaryCard({
     return (
       <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-4 space-y-3">
         <div>
-          <p className="text-xs uppercase tracking-wide text-gray-500">Ungrouped</p>
-          <p className="text-sm font-medium text-gray-900 mt-1">
-            {proofCount} {proofCount === 1 ? 'proof' : 'proofs'} without a skill tag
+          <p className="text-sm font-medium text-gray-900">
+            {proofCount} untagged {proofCount === 1 ? 'proof' : 'proofs'}
           </p>
-          <p className="text-xs text-gray-500 mt-1">Tag these so they show up in a skill timeline.</p>
+          <p className="text-xs text-gray-500 mt-1">Tag these to group them under a skill.</p>
         </div>
         <div className="space-y-2">
           {summary.items.slice(0, 3).map((session) => (
@@ -68,29 +66,7 @@ export default function SkillSummaryCard({
         {latest ? (
           <p className="text-xs text-gray-500">Latest {fmtDate(latest.recorded_at || latest.created_at)}</p>
         ) : null}
-        <p className="text-xs text-gray-500 pt-1">Open skill timeline →</p>
       </div>
-      {onRenameSkill ? (
-        <div className="px-4 pb-4 -mt-2">
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={(event) => {
-              event.stopPropagation()
-              onRenameSkill(summary.skillKey)
-            }}
-            onKeyDown={(event) => {
-              if (event.key !== 'Enter' && event.key !== ' ') return
-              event.preventDefault()
-              event.stopPropagation()
-              onRenameSkill(summary.skillKey)
-            }}
-            className="text-xs text-gray-500 hover:text-gray-900"
-          >
-            Edit name
-          </span>
-        </div>
-      ) : null}
     </button>
   )
 }

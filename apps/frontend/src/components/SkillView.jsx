@@ -1,6 +1,4 @@
 import React, { useMemo, useState } from 'react'
-import { fmtDate } from '../utils'
-import VideoThumbnail from './VideoThumbnail'
 import SessionListItem from './SessionListItem'
 import SkillPickerModal from './SkillPickerModal'
 import { useToast } from './Toast'
@@ -29,35 +27,25 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
     return Array.from(byCanonicalName.values()).sort((left, right) => left.localeCompare(right))
   }, [sessions])
   const skillSessions = useMemo(() => {
-    const filtered = sessions
+    return sessions
       .filter((session) => session.can_edit && String(session.practice_series || '').trim() === String(skillName || '').trim())
-      .sort((left, right) => new Date(left.recorded_at || left.created_at) - new Date(right.recorded_at || right.created_at))
-
-    return filtered.map((session, index) => ({
-      ...session,
-      takeNumber: index + 1,
-    }))
+      .sort((left, right) => new Date(right.recorded_at || right.created_at) - new Date(left.recorded_at || left.created_at))
+      .map((session, index, items) => ({
+        ...session,
+        takeNumber: items.length - index,
+        isLatest: index === 0,
+      }))
   }, [skillName, sessions])
 
-  const latestSession = skillSessions[skillSessions.length - 1] || null
-  const previousSession = skillSessions.length > 1 ? skillSessions[skillSessions.length - 2] : null
+  const latestSession = skillSessions[0] || null
+
   if (sessionsLoading) {
     return (
       <div className="px-4 sm:px-6 py-6">
         <div className="max-w-4xl mx-auto space-y-4">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-gray-500">Skill</p>
-              <div className="h-6 w-48 bg-gray-200 rounded animate-pulse mt-1" />
-              <div className="h-4 w-32 bg-gray-100 rounded animate-pulse mt-2" />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <div className="h-10 w-28 bg-gray-200 rounded animate-pulse" />
-              <div className="h-10 w-28 bg-gray-200 rounded animate-pulse" />
-            </div>
-          </div>
-          <div className="space-y-3">
-            <div className="h-24 w-full bg-gray-100 rounded-2xl animate-pulse" />
+          <div className="h-6 w-48 bg-gray-200 rounded animate-pulse" />
+          <div className="h-4 w-32 bg-gray-100 rounded animate-pulse mt-2" />
+          <div className="space-y-3 mt-6">
             <div className="h-24 w-full bg-gray-100 rounded-2xl animate-pulse" />
             <div className="h-24 w-full bg-gray-100 rounded-2xl animate-pulse" />
           </div>
@@ -67,16 +55,15 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
   }
 
   return (
-    <div className="px-4 sm:px-6 py-6">
+    <div className="px-4 sm:px-6 py-6 pb-28">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="space-y-3">
           <button type="button" onClick={onBack} className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
-            ← Back to progress
+            ← Back to archive
           </button>
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
-              <p className="text-xs uppercase tracking-wide text-gray-500">Skill</p>
-              <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">{skillName}</h2>
                 <button
                   type="button"
@@ -86,122 +73,76 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
                   Rename
                 </button>
               </div>
-              <p className="text-sm text-gray-500 mt-2">{latestSession ? `Latest ${formatCompactDateTime(latestSession.recorded_at || latestSession.created_at)}` : 'No proofs yet'}</p>
+              <p className="text-sm text-gray-500 mt-2">
+                {latestSession
+                  ? `${skillSessions.length} ${skillSessions.length === 1 ? 'proof' : 'proofs'} · latest ${formatCompactDateTime(latestSession.recorded_at || latestSession.created_at)}`
+                  : 'No proofs yet'}
+              </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => onRecordProof?.()}
-                className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
-              >
-                Record proof
-              </button>
-              {latestSession ? (
-                <button
-                  type="button"
-                  onClick={() => onOpenSession?.(latestSession, { view: 'skill', sessionId: null, seriesName: skillName })}
-                  className="rounded-full border border-gray-200 bg-white text-gray-900 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors"
-                >
-                  Open latest proof
-                </button>
-              ) : null}
-            </div>
+            <button
+              type="button"
+              onClick={() => onRecordProof?.()}
+              className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors shrink-0"
+            >
+              Record
+            </button>
           </div>
         </div>
 
         {skillSessions.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
             <p className="text-sm text-gray-700">No proofs in this skill yet.</p>
-            <p className="text-xs text-gray-500 mt-1">Use Record above, then choose this skill when you save.</p>
+            <button
+              type="button"
+              onClick={() => onRecordProof?.()}
+              className="mt-4 rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
+            >
+              Record first proof
+            </button>
           </div>
         ) : (
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
-              <div className="p-4 border-b border-gray-100 flex items-start justify-between gap-4 flex-wrap">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-gray-500">Latest proof</p>
-                  <h3 className="text-lg font-semibold text-gray-900 mt-1">{latestSession?.title}</h3>
-                  <p className="text-sm text-gray-500 mt-1">{latestSession ? formatCompactDateTime(latestSession.recorded_at || latestSession.created_at) : ''}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-700 px-2 py-1 rounded-full">Proof {latestSession?.takeNumber}</span>
-                  {latestSession?.processing_status === 'ready' ? <span className="text-[11px] uppercase tracking-wide bg-gray-100 text-gray-600 px-2 py-1 rounded-full">Ready</span> : null}
-                  {latestSession?.processing_status === 'processing' ? <span className="text-[11px] uppercase tracking-wide bg-amber-100 text-amber-800 px-2 py-1 rounded-full">Processing</span> : null}
-                </div>
-              </div>
-              <div className="p-4 space-y-4">
-                <VideoThumbnail session={latestSession} className="relative w-full max-w-xl aspect-video rounded-2xl overflow-hidden bg-black" />
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onOpenSession?.(latestSession, { view: 'skill', sessionId: null, seriesName: skillName })}
-                    className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
-                  >
-                    Open latest proof
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {previousSession ? (
-              <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-3">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-gray-500">Previous proof</p>
-                  <p className="text-sm font-medium text-gray-900 mt-1">{previousSession.title}</p>
-                  <p className="text-xs text-gray-500 mt-1">{fmtDate(previousSession.recorded_at || previousSession.created_at)}</p>
-                </div>
-                <button type="button" onClick={() => onOpenSession?.(previousSession, { view: 'skill', sessionId: null, seriesName: skillName })} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors">
-                  Open previous proof
-                </button>
-              </div>
-            ) : null}
-
-            <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 space-y-3">
-              <div>
-                <p className="text-sm font-semibold text-gray-900">Proof timeline</p>
-                <p className="text-xs text-gray-500 mt-1">Oldest to newest.</p>
-              </div>
-              <div className="space-y-3">
-                {skillSessions.map((session) => (
-                  <SessionListItem
-                    key={session.id}
-                    session={session}
-                    onOpen={() => onOpenSession?.(session, { view: 'skill', sessionId: null, seriesName: skillName })}
-                    minimal
-                  />
-                ))}
-              </div>
-              <SkillPickerModal
-                open={Boolean(renamingSkill)}
-                title="Rename skill"
-                initialValue={renamingSkill || ''}
-                options={skillOptions}
-                saving={saving}
-                onClose={() => setRenamingSkill('')}
-                onSave={async (val) => {
-                  if (!renamingSkill || !token) return
-                  setSaving(true)
-                  try {
-                    const res = await fetch('/api/sessions/threads/rename/', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Token ${token}` } : {}) },
-                      body: JSON.stringify({ old_practice_series: renamingSkill, new_practice_series: val }),
-                    })
-                    const data = await res.json().catch(() => ({}))
-                    if (!res.ok) throw new Error(data?.error || 'Could not rename skill')
-                    try { window.dispatchEvent(new CustomEvent('practica:skill-renamed', { detail: { oldSeriesName: renamingSkill, newSeriesName: val } })) } catch {}
-                    toast.success('Skill renamed')
-                    setRenamingSkill('')
-                  } catch (e) {
-                    toast.error(e?.message || 'Could not rename skill')
-                  } finally {
-                    setSaving(false)
-                  }
-                }}
+          <div className="space-y-3">
+            {skillSessions.map((session) => (
+              <SessionListItem
+                key={session.id}
+                session={session}
+                onOpen={() => onOpenSession?.(session, { view: 'skill', sessionId: null, seriesName: skillName })}
+                highlight={session.isLatest}
+                latestLabel={session.isLatest ? 'Latest' : ''}
+                minimal
               />
-            </div>
+            ))}
           </div>
         )}
+
+        <SkillPickerModal
+          open={Boolean(renamingSkill)}
+          title="Rename skill"
+          initialValue={renamingSkill || ''}
+          options={skillOptions}
+          saving={saving}
+          onClose={() => setRenamingSkill('')}
+          onSave={async (val) => {
+            if (!renamingSkill || !token) return
+            setSaving(true)
+            try {
+              const res = await fetch('/api/sessions/threads/rename/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Token ${token}` } : {}) },
+                body: JSON.stringify({ old_practice_series: renamingSkill, new_practice_series: val }),
+              })
+              const data = await res.json().catch(() => ({}))
+              if (!res.ok) throw new Error(data?.error || 'Could not rename skill')
+              try { window.dispatchEvent(new CustomEvent('practica:skill-renamed', { detail: { oldSeriesName: renamingSkill, newSeriesName: val } })) } catch {}
+              toast.success('Skill renamed')
+              setRenamingSkill('')
+            } catch (e) {
+              toast.error(e?.message || 'Could not rename skill')
+            } finally {
+              setSaving(false)
+            }
+          }}
+        />
       </div>
     </div>
   )

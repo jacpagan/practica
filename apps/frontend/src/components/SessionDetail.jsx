@@ -179,7 +179,6 @@ function SessionDetail({
   threadNavigationRef.current = threadNavigation
   threadTransitionRef.current = threadTransition
   const hasThreadNavigation = threadNavigation.items.length > 1
-  const threadLabel = session?.practice_series ? session.practice_series : 'Ungrouped'
   const threadPositionLabel = hasThreadNavigation && threadNavigation.index >= 0
     ? `Proof ${threadNavigation.index + 1} of ${threadNavigation.items.length}`
     : ''
@@ -828,91 +827,33 @@ function SessionDetail({
             </div>
           ) : (
             <>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h1 className="text-lg font-semibold text-gray-900">{session.title}</h1>
-                  {session.practice_series ? (
-                    <div className="flex items-center gap-2 flex-wrap mt-2">
-                      <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">{session.practice_series}</span>
-                      <button type="button" onClick={() => onOpenSeries?.(session.practice_series)} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
-                        View skill
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
+              <div>
+                <h1 className="text-lg font-semibold text-gray-900">{session.title}</h1>
+                {session.practice_series ? (
+                  <button
+                    type="button"
+                    onClick={() => onOpenSeries?.(session.practice_series)}
+                    className="mt-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                  >
+                    {session.practice_series} →
+                  </button>
+                ) : null}
+                {(session.recorded_at || session.duration_seconds) ? (
+                  <p className="mt-2 text-xs text-gray-500">
+                    {session.recorded_at ? new Date(session.recorded_at).toLocaleString(undefined, { hour12: undefined }) : null}
+                    {session.recorded_at && session.duration_seconds ? ' · ' : null}
+                    {session.duration_seconds ? fmtTimer(session.duration_seconds) : null}
+                  </p>
+                ) : null}
               </div>
 
               {justUploaded ? (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-                  <p className="text-sm font-medium text-emerald-900">Proof saved to your private archive.</p>
-                  <p className="text-sm text-emerald-800 mt-1">
-                    {returnsToSkill
-                      ? `Stored under ${session.practice_series}. Open that skill timeline to find this proof again.`
-                      : 'Stored in Progress. Open your archive to find this proof again.'}
-                  </p>
+                  <p className="text-sm font-medium text-emerald-900">Proof saved.</p>
                 </div>
               ) : null}
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={onBack}
-                  className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
-                >
-                  {returnsToSkill ? `View in ${session.practice_series}` : 'View in Progress'}
-                </button>
-                {returnsToSkill && session.practice_series ? (
-                  <button
-                    type="button"
-                    onClick={() => onOpenSeries?.(session.practice_series)}
-                    className="rounded-full border border-gray-200 bg-white text-gray-900 px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors"
-                  >
-                    Open skill timeline
-                  </button>
-                ) : null}
-              </div>
 
               {session.description ? <p className="text-sm text-gray-600">{session.description}</p> : null}
-
-              {hasThreadNavigation ? (
-                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-wide text-gray-500">{threadLabel}</p>
-                      <p className="text-sm font-medium text-gray-900 mt-1">{threadPositionLabel}</p>
-                      <p className="text-xs text-gray-500 mt-1">Drag the video up or down to move through this thread.</p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => openThreadSession(threadNavigation.previous)}
-                        disabled={!threadNavigation.previous}
-                        className="rounded-full border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        Prev
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openThreadSession(threadNavigation.next)}
-                        disabled={!threadNavigation.next}
-                        className="rounded-full border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        Next
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              {(session.recorded_at || session.duration_seconds) ? (
-                <details className="text-xs text-gray-500">
-                  <summary className="cursor-pointer list-none hover:text-gray-900 transition-colors">Video details</summary>
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    {session.recorded_at ? <span className="rounded-full bg-gray-100 px-3 py-1">{new Date(session.recorded_at).toLocaleString(undefined, { hour12: undefined })}</span> : null}
-                    {session.duration_seconds ? <span className="rounded-full bg-gray-100 px-3 py-1">{fmtTimer(session.duration_seconds)}</span> : null}
-                  </div>
-                </details>
-              ) : null}
 
               {session.processing_status === 'failed' ? (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
@@ -939,16 +880,21 @@ function SessionDetail({
               ) : null}
 
               <details className="border-t border-gray-100 pt-4">
-                <summary className="cursor-pointer list-none text-sm text-gray-500 hover:text-gray-900 transition-colors">More options</summary>
+                <summary className="cursor-pointer list-none text-sm text-gray-500 hover:text-gray-900 transition-colors">Manage proof</summary>
                 <div className="flex flex-wrap gap-2 pt-4">
+                  {onRecordAnother ? (
+                    <button type="button" onClick={() => onRecordAnother()} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 transition-colors">
+                      Record another
+                    </button>
+                  ) : null}
                   {canEdit ? (
                     <button type="button" onClick={startEditing} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors">
-                      Edit video
+                      Edit
                     </button>
                   ) : null}
                   {canEdit ? (
                     <button type="button" onClick={deleteSession} disabled={deleting} className="text-sm text-red-600 border border-red-200 rounded-lg px-4 py-2.5 hover:bg-red-50 disabled:opacity-50 transition-colors">
-                      {deleting ? 'Deleting…' : 'Delete video'}
+                      {deleting ? 'Deleting…' : 'Delete'}
                     </button>
                   ) : null}
                   <button type="button" onClick={refreshSession} disabled={refreshing} className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 disabled:opacity-50 transition-colors">
@@ -956,7 +902,7 @@ function SessionDetail({
                   </button>
                   {canEdit && session.video_file ? (
                     <a href={videoUrl(session.video_file)} download className="text-sm text-gray-700 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors">
-                      Download original
+                      Download
                     </a>
                   ) : null}
                 </div>
