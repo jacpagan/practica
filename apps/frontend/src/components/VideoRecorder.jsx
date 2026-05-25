@@ -4,17 +4,17 @@ import NoteHighway from './NoteHighway'
 import BeatBackgroundPulse from './BeatBackgroundPulse'
 import { createBeatClock } from '../metronome/beatClock'
 import { createOnsetDetector } from '../metronome/onsetDetector'
-import { matchOnsetToBeat } from '../metronome/matchHit'
 import { buildTimingMetadata } from '../metronome/timingMetadata'
 import {
   clampBpm as clampBpmValue,
   MIN_BPM,
   MAX_BPM,
   ONSET_ANALYSER_FFT,
-  SPEAKER_CLICK_BLEED_MS,
 } from '../metronome/constants'
-import { estimateTapLatencyMs } from '../metronome/tapLatency'
+import { speakerVisualLagSeconds } from '../metronome/tapLatency'
 import { readSpeakerPractice, SPEAKER_PRACTICE_STORAGE_KEY } from '../metronome/speakerPractice'
+import { resolveTimingHit, shouldRejectClickBleed } from '../metronome/timingHit'
+import { wireOnsetProcessor } from '../metronome/wireOnsetProcessor'
 
 const STATES = {
   IDLE: 'idle',
@@ -106,6 +106,9 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   const timerRef = useRef(null)
   const beatClockRef = useRef(null)
   const onsetDetectorRef = useRef(null)
+  const onsetProcessorRef = useRef(null)
+  const resetOnsetProcessorRef = useRef(null)
+  const handleDetectedOnsetRef = useRef(null)
   const timingRafRef = useRef(null)
   const hitsRef = useRef([])
   const lastMatchedBeatRef = useRef(-1)
@@ -270,6 +273,11 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     micGainNodeRef.current = null
     analyserRef.current = null
     onsetDetectorRef.current = null
+    if (onsetProcessorRef.current) {
+      try { onsetProcessorRef.current.disconnect() } catch {}
+      onsetProcessorRef.current = null
+    }
+    resetOnsetProcessorRef.current = null
     if (meterRafRef.current) { cancelAnimationFrame(meterRafRef.current); meterRafRef.current = null }
     if (!ctx) return
     try { ctx.close() } catch {}
@@ -505,6 +513,50 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     throw lastError || new Error('Could not access camera.')
   }, [getAudioConstraints, getVideoConstraints, refreshMediaDevices, selectedAudioInputId, selectedVideoInputId])
 
+  const setupMicTimingChain = useCallback((audioContext, micSource, destination) => {
+    const micGainNode = audioContext.createGain()
+    micGainNode.gain.value = micGain
+    micGainNodeRef.current = micGainNode
+    const analyser = audioContext.createAnalyser()
+    analyser.fftSize = ONSET_ANALYSER_FFT
+    analyserRef.current = analyser
+    micSource.connect(micGainNode)
+
+    if (onsetProcessorRef.current) {
+      try { onsetProcessorRef.current.disconnect() } catch {}
+      onsetProcessorRef.current = null
+    }
+    const wired = wireOnsetProcessor(audioContext, micGainNode, (onset) => {
+      handleDetectedOnsetRef.current?.(onset)
+    })
+    if (wired) {
+      onsetProcessorRef.current = wired.processor
+      resetOnsetProcessorRef.current = wired.reset
+      wired.processor.connect(analyser)
+    } else {
+      micGainNode.connect(analyser)
+      onsetDetectorRef.current = createOnsetDetector(analyser)
+    }
+    analyser.connect(destination)
+
+    if (!meterRafRef.current) {
+      const data = new Float32Array(analyser.fftSize)
+      const tick = () => {
+        try {
+          analyser.getFloatTimeDomainData(data)
+          let peak = 0
+          for (let i = 0; i < data.length; i++) {
+            const v = Math.abs(data[i])
+            if (v > peak) peak = v
+          }
+          setMicLevel(peak)
+        } catch {}
+        meterRafRef.current = requestAnimationFrame(tick)
+      }
+      meterRafRef.current = requestAnimationFrame(tick)
+    }
+  }, [micGain])
+
   const ensureAudioMix = useCallback(async (stream) => {
     if (typeof window === 'undefined') return null
     const AudioContextClass = window.AudioContext || window.webkitAudioContext
@@ -522,34 +574,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       if (audioTracks.length) {
         const micStream = new MediaStream(audioTracks)
         const micSource = audioContext.createMediaStreamSource(micStream)
-        const micGainNode = audioContext.createGain()
-        micGainNode.gain.value = micGain
-        micGainNodeRef.current = micGainNode
-        const analyser = audioContext.createAnalyser()
-        analyser.fftSize = ONSET_ANALYSER_FFT
-        analyserRef.current = analyser
-        micSource.connect(micGainNode)
-        micGainNode.connect(analyser)
-        analyser.connect(destination)
-        if (!onsetDetectorRef.current) {
-          onsetDetectorRef.current = createOnsetDetector(analyser)
-        }
-        if (!meterRafRef.current) {
-          const data = new Float32Array(analyser.fftSize)
-          const tick = () => {
-            try {
-              analyser.getFloatTimeDomainData(data)
-              let peak = 0
-              for (let i = 0; i < data.length; i++) {
-                const v = Math.abs(data[i])
-                if (v > peak) peak = v
-              }
-              setMicLevel(peak)
-            } catch {}
-            meterRafRef.current = requestAnimationFrame(tick)
-          }
-          meterRafRef.current = requestAnimationFrame(tick)
-        }
+        setupMicTimingChain(audioContext, micSource, destination)
       }
     }
 
@@ -562,7 +587,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     if (mixedAudioTrack) tracks.push(mixedAudioTrack)
     mixedStreamRef.current = new MediaStream(tracks)
     return mixedStreamRef.current
-  }, [])
+  }, [setupMicTimingChain])
 
   // Mix audio from multiple input streams (e.g., mic + system audio)
   const ensureAudioMixForStreams = useCallback(async (streams) => {
@@ -591,33 +616,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
           const source = audioContext.createMediaStreamSource(input)
           const gain = audioContext.createGain()
           if (idx === 0) {
-            gain.gain.value = micGain
-            micGainNodeRef.current = gain
-            const analyser = audioContext.createAnalyser()
-            analyser.fftSize = ONSET_ANALYSER_FFT
-            analyserRef.current = analyser
-            source.connect(gain)
-            gain.connect(analyser)
-            analyser.connect(destination)
-            if (!onsetDetectorRef.current) {
-              onsetDetectorRef.current = createOnsetDetector(analyser)
-            }
-            if (!meterRafRef.current) {
-              const data = new Float32Array(analyser.fftSize)
-              const tick = () => {
-                try {
-                  analyser.getFloatTimeDomainData(data)
-                  let peak = 0
-                  for (let i = 0; i < data.length; i++) {
-                    const v = Math.abs(data[i])
-                    if (v > peak) peak = v
-                  }
-                  setMicLevel(peak)
-                } catch {}
-                meterRafRef.current = requestAnimationFrame(tick)
-              }
-              meterRafRef.current = requestAnimationFrame(tick)
-            }
+            setupMicTimingChain(audioContext, source, destination)
           } else {
             // Slightly lower system audio
             gain.gain.value = 0.8
@@ -629,7 +628,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     })
 
     return destination.stream
-  }, [])
+  }, [setupMicTimingChain])
 
   const playTickAt = useCallback(async ({ scheduledTime, isAccent }) => {
     const audioContext = audioContextRef.current
@@ -716,33 +715,22 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     const epoch = beatClock.getEpoch?.()
     if (epoch == null) return
 
-    const lastClick = lastClickAtRef.current
-    if (lastClick && lastClick.gain > 0.02) {
-      const msSinceClick = (hit.onsetTime - lastClick.audioTime) * 1000
-      const bleedMs = speakerPractice ? SPEAKER_CLICK_BLEED_MS : 45
-      if (msSinceClick >= 0 && msSinceClick <= bleedMs) {
-        if (speakerPractice || hit.strength < Math.max(0.1, lastClick.gain * 1.8)) {
-          return
-        }
-      }
-    }
+    if (shouldRejectClickBleed(hit, lastClickAtRef.current, speakerPractice)) return
 
     const audioContext = audioContextRef.current
-    const analyser = analyserRef.current
-    const latencyCompensationMs = estimateTapLatencyMs(
-      audioContext,
-      analyser?.fftSize,
-      { speakerPractice },
-    ) + syncOffsetMs
-
-    const match = matchOnsetToBeat({
-      onsetTime: hit.onsetTime,
+    const resolved = resolveTimingHit({
+      hit,
       epoch,
       period: beatClock.getPeriod(),
       beatsPerBar,
-      latencyCompensationMs,
+      speakerPractice,
+      syncOffsetMs,
+      audioContext,
+      analyserFftSize: analyserRef.current?.fftSize,
+      visualLagSeconds: speakerVisualLagSeconds(audioContext, speakerPractice),
     })
-    if (!match) return
+    if (!resolved) return
+    const { match } = resolved
     if (match.beatIndex === lastMatchedBeatRef.current) return
 
     lastMatchedBeatRef.current = match.beatIndex
@@ -763,6 +751,8 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     handleTimingHit(onset)
   }, [handleTimingHit])
 
+  handleDetectedOnsetRef.current = handleDetectedOnset
+
   const startTimingLoop = useCallback(() => {
     if (timingRafRef.current) return
 
@@ -778,8 +768,10 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
         })
       }
 
+      // Onset detection runs on the audio thread (ScriptProcessor); rAF only drives beats.
       if (
-        audioContext
+        !onsetProcessorRef.current
+        && audioContext
         && analyser
         && metronomeEnabled
         && timingFeedbackEnabled
@@ -803,6 +795,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
 
     stopMetronome()
     onsetDetectorRef.current?.reset?.()
+    resetOnsetProcessorRef.current?.()
     beatClockRef.current.configure({ bpm, beatsPerBar })
     beatClockRef.current.start(audioContext.currentTime + 0.02)
     setIsMetronomeRunning(true)

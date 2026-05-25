@@ -1,4 +1,4 @@
-import { GOOD_MS, PERFECT_MS } from './constants'
+import { GOOD_MS, PERFECT_MS } from './constants.js'
 
 export function matchOnsetToBeat({
   onsetTime,
