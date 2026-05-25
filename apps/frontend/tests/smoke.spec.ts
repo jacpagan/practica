@@ -326,10 +326,9 @@ test('Recording starts and saves a take when the metronome is on', async ({ page
   await page.getByRole('button', { name: /Options/i }).click()
 
   // Tap the big red record button
-  const recordButton = page.locator('button.bg-red-500.w-20').first()
-  await recordButton.click()
+  await page.getByRole('button', { name: 'Start recording' }).click()
 
-  await expect(page.getByText(/Starting in/)).toBeVisible({ timeout: 2000 })
+  await expect(page.getByText(/^Starting in \d+$/)).toBeVisible({ timeout: 2000 })
 
   // RECORDING state begins. This is the assertion that catches the original
   // bug: when startActualRecording threw a ReferenceError (setTimingLiveStats

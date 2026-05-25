@@ -1587,10 +1587,6 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
             </>
             ) : null}
 
-            {isCountingIn ? (
-              <p className="text-center text-lg font-semibold text-white/95">Starting in {countInRemaining}</p>
-            ) : null}
-
             {isRecording ? (
               <div>
                 <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
