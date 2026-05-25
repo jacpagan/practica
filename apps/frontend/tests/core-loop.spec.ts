@@ -505,7 +505,7 @@ test('long upload interruption auto-resumes and saves successfully', async ({ br
   await page.getByRole('button', { name: 'Save proof' }).click()
 
   await expect(page).toHaveURL(/\/sessions\/999$/, { timeout: 30000 })
-  await expect(page.getByText('Mock long take')).toBeVisible({ timeout: 10000 })
+  await expect(page.getByRole('heading', { name: 'Mock long take' })).toBeVisible({ timeout: 10000 })
   expect(mocks.getCompleteAttempts()).toBeGreaterThan(1)
 
   await context.close()
