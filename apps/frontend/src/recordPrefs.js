@@ -1,5 +1,25 @@
 export const LAST_SERIES_KEY = 'practica.last_series.v1'
 export const RECENT_SERIES_KEY = 'practica.recent_series.v1'
+export const VIDEO_FIT_KEY = 'practica.video.fit.v1'
+
+export const readVideoFitMode = () => {
+  try {
+    const raw = String(window.localStorage.getItem(VIDEO_FIT_KEY) || '').trim()
+    if (raw === 'fill' || raw === 'fit') return raw
+  } catch {}
+  if (typeof window !== 'undefined' && window.matchMedia?.('(min-width: 640px)')?.matches) {
+    return 'fit'
+  }
+  return 'fill'
+}
+
+export const saveVideoFitMode = (mode) => {
+  const normalized = mode === 'fit' ? 'fit' : 'fill'
+  try {
+    window.localStorage.setItem(VIDEO_FIT_KEY, normalized)
+  } catch {}
+  return normalized
+}
 
 export const readLastSeries = () => {
   try {

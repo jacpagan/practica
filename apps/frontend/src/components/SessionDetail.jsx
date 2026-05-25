@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fmtTimer, sessionVideoSources, videoUrl } from '../utils'
 import { useConfirm } from './ConfirmDialog'
 import { useToast } from './Toast'
@@ -6,8 +6,13 @@ import SkillField from './SkillField'
 import useSessionDetailEditActions from '../hooks/useSessionDetailEditActions'
 import useSessionDetailMediaActions from '../hooks/useSessionDetailMediaActions'
 import VideoScrubBar from './VideoScrubBar'
+import { readVideoFitMode, saveVideoFitMode } from '../recordPrefs'
 
 const THREAD_SLIDE_TRANSITION_MS = 280
+const VIDEO_OBJECT_CLASS = {
+  fill: 'object-cover',
+  fit: 'object-contain',
+}
 
 function IconPlay({ className = 'h-6 w-6' }) {
   return (
@@ -29,6 +34,24 @@ function IconChevronUp({ className = 'h-5 w-5' }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+    </svg>
+  )
+}
+
+function IconFitFrame({ className = 'h-5 w-5' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+      <rect x="5" y="7" width="14" height="10" rx="1.5" />
+      <path strokeLinecap="round" d="M9 4h6M9 20h6M4 9v6M20 9v6" />
+    </svg>
+  )
+}
+
+function IconFillFrame({ className = 'h-5 w-5' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="1.5" />
+      <path strokeLinecap="round" d="M8 12h8M12 8v8" />
     </svg>
   )
 }
@@ -64,6 +87,8 @@ function SessionDetail({
   const [threadTransition, setThreadTransition] = useState(null)
   const [pagerDrag, setPagerDrag] = useState({ active: false, animating: false, offsetY: 0 })
   const [videoPlaying, setVideoPlaying] = useState(false)
+  const [videoFit, setVideoFit] = useState(() => readVideoFitMode())
+  const videoTapRef = useRef({ lastAt: 0, pendingTimer: null })
   const authHeaders = useMemo(() => (token ? { Authorization: `Token ${token}` } : {}), [token])
   const canEdit = Boolean(session?.can_edit)
   const returnRouteView = String(returnRoute?.view || '').trim()
@@ -326,6 +351,41 @@ function SessionDetail({
     else video.pause?.()
   }
 
+  const videoObjectClass = VIDEO_OBJECT_CLASS[videoFit] || VIDEO_OBJECT_CLASS.fill
+  const videoSurfaceClass = `absolute inset-0 h-full w-full bg-black ${videoObjectClass} sm:static sm:inset-auto`
+
+  const toggleVideoFit = useCallback((event) => {
+    event?.stopPropagation?.()
+    setVideoFit((current) => {
+      const next = saveVideoFitMode(current === 'fill' ? 'fit' : 'fill')
+      return next
+    })
+  }, [])
+
+  const handleVideoClick = (event) => {
+    event?.stopPropagation?.()
+    const now = Date.now()
+    if (now - videoTapRef.current.lastAt < 320) {
+      if (videoTapRef.current.pendingTimer) {
+        window.clearTimeout(videoTapRef.current.pendingTimer)
+        videoTapRef.current.pendingTimer = null
+      }
+      videoTapRef.current.lastAt = 0
+      toggleVideoFit(event)
+      return
+    }
+    videoTapRef.current.lastAt = now
+    if (videoTapRef.current.pendingTimer) window.clearTimeout(videoTapRef.current.pendingTimer)
+    videoTapRef.current.pendingTimer = window.setTimeout(() => {
+      if (videoTapRef.current.lastAt === now) togglePlayback(event)
+      videoTapRef.current.pendingTimer = null
+    }, 320)
+  }
+
+  useEffect(() => () => {
+    if (videoTapRef.current.pendingTimer) window.clearTimeout(videoTapRef.current.pendingTimer)
+  }, [])
+
   const handleSwipeStart = (event) => {
     const touch = event.touches?.[0]
     if (!touch) return
@@ -514,7 +574,7 @@ function SessionDetail({
         style={pagerCardStyle(slot)}
       >
         {url ? (
-          <video src={url} muted playsInline className="absolute inset-0 h-full w-full bg-black object-cover sm:static sm:object-contain" />
+          <video src={url} muted playsInline className={videoSurfaceClass} />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-black px-6 text-center text-sm text-white/70">
             Video is still preparing for playback.
@@ -561,12 +621,13 @@ function SessionDetail({
               src={playableUrl}
               playsInline
               preload="metadata"
-              onClick={togglePlayback}
+              onClick={handleVideoClick}
+              onDoubleClick={toggleVideoFit}
               onPlay={() => setVideoPlaying(true)}
               onPause={() => setVideoPlaying(false)}
               onEnded={() => setVideoPlaying(false)}
               onError={handlePlaybackError}
-              className="absolute inset-0 h-full w-full bg-black object-cover sm:static sm:inset-auto sm:object-contain"
+              className={videoSurfaceClass}
             />
           ) : null}
           {playableUrl && !playbackFailed && !videoPlaying ? (
@@ -584,32 +645,40 @@ function SessionDetail({
                   durationSeconds={session?.duration_seconds}
                   timingMetadata={session?.timing_metadata}
                 />
-                {hasThreadNavigation ? (
-                  <div className="pointer-events-auto flex items-end justify-between gap-3 px-4 pb-2 text-white">
-                    <div className="max-w-[68%]">
-                      <p className="text-sm font-semibold leading-tight drop-shadow">{session.title}</p>
+                <div className="pointer-events-auto flex items-end justify-between gap-3 px-4 pb-2 text-white">
+                  <div className="max-w-[55%] min-w-0">
+                    <p className="truncate text-sm font-semibold leading-tight drop-shadow">{session.title}</p>
+                    {hasThreadNavigation ? (
                       <p className="mt-0.5 text-[11px] text-white/70">{threadPositionLabel}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={togglePlayback}
-                        aria-label={videoPlaying ? 'Pause video' : 'Play video'}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur transition-colors hover:bg-white/15"
-                      >
-                        {videoPlaying ? <IconPause className="h-5 w-5" /> : <IconPlay className="h-5 w-5" />}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleOpenDetails}
-                        aria-label="Open proof details"
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur transition-colors hover:bg-white/15"
-                      >
-                        <IconChevronUp className="h-5 w-5" />
-                      </button>
-                    </div>
+                    ) : null}
                   </div>
-                ) : null}
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={toggleVideoFit}
+                      aria-label={videoFit === 'fill' ? 'Switch to fit (show full frame)' : 'Switch to fill (full screen)'}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur transition-colors hover:bg-white/15"
+                    >
+                      {videoFit === 'fill' ? <IconFitFrame className="h-5 w-5" /> : <IconFillFrame className="h-5 w-5" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={togglePlayback}
+                      aria-label={videoPlaying ? 'Pause video' : 'Play video'}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur transition-colors hover:bg-white/15"
+                    >
+                      {videoPlaying ? <IconPause className="h-5 w-5" /> : <IconPlay className="h-5 w-5" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleOpenDetails}
+                      aria-label="Open proof details"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur transition-colors hover:bg-white/15"
+                    >
+                      <IconChevronUp className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           ) : null}
@@ -631,7 +700,7 @@ function SessionDetail({
             <div className="pointer-events-none absolute inset-0 z-40 overflow-hidden bg-black">
               <div className={`absolute inset-0 transform transition-transform duration-300 ease-out ${currentSlideClass}`}>
                 {playableUrl && !playbackFailed ? (
-                  <video src={playableUrl} muted playsInline className="absolute inset-0 h-full w-full bg-black object-cover sm:static sm:object-contain" />
+                  <video src={playableUrl} muted playsInline className={videoSurfaceClass} />
                 ) : (
                   <div className="h-full w-full bg-black" />
                 )}
@@ -641,7 +710,7 @@ function SessionDetail({
               </div>
               <div className={`absolute inset-0 transform transition-transform duration-300 ease-out ${targetSlideClass}`}>
                 {transitionTargetUrl ? (
-                  <video src={transitionTargetUrl} muted playsInline className="absolute inset-0 h-full w-full bg-black object-cover sm:static sm:object-contain" />
+                  <video src={transitionTargetUrl} muted playsInline className={videoSurfaceClass} />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-black px-6 text-center text-sm text-white/70">
                     Video is still preparing for playback.
