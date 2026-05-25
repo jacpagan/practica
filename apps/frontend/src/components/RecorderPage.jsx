@@ -216,7 +216,7 @@ export default function RecorderPage({
                   ))}
                 </div>
               ) : null}
-              <div>
+              <div className="pb-2">
                 <label className="block text-sm text-white/75 sm:text-gray-600 mb-1.5">Skill name</label>
                 <SkillField
                   value={customSkill}

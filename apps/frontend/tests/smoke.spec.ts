@@ -343,6 +343,7 @@ test('Recording starts and saves a take when the metronome is on', async ({ page
   await page.getByRole('button', { name: 'Stop recording' }).click()
   await expect(page.getByText('Which skill was this?')).toBeVisible({ timeout: 5000 })
   await page.getByPlaceholder('Breathing, Drumming, Guitar…').fill('Drumming')
+  await page.keyboard.press('Escape')
   await page.getByRole('button', { name: 'Save proof' }).click()
   await expect(page.getByText('Saving your proof…')).toBeVisible({ timeout: 5000 })
 
