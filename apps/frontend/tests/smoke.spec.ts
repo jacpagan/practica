@@ -78,8 +78,9 @@ test('Progress view shows grouped proofs for signed-in members', async ({ page }
 
   await expect(page.getByRole('heading', { name: 'Your proof archive' })).toBeVisible()
   await expect(page.getByText('Overall')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Groove Lab' }).first()).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Edit name' }).first()).toBeVisible()
+  await expect(page.getByText('Activity')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Groove Lab' })).toBeVisible()
+  await expect(page.getByText('Edit name')).toBeVisible()
   await expect(page.locator('img').first()).toBeVisible()
 })
 

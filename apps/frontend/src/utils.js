@@ -132,7 +132,7 @@ const toLocalDayNumber = (value) => {
   return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000)
 }
 
-const toLocalDateKey = (value) => {
+export const toLocalDateKey = (value) => {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
   const year = date.getFullYear()
