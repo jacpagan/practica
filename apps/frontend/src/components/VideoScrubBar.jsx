@@ -117,13 +117,12 @@ export default function VideoScrubBar({ videoRef, durationSeconds = 0, timingMet
   }
 
   const shownTime = dragTime != null ? dragTime : currentTime
-  const progress = duration > 0 ? clamp(shownTime / duration, 0, 1) : 0
-
-  if (!Number.isFinite(duration) || duration <= 0) return null
+  const ready = Number.isFinite(duration) && duration > 0
+  const progress = ready ? clamp(shownTime / duration, 0, 1) : 0
 
   return (
     <div
-      className="pointer-events-auto w-full px-3 py-2"
+      className="pointer-events-auto w-full px-3 pb-2 pt-3"
       onPointerDown={stopBubble}
       onClick={stopBubble}
     >
@@ -132,21 +131,22 @@ export default function VideoScrubBar({ videoRef, durationSeconds = 0, timingMet
         role="slider"
         aria-label="Video timeline"
         aria-valuemin={0}
-        aria-valuemax={Math.round(duration)}
-        aria-valuenow={Math.round(shownTime)}
-        className="relative h-8 flex items-center cursor-pointer touch-none select-none"
-        onPointerDown={handleTrackPointerDown}
-        onPointerMove={handleTrackPointerMove}
-        onPointerUp={handleTrackPointerUp}
-        onPointerCancel={handleTrackPointerUp}
+        aria-valuemax={ready ? Math.round(duration) : 0}
+        aria-valuenow={ready ? Math.round(shownTime) : 0}
+        aria-disabled={!ready}
+        className={`relative h-9 flex items-center touch-none select-none ${ready ? 'cursor-pointer' : 'cursor-default opacity-70'}`}
+        onPointerDown={ready ? handleTrackPointerDown : undefined}
+        onPointerMove={ready ? handleTrackPointerMove : undefined}
+        onPointerUp={ready ? handleTrackPointerUp : undefined}
+        onPointerCancel={ready ? handleTrackPointerUp : undefined}
       >
-        <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-white/20 overflow-hidden">
+        <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/25 overflow-hidden sm:h-1.5">
           <div
-            className="h-full rounded-full bg-white/85 transition-none"
+            className="h-full rounded-full bg-white transition-none"
             style={{ width: `${progress * 100}%` }}
           />
         </div>
-        {markers.map((marker) => {
+        {ready ? markers.map((marker) => {
           const left = clamp((marker.t / duration) * 100, 0, 100)
           return (
             <button
@@ -159,15 +159,17 @@ export default function VideoScrubBar({ videoRef, durationSeconds = 0, timingMet
               onClick={(event) => handleMarkerClick(event, marker.t)}
             />
           )
-        })}
-        <div
-          className="absolute top-1/2 z-20 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-md ring-2 ring-black/25"
-          style={{ left: `${progress * 100}%` }}
-        />
+        }) : null}
+        {ready ? (
+          <div
+            className="absolute top-1/2 z-20 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-lg ring-2 ring-black/30 sm:h-4 sm:w-4"
+            style={{ left: `${progress * 100}%` }}
+          />
+        ) : null}
       </div>
-      <div className="mt-1 flex items-center justify-between text-[11px] tabular-nums text-white/75">
-        <span>{fmtTimer(Math.floor(shownTime))}</span>
-        <span>{fmtTimer(Math.floor(duration))}</span>
+      <div className="mt-1 flex items-center justify-between text-[11px] font-medium tabular-nums text-white/90">
+        <span>{ready ? fmtTimer(Math.floor(shownTime)) : '0:00'}</span>
+        <span>{ready ? fmtTimer(Math.floor(duration)) : '--:--'}</span>
       </div>
     </div>
   )

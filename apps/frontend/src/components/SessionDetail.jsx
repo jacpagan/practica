@@ -9,6 +9,30 @@ import VideoScrubBar from './VideoScrubBar'
 
 const THREAD_SLIDE_TRANSITION_MS = 280
 
+function IconPlay({ className = 'h-6 w-6' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M8 5.14v13.72a1 1 0 001.5.86l11.04-6.86a1 1 0 000-1.72L9.5 4.28A1 1 0 008 5.14z" />
+    </svg>
+  )
+}
+
+function IconPause({ className = 'h-6 w-6' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z" />
+    </svg>
+  )
+}
+
+function IconChevronUp({ className = 'h-5 w-5' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+    </svg>
+  )
+}
+
 function SessionDetail({
   session: initialSession,
   sessions = [],
@@ -536,27 +560,71 @@ function SessionDetail({
               ref={videoRef}
               src={playableUrl}
               playsInline
+              preload="metadata"
               onClick={togglePlayback}
               onPlay={() => setVideoPlaying(true)}
               onPause={() => setVideoPlaying(false)}
               onEnded={() => setVideoPlaying(false)}
               onError={handlePlaybackError}
-              className="w-full h-full bg-black"
+              className="w-full h-full bg-black object-contain sm:object-cover"
             />
           ) : null}
+          {playableUrl && !playbackFailed && !videoPlaying ? (
+            <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+              <div className="rounded-full bg-black/45 p-4 shadow-lg backdrop-blur-sm">
+                <IconPlay className="h-10 w-10 text-white" />
+              </div>
+            </div>
+          ) : null}
           {playableUrl && !playbackFailed ? (
-            <div
-              className={`absolute inset-x-0 z-30 ${
-                hasThreadNavigation
-                  ? 'bottom-[max(5.25rem,calc(env(safe-area-inset-bottom)+4.75rem))]'
-                  : 'bottom-[max(0.75rem,env(safe-area-inset-bottom))]'
-              }`}
-            >
-              <VideoScrubBar
-                videoRef={videoRef}
-                durationSeconds={session?.duration_seconds}
-                timingMetadata={session?.timing_metadata}
-              />
+            <div className="absolute inset-x-0 bottom-0 z-40 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pb-2">
+              <div className="pointer-events-none bg-gradient-to-t from-black/85 via-black/45 to-transparent pt-12 sm:pt-10">
+                <VideoScrubBar
+                  videoRef={videoRef}
+                  durationSeconds={session?.duration_seconds}
+                  timingMetadata={session?.timing_metadata}
+                />
+                {hasThreadNavigation ? (
+                  <div className="pointer-events-auto flex items-end justify-between gap-3 px-4 pb-2 text-white">
+                    <div className="max-w-[68%]">
+                      <p className="text-sm font-semibold leading-tight drop-shadow">{session.title}</p>
+                      <p className="mt-0.5 text-[11px] text-white/70">{threadPositionLabel}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={togglePlayback}
+                        aria-label={videoPlaying ? 'Pause video' : 'Play video'}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur transition-colors hover:bg-white/15"
+                      >
+                        {videoPlaying ? <IconPause className="h-5 w-5" /> : <IconPlay className="h-5 w-5" />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleOpenDetails}
+                        aria-label="Open proof details"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur transition-colors hover:bg-white/15"
+                      >
+                        <IconChevronUp className="h-5 w-5" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pointer-events-auto flex items-end justify-between gap-3 px-4 pb-2 text-white sm:hidden">
+                    <div className="max-w-[72%]">
+                      <p className="text-sm font-semibold leading-tight drop-shadow">{session.title}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleOpenDetails}
+                      aria-label="Open proof details"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur transition-colors hover:bg-white/15"
+                    >
+                      <IconChevronUp className="h-5 w-5" />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           ) : null}
           {!playableUrl || playbackFailed ? (
@@ -600,29 +668,6 @@ function SessionDetail({
             </div>
           ) : null}
           {hasThreadNavigation ? (
-            <>
-            <div className="pointer-events-none absolute inset-x-0 bottom-[max(0.9rem,env(safe-area-inset-bottom))] z-20 flex items-end justify-between gap-3 px-4 text-white">
-              <div className="max-w-[72%]">
-                <p className="text-base font-semibold leading-tight drop-shadow">{session.title}</p>
-                <p className="mt-1 text-[11px] text-white/60">{threadPositionLabel}</p>
-              </div>
-              <div className="pointer-events-auto flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={togglePlayback}
-                  className="rounded-full border border-white/15 bg-black/25 px-3 py-2 text-xs font-medium text-white/85 shadow-lg backdrop-blur transition-colors hover:bg-white/15"
-                >
-                  {videoPlaying ? 'Pause' : 'Play'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleOpenDetails}
-                  className="rounded-full border border-white/15 bg-black/25 px-3 py-2 text-xs font-medium text-white/85 shadow-lg backdrop-blur transition-colors hover:bg-white/15"
-                >
-                  Details
-                </button>
-              </div>
-            </div>
             <div className="pointer-events-none absolute inset-x-0 top-1/2 z-20 hidden -translate-y-1/2 items-center justify-between px-3 opacity-0 transition-opacity hover:opacity-100 sm:flex">
               <button
                 type="button"
@@ -643,7 +688,6 @@ function SessionDetail({
                 Next ↓
               </button>
             </div>
-            </>
           ) : null}
         </div>
 
