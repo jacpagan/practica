@@ -60,15 +60,14 @@ async function apiToken(request, username: string, password: string) {
   return body.token as string
 }
 
-async function latestSessionIdByTitle(request, token: string, title: string) {
-  const response = await request.get('/api/sessions/', {
-    headers: { Authorization: `Token ${token}` },
-  })
-  expect(response.ok()).toBeTruthy()
-  const body = await response.json()
-  const sessions = Array.isArray(body) ? body : body.results || []
-  const match = sessions.find((session) => session?.title === title)
-  return match?.id as number | undefined
+async function sessionIdFromUpload(page) {
+  const uploadResponse = await page.waitForResponse((response) => (
+    response.url().includes('/api/sessions/')
+    && response.request().method() === 'POST'
+    && response.status() === 201
+  ), { timeout: 30000 })
+  const body = await uploadResponse.json()
+  return body?.id as number | undefined
 }
 
 async function waitForSessionReady(request, token: string, sessionId: number) {
@@ -359,11 +358,12 @@ test('signed-in proof upload -> optional review loop works', async ({ browser, r
   await expect(studentPage.getByRole('heading', { name: 'New proof' })).toBeVisible({ timeout: 10000 })
   await studentPage.locator('[aria-label="Drop a video or browse files"] input[type=file]').first().setInputFiles(studentVideo)
   await studentPage.locator('input[type=text]').nth(0).fill(title)
+  const uploadComplete = sessionIdFromUpload(studentPage)
   await studentPage.getByRole('button', { name: 'Save proof' }).click()
   await studentPage.waitForURL(/\/progress/, { timeout: 30000 })
   await expect(studentPage.getByText('Proof saved. You showed up today.')).toBeVisible({ timeout: 10000 })
 
-  const sessionId = await latestSessionIdByTitle(request, studentToken, title)
+  const sessionId = await uploadComplete
   expect(sessionId).toBeTruthy()
 
   markSessionReady(sessionId)
@@ -428,11 +428,12 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
   await expect(studentPage.getByRole('heading', { name: 'New proof' })).toBeVisible({ timeout: 10000 })
   await studentPage.locator('[aria-label="Drop a video or browse files"] input[type=file]').first().setInputFiles(firstTakeVideo)
   await studentPage.locator('input[type=text]').nth(0).fill(initialTitle)
+  const initialUploadComplete = sessionIdFromUpload(studentPage)
   await studentPage.getByRole('button', { name: 'Save proof' }).click()
   await studentPage.waitForURL(/\/progress/, { timeout: 30000 })
   await expect(studentPage.getByText('Proof saved. You showed up today.')).toBeVisible({ timeout: 10000 })
 
-  const initialSessionId = await latestSessionIdByTitle(request, studentToken, initialTitle)
+  const initialSessionId = await initialUploadComplete
   expect(initialSessionId).toBeTruthy()
   markSessionReady(initialSessionId)
   await waitForSessionReady(request, studentToken, initialSessionId)
@@ -473,11 +474,12 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
 
   await studentPage.locator('[aria-label="Drop a video or browse files"] input[type=file]').first().setInputFiles(secondTakeVideo)
   await studentPage.locator('input[type=text]').nth(0).fill(followupTitle)
+  const followupUploadComplete = sessionIdFromUpload(studentPage)
   await studentPage.getByRole('button', { name: 'Save proof' }).click()
   await studentPage.waitForURL(/\/progress/, { timeout: 30000 })
   await expect(studentPage.getByText('Proof saved. You showed up today.')).toBeVisible({ timeout: 10000 })
 
-  const followupSessionId = await latestSessionIdByTitle(request, studentToken, followupTitle)
+  const followupSessionId = await followupUploadComplete
   expect(followupSessionId).toBeTruthy()
   expect(followupSessionId).not.toBe(initialSessionId)
   markSessionReady(followupSessionId)
