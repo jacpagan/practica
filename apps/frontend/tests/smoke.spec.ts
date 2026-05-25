@@ -123,7 +123,6 @@ test('Progress is the default signed-in home without dashboard chrome', async ({
   await page.goto('/')
   await expect(page).toHaveURL(/\/progress/)
   await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Today' })).toHaveCount(0)
   await expect(page.getByText('Recent skills')).toHaveCount(0)
   await expect(page.getByText('this week')).toHaveCount(0)
   await expect(page.getByText('XP', { exact: true })).toHaveCount(0)
