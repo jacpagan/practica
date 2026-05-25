@@ -191,7 +191,6 @@ function AppContent() {
     setPendingPracticeSeries,
     setPendingUploadReturnRoute,
     setSelectedSession,
-    skillOptions,
   })
 
   useViewDataRefresh({
@@ -360,6 +359,8 @@ function AppContent() {
         {view === 'record' && (
           <RecorderPage
             practiceSeries={pendingPracticeSeries}
+            skillOptions={skillOptions}
+            sessions={sessions}
             onCancel={() => {
               setPendingPracticeSeries('')
               setPendingUploadReturnRoute({ view: 'progress', sessionId: null, seriesName: '' })

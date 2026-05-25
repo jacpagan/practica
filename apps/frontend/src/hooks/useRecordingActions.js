@@ -1,7 +1,5 @@
 import { useCallback } from 'react'
 
-import { readLastSeries } from '../recordPrefs'
-
 export const useRecordingActions = ({
   currentReturnRoute,
   navigate,
@@ -11,7 +9,6 @@ export const useRecordingActions = ({
   setPendingPracticeSeries,
   setPendingUploadReturnRoute,
   setSelectedSession,
-  skillOptions = [],
 }) => {
   const startRecord = useCallback(({ skillName = '', returnRoute = null } = {}) => {
     setSelectedSession(null)
@@ -31,10 +28,8 @@ export const useRecordingActions = ({
   ])
 
   const openGlobalRecorder = useCallback(() => {
-    const lastSeries = readLastSeries()
-    const fallback = String(skillOptions?.[0] || '').trim()
-    startRecord({ skillName: lastSeries || fallback })
-  }, [skillOptions, startRecord])
+    startRecord({ skillName: '' })
+  }, [startRecord])
 
   const handleRecordAnother = useCallback((draft = null) => {
     const skillName = String(draft?.practiceSeries || '').trim()

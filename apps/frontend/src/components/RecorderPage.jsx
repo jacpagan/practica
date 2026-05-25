@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import VideoRecorder from './VideoRecorder'
-import { LAST_SERIES_KEY } from '../recordPrefs'
+import SkillField from './SkillField'
+import { recordRecentSeries } from '../recordPrefs'
+import { buildRecentSkills } from '../recentSkills'
 import { MAX_RECORDER_DURATION_SECONDS, createSessionUpload, isLikelyVideoFile, uploadErrorMessage, videoFileAccept } from '../utils'
 import { useAuth } from '../auth'
 import { useToast } from './Toast'
@@ -14,12 +16,20 @@ const seriesBasedTitle = (seriesName = '') => {
   return `${normalizedSeries} - proof - ${stamp}`
 }
 
-export default function RecorderPage({ onCancel, onComplete, practiceSeries = '' }) {
+export default function RecorderPage({
+  onCancel,
+  onComplete,
+  practiceSeries = '',
+  skillOptions = [],
+  sessions = [],
+}) {
   const { token } = useAuth()
   const toast = useToast()
+  const contextSkill = String(practiceSeries || '').trim()
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState('')
-  const [title, setTitle] = useState('')
+  const [selectedSkill, setSelectedSkill] = useState(contextSkill)
+  const [customSkill, setCustomSkill] = useState('')
   const [isUploading, setIsUploading] = useState(false)
   const [progress, setProgress] = useState(null)
   const [saveError, setSaveError] = useState('')
@@ -28,6 +38,15 @@ export default function RecorderPage({ onCancel, onComplete, practiceSeries = ''
   const timingMetadataRef = useRef(null)
   const fileInputRef = useRef(null)
 
+  const recentSkills = useMemo(
+    () => buildRecentSkills({ sessions, limit: 5 }),
+    [sessions],
+  )
+
+  useEffect(() => {
+    setSelectedSkill(contextSkill)
+  }, [contextSkill])
+
   useEffect(() => () => {
     if (ownedPreviewUrlRef.current) {
       try { URL.revokeObjectURL(ownedPreviewUrlRef.current) } catch {}
@@ -35,23 +54,29 @@ export default function RecorderPage({ onCancel, onComplete, practiceSeries = ''
     }
   }, [])
 
-  const defaultTitle = () => {
-    const now = new Date()
-    const pad = (n) => String(n).padStart(2, '0')
-    return `proof - ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
+  const resetCapture = () => {
+    shouldAutoSaveRef.current = false
+    setSaveError('')
+    setCustomSkill('')
+    setSelectedSkill(contextSkill)
+    setFile(null)
+    setPreviewUrl('')
+    if (ownedPreviewUrlRef.current) {
+      try { URL.revokeObjectURL(ownedPreviewUrlRef.current) } catch {}
+      ownedPreviewUrlRef.current = ''
+    }
   }
 
   const handleRecorded = (nextFile, _blobUrl, timingMetadata) => {
     timingMetadataRef.current = timingMetadata || null
     setFile(nextFile)
-    setTitle(seriesBasedTitle(practiceSeries))
     setSaveError('')
-    shouldAutoSaveRef.current = true
     if (ownedPreviewUrlRef.current) {
       try { URL.revokeObjectURL(ownedPreviewUrlRef.current) } catch {}
     }
     ownedPreviewUrlRef.current = URL.createObjectURL(nextFile)
     setPreviewUrl(ownedPreviewUrlRef.current)
+    shouldAutoSaveRef.current = Boolean(contextSkill)
   }
 
   const handlePickedFile = (event) => {
@@ -65,17 +90,18 @@ export default function RecorderPage({ onCancel, onComplete, practiceSeries = ''
     handleRecorded(nextFile)
   }
 
-  const handleSave = async ({ auto = false } = {}) => {
-    if (!file || !title.trim() || !token) return
+  const handleSave = async ({ skillName = selectedSkill, auto = false } = {}) => {
+    if (!file || !token) return
+    const series = String(skillName || '').trim()
+    const title = seriesBasedTitle(series)
     setIsUploading(true)
     setProgress(0)
     setSaveError('')
     try {
-      const series = String(practiceSeries || '').trim()
       const res = await createSessionUpload({
         token,
         payload: {
-          title: title.trim(),
+          title,
           practice_series: series,
           description: '',
           timing_metadata: timingMetadataRef.current,
@@ -91,9 +117,7 @@ export default function RecorderPage({ onCancel, onComplete, practiceSeries = ''
         setProgress(null)
         return
       }
-      if (series) {
-        try { window.localStorage.setItem(LAST_SERIES_KEY, series) } catch {}
-      }
+      if (series) recordRecentSeries(series)
       if (!auto) toast.success(series ? `Saved — ${series}` : 'Saved to your private archive')
       try { onComplete?.(res.data) } catch {}
     } catch {
@@ -105,12 +129,23 @@ export default function RecorderPage({ onCancel, onComplete, practiceSeries = ''
     }
   }
 
+  const chooseSkillAndSave = (skillName) => {
+    const normalized = String(skillName || '').trim()
+    setSelectedSkill(normalized)
+    setCustomSkill(normalized)
+    shouldAutoSaveRef.current = true
+    handleSave({ skillName: normalized, auto: true })
+  }
+
   useEffect(() => {
-    if (!file || !title.trim() || !token) return
+    if (!file || !token) return
     if (!shouldAutoSaveRef.current) return
+    if (!contextSkill) return
     shouldAutoSaveRef.current = false
-    handleSave({ auto: true })
-  }, [file, title, token])
+    handleSave({ skillName: contextSkill, auto: true })
+  }, [file, token, contextSkill])
+
+  const needsSkillTag = Boolean(file) && !contextSkill && !isUploading
 
   return (
     <div className="min-h-screen bg-gray-950 text-white sm:bg-white sm:text-gray-900 px-0 sm:px-6 sm:py-6">
@@ -118,13 +153,13 @@ export default function RecorderPage({ onCancel, onComplete, practiceSeries = ''
         <div className="flex items-center justify-between">
           <div className="hidden sm:block">
             <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Record</h1>
-            {practiceSeries ? <p className="text-sm text-gray-500 mt-1">{practiceSeries}</p> : null}
+            {contextSkill ? <p className="text-sm text-gray-500 mt-1">{contextSkill}</p> : null}
           </div>
           <button type="button" onClick={onCancel} className="fixed top-[max(0.75rem,env(safe-area-inset-top))] left-4 z-40 text-xs text-white/85 rounded-full border border-white/25 bg-black/45 px-3 py-1.5 backdrop-blur sm:static sm:rounded-none sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none sm:text-gray-500 sm:hover:text-gray-900">Close</button>
         </div>
-        {practiceSeries ? (
+        {contextSkill ? (
           <p className="fixed top-[max(0.75rem,env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-40 sm:hidden text-xs text-white/90 rounded-full border border-white/25 bg-black/45 px-3 py-1.5 backdrop-blur">
-            {practiceSeries}
+            {contextSkill}
           </p>
         ) : null}
 
@@ -157,26 +192,81 @@ export default function RecorderPage({ onCancel, onComplete, practiceSeries = ''
               />
             </div>
           </div>
+        ) : needsSkillTag ? (
+          <div className="space-y-4 px-4 sm:px-0 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-0">
+            <div className="overflow-hidden bg-black sm:rounded-2xl">
+              <video src={previewUrl} controls playsInline className="w-full h-[42dvh] object-cover sm:h-auto sm:aspect-video" />
+            </div>
+            <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-4 sm:border-gray-200 sm:bg-white sm:text-gray-900">
+              <div>
+                <h2 className="text-lg font-semibold text-white sm:text-gray-900">Which skill was this?</h2>
+                <p className="mt-1 text-sm text-white/70 sm:text-gray-500">Tap a recent skill or type a new one. No plan needed — just label this take.</p>
+              </div>
+              {recentSkills.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {recentSkills.map((skill) => (
+                    <button
+                      key={skill}
+                      type="button"
+                      onClick={() => chooseSkillAndSave(skill)}
+                      className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/20 transition-colors sm:border-gray-200 sm:bg-gray-50 sm:text-gray-900 sm:hover:bg-gray-100"
+                    >
+                      {skill}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <div>
+                <label className="block text-sm text-white/75 sm:text-gray-600 mb-1.5">Skill name</label>
+                <SkillField
+                  value={customSkill}
+                  onChange={setCustomSkill}
+                  options={skillOptions}
+                  placeholder="Breathing, Drumming, Guitar…"
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => chooseSkillAndSave(customSkill)}
+                  disabled={!customSkill.trim()}
+                  className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 sm:bg-gray-900"
+                >
+                  Save proof
+                </button>
+                <button type="button" onClick={resetCapture} className="text-sm text-white/80 hover:text-white sm:text-gray-600 sm:hover:text-gray-900">
+                  Re-record
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSave({ skillName: '', auto: true })}
+                  className="text-sm text-white/60 hover:text-white sm:text-gray-500 sm:hover:text-gray-800"
+                >
+                  Save without skill
+                </button>
+              </div>
+              {saveError ? <p className="text-sm text-red-400 sm:text-red-600">{saveError}</p> : null}
+            </div>
+          </div>
         ) : (
           <div className="space-y-4 px-4 sm:px-0 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-0">
             <div className="overflow-hidden bg-black sm:rounded-2xl">
               <video src={previewUrl} controls playsInline className="w-full h-[100dvh] object-cover sm:h-auto sm:aspect-video" />
             </div>
             <div className="space-y-3">
-              <div>
-                <label className="block text-sm text-white/75 sm:text-gray-600 mb-1.5">Title</label>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} className="w-full px-3 py-2 text-sm border border-white/20 bg-black/30 text-white rounded-lg focus:outline-none focus:border-white/40 sm:border-gray-200 sm:bg-white sm:text-gray-900 sm:focus:border-gray-400" />
-              </div>
-              <div className="flex items-center justify-between">
-                <button type="button" onClick={() => { shouldAutoSaveRef.current = false; setSaveError(''); setFile(null) }} className="text-sm text-white/80 hover:text-white sm:text-gray-600 sm:hover:text-gray-900">Re-record</button>
-                <button type="button" onClick={handleSave} disabled={isUploading || !title.trim()} className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2 hover:bg-gray-800 disabled:opacity-50">{isUploading ? 'Saving…' : 'Save'}</button>
-              </div>
-              {saveError ? <p className="text-sm text-red-600">{saveError}</p> : null}
+              <p className="text-sm text-white/80 sm:text-gray-600">
+                {isUploading ? 'Saving your proof…' : contextSkill ? `Saving under ${contextSkill}…` : 'Saving…'}
+              </p>
+              {saveError ? <p className="text-sm text-red-400 sm:text-red-600">{saveError}</p> : null}
               {isUploading ? (
                 <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
                   <div className="h-full bg-gray-900 transition-all" style={{ width: `${Math.max(5, progress || 0)}%` }} />
                 </div>
-              ) : null}
+              ) : (
+                <button type="button" onClick={resetCapture} className="text-sm text-white/80 hover:text-white sm:text-gray-600 sm:hover:text-gray-900">
+                  Re-record
+                </button>
+              )}
             </div>
           </div>
         )}
