@@ -795,7 +795,8 @@ test('Upload retries once after network interruption and reuses idempotency key'
   await page.locator('input[type=text]').first().fill('Retry-safe take')
   await page.getByRole('button', { name: 'Save proof' }).click()
 
-  await page.waitForURL(/\/sessions\/777$/)
+  await page.waitForURL(/\/progress$/, { timeout: 30000 })
+  await expect(page.getByText('Proof saved. You showed up today.')).toBeVisible({ timeout: 10000 })
   expect(uploadPostAttempts).toBe(2)
   expect(uploadClientIds[0]).toBeTruthy()
   expect(uploadClientIds[0]).toBe(uploadClientIds[1])

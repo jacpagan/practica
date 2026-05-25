@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import SessionListItem from './SessionListItem'
 import SkillPickerModal from './SkillPickerModal'
 import ActivityCalendar from './ActivityCalendar'
@@ -20,11 +20,13 @@ export default function ProgressView({
   sessions = [],
   sessionsLoading = false,
   token = '',
+  highlightSession = null,
   onOpenSession,
   onOpenSkill,
   onSessionUpdate,
 }) {
   const toast = useToast()
+  const highlightRef = useRef(null)
   const [editingSession, setEditingSession] = useState(null)
   const [draftSkill, setDraftSkill] = useState('')
   const [saving, setSaving] = useState(false)
@@ -109,6 +111,16 @@ export default function ProgressView({
 
   const clearSkill = useCallback(() => saveSkill(''), [saveSkill])
 
+  const justSavedSession = useMemo(() => {
+    if (!highlightSession?.id) return null
+    return sessions.find((session) => session?.id === highlightSession.id) || highlightSession
+  }, [highlightSession, sessions])
+
+  useEffect(() => {
+    if (!justSavedSession || !highlightRef.current) return
+    highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [justSavedSession?.id])
+
   if (sessionsLoading) {
     return (
       <div className="px-4 sm:px-6 py-6">
@@ -134,17 +146,22 @@ export default function ProgressView({
     }
   }
 
-  const renderProofCard = (session, label) => (
+  const renderProofCard = (session, label, { highlighted = false } = {}) => (
     <button
       key={session.id}
+      ref={highlighted ? highlightRef : null}
       type="button"
       onClick={() => onOpenSession?.(session, { view: 'progress', sessionId: null, seriesName: '' })}
-      className="w-full rounded-2xl border border-gray-900 bg-gray-50/40 overflow-hidden text-left hover:bg-gray-50 transition-colors"
+      className={`w-full rounded-2xl border overflow-hidden text-left transition-colors ${
+        highlighted
+          ? 'border-emerald-400 bg-emerald-50/70 ring-2 ring-emerald-200 hover:bg-emerald-50'
+          : 'border-gray-900 bg-gray-50/40 hover:bg-gray-50'
+      }`}
     >
       <div className="flex items-stretch gap-0 sm:gap-4">
         <VideoThumbnail session={session} variant="poster" className="relative w-28 shrink-0 bg-black sm:w-40 sm:rounded-l-2xl" />
         <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-4">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">{label}</p>
+          <p className={`text-[11px] font-medium uppercase tracking-wide ${highlighted ? 'text-emerald-700' : 'text-gray-500'}`}>{label}</p>
           <p className="mt-1 truncate text-base font-semibold text-gray-900">{session.title || 'Proof'}</p>
           <p className="mt-1 text-sm text-gray-500">
             {formatCompactDateTime(session.recorded_at || session.created_at)}
@@ -161,15 +178,26 @@ export default function ProgressView({
         <div>
           <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Today</h2>
           <p className="text-sm text-gray-500 mt-1">
-            {overview.proofRecordedToday
-              ? (todaySessions.length > 1
-                ? `${todaySessions.length} proofs logged today.`
-                : 'You showed up today.')
-              : sessions.length > 0
-                ? 'No proof yet today. Tap Record when you are ready.'
-                : 'Tap Record above when you are ready to practice.'}
+            {justSavedSession
+              ? 'Proof saved. You showed up today.'
+              : overview.proofRecordedToday
+                ? (todaySessions.length > 1
+                  ? `${todaySessions.length} proofs logged today.`
+                  : 'You showed up today.')
+                : sessions.length > 0
+                  ? 'No proof yet today. Tap Record when you are ready.'
+                  : 'Tap Record above when you are ready to practice.'}
           </p>
         </div>
+
+        {justSavedSession ? (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+            <p className="text-sm font-medium text-emerald-900">Done for today?</p>
+            <p className="mt-1 text-sm text-emerald-800">
+              Your proof is saved. Tap it to watch, or come back tomorrow for another take.
+            </p>
+          </div>
+        ) : null}
 
         {sessions.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
@@ -178,7 +206,15 @@ export default function ProgressView({
           </div>
         ) : (
           <>
-            {todayLatest ? renderProofCard(todayLatest, "Today's proof") : null}
+            {todayLatest ? renderProofCard(
+              todayLatest,
+              justSavedSession?.id === todayLatest.id ? 'Just saved' : "Today's proof",
+              { highlighted: justSavedSession?.id === todayLatest.id },
+            ) : null}
+
+            {justSavedSession && (!todayLatest || todayLatest.id !== justSavedSession.id) ? (
+              renderProofCard(justSavedSession, 'Just saved', { highlighted: true })
+            ) : null}
 
             {!overview.proofRecordedToday && latestSession ? (
               <button

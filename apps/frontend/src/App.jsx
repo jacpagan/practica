@@ -51,6 +51,7 @@ function AppContent() {
   const [detailReturnRoute, setDetailReturnRoute] = useState({ view: 'progress', sessionId: null, seriesName: '' })
   const [openRecorderOnUpload, setOpenRecorderOnUpload] = useState(false)
   const [justUploadedSessionId, setJustUploadedSessionId] = useState(null)
+  const [justUploadedSession, setJustUploadedSession] = useState(null)
   const [pendingPracticeSeries, setPendingPracticeSeries] = useState(initialRoute.seriesName || '')
   const [pendingUploadReturnRoute, setPendingUploadReturnRoute] = useState({
     view: initialRoute.view === 'skill' && initialRoute.seriesName ? 'skill' : 'progress',
@@ -165,6 +166,7 @@ function AppContent() {
     openSessionById,
     routeSeriesName,
     setDetailReturnRoute,
+    setJustUploadedSession,
     setJustUploadedSessionId,
     setOpenRecorderOnUpload,
     setPendingPracticeSeries,
@@ -186,6 +188,7 @@ function AppContent() {
     currentReturnRoute,
     navigate,
     resolveUploadReturnRoute,
+    setJustUploadedSession,
     setJustUploadedSessionId,
     setOpenRecorderOnUpload,
     setPendingPracticeSeries,
@@ -322,6 +325,7 @@ function AppContent() {
             sessions={sessions}
             sessionsLoading={sessionsLoading}
             token={token}
+            highlightSession={justUploadedSession}
             onOpenSession={openSession}
             onOpenSkill={goSkill}
             onSessionUpdate={onDetailSessionUpdate}

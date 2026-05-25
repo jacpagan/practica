@@ -7,6 +7,7 @@ export const useSessionDetailActions = ({
   openSessionById,
   routeSeriesName,
   setDetailReturnRoute,
+  setJustUploadedSession,
   setJustUploadedSessionId,
   setOpenRecorderOnUpload,
   setPendingPracticeSeries,
@@ -15,20 +16,18 @@ export const useSessionDetailActions = ({
   setSessions,
   view,
 }) => {
-  const buildProofReturnRoute = useCallback((session) => {
-    const practiceSeries = String(session?.practice_series || '').trim()
-    if (practiceSeries) {
-      return { view: 'skill', sessionId: null, seriesName: practiceSeries }
-    }
-    return { view: 'progress', sessionId: null, seriesName: '' }
-  }, [])
+  const buildProofReturnRoute = useCallback(() => (
+    { view: 'progress', sessionId: null, seriesName: '' }
+  ), [])
 
   const openSession = useCallback((session, returnRoute = { view, sessionId: null, seriesName: routeSeriesName }) => {
     if (!session?.id) return
     setDetailReturnRoute(returnRoute)
     setOpenRecorderOnUpload(false)
+    setJustUploadedSessionId(null)
+    setJustUploadedSession?.(null)
     openSessionById(session.id)
-  }, [openSessionById, routeSeriesName, setDetailReturnRoute, setOpenRecorderOnUpload, view])
+  }, [openSessionById, routeSeriesName, setDetailReturnRoute, setJustUploadedSession, setJustUploadedSessionId, setOpenRecorderOnUpload, view])
 
   const goBack = useCallback(() => {
     const fallback = { view: 'progress', sessionId: null, seriesName: '' }
@@ -38,24 +37,27 @@ export const useSessionDetailActions = ({
     navigate(route)
     setSelectedSession(null)
     setJustUploadedSessionId(null)
-  }, [detailReturnRoute, navigate, setJustUploadedSessionId, setSelectedSession])
+    setJustUploadedSession?.(null)
+  }, [detailReturnRoute, navigate, setJustUploadedSession, setJustUploadedSessionId, setSelectedSession])
 
   const handleUploadComplete = useCallback((session) => {
     calendarMonthCacheRef.current.clear()
-    const nextReturnRoute = buildProofReturnRoute(session)
+    const nextReturnRoute = buildProofReturnRoute()
     setSessions((current) => [session, ...current.filter((item) => item.id !== session.id)])
-    setSelectedSession(session)
+    setSelectedSession(null)
     setDetailReturnRoute(nextReturnRoute)
     setJustUploadedSessionId(session.id)
+    setJustUploadedSession?.(session)
     setOpenRecorderOnUpload(false)
     setPendingPracticeSeries('')
     setPendingUploadReturnRoute(nextReturnRoute)
-    navigate({ view: 'detail', sessionId: session.id })
+    navigate(nextReturnRoute)
   }, [
     buildProofReturnRoute,
     calendarMonthCacheRef,
     navigate,
     setDetailReturnRoute,
+    setJustUploadedSession,
     setJustUploadedSessionId,
     setOpenRecorderOnUpload,
     setPendingPracticeSeries,

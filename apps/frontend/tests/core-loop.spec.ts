@@ -60,6 +60,17 @@ async function apiToken(request, username: string, password: string) {
   return body.token as string
 }
 
+async function latestSessionIdByTitle(request, token: string, title: string) {
+  const response = await request.get('/api/sessions/', {
+    headers: { Authorization: `Token ${token}` },
+  })
+  expect(response.ok()).toBeTruthy()
+  const body = await response.json()
+  const sessions = Array.isArray(body) ? body : body.results || []
+  const match = sessions.find((session) => session?.title === title)
+  return match?.id as number | undefined
+}
+
 async function waitForSessionReady(request, token: string, sessionId: number) {
   for (let index = 0; index < 30; index += 1) {
     const response = await request.get(`/api/sessions/${sessionId}/`, {
@@ -349,9 +360,10 @@ test('signed-in proof upload -> optional review loop works', async ({ browser, r
   await studentPage.locator('[aria-label="Drop a video or browse files"] input[type=file]').first().setInputFiles(studentVideo)
   await studentPage.locator('input[type=text]').nth(0).fill(title)
   await studentPage.getByRole('button', { name: 'Save proof' }).click()
-  await studentPage.waitForURL(/\/sessions\/\d+/, { timeout: 30000 })
+  await studentPage.waitForURL(/\/progress/, { timeout: 30000 })
+  await expect(studentPage.getByText('Proof saved. You showed up today.')).toBeVisible({ timeout: 10000 })
 
-  const sessionId = Number(studentPage.url().match(/\/sessions\/(\d+)/)?.[1])
+  const sessionId = await latestSessionIdByTitle(request, studentToken, title)
   expect(sessionId).toBeTruthy()
 
   markSessionReady(sessionId)
@@ -417,9 +429,10 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
   await studentPage.locator('[aria-label="Drop a video or browse files"] input[type=file]').first().setInputFiles(firstTakeVideo)
   await studentPage.locator('input[type=text]').nth(0).fill(initialTitle)
   await studentPage.getByRole('button', { name: 'Save proof' }).click()
-  await studentPage.waitForURL(/\/sessions\/\d+/, { timeout: 30000 })
+  await studentPage.waitForURL(/\/progress/, { timeout: 30000 })
+  await expect(studentPage.getByText('Proof saved. You showed up today.')).toBeVisible({ timeout: 10000 })
 
-  const initialSessionId = Number(studentPage.url().match(/\/sessions\/(\d+)/)?.[1])
+  const initialSessionId = await latestSessionIdByTitle(request, studentToken, initialTitle)
   expect(initialSessionId).toBeTruthy()
   markSessionReady(initialSessionId)
   await waitForSessionReady(request, studentToken, initialSessionId)
@@ -461,9 +474,10 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
   await studentPage.locator('[aria-label="Drop a video or browse files"] input[type=file]').first().setInputFiles(secondTakeVideo)
   await studentPage.locator('input[type=text]').nth(0).fill(followupTitle)
   await studentPage.getByRole('button', { name: 'Save proof' }).click()
-  await studentPage.waitForURL(/\/sessions\/\d+/, { timeout: 30000 })
+  await studentPage.waitForURL(/\/progress/, { timeout: 30000 })
+  await expect(studentPage.getByText('Proof saved. You showed up today.')).toBeVisible({ timeout: 10000 })
 
-  const followupSessionId = Number(studentPage.url().match(/\/sessions\/(\d+)/)?.[1])
+  const followupSessionId = await latestSessionIdByTitle(request, studentToken, followupTitle)
   expect(followupSessionId).toBeTruthy()
   expect(followupSessionId).not.toBe(initialSessionId)
   markSessionReady(followupSessionId)
@@ -504,8 +518,8 @@ test('long upload interruption auto-resumes and saves successfully', async ({ br
   await page.locator('input[type=text]').nth(0).fill('Mock long take')
   await page.getByRole('button', { name: 'Save proof' }).click()
 
-  await expect(page).toHaveURL(/\/sessions\/999$/, { timeout: 30000 })
-  await expect(page.getByRole('heading', { name: 'Mock long take' })).toBeVisible({ timeout: 10000 })
+  await page.waitForURL(/\/progress$/, { timeout: 30000 })
+  await expect(page.getByText('Proof saved. You showed up today.')).toBeVisible({ timeout: 10000 })
   expect(mocks.getCompleteAttempts()).toBeGreaterThan(1)
 
   await context.close()
