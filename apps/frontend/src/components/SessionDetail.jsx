@@ -514,7 +514,7 @@ function SessionDetail({
         style={pagerCardStyle(slot)}
       >
         {url ? (
-          <video src={url} muted playsInline className="h-full w-full bg-black object-contain" />
+          <video src={url} muted playsInline className="absolute inset-0 h-full w-full bg-black object-cover sm:static sm:object-contain" />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-black px-6 text-center text-sm text-white/70">
             Video is still preparing for playback.
@@ -537,13 +537,13 @@ function SessionDetail({
       <div className="relative sm:rounded-2xl sm:border sm:border-gray-200 bg-black sm:bg-white overflow-hidden">
         <button
           onClick={onBack}
-          className="sm:hidden absolute top-[max(0.75rem,env(safe-area-inset-top))] left-4 z-40 text-xs text-white/85 rounded-full border border-white/25 bg-black/45 px-3 py-1.5 backdrop-blur"
+          className="sm:hidden fixed top-[max(0.75rem,env(safe-area-inset-top))] left-4 z-50 text-xs text-white/85 rounded-full border border-white/25 bg-black/45 px-3 py-1.5 backdrop-blur"
         >
           Back
         </button>
         <div
           ref={playerRef}
-          className="relative h-[100dvh] cursor-grab overflow-hidden bg-black touch-none active:cursor-grabbing sm:h-auto sm:aspect-video"
+          className="relative fixed inset-0 z-30 h-[100dvh] w-full cursor-grab overflow-hidden bg-black touch-none active:cursor-grabbing sm:static sm:z-auto sm:h-auto sm:aspect-video"
           onTouchStart={handlePlayerTouchStart}
           onTouchMove={handlePlayerTouchMove}
           onTouchEnd={handlePlayerTouchEnd}
@@ -566,7 +566,7 @@ function SessionDetail({
               onPause={() => setVideoPlaying(false)}
               onEnded={() => setVideoPlaying(false)}
               onError={handlePlaybackError}
-              className="w-full h-full bg-black object-contain sm:object-cover"
+              className="absolute inset-0 h-full w-full bg-black object-cover sm:static sm:inset-auto sm:object-contain"
             />
           ) : null}
           {playableUrl && !playbackFailed && !videoPlaying ? (
@@ -631,7 +631,7 @@ function SessionDetail({
             <div className="pointer-events-none absolute inset-0 z-40 overflow-hidden bg-black">
               <div className={`absolute inset-0 transform transition-transform duration-300 ease-out ${currentSlideClass}`}>
                 {playableUrl && !playbackFailed ? (
-                  <video src={playableUrl} muted playsInline className="h-full w-full bg-black object-contain" />
+                  <video src={playableUrl} muted playsInline className="absolute inset-0 h-full w-full bg-black object-cover sm:static sm:object-contain" />
                 ) : (
                   <div className="h-full w-full bg-black" />
                 )}
@@ -641,7 +641,7 @@ function SessionDetail({
               </div>
               <div className={`absolute inset-0 transform transition-transform duration-300 ease-out ${targetSlideClass}`}>
                 {transitionTargetUrl ? (
-                  <video src={transitionTargetUrl} muted playsInline className="h-full w-full bg-black object-contain" />
+                  <video src={transitionTargetUrl} muted playsInline className="absolute inset-0 h-full w-full bg-black object-cover sm:static sm:object-contain" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-black px-6 text-center text-sm text-white/70">
                     Video is still preparing for playback.
@@ -677,7 +677,7 @@ function SessionDetail({
           ) : null}
         </div>
 
-        <div ref={detailsRef} className="p-4 sm:p-4 space-y-3 bg-white rounded-t-3xl sm:rounded-none -mt-8 sm:mt-0 relative z-30">
+        <div ref={detailsRef} className="relative z-20 mt-[100dvh] p-4 sm:p-4 space-y-3 bg-white rounded-t-3xl sm:rounded-none sm:mt-0">
           {editing ? (
             <div className="space-y-4">
               <input
