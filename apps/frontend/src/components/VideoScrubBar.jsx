@@ -1,9 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fmtTimer } from '../utils'
-import { parseTimingMetadata } from '../metronome/timingMetadata'
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value))
+}
+
+function parseTimingHits(raw) {
+  if (!raw) return []
+  let meta = raw
+  if (typeof raw === 'string') {
+    try { meta = JSON.parse(raw) } catch { return [] }
+  }
+  if (!meta || typeof meta !== 'object') return []
+  return (meta.hits || [])
+    .filter((hit) => hit.tier === 'perfect' || hit.tier === 'good')
+    .map((hit, index) => ({ id: `${index}-${hit.t}`, t: Number(hit.t) }))
+    .filter((hit) => Number.isFinite(hit.t) && hit.t >= 0)
 }
 
 export default function VideoScrubBar({ videoRef, durationSeconds = 0, timingMetadata = null }) {
@@ -13,16 +25,7 @@ export default function VideoScrubBar({ videoRef, durationSeconds = 0, timingMet
   const [duration, setDuration] = useState(Number(durationSeconds) || 0)
   const [dragTime, setDragTime] = useState(null)
 
-  const markers = useMemo(() => {
-    const meta = parseTimingMetadata(timingMetadata)
-    return (meta?.hits || [])
-      .filter((hit) => hit.tier === 'perfect' || hit.tier === 'good')
-      .map((hit, index) => ({
-        id: `${index}-${hit.t}`,
-        t: Number(hit.t),
-      }))
-      .filter((hit) => Number.isFinite(hit.t) && hit.t >= 0)
-  }, [timingMetadata])
+  const markers = useMemo(() => parseTimingHits(timingMetadata), [timingMetadata])
 
   useEffect(() => {
     setDuration(Number(durationSeconds) || 0)
