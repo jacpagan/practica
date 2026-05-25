@@ -11,7 +11,7 @@ const formatCompactDateTime = (value) => {
   return `${dayPart} · ${timePart}`
 }
 
-function SkillView({ skillName = '', sessions = [], sessionsLoading = false, token = '', onBack, onOpenSession, onRecordProof }) {
+function SkillView({ skillName = '', sessions = [], sessionsLoading = false, token = '', onBack, onOpenSession }) {
   const [renamingSkill, setRenamingSkill] = useState('')
   const [saving, setSaving] = useState(false)
   const toast = useToast()
@@ -61,44 +61,29 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
           <button type="button" onClick={onBack} className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
             ← Back to archive
           </button>
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div>
-              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">{skillName}</h2>
-                <button
-                  type="button"
-                  onClick={() => setRenamingSkill(skillName)}
-                  className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
-                >
-                  Rename
-                </button>
-              </div>
-              <p className="text-sm text-gray-500 mt-2">
-                {latestSession
-                  ? `${skillSessions.length} ${skillSessions.length === 1 ? 'proof' : 'proofs'} · latest ${formatCompactDateTime(latestSession.recorded_at || latestSession.created_at)}`
-                  : 'No proofs yet'}
-              </p>
+          <div>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">{skillName}</h2>
+              <button
+                type="button"
+                onClick={() => setRenamingSkill(skillName)}
+                className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
+              >
+                Rename
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => onRecordProof?.()}
-              className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors shrink-0"
-            >
-              Record
-            </button>
+            <p className="text-sm text-gray-500 mt-2">
+              {latestSession
+                ? `${skillSessions.length} ${skillSessions.length === 1 ? 'proof' : 'proofs'} · latest ${formatCompactDateTime(latestSession.recorded_at || latestSession.created_at)}`
+                : 'No proofs yet'}
+            </p>
           </div>
         </div>
 
         {skillSessions.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
             <p className="text-sm text-gray-700">No proofs in this skill yet.</p>
-            <button
-              type="button"
-              onClick={() => onRecordProof?.()}
-              className="mt-4 rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
-            >
-              Record first proof
-            </button>
+            <p className="text-xs text-gray-500 mt-1">Tap Record above to add one.</p>
           </div>
         ) : (
           <div className="space-y-3">

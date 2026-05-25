@@ -276,7 +276,16 @@ function AppContent() {
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <button
-              onClick={openGlobalRecorder}
+              onClick={() => {
+                if (view === 'skill' && routeSeriesName) {
+                  startRecord({
+                    skillName: routeSeriesName,
+                    returnRoute: { view: 'skill', sessionId: null, seriesName: routeSeriesName },
+                  })
+                } else {
+                  openGlobalRecorder()
+                }
+              }}
               className="inline-flex rounded-full bg-gray-900 px-3 py-2 text-xs font-medium text-white hover:bg-gray-800 transition-colors sm:px-4 sm:text-sm"
             >
               Record
@@ -316,7 +325,6 @@ function AppContent() {
             onOpenSession={openSession}
             onOpenSkill={goSkill}
             onSessionUpdate={onDetailSessionUpdate}
-            onRecordProof={openGlobalRecorder}
           />
         )}
 
@@ -328,10 +336,6 @@ function AppContent() {
             token={token}
             onBack={goProgress}
             onOpenSession={openSession}
-            onRecordProof={() => startRecord({
-              skillName: routeSeriesName,
-              returnRoute: { view: 'skill', sessionId: null, seriesName: routeSeriesName },
-            })}
           />
         )}
 
