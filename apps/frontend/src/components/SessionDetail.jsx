@@ -5,6 +5,7 @@ import { useToast } from './Toast'
 import SkillField from './SkillField'
 import useSessionDetailEditActions from '../hooks/useSessionDetailEditActions'
 import useSessionDetailMediaActions from '../hooks/useSessionDetailMediaActions'
+import VideoScrubBar from './VideoScrubBar'
 
 const THREAD_SLIDE_TRANSITION_MS = 280
 
@@ -543,6 +544,30 @@ function SessionDetail({
               className="w-full h-full bg-black"
             />
           ) : null}
+<<<<<<< HEAD
+=======
+          {playableUrl && !playbackFailed ? (
+            <TimingPlaybackOverlay
+              timingMetadata={session?.timing_metadata}
+              videoRef={videoRef}
+            />
+          ) : null}
+          {playableUrl && !playbackFailed ? (
+            <div
+              className={`absolute inset-x-0 z-30 ${
+                hasThreadNavigation
+                  ? 'bottom-[max(5.25rem,calc(env(safe-area-inset-bottom)+4.75rem))]'
+                  : 'bottom-[max(0.75rem,env(safe-area-inset-bottom))]'
+              }`}
+            >
+              <VideoScrubBar
+                videoRef={videoRef}
+                durationSeconds={session?.duration_seconds}
+                timingMetadata={session?.timing_metadata}
+              />
+            </div>
+          ) : null}
+>>>>>>> 207cf84 (Feature: interactive video scrub bar on proof playback)
           {!playableUrl || playbackFailed ? (
             <div className="w-full h-full flex items-center justify-center px-6 text-center text-sm text-white/70">
               {session?.processing_status === 'ready'
