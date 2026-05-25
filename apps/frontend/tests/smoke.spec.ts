@@ -35,6 +35,9 @@ test('Progress view shows grouped proofs for signed-in members', async ({ page }
     })
   })
 
+  const todayRecordedAt = new Date()
+  todayRecordedAt.setHours(9, 30, 0, 0)
+
   const sessions = [
     {
       id: 101,
@@ -43,8 +46,8 @@ test('Progress view shows grouped proofs for signed-in members', async ({ page }
       description: '',
       video_file: null,
       duration_seconds: 12,
-      recorded_at: '2099-01-01T00:00:00Z',
-      created_at: '2099-01-01T00:00:00Z',
+      recorded_at: todayRecordedAt.toISOString(),
+      created_at: todayRecordedAt.toISOString(),
       processing_status: 'ready',
       poster_image_url: '/media/processed/sessions/101/thumbs/poster.jpg',
       can_edit: true,
@@ -76,9 +79,10 @@ test('Progress view shows grouped proofs for signed-in members', async ({ page }
   })
   await page.goto('/progress')
 
-  await expect(page.getByRole('heading', { name: 'Your archive' })).toBeVisible()
-  await expect(page.getByText('Latest proof').first()).toBeVisible()
-  await expect(page.getByText('Activity & overview')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible()
+  await expect(page.getByText("Today's proof").first()).toBeVisible()
+  await expect(page.getByText('Activity & overview')).toHaveCount(0)
+  await expect(page.getByText('Full archive')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Groove Lab' })).toBeVisible()
 })
 
@@ -118,7 +122,7 @@ test('Progress is the default signed-in home without dashboard chrome', async ({
 
   await page.goto('/')
   await expect(page).toHaveURL(/\/progress/)
-  await expect(page.getByRole('heading', { name: 'Your archive' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Today' })).toHaveCount(0)
   await expect(page.getByText('Recent skills')).toHaveCount(0)
   await expect(page.getByText('this week')).toHaveCount(0)

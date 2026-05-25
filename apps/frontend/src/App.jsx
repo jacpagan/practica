@@ -271,7 +271,7 @@ function AppContent() {
               onClick={goProgress}
               className={`hidden sm:inline-flex text-sm px-3 py-1.5 rounded-full border transition-colors ${progressNavActive ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:text-gray-900'}`}
             >
-              Progress
+              Today
             </button>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
