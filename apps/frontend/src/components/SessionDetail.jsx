@@ -609,21 +609,7 @@ function SessionDetail({
                       </button>
                     </div>
                   </div>
-                ) : (
-                  <div className="pointer-events-auto flex items-end justify-between gap-3 px-4 pb-2 text-white sm:hidden">
-                    <div className="max-w-[72%]">
-                      <p className="text-sm font-semibold leading-tight drop-shadow">{session.title}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleOpenDetails}
-                      aria-label="Open proof details"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur transition-colors hover:bg-white/15"
-                    >
-                      <IconChevronUp className="h-5 w-5" />
-                    </button>
-                  </div>
-                )}
+                ) : null}
               </div>
             </div>
           ) : null}
