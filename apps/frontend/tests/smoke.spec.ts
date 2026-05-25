@@ -280,6 +280,7 @@ test('Record route shows camera and microphone selectors for signed-in members',
 test('Recording starts and saves a take when the metronome is on', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('token', 'smoke-token')
+    window.localStorage.setItem('practica.recent_series.v1', JSON.stringify(['Drumming']))
 
     const originalFetch = window.fetch.bind(window)
     window.fetch = async (input, init) => {
@@ -342,9 +343,7 @@ test('Recording starts and saves a take when the metronome is on', async ({ page
 
   await page.getByRole('button', { name: 'Stop recording' }).click()
   await expect(page.getByText('Which skill was this?')).toBeVisible({ timeout: 5000 })
-  await page.getByPlaceholder('Breathing, Drumming, Guitar…').fill('Drumming')
-  await page.keyboard.press('Escape')
-  await page.getByRole('button', { name: 'Save proof' }).click()
+  await page.getByRole('button', { name: 'Drumming' }).click()
   await expect(page.getByText('Saving your proof…')).toBeVisible({ timeout: 5000 })
 
 })
