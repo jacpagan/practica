@@ -106,9 +106,16 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   const camAspectRef = useRef(9 / 16)
   const videoContainerRef = useRef(null)
   const draggingRef = useRef(null) // {type: 'move'|'resize', startX, startY, start}
+  const stateRef = useRef(state)
   const isCaptureMode = state === STATES.PREVIEWING || state === STATES.RECORDING || state === STATES.RECORDED
   const isLiveCapture = state === STATES.PREVIEWING || state === STATES.RECORDING
   const isRecording = state === STATES.RECORDING
+  const isCountingIn = countInRemaining != null && countInRemaining > 0
+  const showCaptureControls = isRecording || isCountingIn
+
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
 
   useEffect(() => {
     setBpmInput(String(bpm))
@@ -888,19 +895,34 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       if (e.data.size > 0) chunksRef.current.push(e.data)
     }
 
-    recorder.onerror = () => {}
+    recorder.onerror = (event) => {
+      const message = event?.error?.message || event?.message || 'Recording failed'
+      setError(`Recording error: ${message}`)
+      recorderRef.current = null
+      chunksRef.current = []
+      setState(STATES.PREVIEWING)
+    }
 
     recorder.onstop = () => {
       const outputType = mimeType || recorder.mimeType || 'video/webm'
       const blob = new Blob(chunksRef.current, { type: outputType })
+      recorderRef.current = null
+      cancelCountIn()
+      stopStream()
+
+      if (!blob.size) {
+        setError('Recording stopped before any video was captured. Try again.')
+        chunksRef.current = []
+        setState(STATES.PREVIEWING)
+        return
+      }
+
       const ext = outputType.includes('mp4') ? 'mp4' : 'webm'
       const file = new File([blob], `take-${Date.now()}.${ext}`, { type: outputType })
 
       if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
       blobUrlRef.current = URL.createObjectURL(blob)
       setRecordedFile(file)
-      cancelCountIn()
-      stopStream()
       const shouldAutoUse = Boolean(autoUseOnStop) && (Number(minAutoUseSeconds) <= 0 || Number(elapsed) >= Number(minAutoUseSeconds))
       if (shouldAutoUse) {
         notifyRecorded(file, blobUrlRef.current)
@@ -952,11 +974,31 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     }, beatDurationMs * beatsPerBar)
   }
 
-  const stopRecording = () => {
+  const stopRecording = useCallback(() => {
     stopTimer()
     cancelCountIn()
-    if (recorderRef.current?.state === 'recording') recorderRef.current.stop()
-  }
+    stopMetronome()
+
+    const recorder = recorderRef.current
+    if (recorder && (recorder.state === 'recording' || recorder.state === 'paused')) {
+      try {
+        if (typeof recorder.requestData === 'function') recorder.requestData()
+        recorder.stop()
+      } catch (stopError) {
+        recorderRef.current = null
+        chunksRef.current = []
+        setError(`Could not stop recording: ${stopError?.message || 'unknown error'}`)
+        setState(STATES.PREVIEWING)
+      }
+      return
+    }
+
+    if (stateRef.current === STATES.RECORDING) {
+      recorderRef.current = null
+      chunksRef.current = []
+      setState(STATES.PREVIEWING)
+    }
+  }, [cancelCountIn, stopMetronome, stopTimer])
 
   // ── Mic gain ──
   useEffect(() => {
@@ -1220,8 +1262,8 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
             ) : null}
           </div>
 
-          <div className={`shrink-0 z-20 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-black/90 via-black/70 to-transparent ${isRecording ? 'space-y-3' : 'space-y-4'}`}>
-            {!isRecording ? (
+          <div className={`${showCaptureControls ? 'fixed inset-x-0 bottom-0 z-50 sm:absolute' : ''} shrink-0 z-20 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-black/90 via-black/70 to-transparent ${showCaptureControls || isRecording ? 'space-y-3' : 'space-y-4'}`}>
+            {!showCaptureControls ? (
             <>
             {countInRemaining ? (
               <p className="text-center text-lg font-semibold text-white/95">Starting in {countInRemaining}</p>
@@ -1560,26 +1602,40 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
             ) : null}
 
             <div className="flex items-center justify-center gap-3">
-              {!isRecording ? (
+              {!showCaptureControls ? (
                 <>
-                  <button onClick={handleCancel}
+                  <button type="button" onClick={handleCancel}
+                    aria-label="Cancel recording"
                     className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
-                  <button onClick={startRecording}
+                  <button type="button" onClick={startRecording}
                     disabled={Boolean(countInRemaining)}
+                    aria-label="Start recording"
                     className="w-20 h-20 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-90 shadow-lg shadow-red-500/30 border-4 border-white/20 disabled:opacity-60 disabled:scale-100">
                     <div className="w-8 h-8 bg-white rounded-full" />
                   </button>
                   <div className="w-12" />
                 </>
               ) : (
-                <button onClick={stopRecording}
-                  className="w-20 h-20 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-90 shadow-lg shadow-red-500/30 border-4 border-white/20">
-                  <div className="w-7 h-7 bg-white rounded-sm" />
-                </button>
+                <>
+                  <button type="button" onClick={handleCancel}
+                    aria-label="Cancel recording"
+                    className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                  <button type="button" onClick={stopRecording}
+                    aria-label={isCountingIn ? 'Cancel count-in' : 'Stop recording'}
+                    className="w-20 h-20 rounded-full bg-red-500 hover:bg-red-600 flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-90 shadow-lg shadow-red-500/30 border-4 border-white/20">
+                    <div className="w-7 h-7 bg-white rounded-sm" />
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-white/90">{isCountingIn ? 'Cancel' : 'Stop'}</span>
+                  </button>
+                  <div className="w-12" />
+                </>
               )}
             </div>
           </div>

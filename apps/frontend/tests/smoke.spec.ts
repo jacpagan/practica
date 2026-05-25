@@ -341,6 +341,9 @@ test('Recording starts and saves a take when the metronome is on', async ({ page
   // loop is actually running, not just a one-shot state flip).
   await expect(page.getByText(/Recording · 0:02/)).toBeVisible({ timeout: 4000 })
 
+  await page.getByRole('button', { name: 'Stop recording' }).click()
+  await expect(page.getByText('Recording ready')).toBeVisible({ timeout: 5000 })
+
 })
 
 test('Record route falls back when selected camera fails', async ({ browser }) => {
