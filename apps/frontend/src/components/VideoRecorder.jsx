@@ -1248,10 +1248,10 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
               />
             )}
 
-            {isRecording ? (
+            {(isRecording || isCountingIn) ? (
               <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
                 <div className="rounded-full bg-red-500/90 px-3 py-1.5 text-xs font-medium text-white shadow">
-                  Recording · {fmtTimer(elapsed)}
+                  {isCountingIn ? `Starting in ${countInRemaining}` : `Recording · ${fmtTimer(elapsed)}`}
                 </div>
                 {metronomeEnabled ? (
                   <div className="rounded-full bg-black/50 px-3 py-1.5 text-xs text-white/90 backdrop-blur">
@@ -1265,9 +1265,6 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
           <div className={`${showCaptureControls ? 'fixed inset-x-0 bottom-0 z-50 sm:absolute' : ''} shrink-0 z-20 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-black/90 via-black/70 to-transparent ${showCaptureControls || isRecording ? 'space-y-3' : 'space-y-4'}`}>
             {!showCaptureControls ? (
             <>
-            {countInRemaining ? (
-              <p className="text-center text-lg font-semibold text-white/95">Starting in {countInRemaining}</p>
-            ) : null}
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="rounded-full bg-white/10 px-3 py-1.5 text-xs text-white/90">
                   {countInRemaining ? '' : 'Camera ready'}
@@ -1588,6 +1585,10 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
             ) : null}
 
             </>
+            ) : null}
+
+            {isCountingIn ? (
+              <p className="text-center text-lg font-semibold text-white/95">Starting in {countInRemaining}</p>
             ) : null}
 
             {isRecording ? (
