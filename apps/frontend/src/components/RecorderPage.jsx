@@ -1,10 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import VideoRecorder from './VideoRecorder'
+import { LAST_SERIES_KEY } from '../dailyStack'
 import { MAX_RECORDER_DURATION_SECONDS, createSessionUpload, isLikelyVideoFile, uploadErrorMessage, videoFileAccept } from '../utils'
 import { useAuth } from '../auth'
 import { useToast } from './Toast'
 
-export default function RecorderPage({ onCancel, onComplete }) {
+const seriesBasedTitle = (seriesName = '') => {
+  const normalizedSeries = String(seriesName || '').trim()
+  const now = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
+  if (!normalizedSeries) return `proof - ${stamp}`
+  return `${normalizedSeries} - proof - ${stamp}`
+}
+
+export default function RecorderPage({ onCancel, onComplete, practiceSeries = '' }) {
   const { token } = useAuth()
   const toast = useToast()
   const [file, setFile] = useState(null)
@@ -34,7 +44,7 @@ export default function RecorderPage({ onCancel, onComplete }) {
   const handleRecorded = (nextFile, _blobUrl, timingMetadata) => {
     timingMetadataRef.current = timingMetadata || null
     setFile(nextFile)
-    setTitle(defaultTitle())
+    setTitle(seriesBasedTitle(practiceSeries))
     setSaveError('')
     shouldAutoSaveRef.current = true
     if (ownedPreviewUrlRef.current) {
@@ -61,11 +71,12 @@ export default function RecorderPage({ onCancel, onComplete }) {
     setProgress(0)
     setSaveError('')
     try {
+      const series = String(practiceSeries || '').trim()
       const res = await createSessionUpload({
         token,
         payload: {
           title: title.trim(),
-          practice_series: '',
+          practice_series: series,
           description: '',
           timing_metadata: timingMetadataRef.current,
         },
@@ -80,7 +91,10 @@ export default function RecorderPage({ onCancel, onComplete }) {
         setProgress(null)
         return
       }
-      if (!auto) toast.success('Saved to your private archive')
+      if (series) {
+        try { window.localStorage.setItem(LAST_SERIES_KEY, series) } catch {}
+      }
+      if (!auto) toast.success(series ? `Saved — ${series}` : 'Saved to your private archive')
       try { onComplete?.(res.data) } catch {}
     } catch {
       const message = 'Upload failed'
@@ -102,9 +116,17 @@ export default function RecorderPage({ onCancel, onComplete }) {
     <div className="min-h-screen bg-gray-950 text-white sm:bg-white sm:text-gray-900 px-0 sm:px-6 sm:py-6">
       <main className="w-full sm:max-w-4xl sm:mx-auto space-y-4">
         <div className="flex items-center justify-between">
-          <h1 className="hidden sm:block text-2xl font-semibold text-gray-900 tracking-tight">Record</h1>
+          <div className="hidden sm:block">
+            <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Record</h1>
+            {practiceSeries ? <p className="text-sm text-gray-500 mt-1">{practiceSeries}</p> : null}
+          </div>
           <button type="button" onClick={onCancel} className="fixed top-[max(0.75rem,env(safe-area-inset-top))] left-4 z-40 text-xs text-white/85 rounded-full border border-white/25 bg-black/45 px-3 py-1.5 backdrop-blur sm:static sm:rounded-none sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none sm:text-gray-500 sm:hover:text-gray-900">Close</button>
         </div>
+        {practiceSeries ? (
+          <p className="fixed top-[max(0.75rem,env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-40 sm:hidden text-xs text-white/90 rounded-full border border-white/25 bg-black/45 px-3 py-1.5 backdrop-blur">
+            {practiceSeries}
+          </p>
+        ) : null}
 
         {!file ? (
           <div className="space-y-3">

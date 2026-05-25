@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react'
 import SessionListItem from './SessionListItem'
 import SkillPickerModal from './SkillPickerModal'
+import TodayStack from './TodayStack'
 import { useToast } from './Toast'
 
 const UNGROUPED_KEY = '__ungrouped__'
@@ -12,6 +13,7 @@ export default function ProgressView({
   token = '',
   onOpenSession,
   onSessionUpdate,
+  onRecordSkill,
 }) {
   const toast = useToast()
   const [editingSession, setEditingSession] = useState(null)
@@ -183,6 +185,13 @@ export default function ProgressView({
             <p className="text-xs text-gray-500">{summaryParts.join(' · ')}</p>
           ) : null}
         </div>
+
+        <TodayStack
+          sessions={sessions}
+          skillOptions={skillOptions}
+          onRecordSkill={onRecordSkill}
+          onOpenSession={(session) => onOpenSession?.(session, { view: 'progress', sessionId: null, seriesName: '' })}
+        />
 
         {sessions.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">

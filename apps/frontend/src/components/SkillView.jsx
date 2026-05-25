@@ -92,6 +92,13 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
               <p className="text-sm text-gray-500 mt-2">{latestSession ? `Latest ${formatCompactDateTime(latestSession.recorded_at || latestSession.created_at)}` : 'No proofs yet'}</p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => onRecordProof?.()}
+                className="rounded-full bg-gray-900 text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 transition-colors"
+              >
+                Record proof
+              </button>
               {latestSession ? (
                 <button
                   type="button"
