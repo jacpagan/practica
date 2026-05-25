@@ -854,7 +854,9 @@ test('Session detail shows basic skill controls', async ({ page }) => {
 
   await page.goto('/sessions/123')
 
-  await expect(page.getByText('Smoke session')).toBeVisible()
+  await expect(page.getByText('Smoke session').first()).toBeVisible()
+  await page.getByRole('button', { name: 'Open proof details' }).click()
+  await expect(page.getByRole('heading', { name: 'Smoke session' })).toBeVisible()
   await expect(page.getByText('Groove Lab')).toBeVisible()
   await expect(page.getByText('Video details')).toBeVisible()
   await expect(page.getByText('More options')).toBeVisible()
