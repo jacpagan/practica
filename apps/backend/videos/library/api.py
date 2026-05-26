@@ -204,6 +204,12 @@ class SessionViewSet(SessionMediaActionsMixin, viewsets.ModelViewSet):
             session.user_id,
             client_upload_id,
         )
+        _record_session_product_event(
+            event_name='proof_saved',
+            session=session,
+            extra={'action': 'proof_saved'},
+            path='/api/sessions/',
+        )
         start_processing_pipeline(session)
 
     def perform_update(self, serializer):

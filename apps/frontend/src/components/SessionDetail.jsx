@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { fmtTimer, sessionVideoSources, videoUrl } from '../utils'
+import { fmtTimer, reportClientEvent, sessionVideoSources, videoUrl } from '../utils'
 import { useConfirm } from './ConfirmDialog'
 import { useToast } from './Toast'
 import SkillField from './SkillField'
@@ -77,6 +77,7 @@ function SessionDetail({
   const toast = useToast()
   const confirm = useConfirm()
   const videoRef = useRef(null)
+  const playbackLoggedRef = useRef(null)
   const playerRef = useRef(null)
   const detailsRef = useRef(null)
   const [session, setSession] = useState(initialSession)
@@ -365,6 +366,21 @@ function SessionDetail({
     if (video.paused) video.play?.().catch?.(() => {})
     else video.pause?.()
   }, [revealControls])
+
+  const handleVideoPlay = useCallback(() => {
+    setVideoPlaying(true)
+    const sessionId = Number(session?.id)
+    if (!sessionId || playbackLoggedRef.current === sessionId) return
+    playbackLoggedRef.current = sessionId
+    reportClientEvent('proof_playback_started', {
+      action: 'proof_playback_started',
+      session_id: sessionId,
+    })
+  }, [session?.id])
+
+  useEffect(() => {
+    playbackLoggedRef.current = null
+  }, [session?.id])
 
   const videoObjectClass = VIDEO_OBJECT_CLASS[videoFit] || VIDEO_OBJECT_CLASS.fill
   const videoSurfaceClass = `absolute inset-0 h-full w-full bg-black ${videoObjectClass}`
@@ -673,7 +689,7 @@ function SessionDetail({
             src={playableUrl}
             playsInline
             preload="metadata"
-            onPlay={() => setVideoPlaying(true)}
+            onPlay={handleVideoPlay}
             onPause={() => setVideoPlaying(false)}
             onEnded={() => setVideoPlaying(false)}
             onError={handlePlaybackError}

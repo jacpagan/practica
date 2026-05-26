@@ -4,7 +4,7 @@ import ActivityCalendar from './ActivityCalendar'
 import SkillSummaryCard from './SkillSummaryCard'
 import VideoThumbnail from './VideoThumbnail'
 import { buildSkillSummaries } from '../progressActivity'
-import { calculatePracticeProgress, fmtDate, toLocalDateKey } from '../utils'
+import { calculatePracticeProgress, fmtDate, reportClientEvent, toLocalDateKey } from '../utils'
 
 const formatCompactDateTime = (value) => {
   const date = new Date(value)
@@ -59,6 +59,19 @@ export default function ProgressView({
     if (!justSavedSession || !highlightRef.current) return
     highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [justSavedSession?.id])
+
+  useEffect(() => {
+    if (sessionsLoading || !token) return
+    const todayKey = toLocalDateKey(new Date())
+    const storageKey = `practica.loop.today_viewed.${todayKey}`
+    try {
+      if (window.localStorage.getItem(storageKey)) return
+      window.localStorage.setItem(storageKey, '1')
+    } catch {
+      // Ignore storage failures; still attempt one event this mount.
+    }
+    reportClientEvent('today_viewed', { action: 'today_viewed' })
+  }, [sessionsLoading, token])
 
   if (sessionsLoading) {
     return (

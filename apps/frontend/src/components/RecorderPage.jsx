@@ -3,7 +3,7 @@ import VideoRecorder from './VideoRecorder'
 import SkillField from './SkillField'
 import { recordRecentSeries } from '../recordPrefs'
 import { buildRecentSkills } from '../recentSkills'
-import { MAX_RECORDER_DURATION_SECONDS, createSessionUpload, isLikelyVideoFile, uploadErrorMessage, videoFileAccept } from '../utils'
+import { MAX_RECORDER_DURATION_SECONDS, createSessionUpload, isLikelyVideoFile, reportClientEvent, uploadErrorMessage, videoFileAccept } from '../utils'
 import { useAuth } from '../auth'
 import { useToast } from './Toast'
 
@@ -119,6 +119,12 @@ export default function RecorderPage({
       }
       if (series) recordRecentSeries(series)
       if (!auto) toast.success(series ? `Saved — ${series}` : 'Saved to your private archive')
+      reportClientEvent('session_upload_succeeded', {
+        action: 'session_upload_succeeded',
+        session_id: res.data?.id,
+        upload_mode: 'single',
+        file_size_bytes: file?.size || 0,
+      })
       try { onComplete?.(res.data) } catch {}
     } catch {
       const message = 'Upload failed'

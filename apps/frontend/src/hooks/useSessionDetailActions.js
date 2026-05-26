@@ -1,5 +1,7 @@
 import { useCallback } from 'react'
 
+import { reportClientEvent } from '../utils'
+
 export const useSessionDetailActions = ({
   calendarMonthCacheRef,
   detailReturnRoute,
@@ -51,6 +53,10 @@ export const useSessionDetailActions = ({
     setOpenRecorderOnUpload(false)
     setPendingPracticeSeries('')
     setPendingUploadReturnRoute(nextReturnRoute)
+    reportClientEvent('loop_save_landed_today', {
+      action: 'loop_save_landed_today',
+      session_id: session.id,
+    })
     navigate(nextReturnRoute)
   }, [
     buildProofReturnRoute,
