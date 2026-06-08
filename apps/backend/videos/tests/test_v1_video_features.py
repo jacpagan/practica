@@ -798,10 +798,9 @@ class V1VideoFeaturesTests(APITestCase):
         settings_payload = _create_job_settings(session)
 
         proxy_h264 = settings_payload['OutputGroups'][0]['Outputs'][0]['VideoDescription']['CodecSettings']['H264Settings']
-        hls_h264 = settings_payload['OutputGroups'][1]['Outputs'][0]['VideoDescription']['CodecSettings']['H264Settings']
 
         self.assertEqual(proxy_h264['MaxBitrate'], 3000000)
-        self.assertEqual(hls_h264['MaxBitrate'], 5000000)
+        self.assertEqual([group['Name'] for group in settings_payload['OutputGroups']], ['proxy-mp4', 'thumb-capture'])
 
     @override_settings(AWS_STORAGE_BUCKET_NAME='test-bucket')
     def test_mediaconvert_job_settings_use_default_audio_selector(self):
@@ -812,9 +811,7 @@ class V1VideoFeaturesTests(APITestCase):
 
         input_settings = settings_payload['Inputs'][0]
         proxy_audio = settings_payload['OutputGroups'][0]['Outputs'][0]['AudioDescriptions'][0]
-        hls_audio = settings_payload['OutputGroups'][1]['Outputs'][0]['AudioDescriptions'][0]
 
         self.assertEqual(input_settings['AudioSelectors'], {'A1': {'DefaultSelection': 'DEFAULT'}})
         self.assertNotIn('AudioSelectorGroups', input_settings)
         self.assertEqual(proxy_audio['AudioSourceName'], 'A1')
-        self.assertEqual(hls_audio['AudioSourceName'], 'A1')

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useToast } from './Toast'
-import { createSessionUpload, isLikelyVideoFile, MAX_RECORDER_DURATION_SECONDS, MAX_VIDEO_UPLOAD_BYTES, reportClientEvent, uploadErrorMessage, videoFileAccept } from '../utils'
+import { createSessionUpload, isLikelyVideoFile, MAX_RECORDER_DURATION_SECONDS, MAX_VIDEO_UPLOAD_BYTES, reportClientEvent, uploadErrorMessage, uploadModeForFile, videoFileAccept } from '../utils'
 import VideoRecorder from './VideoRecorder'
 import { useConfirm } from './ConfirmDialog'
 import SkillField from './SkillField'
@@ -238,9 +238,9 @@ function SessionUpload({
     }
 
     const accepted = await confirm({
-      title: 'Abort upload?',
-      message: 'This video is still saving. If you leave now, the upload will be aborted and you will need to start again.',
-      confirmLabel: 'Abort upload',
+      title: 'Stop upload?',
+      message: 'This video is still saving. If you stop now, Practica will try to resume when you choose the same video again.',
+      confirmLabel: 'Stop upload',
       cancelLabel: 'Keep uploading',
       tone: 'danger',
     })
@@ -262,7 +262,13 @@ function SessionUpload({
     abortRequestedRef.current = false
     abortControllerRef.current = new AbortController()
     let success = false
-    const uploadMode = videoFile && videoFile.size >= 8 * 1024 * 1024 ? 'multipart' : 'single'
+    const uploadMode = uploadModeForFile(videoFile)
+    const uploadStartedAt = Date.now()
+    reportClientEvent('session_upload_started', {
+      action: 'session_upload_started',
+      upload_mode: uploadMode,
+      file_size_bytes: videoFile?.size || 0,
+    })
     try {
       const res = await createSessionUpload({
         token,
@@ -278,12 +284,14 @@ function SessionUpload({
         signal: abortControllerRef.current.signal,
       })
       if (!res.ok) {
-        if (res?.data?.code === 'upload_aborted') {
-          reportClientEvent('session_upload_aborted', {
-            action: 'session_upload_aborted',
+        if (res?.data?.code === 'upload_aborted' || res?.data?.code === 'upload_paused') {
+          reportClientEvent(res?.data?.code === 'upload_paused' ? 'session_upload_paused' : 'session_upload_aborted', {
+            action: res?.data?.code === 'upload_paused' ? 'session_upload_paused' : 'session_upload_aborted',
             upload_mode: uploadMode,
             file_size_bytes: videoFile?.size || 0,
+            duration_ms: Date.now() - uploadStartedAt,
           })
+          if (res?.data?.code === 'upload_paused') toast.success('Upload paused. Choose the same video again to resume.')
           return
         }
         reportClientEvent('session_upload_failed', {
@@ -293,6 +301,7 @@ function SessionUpload({
           code: String(res?.data?.code || '').slice(0, 80),
           phase: uploadPhase,
           file_size_bytes: videoFile?.size || 0,
+          duration_ms: Date.now() - uploadStartedAt,
         })
         toast.error(uploadErrorMessage(res))
         return
@@ -304,6 +313,7 @@ function SessionUpload({
         upload_mode: uploadMode,
         session_id: res?.data?.id || null,
         file_size_bytes: videoFile?.size || 0,
+        duration_ms: Date.now() - uploadStartedAt,
       })
       try {
         if (practiceSeries.trim()) window.localStorage.setItem(LAST_SERIES_KEY, practiceSeries.trim())
@@ -317,6 +327,7 @@ function SessionUpload({
           action: 'session_upload_aborted',
           upload_mode: uploadMode,
           file_size_bytes: videoFile?.size || 0,
+          duration_ms: Date.now() - uploadStartedAt,
         })
         return
       }
@@ -327,6 +338,7 @@ function SessionUpload({
         code: 'upload_network_interrupted',
         phase: uploadPhase,
         file_size_bytes: videoFile?.size || 0,
+        duration_ms: Date.now() - uploadStartedAt,
       })
       toast.error('Error uploading')
     } finally {
@@ -554,7 +566,7 @@ function SessionUpload({
           ) : null}
 
           <div className="flex gap-3 pt-2">
-            <button type="button" onClick={handleCancel} className="flex-1 text-sm text-gray-600 border border-gray-200 rounded-lg py-2.5 hover:bg-gray-50 transition-colors">{isUploading ? 'Abort upload' : 'Cancel'}</button>
+            <button type="button" onClick={handleCancel} className="flex-1 text-sm text-gray-600 border border-gray-200 rounded-lg py-2.5 hover:bg-gray-50 transition-colors">{isUploading ? 'Stop upload' : 'Cancel'}</button>
             <button type="submit" disabled={isUploading} className="flex-1 text-sm font-medium text-white bg-gray-900 rounded-lg py-2.5 hover:bg-gray-800 disabled:opacity-40 transition-colors">
               {isUploading ? (uploadPhase === 'resuming' ? 'Resuming upload…' : `Saving${uploadProgress !== null ? ` ${uploadProgress}%` : '...'}`) : 'Save proof'}
             </button>

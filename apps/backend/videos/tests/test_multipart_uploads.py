@@ -1,7 +1,10 @@
 from datetime import timedelta
+import json
+from io import StringIO
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.core.management import call_command
 from django.db import IntegrityError
 from django.test import override_settings
 from django.utils import timezone
@@ -15,6 +18,7 @@ class FakeS3Client:
     def __init__(self):
         self.parts_by_upload_id = {}
         self.create_calls = 0
+        self.abort_calls = []
 
     def create_multipart_upload(self, **kwargs):
         self.create_calls += 1
@@ -35,6 +39,7 @@ class FakeS3Client:
         return {'Location': 'https://example.test/object'}
 
     def abort_multipart_upload(self, **kwargs):
+        self.abort_calls.append(kwargs)
         self.aborted = kwargs
         return {}
 
@@ -432,6 +437,49 @@ class MultipartUploadApiTests(APITestCase):
 
         self.assertEqual(complete_res.status_code, status.HTTP_200_OK)
         self.assertEqual(complete_res.data['id'], session.id)
+
+    def test_cleanup_multipart_uploads_aborts_only_expired_uploads(self):
+        fake_s3 = FakeS3Client()
+        expired = MultipartSessionUpload.objects.create(
+            user=self.member,
+            status=MultipartSessionUpload.STATUS_INITIATED,
+            title='Expired upload',
+            description='',
+            tags_csv='',
+            duration_seconds=None,
+            original_filename='expired.mp4',
+            content_type='video/mp4',
+            size_bytes=10 * 1024 * 1024,
+            s3_key='sessions/member/expired.mp4',
+            s3_upload_id='upload-expired-cleanup',
+            expires_at=timezone.now() - timedelta(minutes=1),
+        )
+        active = MultipartSessionUpload.objects.create(
+            user=self.member,
+            status=MultipartSessionUpload.STATUS_INITIATED,
+            title='Active upload',
+            description='',
+            tags_csv='',
+            duration_seconds=None,
+            original_filename='active.mp4',
+            content_type='video/mp4',
+            size_bytes=10 * 1024 * 1024,
+            s3_key='sessions/member/active.mp4',
+            s3_upload_id='upload-active-cleanup',
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        out = StringIO()
+        with patch('videos.management.commands.cleanup_multipart_uploads.s3_client', return_value=fake_s3):
+            call_command('cleanup_multipart_uploads', stdout=out)
+
+        expired.refresh_from_db()
+        active.refresh_from_db()
+        payload = json.loads(out.getvalue())
+        self.assertEqual(payload['expired'], 1)
+        self.assertEqual(expired.status, MultipartSessionUpload.STATUS_EXPIRED)
+        self.assertEqual(active.status, MultipartSessionUpload.STATUS_INITIATED)
+        self.assertEqual(fake_s3.abort_calls[0]['UploadId'], 'upload-expired-cleanup')
 
     def test_multipart_initiate_accepts_mov_with_generic_content_type(self):
         fake_s3 = FakeS3Client()

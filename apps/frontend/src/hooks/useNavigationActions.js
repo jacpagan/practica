@@ -31,9 +31,9 @@ export const useNavigationActions = ({
   const confirmAbortActiveUpload = useCallback(async (nextAction = 'leave this page') => {
     if (!uploadGuardRef.current.active) return true
     return confirm({
-      title: 'Abort upload?',
-      message: `A video is still uploading. If you ${nextAction}, the upload will be aborted and you will need to start again.`,
-      confirmLabel: 'Abort upload',
+      title: 'Stop upload?',
+      message: `A video is still uploading. If you ${nextAction}, Practica will try to resume when you choose the same video again.`,
+      confirmLabel: 'Stop upload',
       cancelLabel: 'Keep uploading',
       tone: 'danger',
     })

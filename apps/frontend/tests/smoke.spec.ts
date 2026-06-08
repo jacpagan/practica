@@ -784,6 +784,17 @@ test('Upload retries once after network interruption and reuses idempotency key'
     await route.continue()
   })
 
+  await page.route('**/api/sessions/multipart/initiate/', async (route) => {
+    await route.fulfill({
+      status: 400,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        error: 'Direct uploads are not configured',
+        code: 'direct_uploads_not_configured',
+      }),
+    })
+  })
+
   await page.goto('/upload')
   await expect(page.getByRole('heading', { name: 'New proof' })).toBeVisible()
 

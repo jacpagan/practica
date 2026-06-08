@@ -3,7 +3,7 @@ import VideoRecorder from './VideoRecorder'
 import SkillField from './SkillField'
 import { recordRecentSeries } from '../recordPrefs'
 import { buildRecentSkills } from '../recentSkills'
-import { MAX_RECORDER_DURATION_SECONDS, createSessionUpload, isLikelyVideoFile, reportClientEvent, uploadErrorMessage, videoFileAccept } from '../utils'
+import { MAX_RECORDER_DURATION_SECONDS, createSessionUpload, isLikelyVideoFile, reportClientEvent, uploadErrorMessage, uploadModeForFile, videoFileAccept } from '../utils'
 import { useAuth } from '../auth'
 import { useToast } from './Toast'
 
@@ -97,6 +97,13 @@ export default function RecorderPage({
     setIsUploading(true)
     setProgress(0)
     setSaveError('')
+    const uploadMode = uploadModeForFile(file)
+    const uploadStartedAt = Date.now()
+    reportClientEvent('session_upload_started', {
+      action: 'session_upload_started',
+      upload_mode: uploadMode,
+      file_size_bytes: file?.size || 0,
+    })
     try {
       const res = await createSessionUpload({
         token,
@@ -111,8 +118,18 @@ export default function RecorderPage({
       })
       if (!res.ok) {
         const message = uploadErrorMessage(res)
+        const code = String(res?.data?.code || '').slice(0, 80)
+        reportClientEvent(code === 'upload_paused' ? 'session_upload_paused' : 'session_upload_failed', {
+          action: code === 'upload_paused' ? 'session_upload_paused' : 'session_upload_failed',
+          upload_mode: uploadMode,
+          status: Number(res?.status || 0),
+          code,
+          file_size_bytes: file?.size || 0,
+          duration_ms: Date.now() - uploadStartedAt,
+        })
         setSaveError(message)
-        toast.error(message)
+        if (code === 'upload_paused') toast.success(message)
+        else toast.error(message)
         setIsUploading(false)
         setProgress(null)
         return
@@ -122,12 +139,21 @@ export default function RecorderPage({
       reportClientEvent('session_upload_succeeded', {
         action: 'session_upload_succeeded',
         session_id: res.data?.id,
-        upload_mode: 'single',
+        upload_mode: uploadMode,
         file_size_bytes: file?.size || 0,
+        duration_ms: Date.now() - uploadStartedAt,
       })
       try { onComplete?.(res.data) } catch {}
     } catch {
       const message = 'Upload failed'
+      reportClientEvent('session_upload_failed', {
+        action: 'session_upload_failed',
+        upload_mode: uploadMode,
+        status: 0,
+        code: 'upload_network_interrupted',
+        file_size_bytes: file?.size || 0,
+        duration_ms: Date.now() - uploadStartedAt,
+      })
       setSaveError(message)
       toast.error(message)
     } finally {

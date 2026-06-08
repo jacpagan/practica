@@ -197,7 +197,13 @@ def product_event_insights_view(request):
         .order_by('-created_at')[:limit]
     )
 
-    upload_events_qs = qs.filter(event_name__in=['session_upload_succeeded', 'session_upload_failed', 'session_upload_aborted'])
+    upload_events_qs = qs.filter(event_name__in=[
+        'session_upload_started',
+        'session_upload_succeeded',
+        'session_upload_failed',
+        'session_upload_aborted',
+        'session_upload_paused',
+    ])
     upload_rows = list(upload_events_qs.values('event_name', 'extra_json'))
     upload_mode_counts = Counter()
     failure_code_counts = Counter()
@@ -207,17 +213,29 @@ def product_event_insights_view(request):
     upload_succeeded_count = 0
     upload_failed_count = 0
     upload_aborted_count = 0
+    upload_started_count = 0
+    upload_paused_count = 0
+    completed_durations_ms = []
     for row in upload_rows:
         event_name = str(row.get('event_name', '')).strip()
         extra = row.get('extra_json') if isinstance(row.get('extra_json'), dict) else {}
         mode = str(extra.get('upload_mode', '')).strip().lower() or 'unknown'
         upload_mode_counts[mode] += 1
 
+        if event_name == 'session_upload_started':
+            upload_started_count += 1
+            continue
         if event_name == 'session_upload_succeeded':
             upload_succeeded_count += 1
+            duration_ms = extra.get('duration_ms')
+            if isinstance(duration_ms, int) and duration_ms >= 0:
+                completed_durations_ms.append(duration_ms)
             continue
         if event_name == 'session_upload_aborted':
             upload_aborted_count += 1
+            continue
+        if event_name == 'session_upload_paused':
+            upload_paused_count += 1
             continue
 
         upload_failed_count += 1
@@ -233,6 +251,9 @@ def product_event_insights_view(request):
         'upload_succeeded_count': upload_succeeded_count,
         'upload_failed_count': upload_failed_count,
         'upload_aborted_count': upload_aborted_count,
+        'upload_started_count': upload_started_count,
+        'upload_paused_count': upload_paused_count,
+        'avg_success_duration_ms': int(sum(completed_durations_ms) / len(completed_durations_ms)) if completed_durations_ms else 0,
         'upload_mode_counts': [{'upload_mode': mode, 'count': count} for mode, count in upload_mode_counts.most_common(limit)],
         'top_failure_codes': [{'code': code, 'count': count} for code, count in failure_code_counts.most_common(limit)],
         'top_failure_statuses': [{'status': status_value, 'count': count} for status_value, count in failure_status_counts.most_common(limit)],

@@ -1,7 +1,7 @@
 const API_BASE = window.location.hostname === 'localhost'
   ? 'http://localhost:8000'
   : ''
-const MULTIPART_THRESHOLD_BYTES = 8 * 1024 * 1024
+const DIRECT_UPLOAD_THRESHOLD_BYTES = 1
 const MAX_PART_RETRIES = 3
 const MULTIPART_CONCURRENCY = 4
 const RETRY_BASE_DELAY_MS = 500
@@ -24,6 +24,9 @@ const KNOWN_VIDEO_EXTENSIONS = ['mov', 'mp4', 'm4v', 'webm', 'avi', 'mkv', 'mpeg
 const VIDEO_CONTENT_TYPE_ALIASES = ['application/mp4', 'application/x-mp4', 'audio/mp4', 'application/quicktime', 'application/3gpp', 'application/3gpp2', 'audio/3gpp', 'audio/3gpp2']
 
 export const videoFileAccept = () => VIDEO_FILE_ACCEPT
+export const uploadModeForFile = (file) => (
+  file && Number(file.size || 0) >= DIRECT_UPLOAD_THRESHOLD_BYTES ? 'multipart' : 'single'
+)
 
 export const isLikelyVideoFile = (file) => {
   const name = String(file?.name || '').toLowerCase()
@@ -774,21 +777,10 @@ const createSessionViaMultipartAttempt = async ({ token, payload, videoFile, onP
     return completeRes
   } catch (error) {
     if (isAbortError(error)) {
-      if (uploadId) {
-        try {
-          await authedJsonPost({
-            url: '/api/sessions/multipart/abort/',
-            token,
-            body: { multipart_upload_id: uploadId },
-          })
-        } catch {
-          // Best effort.
-        }
-      }
       return {
         ok: false,
         status: 499,
-        data: { error: 'Upload aborted', code: 'upload_aborted' },
+        data: { error: 'Upload paused', code: 'upload_paused' },
         text: '',
       }
     }
@@ -812,7 +804,7 @@ const createSessionViaMultipart = async ({ token, payload, videoFile, onProgress
         return {
           ok: false,
           status: 499,
-          data: { error: 'Upload aborted', code: 'upload_aborted' },
+          data: { error: 'Upload paused', code: 'upload_paused' },
           text: '',
         }
       }
@@ -896,7 +888,7 @@ export const createSessionUpload = async ({ token, payload, videoFile, onProgres
   }
 
   try {
-    if (videoFile && videoFile.size >= MULTIPART_THRESHOLD_BYTES) {
+    if (uploadModeForFile(videoFile) === 'multipart') {
       const multipartRes = await createSessionViaMultipart({
         token,
         payload,
@@ -910,7 +902,6 @@ export const createSessionUpload = async ({ token, payload, videoFile, onProgres
         const multipartCode = String(multipartRes?.data?.code || '').trim().toLowerCase()
         if (
           multipartRes.ok
-          || multipartCode === 'upload_aborted'
           || multipartCode === 'upload_expired'
           || multipartCode === 'upload_restart_required'
         ) {
@@ -933,11 +924,10 @@ export const createSessionUpload = async ({ token, payload, videoFile, onProgres
     return res
   } catch (error) {
     if (isAbortError(error)) {
-      clearStoredUploadId(uploadIdStorageKey)
       return {
         ok: false,
         status: 499,
-        data: { error: 'Upload aborted', code: 'upload_aborted' },
+        data: { error: 'Upload paused', code: 'upload_paused' },
         text: '',
       }
     }
@@ -954,6 +944,7 @@ export const uploadErrorMessage = (res) => {
   if (!res) return 'Upload failed'
   const code = String(res?.data?.code || '').trim().toLowerCase()
   if (code === 'upload_aborted') return 'Upload aborted.'
+  if (code === 'upload_paused') return 'Upload paused. Choose the same video again to resume.'
   if (code === 'upload_restart_required') return 'Previous upload can’t resume. Please restart the upload.'
   if (code === 'upload_expired') return 'Upload session expired. Please restart the upload.'
   if (code === 'upload_not_open') return 'Upload session is no longer open. Please restart the upload.'
