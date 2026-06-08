@@ -246,6 +246,11 @@ cat > /etc/cron.d/practica-mediaconvert-sync <<'CRON'
 * * * * * root /usr/bin/flock -n /tmp/practica-mediaconvert-sync.lock /bin/bash -lc 'cd /opt/practica && docker compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py sync_mediaconvert_jobs' >> /opt/practica-runtime/mediaconvert-sync.log 2>&1
 CRON
 chmod 644 /etc/cron.d/practica-mediaconvert-sync
+
+cat > /etc/cron.d/practica-multipart-cleanup <<'CRON'
+17 * * * * root /usr/bin/flock -n /tmp/practica-multipart-cleanup.lock /bin/bash -lc 'cd /opt/practica && docker compose -f docker-compose.prod.yml exec -T backend python /app/apps/backend/manage.py cleanup_multipart_uploads' >> /opt/practica-runtime/multipart-cleanup.log 2>&1
+CRON
+chmod 644 /etc/cron.d/practica-multipart-cleanup
 systemctl restart cron || service cron restart || true
 
 echo 'Backfilling browser-safe feedback video playback files...'

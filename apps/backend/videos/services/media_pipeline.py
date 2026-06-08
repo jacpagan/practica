@@ -182,43 +182,6 @@ def _create_job_settings(session):
                 }],
             },
             {
-                'Name': 'hls-cmaf',
-                'OutputGroupSettings': {
-                    'Type': 'HLS_GROUP_SETTINGS',
-                    'HlsGroupSettings': {
-                        'Destination': f'{base}hls/',
-                        'SegmentLength': 4,
-                        'MinSegmentLength': 0,
-                        'ManifestDurationFormat': 'FLOATING_POINT',
-                    },
-                },
-                'Outputs': [{
-                    'NameModifier': '_hls',
-                    'ContainerSettings': {'Container': 'M3U8'},
-                    'VideoDescription': {
-                        'CodecSettings': {
-                            'Codec': 'H_264',
-                            'H264Settings': {
-                                'RateControlMode': 'QVBR',
-                                'QvbrSettings': {'QvbrQualityLevel': 7},
-                                'MaxBitrate': 5000000,
-                                'GopSize': 30,
-                                'GopSizeUnits': 'FRAMES',
-                            },
-                        },
-                        'Width': 1280,
-                        'Height': 720,
-                    },
-                    'AudioDescriptions': [{
-                        'AudioSourceName': 'A1',
-                        'CodecSettings': {
-                            'Codec': 'AAC',
-                            'AacSettings': {'Bitrate': 96000, 'CodingMode': 'CODING_MODE_2_0', 'SampleRate': 48000},
-                        },
-                    }],
-                }],
-            },
-            {
                 'Name': 'thumb-capture',
                 'OutputGroupSettings': {
                     'Type': 'FILE_GROUP_SETTINGS',

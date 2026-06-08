@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { pickRecorderMimeType } from '../utils'
 import { createBeatClock } from '../metronome/beatClock'
 import { clampBpm as clampBpmValue, MIN_BPM, MAX_BPM } from '../metronome/constants'
+import { recorderOptions } from '../recorderSettings'
 
 const STATES = {
   IDLE: 'idle',
@@ -879,13 +880,17 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     const recorderStream = mixedStreamRef.current || streamRef.current
     let recorder
     try {
-      recorder = mimeType
-        ? new MediaRecorder(recorderStream, { mimeType })
-        : new MediaRecorder(recorderStream)
+      recorder = new MediaRecorder(recorderStream, recorderOptions(mimeType))
     } catch (constructorError) {
-      setError(`Recorder failed: ${constructorError?.name || 'error'} — ${constructorError?.message || ''}`)
-      setState(STATES.IDLE)
-      return
+      try {
+        recorder = mimeType
+          ? new MediaRecorder(recorderStream, { mimeType })
+          : new MediaRecorder(recorderStream)
+      } catch {
+        setError(`Recorder failed: ${constructorError?.name || 'error'} — ${constructorError?.message || ''}`)
+        setState(STATES.IDLE)
+        return
+      }
     }
     recorderRef.current = recorder
     chunksRef.current = []

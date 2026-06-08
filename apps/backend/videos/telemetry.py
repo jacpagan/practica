@@ -11,6 +11,7 @@ PRODUCT_EVENT_EXTRA_WHITELIST = {
     'action',
     'code',
     'file_size_bytes',
+    'duration_ms',
     'phase',
     'processing_mode',
     'session_id',

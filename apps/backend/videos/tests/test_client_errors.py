@@ -60,6 +60,7 @@ class ClientErrorTelemetryTests(APITestCase):
                     'code': 'upload_finalize_failed',
                     'phase': 'resuming',
                     'status': 502,
+                    'duration_ms': 1200,
                 },
             },
             format='json',
@@ -73,6 +74,7 @@ class ClientErrorTelemetryTests(APITestCase):
         self.assertEqual(stored.extra_json.get('code'), 'upload_finalize_failed')
         self.assertEqual(stored.extra_json.get('phase'), 'resuming')
         self.assertEqual(stored.extra_json.get('status'), 502)
+        self.assertEqual(stored.extra_json.get('duration_ms'), 1200)
 
     @patch('videos.views.logger')
     def test_non_product_event_uses_legacy_client_error_log(self, logger_mock):
@@ -138,7 +140,13 @@ class ClientErrorTelemetryTests(APITestCase):
             event_name='session_upload_succeeded',
             path='/upload',
             is_authenticated=True,
-            extra_json={'upload_mode': 'single'},
+            extra_json={'upload_mode': 'single', 'duration_ms': 1200},
+        )
+        ProductEventLog.objects.create(
+            event_name='session_upload_paused',
+            path='/upload',
+            is_authenticated=True,
+            extra_json={'upload_mode': 'multipart'},
         )
 
         self.client.force_authenticate(user=staff)
@@ -146,10 +154,12 @@ class ClientErrorTelemetryTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         summary = response.data['upload_summary']
-        self.assertEqual(summary['total_upload_events'], 4)
+        self.assertEqual(summary['total_upload_events'], 5)
         self.assertEqual(summary['upload_failed_count'], 2)
         self.assertEqual(summary['upload_aborted_count'], 1)
         self.assertEqual(summary['upload_succeeded_count'], 1)
+        self.assertEqual(summary['upload_paused_count'], 1)
+        self.assertEqual(summary['avg_success_duration_ms'], 1200)
         self.assertEqual(summary['top_failure_codes'][0]['code'], 'upload_finalize_failed')
         self.assertEqual(summary['top_failure_codes'][0]['count'], 2)
         self.assertEqual(summary['top_failure_statuses'][0]['status'], '502')
