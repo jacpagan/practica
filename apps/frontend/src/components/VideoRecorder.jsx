@@ -75,6 +75,9 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   const [videoInputs, setVideoInputs] = useState([])
   const [selectedVideoInputId, setSelectedVideoInputId] = useState(readStoredVideoInputId)
   const [requestingPermissionLabel, setRequestingPermissionLabel] = useState('camera')
+  const [activeFacingMode, setActiveFacingMode] = useState('user')
+  const [isFlippingCamera, setIsFlippingCamera] = useState(false)
+  const [cameraFlipNotice, setCameraFlipNotice] = useState('')
 
   const liveRef = useRef(null)
   const playbackRef = useRef(null)
@@ -98,6 +101,8 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   const micGainNodeRef = useRef(null)
   const analyserRef = useRef(null)
   const meterRafRef = useRef(null)
+  const lastPreviewTapAtRef = useRef(0)
+  const cameraFlipNoticeTimeoutRef = useRef(null)
   const [recordedFile, setRecordedFile] = useState(null)
 
   if (!beatClockRef.current) beatClockRef.current = createBeatClock()
@@ -264,6 +269,10 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     stopMetronome()
     stopStream()
     closeAudioContext()
+    if (cameraFlipNoticeTimeoutRef.current) {
+      clearTimeout(cameraFlipNoticeTimeoutRef.current)
+      cameraFlipNoticeTimeoutRef.current = null
+    }
     if (blobUrlRef.current) { URL.revokeObjectURL(blobUrlRef.current); blobUrlRef.current = null }
   }, [cancelCountIn, closeAudioContext, stopMetronome, stopTimer, stopStream])
 
@@ -408,10 +417,10 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     return new MediaStream(tracks)
   }, [])
 
-  const openUserMediaWithFallback = useCallback(async ({ size = 'default' } = {}) => {
+  const openUserMediaWithFallback = useCallback(async ({ size = 'default', videoInputId: requestedVideoInputId } = {}) => {
     const devices = await refreshMediaDevices()
 
-    let videoInputId = selectedVideoInputId
+    let videoInputId = requestedVideoInputId === undefined ? selectedVideoInputId : requestedVideoInputId
     let audioInputId = selectedAudioInputId
 
     if (videoInputId && !devices?.videoInputs?.some((device) => device.deviceId === videoInputId)) {
@@ -679,7 +688,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
 
   // ── Camera ──
 
-  const openCamera = async () => {
+  const openCamera = async (videoInputId = undefined) => {
     cancelCountIn()
     stopTimer()
     stopMetronome()
@@ -691,9 +700,15 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera not supported')
       setWarning(null)
-      const stream = await openUserMediaWithFallback({ size: 'default' })
+      const stream = await openUserMediaWithFallback({ size: 'default', videoInputId })
       camStreamRef.current = stream
       streamRef.current = stream
+      const videoTrack = stream.getVideoTracks()[0]
+      const trackSettings = videoTrack?.getSettings?.() || {}
+      const activeDeviceId = String(trackSettings.deviceId || videoInputId || '')
+      const activeDeviceLabel = videoInputs.find((device) => device.deviceId === activeDeviceId)?.label || videoTrack?.label || ''
+      const inferredFacingMode = /back|rear|environment/i.test(activeDeviceLabel) ? 'environment' : 'user'
+      setActiveFacingMode(trackSettings.facingMode || inferredFacingMode)
       await ensureAudioMix(stream)
       await refreshMediaDevices()
       setMode('camera')
@@ -705,6 +720,89 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       setState(STATES.IDLE)
     }
   }
+
+  const flipCamera = useCallback(async () => {
+    if (stateRef.current !== STATES.PREVIEWING || mode !== 'camera' || isFlippingCamera) return
+
+    const devices = await refreshMediaDevices()
+    const availableCameras = devices?.videoInputs || []
+    if (availableCameras.length < 2) {
+      setCameraFlipNotice('No other camera available')
+      if (cameraFlipNoticeTimeoutRef.current) clearTimeout(cameraFlipNoticeTimeoutRef.current)
+      cameraFlipNoticeTimeoutRef.current = window.setTimeout(() => setCameraFlipNotice(''), 1400)
+      return
+    }
+
+    const activeDeviceId = camStreamRef.current?.getVideoTracks?.()[0]?.getSettings?.().deviceId
+      || selectedVideoInputId
+    const activeIndex = availableCameras.findIndex((device) => device.deviceId === activeDeviceId)
+    const nextCamera = availableCameras[(activeIndex + 1 + availableCameras.length) % availableCameras.length]
+    if (!nextCamera?.deviceId) return
+
+    setIsFlippingCamera(true)
+    setCameraFlipNotice('Flipping camera...')
+    try {
+      const nextStream = await openUserMediaWithFallback({
+        size: 'default',
+        videoInputId: nextCamera.deviceId,
+      })
+      const previousStream = streamRef.current
+      const previousMixedStream = mixedStreamRef.current
+      const previousCamStream = camStreamRef.current
+
+      stopMetronome()
+      closeAudioContext()
+      mixedStreamRef.current = null
+      camStreamRef.current = nextStream
+      streamRef.current = nextStream
+
+      const videoTrack = nextStream.getVideoTracks()[0]
+      const trackSettings = videoTrack?.getSettings?.() || {}
+      const activeDeviceLabel = nextCamera.label || videoTrack?.label || ''
+      setActiveFacingMode(
+        trackSettings.facingMode
+          || (/back|rear|environment/i.test(activeDeviceLabel) ? 'environment' : 'user'),
+      )
+      attachStream()
+
+      new Set([previousStream, previousMixedStream, previousCamStream]).forEach((stream) => {
+        if (stream && stream !== nextStream) stream.getTracks().forEach((track) => track.stop())
+      })
+
+      await ensureAudioMix(nextStream)
+      if (metronomeEnabled) await startMetronome()
+      setCameraFlipNotice('Camera flipped')
+    } catch {
+      setCameraFlipNotice('Could not flip camera')
+    } finally {
+      setIsFlippingCamera(false)
+      if (cameraFlipNoticeTimeoutRef.current) clearTimeout(cameraFlipNoticeTimeoutRef.current)
+      cameraFlipNoticeTimeoutRef.current = window.setTimeout(() => setCameraFlipNotice(''), 1000)
+    }
+  }, [
+    attachStream,
+    closeAudioContext,
+    ensureAudioMix,
+    isFlippingCamera,
+    metronomeEnabled,
+    mode,
+    openUserMediaWithFallback,
+    refreshMediaDevices,
+    selectedVideoInputId,
+    startMetronome,
+    stopMetronome,
+  ])
+
+  const handlePreviewPointerUp = useCallback((event) => {
+    if (event.pointerType === 'mouse') return
+    const now = Date.now()
+    const elapsedSinceLastTap = now - lastPreviewTapAtRef.current
+    lastPreviewTapAtRef.current = now
+    if (elapsedSinceLastTap > 0 && elapsedSinceLastTap <= 350) {
+      lastPreviewTapAtRef.current = 0
+      flipCamera()
+    }
+  }, [flipCamera])
 
   // Screen + Camera (PiP)
   const openScreenCam = async () => {
@@ -1131,7 +1229,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                 </svg>
               </div>
               <p className="text-xs text-red-400 text-center max-w-[240px]">{error}</p>
-              <button onClick={openCamera} className="text-xs text-white/60 hover:text-white underline transition-colors">
+              <button onClick={() => openCamera()} className="text-xs text-white/60 hover:text-white underline transition-colors">
                 Try again
               </button>
               <div className="w-full max-w-3xl pt-2">
@@ -1161,7 +1259,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
               <div className="w-full max-w-md space-y-3">
                 <p className="text-center text-xs text-white/55">Start with single-cam for the fastest flow. Add screen only when needed.</p>
                 <button
-                  onClick={openCamera}
+                  onClick={() => openCamera()}
                   className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-4 hover:bg-white/15 transition-all duration-200"
                 >
                   <div className="flex items-center gap-3 text-left">
@@ -1240,8 +1338,49 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
               muted
               playsInline
               className="absolute inset-0 w-full h-full object-cover"
-              style={{ transform: mode === 'camera' ? 'scaleX(-1)' : 'none' }}
+              style={{ transform: mode === 'camera' && activeFacingMode !== 'environment' ? 'scaleX(-1)' : 'none' }}
             />
+
+            {mode === 'camera' && state === STATES.PREVIEWING ? (
+              <div
+                className="absolute inset-0 z-10 touch-manipulation"
+                onPointerUp={handlePreviewPointerUp}
+                onDoubleClick={flipCamera}
+                aria-label="Double-tap preview to flip camera"
+              >
+                {videoInputs.length > 1 ? (
+                  <button
+                    type="button"
+                    onPointerUp={(event) => event.stopPropagation()}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      flipCamera()
+                    }}
+                    disabled={isFlippingCamera}
+                    aria-label="Flip camera"
+                    className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-20 flex h-11 w-11 items-center justify-center rounded-full bg-black/45 text-white shadow backdrop-blur transition-colors hover:bg-black/60 disabled:opacity-60"
+                  >
+                    <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" d="M7 7h8.5A3.5 3.5 0 0119 10.5V12m0 0-2.5-2.5M19 12l2.5-2.5M17 17H8.5A3.5 3.5 0 015 13.5V12m0 0 2.5 2.5M5 12l-2.5 2.5" />
+                    </svg>
+                  </button>
+                ) : null}
+                {cameraFlipNotice ? (
+                  <div className="pointer-events-none absolute inset-x-0 top-1/2 flex -translate-y-1/2 justify-center">
+                    <span className="rounded-full bg-black/65 px-4 py-2 text-sm font-medium text-white shadow backdrop-blur">
+                      {cameraFlipNotice}
+                    </span>
+                  </div>
+                ) : null}
+                {videoInputs.length > 1 && !cameraFlipNotice ? (
+                  <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center sm:hidden">
+                    <span className="rounded-full bg-black/40 px-3 py-1.5 text-xs text-white/80 backdrop-blur">
+                      Double-tap to flip
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             {mode === 'screen_cam' && (
               <PiPOverlay
@@ -1292,7 +1431,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
                   ) : (
                     <button
                       type="button"
-                      onClick={openCamera}
+                      onClick={() => openCamera()}
                       className="rounded-full px-3 py-1.5 text-xs transition-colors bg-white/10 text-white/80 hover:bg-white/20"
                     >
                       Back to single-cam

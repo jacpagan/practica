@@ -220,7 +220,14 @@ test('Record route shows camera and microphone selectors for signed-in members',
       {
         deviceId: 'video-device-1',
         kind: 'videoinput',
-        label: 'Built-in Camera',
+        label: 'Front Camera',
+        groupId: 'group-video',
+        toJSON() { return this },
+      },
+      {
+        deviceId: 'video-device-2',
+        kind: 'videoinput',
+        label: 'Back Camera',
         groupId: 'group-video',
         toJSON() { return this },
       },
@@ -250,7 +257,17 @@ test('Record route shows camera and microphone selectors for signed-in members',
       const context = canvas.getContext('2d')
       context.fillStyle = '#111827'
       context.fillRect(0, 0, canvas.width, canvas.height)
-      return canvas.captureStream(1)
+      const stream = canvas.captureStream(1)
+      const requestedDeviceId = constraints?.video && typeof constraints.video === 'object'
+        ? constraints.video?.deviceId?.exact
+        : ''
+      stream.getVideoTracks().forEach((track) => {
+        track.getSettings = () => ({
+          deviceId: requestedDeviceId || 'video-device-1',
+          facingMode: requestedDeviceId === 'video-device-2' ? 'environment' : 'user',
+        })
+      })
+      return stream
     }
 
     mediaDevices.getDisplayMedia = async () => {
@@ -265,6 +282,9 @@ test('Record route shows camera and microphone selectors for signed-in members',
   await expect(page.getByRole('heading', { name: 'Record' })).toBeVisible()
   await expect(page.getByText('Camera ready')).toBeVisible({ timeout: 10000 })
   await expect(page.getByRole('button', { name: /Add screen \(optional\)|Switch to Screen \+ Cam/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Flip camera' })).toBeVisible()
+  await page.locator('[aria-label="Double-tap preview to flip camera"]').dblclick({ position: { x: 100, y: 100 } })
+  await expect(page.getByText('Camera flipped')).toBeVisible()
   await expect(page.getByRole('button', { name: /Options/i })).toBeVisible()
   await expect(page.locator('text=Camera input')).toHaveCount(0)
   await expect(page.locator('text=Microphone input')).toHaveCount(0)
@@ -274,7 +294,9 @@ test('Record route shows camera and microphone selectors for signed-in members',
   await expect(page.locator('text=Microphone input').first()).toBeVisible()
   const cameraSelect = page.locator('label:has-text("Camera input") + select').first()
   const micSelect = page.locator('label:has-text("Microphone input") + select').first()
-  await expect(cameraSelect).toContainText('Built-in Camera')
+  await expect(cameraSelect).toContainText('Front Camera')
+  await expect(cameraSelect).toContainText('Back Camera')
+  await expect(cameraSelect).toHaveValue('video-device-2')
   await expect(micSelect).toContainText('Built-in Microphone')
 })
 
