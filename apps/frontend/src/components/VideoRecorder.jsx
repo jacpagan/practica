@@ -330,7 +330,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   const getVideoConstraints = useCallback((size = 'default', videoInputId = selectedVideoInputId) => {
     const constraints = size === 'pip'
       ? { width: { ideal: 640 }, height: { ideal: 360 } }
-      : { width: { ideal: 854 }, height: { ideal: 480 } }
+      : { width: { ideal: 640 }, height: { ideal: 360 } }
 
     if (videoInputId) {
       constraints.deviceId = { exact: videoInputId }
