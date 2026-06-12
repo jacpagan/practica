@@ -59,7 +59,7 @@ function SkillField({
           setOpen(true)
         }}
         disabled={disabled}
-        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
+        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-900 caret-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
         placeholder={placeholder}
         autoComplete="off"
       />

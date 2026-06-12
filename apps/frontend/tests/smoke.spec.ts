@@ -366,7 +366,12 @@ test('Recording starts and saves a take when the metronome is on', async ({ page
 
   await page.getByRole('button', { name: 'Stop recording' }).click()
   await expect(page.getByText('Label this take (optional)')).toBeVisible({ timeout: 5000 })
-  await page.getByRole('button', { name: 'Drumming' }).click()
+  const skillInput = page.getByPlaceholder('Breathing, Drumming, Guitar…')
+  await skillInput.fill('Chinese')
+  await expect(skillInput).toHaveValue('Chinese')
+  await expect(skillInput).toHaveCSS('color', 'rgb(17, 24, 39)')
+  await page.getByText('Create “Chinese”').click()
+  await page.getByRole('button', { name: 'Save proof' }).click()
   await expect(page.getByText('Saving your proof…')).toBeVisible({ timeout: 5000 })
 
 })
