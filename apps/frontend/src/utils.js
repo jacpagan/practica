@@ -1,3 +1,5 @@
+import { multipartFingerprint } from './uploadIdentity'
+
 const API_BASE = window.location.hostname === 'localhost'
   ? 'http://localhost:8000'
   : ''
@@ -286,21 +288,6 @@ export const reportClientEvent = (eventName = '', extra = {}) => {
     message: normalizedName,
     extra,
   })
-}
-
-const multipartFingerprint = ({ payload, videoFile }) => {
-  const tags = Array.isArray(payload?.tags) ? [...payload.tags].map((t) => String(t)).sort().join(',') : ''
-  return [
-    videoFile?.name || '',
-    videoFile?.size || 0,
-    videoFile?.lastModified || 0,
-    payload?.title || '',
-    payload?.practice_series || '',
-    payload?.reference_title || '',
-    payload?.reference_url || '',
-    payload?.duration_seconds || '',
-    tags,
-  ].join('|')
 }
 
 const multipartResumeKey = (fingerprint) => `${MULTIPART_RESUME_PREFIX}:${fingerprint}`
