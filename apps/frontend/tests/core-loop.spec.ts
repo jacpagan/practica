@@ -3,9 +3,11 @@ import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const backendDir = path.resolve(__dirname, '../../backend')
-const venvPython = path.resolve(__dirname, '../../../.venv/bin/python')
+const testDir = path.dirname(fileURLToPath(import.meta.url))
+const backendDir = path.resolve(testDir, '../../backend')
+const venvPython = path.resolve(testDir, '../../../.venv/bin/python')
 const pythonBin = process.env.PYTHON || (fs.existsSync(venvPython) ? venvPython : 'python3')
 const databaseUrl = `sqlite:///${process.env.PRACTICA_E2E_DB_PATH || '/tmp/practica-e2e.sqlite3'}`
 const baseEnv = {
