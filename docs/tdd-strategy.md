@@ -30,7 +30,8 @@ Use `scripts/test-core-loop.sh` as the default local test gate for core-loop wor
 
 That script currently checks:
 
-- focused backend regression suites around proof capture, playback, history, permissions, legacy review flows, and multipart uploads
+- focused backend regression suites around authentication, proof capture, playback processing, proof history, ownership permissions, loop metrics, private sharing, legacy review flows, and multipart uploads
+- lightweight frontend unit tests around recorder settings, resumable-upload identity, recent skills, and progress activity
 - frontend production build integrity
 
 ## Working Rules
