@@ -635,7 +635,13 @@ class V1VideoFeaturesTests(APITestCase):
     )
     @patch('videos.media.services.enqueue_session_processing')
     @patch('videos.media.services.enqueue_local_session_transcode', return_value=(True, ''))
-    def test_session_create_with_explicit_local_ffmpeg_skips_mediaconvert(self, enqueue_local_transcode, enqueue_session_processing):
+    @patch('videos.media.services.configured_video_processing_mode', return_value='local_ffmpeg')
+    def test_session_create_with_explicit_local_ffmpeg_skips_mediaconvert(
+        self,
+        configured_video_processing_mode,
+        enqueue_local_transcode,
+        enqueue_session_processing,
+    ):
         self.client.force_authenticate(user=self.owner)
 
         res = self.client.post(
@@ -651,6 +657,7 @@ class V1VideoFeaturesTests(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         created = Session.objects.get(id=res.data['id'])
         self.assertEqual(created.processing_status, Session.STATUS_PROCESSING)
+        configured_video_processing_mode.assert_called_once()
         enqueue_local_transcode.assert_called_once()
         enqueue_session_processing.assert_not_called()
 
