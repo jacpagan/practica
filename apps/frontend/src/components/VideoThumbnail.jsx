@@ -122,11 +122,15 @@ function VideoThumbnail({ session, className = '', variant = 'video' }) {
     return <PosterThumbnail className={className} session={session} />
   }
 
+  if (variant === 'frame') {
+    return <VideoFrameThumbnail session={session} className={className} />
+  }
+
   if (posterUrl && session?.processing_status === 'ready') {
     return <PosterThumbnail className={className} session={session} eager />
   }
 
-  return <VideoFrameThumbnail session={session} className={className} />
+  return <PosterThumbnail className={className} session={session} />
 }
 
 export default VideoThumbnail

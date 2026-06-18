@@ -66,6 +66,28 @@ class V1VideoFeaturesTests(APITestCase):
             '/media/processed/sessions/1/thumbs/poster.jpg',
         )
 
+    def test_sessions_list_omits_playable_video_urls_until_detail_is_opened(self):
+        session = self._create_session(user=self.owner, title='Light archive session')
+        SessionAsset.objects.create(
+            session=session,
+            asset_type=SessionAsset.TYPE_PROXY_MP4,
+            object_key='processed/sessions/1/proxy/video_proxy.mp4',
+            content_type='video/mp4',
+        )
+        self.client.force_authenticate(user=self.owner)
+
+        list_response = self.client.get('/api/sessions/')
+        detail_response = self.client.get(f'/api/sessions/{session.id}/')
+
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(detail_response.status_code, status.HTTP_200_OK)
+        payload = list_response.data if isinstance(list_response.data, list) else list_response.data.get('results', [])
+        self.assertNotIn('video_file', payload[0])
+        self.assertNotIn('assets', payload[0])
+        self.assertIn('video_file', detail_response.data)
+        self.assertEqual(len(detail_response.data['assets']), 1)
+        self.assertTrue(detail_response.data['assets'][0]['url'].endswith('/processed/sessions/1/proxy/video_proxy.mp4'))
+
     def test_video_feedback_requires_video(self):
         session = self._create_session(user=self.owner)
         self.client.force_authenticate(user=self.owner)

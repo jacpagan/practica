@@ -181,6 +181,16 @@ class SessionAssetSerializer(serializers.ModelSerializer):
         return _normalize_storage_url(raw_url, key=key)
 
 
+def _session_poster_asset_url(obj, context):
+    asset = next(
+        (item for item in obj.assets.all() if item.asset_type == SessionAsset.TYPE_THUMB_SPRITE),
+        None,
+    )
+    if not asset:
+        return ''
+    return SessionAssetSerializer(asset, context=context).data.get('url', '')
+
+
 class VideoFeedbackSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     display_name = serializers.SerializerMethodField()
@@ -263,10 +273,7 @@ class SessionSerializer(serializers.ModelSerializer):
         return [t.name for t in obj.tags.all()]
 
     def get_poster_image_url(self, obj):
-        asset = obj.assets.filter(asset_type=SessionAsset.TYPE_THUMB_SPRITE).order_by('-created_at').first()
-        if not asset:
-            return ''
-        return SessionAssetSerializer(asset, context=self.context).data.get('url', '')
+        return _session_poster_asset_url(obj, self.context)
 
     def get_chapter_count(self, obj):
         return obj.chapters.count()
@@ -316,20 +323,18 @@ class SessionSerializer(serializers.ModelSerializer):
 class SessionListSerializer(serializers.ModelSerializer):
     video_feedback_count = serializers.SerializerMethodField()
     can_edit = serializers.SerializerMethodField()
-    video_file = SafeFileField()
     processing_status = serializers.CharField(read_only=True)
     processing_job_id = serializers.CharField(read_only=True)
     processing_error = serializers.CharField(read_only=True)
-    assets = SessionAssetSerializer(many=True, read_only=True)
     poster_image_url = serializers.SerializerMethodField()
     resolution = serializers.SerializerMethodField()
 
     class Meta:
         model = Session
-        fields = ['id', 'title', 'practice_series', 'description', 'video_file',
+        fields = ['id', 'title', 'practice_series', 'description',
                   'duration_seconds', 'timing_metadata', 'recorded_at', 'created_at',
                   'processing_status', 'processing_job_id', 'processing_error',
-                  'poster_image_url', 'resolution', 'assets', 'video_feedback_count',
+                  'poster_image_url', 'resolution', 'video_feedback_count',
                   'can_edit']
         read_only_fields = ['id', 'recorded_at', 'created_at']
 
@@ -337,10 +342,7 @@ class SessionListSerializer(serializers.ModelSerializer):
         return obj.video_feedback.count()
 
     def get_poster_image_url(self, obj):
-        asset = obj.assets.filter(asset_type=SessionAsset.TYPE_THUMB_SPRITE).order_by('-created_at').first()
-        if not asset:
-            return ''
-        return SessionAssetSerializer(asset, context=self.context).data.get('url', '')
+        return _session_poster_asset_url(obj, self.context)
 
     def _request_user(self):
         request = self.context.get('request')
@@ -370,10 +372,7 @@ class PublicSessionSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_poster_image_url(self, obj):
-        asset = obj.assets.filter(asset_type=SessionAsset.TYPE_THUMB_SPRITE).order_by('-created_at').first()
-        if not asset:
-            return ''
-        return SessionAssetSerializer(asset, context=self.context).data.get('url', '')
+        return _session_poster_asset_url(obj, self.context)
 
 
 class ReviewLinkSerializer(serializers.ModelSerializer):

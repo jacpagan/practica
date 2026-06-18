@@ -87,7 +87,5 @@ class CoreLoopProtectionTests(APITestCase):
         self.assertEqual(proofs_by_id[ready.id]['resolution']['code'], 'ready_for_review')
         self.assertEqual(proofs_by_id[processing.id]['resolution']['code'], 'processing')
         self.assertEqual(proofs_by_id[failed.id]['resolution']['code'], 'playback_failed')
-        self.assertEqual(
-            proofs_by_id[ready.id]['assets'][0]['url'],
-            '/media/processed/sessions/ready/proxy.mp4',
-        )
+        self.assertNotIn('video_file', proofs_by_id[ready.id])
+        self.assertNotIn('assets', proofs_by_id[ready.id])
