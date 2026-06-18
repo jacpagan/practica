@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { fmtTimer, reportClientEvent, sessionVideoSources, videoUrl } from '../utils'
+import { fmtTimer, reportClientEvent, sessionPosterUrl, sessionVideoSources, videoUrl } from '../utils'
 import { useConfirm } from './ConfirmDialog'
 import { useToast } from './Toast'
 import SkillField from './SkillField'
@@ -604,10 +604,6 @@ function SessionDetail({
     }
   }, [onSessionUpdate, refreshSession, session?.id, session?.processing_status, token])
 
-  const transitionTargetSources = threadTransition
-    ? sessionVideoSources(threadTransition.targetSession, threadTransition.targetSession?.local_preview_url || '')
-    : []
-  const transitionTargetUrl = transitionTargetSources[0] || null
   const currentSlideClass = threadTransition?.active
     ? (threadTransition.direction === 'next' ? '-translate-y-full' : 'translate-y-full')
     : 'translate-y-0'
@@ -616,31 +612,29 @@ function SessionDetail({
     : (threadTransition?.direction === 'next' ? 'translate-y-full' : '-translate-y-full')
   const pagerActive = pagerDrag.active || pagerDrag.animating
   const pagerTransitionClass = pagerDrag.animating ? 'transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform' : ''
-  const previousPagerSources = threadNavigation.previous
-    ? sessionVideoSources(threadNavigation.previous, threadNavigation.previous?.local_preview_url || '')
-    : []
-  const nextPagerSources = threadNavigation.next
-    ? sessionVideoSources(threadNavigation.next, threadNavigation.next?.local_preview_url || '')
-    : []
-  const previousPagerUrl = previousPagerSources[0] || null
-  const nextPagerUrl = nextPagerSources[0] || null
+  const previewUrlForSession = (item) => sessionPosterUrl(item) || ''
   const pagerCardStyle = (slot) => ({
     transform: `translateY(calc(${slot * 100}% + ${pagerDrag.offsetY}px))`,
   })
-  const renderPagerCard = (item, url, label, slot) => {
+  const renderPreviewCardMedia = (item) => {
+    const previewUrl = previewUrlForSession(item)
+    if (previewUrl) {
+      return <img src={previewUrl} alt="" className={videoSurfaceClass} draggable="false" />
+    }
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-black px-6 text-center text-sm text-white/70">
+        Video is still preparing for playback.
+      </div>
+    )
+  }
+  const renderPagerCard = (item, label, slot) => {
     if (!item && slot !== 0) return null
     return (
       <div
         className={`absolute inset-0 ${pagerTransitionClass}`}
         style={pagerCardStyle(slot)}
       >
-        {url ? (
-          <video src={url} muted playsInline className={videoSurfaceClass} />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-black px-6 text-center text-sm text-white/70">
-            Video is still preparing for playback.
-          </div>
-        )}
+        {renderPreviewCardMedia(item || session)}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-20 text-white">
           <p className="text-base font-semibold leading-tight drop-shadow">{item?.title || session?.title || 'Proof'}</p>
           <p className="mt-1 text-[11px] text-white/60">{label}</p>
@@ -687,8 +681,9 @@ function SessionDetail({
             key={playableUrl}
             ref={videoRef}
             src={playableUrl}
+            poster={previewUrlForSession(session)}
             playsInline
-            preload="metadata"
+            preload="auto"
             onPlay={handleVideoPlay}
             onPause={() => setVideoPlaying(false)}
             onEnded={() => setVideoPlaying(false)}
@@ -755,31 +750,21 @@ function SessionDetail({
         ) : null}
         {pagerActive ? (
           <div className="pointer-events-none absolute inset-0 z-50 overflow-hidden bg-black">
-            {renderPagerCard(threadNavigation.previous, previousPagerUrl, threadNavigation.index > 0 ? `Proof ${threadNavigation.index} of ${threadNavigation.items.length}` : '', -1)}
-            {renderPagerCard(session, playableUrl, threadPositionLabel, 0)}
-            {renderPagerCard(threadNavigation.next, nextPagerUrl, threadNavigation.index >= 0 ? `Proof ${threadNavigation.index + 2} of ${threadNavigation.items.length}` : '', 1)}
+            {renderPagerCard(threadNavigation.previous, threadNavigation.index > 0 ? `Proof ${threadNavigation.index} of ${threadNavigation.items.length}` : '', -1)}
+            {renderPagerCard(session, threadPositionLabel, 0)}
+            {renderPagerCard(threadNavigation.next, threadNavigation.index >= 0 ? `Proof ${threadNavigation.index + 2} of ${threadNavigation.items.length}` : '', 1)}
           </div>
         ) : null}
         {threadTransition ? (
           <div className="pointer-events-none absolute inset-0 z-40 overflow-hidden bg-black">
             <div className={`absolute inset-0 transform transition-transform duration-300 ease-out ${currentSlideClass}`}>
-              {playableUrl && !playbackFailed ? (
-                <video src={playableUrl} muted playsInline className={videoSurfaceClass} />
-              ) : (
-                <div className="h-full w-full bg-black" />
-              )}
+              {renderPreviewCardMedia(session)}
               <div className="absolute bottom-8 left-4 rounded-full bg-black/55 px-3 py-1.5 text-xs font-medium text-white/85 backdrop-blur">
                 {threadPositionLabel}
               </div>
             </div>
             <div className={`absolute inset-0 transform transition-transform duration-300 ease-out ${targetSlideClass}`}>
-              {transitionTargetUrl ? (
-                <video src={transitionTargetUrl} muted playsInline className={videoSurfaceClass} />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-black px-6 text-center text-sm text-white/70">
-                  Video is still preparing for playback.
-                </div>
-              )}
+              {renderPreviewCardMedia(threadTransition.targetSession)}
               <div className="absolute bottom-8 left-4 max-w-[75%] rounded-full bg-black/55 px-3 py-1.5 text-xs font-medium text-white/85 backdrop-blur">
                 <span className="block truncate">{threadTransition.targetSession?.title || 'Next proof'}</span>
               </div>

@@ -148,6 +148,39 @@ class MultipartUploadApiTests(APITestCase):
         )
         self.assertEqual(fake_s3.create_calls, 1)
 
+    def test_multipart_initiate_existing_response_preserves_same_upload_for_resume(self):
+        fake_s3 = FakeS3Client()
+        self.client.force_authenticate(user=self.member)
+
+        with patch('videos.media.api.s3_client', return_value=fake_s3):
+            first = self.client.post(
+                '/api/sessions/multipart/initiate/',
+                {
+                    'title': 'Resume without restart',
+                    'size_bytes': 6 * 1024 * 1024,
+                    'filename': 'resume-small.mp4',
+                    'content_type': 'video/mp4',
+                    'client_upload_id': 'resume-same-upload-123',
+                },
+                format='json',
+            )
+            second = self.client.post(
+                '/api/sessions/multipart/initiate/',
+                {
+                    'title': 'Resume without restart',
+                    'size_bytes': 6 * 1024 * 1024,
+                    'filename': 'resume-small.mp4',
+                    'content_type': 'video/mp4',
+                    'client_upload_id': 'resume-same-upload-123',
+                },
+                format='json',
+            )
+
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
+        self.assertEqual(second.data['multipart_upload_id'], first.data['multipart_upload_id'])
+        self.assertEqual(fake_s3.create_calls, 1)
+
     def test_multipart_upload_has_db_level_idempotency_constraint(self):
         MultipartSessionUpload.objects.create(
             user=self.member,
@@ -399,6 +432,51 @@ class MultipartUploadApiTests(APITestCase):
         self.assertEqual(status_res.status_code, status.HTTP_200_OK)
         self.assertEqual(status_res.data['status'], MultipartSessionUpload.STATUS_COMPLETED)
         self.assertEqual(status_res.data['session']['id'], session.id)
+
+    def test_cleanup_multipart_uploads_aborts_expired_initiated_uploads(self):
+        fake_s3 = FakeS3Client()
+        expired = MultipartSessionUpload.objects.create(
+            user=self.member,
+            status=MultipartSessionUpload.STATUS_INITIATED,
+            title='Expired upload',
+            description='',
+            tags_csv='',
+            duration_seconds=None,
+            original_filename='expired.mp4',
+            content_type='video/mp4',
+            size_bytes=10 * 1024 * 1024,
+            s3_key='sessions/member/expired.mp4',
+            s3_upload_id='upload-expired-cleanup',
+            expires_at=timezone.now() - timedelta(minutes=1),
+        )
+        active = MultipartSessionUpload.objects.create(
+            user=self.member,
+            status=MultipartSessionUpload.STATUS_INITIATED,
+            title='Active upload',
+            description='',
+            tags_csv='',
+            duration_seconds=None,
+            original_filename='active.mp4',
+            content_type='video/mp4',
+            size_bytes=10 * 1024 * 1024,
+            s3_key='sessions/member/active.mp4',
+            s3_upload_id='upload-active-cleanup',
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        out = StringIO()
+        with patch('videos.management.commands.cleanup_multipart_uploads.s3_client', return_value=fake_s3):
+            call_command('cleanup_multipart_uploads', stdout=out)
+
+        expired.refresh_from_db()
+        active.refresh_from_db()
+        payload = json.loads(out.getvalue())
+        self.assertEqual(payload['status'], 'ok')
+        self.assertEqual(payload['expired'], 1)
+        self.assertEqual(expired.status, MultipartSessionUpload.STATUS_EXPIRED)
+        self.assertEqual(active.status, MultipartSessionUpload.STATUS_INITIATED)
+        self.assertEqual(len(fake_s3.abort_calls), 1)
+        self.assertEqual(fake_s3.abort_calls[0]['UploadId'], 'upload-expired-cleanup')
 
     def test_complete_returns_existing_session_for_completed_upload(self):
         session = Session.objects.create(
