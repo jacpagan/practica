@@ -21,8 +21,9 @@ class LoopMetricsTests(APITestCase):
         self.member = User.objects.create_user(username='loop_member', password='pass1234')
         Profile.objects.create(user=self.member, display_name='Loop Member')
 
-    def _create_session(self, *, offset_days=0, hours=0):
-        recorded_at = timezone.now() - timedelta(days=offset_days, hours=hours)
+    def _create_session(self, *, offset_days=0, hours=0, recorded_at=None):
+        if recorded_at is None:
+            recorded_at = timezone.now() - timedelta(days=offset_days, hours=hours)
         session = Session.objects.create(
             user=self.member,
             title=f'Proof {offset_days}-{hours}',
@@ -57,9 +58,10 @@ class LoopMetricsTests(APITestCase):
         self.assertEqual(stored.extra_json.get('session_id'), response.data['id'])
 
     def test_build_loop_metrics_counts_return_windows(self, pipeline_mock):
-        first = self._create_session(offset_days=20)
-        self._create_session(offset_days=20, hours=-6)
-        self._create_session(offset_days=15)
+        base = timezone.now().replace(hour=12, minute=0, second=0, microsecond=0)
+        first = self._create_session(recorded_at=base - timedelta(days=20))
+        self._create_session(recorded_at=base - timedelta(days=20) + timedelta(hours=6))
+        self._create_session(recorded_at=base - timedelta(days=15))
 
         ProductEventLog.objects.create(
             event_name='proof_playback_started',
