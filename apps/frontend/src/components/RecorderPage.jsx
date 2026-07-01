@@ -232,7 +232,7 @@ export default function RecorderPage({
             <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-4 sm:border-gray-200 sm:bg-white sm:text-gray-900">
               <div>
                 <h2 className="text-lg font-semibold text-white sm:text-gray-900">Label this take (optional)</h2>
-                <p className="mt-1 text-sm text-white/70 sm:text-gray-500">Pick a recent skill or type a new one — or save without one.</p>
+                <p className="mt-1 text-sm text-white/70 sm:text-gray-500">Pick a recent skill to keep today connected, type a new one, or save to your private archive.</p>
               </div>
               {recentSkills.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
@@ -274,7 +274,7 @@ export default function RecorderPage({
                   onClick={() => handleSave({ skillName: '', auto: true })}
                   className="text-sm text-white/60 hover:text-white sm:text-gray-500 sm:hover:text-gray-800"
                 >
-                  Save without skill
+                  Save to private archive
                 </button>
               </div>
               {saveError ? <p className="text-sm text-red-400 sm:text-red-600">{saveError}</p> : null}

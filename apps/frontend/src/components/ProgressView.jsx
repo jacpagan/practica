@@ -3,7 +3,7 @@ import SessionListItem from './SessionListItem'
 import ActivityCalendar from './ActivityCalendar'
 import SkillSummaryCard from './SkillSummaryCard'
 import VideoThumbnail from './VideoThumbnail'
-import { buildSkillSummaries } from '../progressActivity'
+import { buildSkillSummaries, buildTodayLoopState } from '../progressActivity'
 import { calculatePracticeProgress, fmtDate, reportClientEvent, toLocalDateKey } from '../utils'
 
 const formatCompactDateTime = (value) => {
@@ -21,10 +21,12 @@ export default function ProgressView({
   highlightSession = null,
   onOpenSession,
   onOpenSkill,
+  onRecord,
 }) {
   const highlightRef = useRef(null)
 
   const overview = useMemo(() => calculatePracticeProgress(sessions), [sessions])
+  const todayLoop = useMemo(() => buildTodayLoopState(sessions), [sessions])
   const skillSummaries = useMemo(() => buildSkillSummaries(sessions), [sessions])
   const taggedSummaries = useMemo(() => skillSummaries.filter((item) => !item.isUngrouped), [skillSummaries])
   const ungroupedSummary = useMemo(() => skillSummaries.find((item) => item.isUngrouped) || null, [skillSummaries])
@@ -54,6 +56,20 @@ export default function ProgressView({
     if (!highlightSession?.id) return null
     return sessions.find((session) => session?.id === highlightSession.id) || highlightSession
   }, [highlightSession, sessions])
+
+  const nextSkillName = todayLoop.nextSkillName
+  const primaryActionLabel = todayLoop.proofRecordedToday
+    ? 'Record another proof'
+    : (nextSkillName ? `Record ${nextSkillName} today` : 'Record today\'s proof')
+  const primaryActionDetail = todayLoop.proofRecordedToday
+    ? (todayLoop.todayProofCount > 1 ? `${todayLoop.todayProofCount} proofs saved today.` : 'Your proof is saved for today.')
+    : (nextSkillName
+        ? `${todayLoop.recommendedSkill?.proofCount || 0} ${todayLoop.recommendedSkill?.proofCount === 1 ? 'proof' : 'proofs'} already in this skill.`
+        : (todayLoop.totalProofCount > 0 ? 'Start with one tiny take and label it after recording.' : 'Your private archive starts with one tiny take.'))
+
+  const handlePrimaryRecord = () => {
+    onRecord?.({ skillName: nextSkillName })
+  }
 
   useEffect(() => {
     if (!justSavedSession || !highlightRef.current) return
@@ -141,6 +157,43 @@ export default function ProgressView({
           </p>
         </div>
 
+        <section className="rounded-2xl border border-gray-900 bg-gray-950 p-4 text-white shadow-sm sm:p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-medium uppercase tracking-wide text-white/55">Next tiny proof</p>
+              <h3 className="mt-1 text-xl font-semibold tracking-tight">
+                {todayLoop.proofRecordedToday
+                  ? 'You showed up today.'
+                  : (nextSkillName ? `Continue ${nextSkillName}` : 'Capture one small rep')}
+              </h3>
+              <p className="mt-2 text-sm text-white/70">{primaryActionDetail}</p>
+            </div>
+            <button
+              type="button"
+              onClick={handlePrimaryRecord}
+              className="inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-gray-950 transition-colors hover:bg-gray-100 sm:w-auto"
+            >
+              {primaryActionLabel}
+            </button>
+          </div>
+          {overview.proofCount > 0 ? (
+            <div className="mt-4 grid grid-cols-3 gap-2 border-t border-white/10 pt-4 text-center">
+              <div>
+                <p className="text-lg font-semibold">{overview.proofCount}</p>
+                <p className="text-[11px] text-white/55">proofs</p>
+              </div>
+              <div>
+                <p className="text-lg font-semibold">{overview.uniqueDayCount}</p>
+                <p className="text-[11px] text-white/55">proof days</p>
+              </div>
+              <div>
+                <p className="text-lg font-semibold">{overview.proofsLast7Days}</p>
+                <p className="text-[11px] text-white/55">recent</p>
+              </div>
+            </div>
+          ) : null}
+        </section>
+
         {justSavedSession ? (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
             <p className="text-sm font-medium text-emerald-900">Done for today?</p>
@@ -198,7 +251,10 @@ export default function ProgressView({
 
             {taggedSummaries.length > 0 ? (
               <div className="space-y-3">
-                <p className="text-sm font-medium text-gray-900">Skills</p>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Skills</p>
+                  <p className="mt-0.5 text-xs text-gray-500">Pick up where your latest proofs left off.</p>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {taggedSummaries.map((summary) => (
                     <SkillSummaryCard

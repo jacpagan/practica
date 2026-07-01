@@ -157,6 +157,9 @@ export const calculatePracticeProgress = (sessions = []) => {
   const proofDays = new Set()
   const skillCounts = new Map()
   const recentProofs = sorted.slice(0, 6)
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
+  sevenDaysAgo.setHours(0, 0, 0, 0)
 
   sorted.forEach((session) => {
     const dateValue = session?.recorded_at || session?.created_at
@@ -176,12 +179,21 @@ export const calculatePracticeProgress = (sessions = []) => {
   const proofCount = sorted.length
   const todayKey = toLocalDateKey(new Date())
   const proofRecordedToday = Boolean(todayKey && uniqueDays.includes(todayKey))
+  const proofsLast7Days = sorted.filter((session) => {
+    const date = new Date(session?.recorded_at || session?.created_at || '')
+    return !Number.isNaN(date.getTime()) && date >= sevenDaysAgo
+  }).length
+  const skillProofCounts = Array.from(skillCounts.entries())
+    .map(([skillName, count]) => ({ skillName, count }))
+    .sort((left, right) => right.count - left.count || left.skillName.localeCompare(right.skillName))
 
   return {
     activeSkill,
     proofCount,
     uniqueDayCount: uniqueDays.length,
     skillCount: Array.from(skillCounts.keys()).length,
+    skillProofCounts,
+    proofsLast7Days,
     recentProofs,
     proofDays: uniqueDays,
     proofRecordedToday,
