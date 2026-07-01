@@ -79,7 +79,7 @@ test('Progress view shows grouped proofs for signed-in members', async ({ page }
   })
   await page.goto('/progress')
 
-  await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Today', exact: true })).toBeVisible()
   await expect(page.getByText("Today's proof").first()).toBeVisible()
   await expect(page.getByText('Activity & overview')).toHaveCount(0)
   await expect(page.getByText('Full archive')).toBeVisible()
@@ -122,7 +122,7 @@ test('Progress is the default signed-in home without dashboard chrome', async ({
 
   await page.goto('/')
   await expect(page).toHaveURL(/\/today/)
-  await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Today', exact: true })).toBeVisible()
   await expect(page.getByText('Recent skills')).toHaveCount(0)
   await expect(page.getByText('this week')).toHaveCount(0)
   await expect(page.getByText('XP', { exact: true })).toHaveCount(0)
