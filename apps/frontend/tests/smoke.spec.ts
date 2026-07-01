@@ -14,12 +14,12 @@ test('Library route (signed-out) shows Auth form without crashing', async ({ pag
   await page.goto('/library?date=2026-04-01')
   await expect(page.getByRole('button', { name: 'Log in' }).first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'Sign up' }).first()).toBeVisible()
-  // Legacy routes normalize to progress.
-  await expect(page).toHaveURL(/\/progress/)
+  // Legacy routes normalize to Today.
+  await expect(page).toHaveURL(/\/today/)
   // Report link available and non-crashing
   await page.getByRole('button', { name: 'Report a problem' }).click()
   // No navigation expected.
-  await expect(page).toHaveURL(/\/progress/)
+  await expect(page).toHaveURL(/\/today/)
 })
 
 test('Progress view shows grouped proofs for signed-in members', async ({ page }) => {
@@ -79,7 +79,7 @@ test('Progress view shows grouped proofs for signed-in members', async ({ page }
   })
   await page.goto('/progress')
 
-  await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Today', exact: true })).toBeVisible()
   await expect(page.getByText("Today's proof").first()).toBeVisible()
   await expect(page.getByText('Activity & overview')).toHaveCount(0)
   await expect(page.getByText('Full archive')).toBeVisible()
@@ -121,8 +121,8 @@ test('Progress is the default signed-in home without dashboard chrome', async ({
   })
 
   await page.goto('/')
-  await expect(page).toHaveURL(/\/progress/)
-  await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible()
+  await expect(page).toHaveURL(/\/today/)
+  await expect(page.getByRole('heading', { name: 'Today', exact: true })).toBeVisible()
   await expect(page.getByText('Recent skills')).toHaveCount(0)
   await expect(page.getByText('this week')).toHaveCount(0)
   await expect(page.getByText('XP', { exact: true })).toHaveCount(0)
@@ -833,7 +833,7 @@ test('Upload retries once after network interruption and reuses idempotency key'
   await page.locator('input[type=text]').first().fill('Retry-safe take')
   await page.getByRole('button', { name: 'Save proof' }).click()
 
-  await page.waitForURL(/\/progress$/, { timeout: 30000 })
+  await page.waitForURL(/\/today$/, { timeout: 30000 })
   await expect(page.getByText('Proof saved. You showed up today.')).toBeVisible({ timeout: 10000 })
   expect(uploadPostAttempts).toBe(2)
   expect(uploadClientIds[0]).toBeTruthy()

@@ -11,7 +11,7 @@ const formatCompactDateTime = (value) => {
   return `${dayPart} · ${timePart}`
 }
 
-function SkillView({ skillName = '', sessions = [], sessionsLoading = false, token = '', onBack, onOpenSession }) {
+function SkillView({ skillName = '', sessions = [], sessionsLoading = false, token = '', onBack, onOpenSession, onRecord }) {
   const [renamingSkill, setRenamingSkill] = useState('')
   const [saving, setSaving] = useState(false)
   const toast = useToast()
@@ -78,12 +78,19 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
                 : 'No proofs yet'}
             </p>
           </div>
+          <button
+            type="button"
+            onClick={() => onRecord?.(skillName)}
+            className="inline-flex w-full items-center justify-center rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-gray-800 sm:w-auto"
+          >
+            Record next proof
+          </button>
         </div>
 
         {skillSessions.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
-            <p className="text-sm text-gray-700">No proofs in this skill yet.</p>
-            <p className="text-xs text-gray-500 mt-1">Tap Record above to add one.</p>
+            <p className="text-sm text-gray-700">Start this skill with one tiny proof.</p>
+            <p className="text-xs text-gray-500 mt-1">Record now, then Practica will keep it in your private archive.</p>
           </div>
         ) : (
           <div className="space-y-3">

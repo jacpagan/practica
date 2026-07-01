@@ -21,6 +21,8 @@ test('calculatePracticeProgress marks when a proof was recorded today', () => {
   assert.equal(summary.proofCount, 2)
   assert.equal(summary.uniqueDayCount, 2)
   assert.equal(summary.activeSkill, 'Drums')
+  assert.equal(summary.proofsLast7Days, 2)
+  assert.deepEqual(summary.skillProofCounts, [{ skillName: 'Drums', count: 2 }])
 })
 
 test('calculatePracticeProgress stays false when there is no proof today', () => {
@@ -33,4 +35,19 @@ test('calculatePracticeProgress stays false when there is no proof today', () =>
 
   assert.equal(summary.proofRecordedToday, false)
   assert.equal(summary.latestProofAt, twoDaysAgo.toISOString())
+  assert.equal(summary.proofsLast7Days, 1)
+})
+
+test('calculatePracticeProgress sorts skill proof counts without streak scoring', () => {
+  const today = new Date()
+  const summary = calculatePracticeProgress([
+    { practice_series: 'Guitar', recorded_at: today.toISOString() },
+    { practice_series: 'Drums', recorded_at: today.toISOString() },
+    { practice_series: 'Drums', recorded_at: today.toISOString() },
+  ])
+
+  assert.deepEqual(summary.skillProofCounts, [
+    { skillName: 'Drums', count: 2 },
+    { skillName: 'Guitar', count: 1 },
+  ])
 })

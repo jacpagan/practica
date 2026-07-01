@@ -362,7 +362,7 @@ test('signed-in proof upload -> optional review loop works', async ({ browser, r
   await studentPage.locator('input[type=text]').nth(0).fill(title)
   const uploadComplete = sessionIdFromUpload(studentPage)
   await studentPage.getByRole('button', { name: 'Save proof' }).click()
-  await studentPage.waitForURL(/\/progress/, { timeout: 30000 })
+  await studentPage.waitForURL(/\/today/, { timeout: 30000 })
   await expect(studentPage.getByText('Proof saved. You showed up today.')).toBeVisible({ timeout: 10000 })
 
   const sessionId = await uploadComplete
@@ -432,7 +432,7 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
   await studentPage.locator('input[type=text]').nth(0).fill(initialTitle)
   const initialUploadComplete = sessionIdFromUpload(studentPage)
   await studentPage.getByRole('button', { name: 'Save proof' }).click()
-  await studentPage.waitForURL(/\/progress/, { timeout: 30000 })
+  await studentPage.waitForURL(/\/today/, { timeout: 30000 })
   await expect(studentPage.getByText('Proof saved. You showed up today.')).toBeVisible({ timeout: 10000 })
 
   const initialSessionId = await initialUploadComplete
@@ -478,7 +478,7 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
   await studentPage.locator('input[type=text]').nth(0).fill(followupTitle)
   const followupUploadComplete = sessionIdFromUpload(studentPage)
   await studentPage.getByRole('button', { name: 'Save proof' }).click()
-  await studentPage.waitForURL(/\/progress/, { timeout: 30000 })
+  await studentPage.waitForURL(/\/today/, { timeout: 30000 })
   await expect(studentPage.getByText('Proof saved. You showed up today.')).toBeVisible({ timeout: 10000 })
 
   const followupSessionId = await followupUploadComplete
@@ -522,7 +522,7 @@ test('long upload interruption auto-resumes and saves successfully', async ({ br
   await page.locator('input[type=text]').nth(0).fill('Mock long take')
   await page.getByRole('button', { name: 'Save proof' }).click()
 
-  await page.waitForURL(/\/progress$/, { timeout: 30000 })
+  await page.waitForURL(/\/today$/, { timeout: 30000 })
   await expect(page.getByText('Proof saved. You showed up today.')).toBeVisible({ timeout: 10000 })
   expect(mocks.getCompleteAttempts()).toBeGreaterThan(1)
 

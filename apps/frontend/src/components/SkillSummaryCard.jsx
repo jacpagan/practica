@@ -16,7 +16,7 @@ export default function SkillSummaryCard({
   onOpenSkill,
   onOpenSession,
 }) {
-  const { skillName, isUngrouped, proofCount, latest, earliest } = summary
+  const { skillName, isUngrouped, proofCount, proofDayCount, latest, earliest } = summary
   const spanLabel = formatSpan(earliest, latest)
 
   if (isUngrouped) {
@@ -58,12 +58,17 @@ export default function SkillSummaryCard({
       </div>
       <div className="p-4 space-y-1">
         <p className="text-base font-semibold text-gray-900 truncate">{skillName}</p>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-600">
           {proofCount} {proofCount === 1 ? 'proof' : 'proofs'}
-          {spanLabel ? ` · ${spanLabel}` : ''}
+          {proofDayCount ? ` · ${proofDayCount} ${proofDayCount === 1 ? 'proof day' : 'proof days'}` : ''}
         </p>
         {latest ? (
           <p className="text-xs text-gray-500">Latest {fmtDate(latest.recorded_at || latest.created_at)}</p>
+        ) : null}
+        {earliest && latest && earliest !== latest ? (
+          <p className="text-xs text-gray-500">First proof {fmtDate(earliest.recorded_at || earliest.created_at)}</p>
+        ) : spanLabel ? (
+          <p className="text-xs text-gray-500">Started {spanLabel}</p>
         ) : null}
       </div>
     </button>

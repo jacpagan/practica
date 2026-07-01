@@ -23,14 +23,14 @@ export const parseRoute = (pathname, search = '') => {
 export const routePath = ({ view, sessionId, seriesName, date }) => {
   if (view === 'privacy') return '/privacy'
   if (view === 'progress' || view === 'archive' || view === 'evidence' || view === 'threads' || view === 'today') {
-    return date ? `/progress?date=${encodeURIComponent(date)}` : '/progress'
+    return date ? `/today?date=${encodeURIComponent(date)}` : '/today'
   }
   if (view === 'upload') return '/upload'
   if (view === 'record') return '/record'
   if (view === 'skill' && seriesName) return `/skill/${encodeURIComponent(seriesName)}`
   if (view === 'detail' && sessionId) return `/sessions/${sessionId}`
-  if (view === 'calendar') return '/progress'
-  return '/progress'
+  if (view === 'calendar') return '/today'
+  return '/today'
 }
 
 export const resolveUploadReturnRouteDraft = (draft = null, routeDate = '') => {

@@ -328,6 +328,10 @@ function AppContent() {
             highlightSession={justUploadedSession}
             onOpenSession={openSession}
             onOpenSkill={goSkill}
+            onRecord={({ skillName = '' } = {}) => startRecord({
+              skillName,
+              returnRoute: { view: 'progress', sessionId: null, seriesName: '' },
+            })}
           />
         )}
 
@@ -339,6 +343,10 @@ function AppContent() {
             token={token}
             onBack={goProgress}
             onOpenSession={openSession}
+            onRecord={(skillName) => startRecord({
+              skillName,
+              returnRoute: { view: 'skill', sessionId: null, seriesName: skillName },
+            })}
           />
         )}
 
