@@ -5,7 +5,7 @@ globalThis.window = {
   location: { hostname: 'localhost' },
 }
 
-const { calculatePracticeProgress } = await import('./utils.js')
+const { buildPracticeProgressInsight, buildProgressShareText, calculatePracticeProgress } = await import('./utils.js')
 
 test('calculatePracticeProgress marks when a proof was recorded today', () => {
   const today = new Date()
@@ -50,4 +50,49 @@ test('calculatePracticeProgress sorts skill proof counts without streak scoring'
     { skillName: 'Drums', count: 2 },
     { skillName: 'Guitar', count: 1 },
   ])
+})
+
+test('calculatePracticeProgress explains broad skill rotation as signal', () => {
+  const today = new Date()
+  const summary = calculatePracticeProgress([
+    { practice_series: 'Drums', recorded_at: today.toISOString() },
+    { practice_series: 'Guitar', recorded_at: today.toISOString() },
+    { practice_series: 'Piano', recorded_at: today.toISOString() },
+  ])
+
+  assert.equal(summary.skillCount, 3)
+  assert.equal(summary.progressInsight.label, 'Wide skill mix')
+  assert.match(summary.progressInsight.detail, /rotation across interests/)
+})
+
+test('buildPracticeProgressInsight prioritizes untagged proofs when signal quality is low', () => {
+  const insight = buildPracticeProgressInsight({
+    proofCount: 4,
+    taggedProofCount: 1,
+    untaggedProofCount: 3,
+    skillCount: 1,
+    topSkill: { skillName: 'Drums', count: 1 },
+    topSkillShare: 1,
+  })
+
+  assert.equal(insight.label, 'Improve the signal')
+  assert.match(insight.detail, /3 proofs are untagged/)
+})
+
+test('buildProgressShareText summarizes progress without exposing private media', () => {
+  const text = buildProgressShareText({
+    overview: {
+      proofCount: 12,
+      uniqueDayCount: 5,
+      proofsLast7Days: 3,
+      activeSkill: 'Hack Squat',
+    },
+    session: { practice_series: 'Hack Squat', video: '/private/proof.mp4' },
+  })
+
+  assert.match(text, /Logged a proof for Hack Squat/)
+  assert.match(text, /12 proofs across 5 proof days/)
+  assert.match(text, /3 proofs in the last 7 days/)
+  assert.match(text, /private video proof/)
+  assert.doesNotMatch(text, /private\/proof\.mp4/)
 })

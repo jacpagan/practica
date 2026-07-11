@@ -156,6 +156,7 @@ export const calculatePracticeProgress = (sessions = []) => {
 
   const proofDays = new Set()
   const skillCounts = new Map()
+  let untaggedProofCount = 0
   const recentProofs = sorted.slice(0, 6)
   const sevenDaysAgo = new Date()
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
@@ -171,6 +172,8 @@ export const calculatePracticeProgress = (sessions = []) => {
     const skill = String(session?.practice_series || '').trim()
     if (skill) {
       skillCounts.set(skill, (skillCounts.get(skill) || 0) + 1)
+    } else {
+      untaggedProofCount += 1
     }
   })
 
@@ -186,6 +189,19 @@ export const calculatePracticeProgress = (sessions = []) => {
   const skillProofCounts = Array.from(skillCounts.entries())
     .map(([skillName, count]) => ({ skillName, count }))
     .sort((left, right) => right.count - left.count || left.skillName.localeCompare(right.skillName))
+  const taggedProofCount = skillProofCounts.reduce((total, item) => total + item.count, 0)
+  const topSkill = skillProofCounts[0] || null
+  const topSkillShare = taggedProofCount > 0 && topSkill ? topSkill.count / taggedProofCount : 0
+  const progressInsight = buildPracticeProgressInsight({
+    proofCount,
+    proofsLast7Days,
+    skillCount: Array.from(skillCounts.keys()).length,
+    skillProofCounts,
+    taggedProofCount,
+    untaggedProofCount,
+    topSkill,
+    topSkillShare,
+  })
 
   return {
     activeSkill,
@@ -193,11 +209,89 @@ export const calculatePracticeProgress = (sessions = []) => {
     uniqueDayCount: uniqueDays.length,
     skillCount: Array.from(skillCounts.keys()).length,
     skillProofCounts,
+    taggedProofCount,
+    untaggedProofCount,
     proofsLast7Days,
     recentProofs,
     proofDays: uniqueDays,
     proofRecordedToday,
     latestProofAt: sorted[0]?.recorded_at || sorted[0]?.created_at || '',
+    progressInsight,
+  }
+}
+
+export const buildProgressShareText = ({
+  overview = {},
+  session = null,
+  appName = 'Practica',
+} = {}) => {
+  const proofCount = Number(overview?.proofCount || 0)
+  const proofDays = Number(overview?.uniqueDayCount || 0)
+  const recentProofs = Number(overview?.proofsLast7Days || 0)
+  const skillName = String(session?.practice_series || overview?.activeSkill || '').trim()
+  const title = skillName && skillName !== 'Your skill'
+    ? `Logged a proof for ${skillName}.`
+    : 'Logged a private proof.'
+  const proofLabel = proofCount === 1 ? 'proof' : 'proofs'
+  const dayLabel = proofDays === 1 ? 'proof day' : 'proof days'
+  const recentLabel = recentProofs === 1 ? 'proof' : 'proofs'
+
+  return [
+    title,
+    `${proofCount} ${proofLabel} across ${proofDays} ${dayLabel}.`,
+    `${recentProofs} ${recentLabel} in the last 7 days.`,
+    `${appName}: private video proof for building skills one rep at a time.`,
+  ].join(' ')
+}
+
+export const buildPracticeProgressInsight = ({
+  proofCount = 0,
+  proofsLast7Days = 0,
+  skillCount = 0,
+  skillProofCounts = [],
+  taggedProofCount = 0,
+  untaggedProofCount = 0,
+  topSkill = null,
+  topSkillShare = 0,
+} = {}) => {
+  if (proofCount <= 0) {
+    return {
+      label: 'No pattern yet',
+      detail: 'Record a few proofs first. The useful signal comes from repeated evidence, not a single count.',
+    }
+  }
+
+  if (untaggedProofCount > taggedProofCount && proofCount >= 3) {
+    return {
+      label: 'Improve the signal',
+      detail: `${untaggedProofCount} proofs are untagged. Add skill names when useful so your archive can show stronger patterns.`,
+    }
+  }
+
+  if (skillCount >= 3 && topSkillShare < 0.6) {
+    return {
+      label: 'Wide skill mix',
+      detail: `${skillCount} skills are active. Your data is showing rotation across interests, not failure to stick to one track.`,
+    }
+  }
+
+  if (topSkill && topSkillShare >= 0.6 && skillCount > 1) {
+    return {
+      label: `Current anchor: ${topSkill.skillName}`,
+      detail: `${Math.round(topSkillShare * 100)}% of tagged proofs are here. Use this as context, not a rule.`,
+    }
+  }
+
+  if (topSkill) {
+    return {
+      label: `Most evidence: ${topSkill.skillName}`,
+      detail: `${topSkill.count} ${topSkill.count === 1 ? 'proof' : 'proofs'} tagged here${proofsLast7Days ? `, with ${proofsLast7Days} recent` : ''}.`,
+    }
+  }
+
+  return {
+    label: 'Evidence saved',
+    detail: `${proofCount} ${proofCount === 1 ? 'proof is' : 'proofs are'} in your archive. Tag when a pattern would help you decide what to practice next.`,
   }
 }
 

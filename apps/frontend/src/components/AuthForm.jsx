@@ -24,7 +24,7 @@ function AuthForm({
   const [loading, setLoading] = useState(false)
 
   const title = contextTitle || 'Practica'
-  const subtitle = contextSubtitle || 'Record private proof of any skill you practice.'
+  const subtitle = contextSubtitle || 'Private video proof for building skills one rep at a time.'
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -61,6 +61,14 @@ function AuthForm({
         <h1 className="text-2xl font-semibold text-gray-900 text-center mb-1">{title}</h1>
 
         <p className="text-sm text-gray-400 text-center mb-8">{subtitle}</p>
+        {!embedded ? (
+          <div className="mb-6 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-center">
+            <p className="text-sm font-medium text-gray-900">Pick. Record. See progress. Repeat.</p>
+            <p className="mt-1 text-xs leading-5 text-gray-500">
+              A private proof archive for habits, lifts, music, rehab, sports, and everyday practice.
+            </p>
+          </div>
+        ) : null}
         {inviteCodeLocked && inviteCode ? (
           <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left">
             <p className="text-xs font-medium uppercase tracking-wide text-emerald-800">

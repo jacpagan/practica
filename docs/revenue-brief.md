@@ -86,6 +86,7 @@ Possible direction:
 - low-friction monthly personal plan
 - annual discount later
 - paid pilot before full self-serve billing
+- first manual test: ask invited members to pay $5-$10/month or $50/year for private archive, progress history, and the daily proof loop
 
 What matters more than the exact number:
 

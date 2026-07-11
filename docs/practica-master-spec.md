@@ -62,6 +62,7 @@ That wedge is narrow on purpose. It is easier to explain, recruit, and charge fo
 - optional skill or habit tags per proof
 - session detail and metadata editing
 - progress summaries from completed proof events
+- lightweight insights that turn proof data into useful interpretation
 - Record / Progress navigation
 - private authenticated legacy review flows where already shipped
 
@@ -84,8 +85,8 @@ The core loop is:
 2. do a tiny action
 3. record proof
 4. tag the skill if useful
-5. see progress
-6. repeat tomorrow
+5. see progress and insight from the evidence
+6. repeat when ready, with the same skill or a different one
 
 This loop is the product. Everything else should support it.
 
@@ -99,7 +100,8 @@ When the metronome is on, the recorder plays a simple click track (BPM, time sig
 2. A member can revisit prior takes in a private archive.
 3. A member can tag proofs across multiple skills or habits.
 4. A member can see effort-based progress where each saved proof counts.
-5. A member can continue the loop with another take.
+5. A member can get useful interpretation from their own practice data.
+6. A member can continue the loop with another take.
 
 ## Roles And Access Model
 
@@ -176,6 +178,7 @@ Current gaps:
 - member-led
 - proof before anything else
 - progress through repetition
+- data should create value and insight
 - low pressure
 - tiny actions
 - every effort matters
@@ -189,7 +192,7 @@ Preferred language:
 - member
 - skill
 - proof
-- daily proof
+- practice proof
 - progress
 - private archive
 

@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useRef } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import SessionListItem from './SessionListItem'
 import ActivityCalendar from './ActivityCalendar'
 import SkillSummaryCard from './SkillSummaryCard'
 import VideoThumbnail from './VideoThumbnail'
-import { buildSkillSummaries, buildTodayLoopState } from '../progressActivity'
-import { calculatePracticeProgress, fmtDate, reportClientEvent, toLocalDateKey } from '../utils'
+import { buildSkillSummaries } from '../progressActivity'
+import { buildProgressShareText, calculatePracticeProgress, fmtDate, reportClientEvent, toLocalDateKey } from '../utils'
 
 const formatCompactDateTime = (value) => {
   const date = new Date(value)
@@ -21,12 +21,11 @@ export default function ProgressView({
   highlightSession = null,
   onOpenSession,
   onOpenSkill,
-  onRecord,
 }) {
   const highlightRef = useRef(null)
+  const [shareStatus, setShareStatus] = useState('')
 
   const overview = useMemo(() => calculatePracticeProgress(sessions), [sessions])
-  const todayLoop = useMemo(() => buildTodayLoopState(sessions), [sessions])
   const skillSummaries = useMemo(() => buildSkillSummaries(sessions), [sessions])
   const taggedSummaries = useMemo(() => skillSummaries.filter((item) => !item.isUngrouped), [skillSummaries])
   const ungroupedSummary = useMemo(() => skillSummaries.find((item) => item.isUngrouped) || null, [skillSummaries])
@@ -57,18 +56,65 @@ export default function ProgressView({
     return sessions.find((session) => session?.id === highlightSession.id) || highlightSession
   }, [highlightSession, sessions])
 
-  const nextSkillName = todayLoop.nextSkillName
-  const primaryActionLabel = todayLoop.proofRecordedToday
-    ? 'Record another proof'
-    : (nextSkillName ? `Record ${nextSkillName} today` : 'Record today\'s proof')
-  const primaryActionDetail = todayLoop.proofRecordedToday
-    ? (todayLoop.todayProofCount > 1 ? `${todayLoop.todayProofCount} proofs saved today.` : 'Your proof is saved for today.')
-    : (nextSkillName
-        ? `${todayLoop.recommendedSkill?.proofCount || 0} ${todayLoop.recommendedSkill?.proofCount === 1 ? 'proof' : 'proofs'} already in this skill.`
-        : (todayLoop.totalProofCount > 0 ? 'Start with one tiny take and label it after recording.' : 'Your private archive starts with one tiny take.'))
+  const shareText = useMemo(() => buildProgressShareText({
+    overview,
+    session: justSavedSession || todayLatest || latestSession,
+  }), [justSavedSession, latestSession, overview, todayLatest])
 
-  const handlePrimaryRecord = () => {
-    onRecord?.({ skillName: nextSkillName })
+  const handleShareProgressCard = async () => {
+    const shareUrl = (() => {
+      try {
+        return window.location.origin || 'https://practica.jpagan.com'
+      } catch {
+        return 'https://practica.jpagan.com'
+      }
+    })()
+    const textWithUrl = `${shareText}\n${shareUrl}`
+    setShareStatus('')
+    reportClientEvent('progress_card_share_started', {
+      action: 'progress_card_share_started',
+      session_id: justSavedSession?.id || '',
+      proof_count: overview.proofCount,
+      proof_days: overview.uniqueDayCount,
+    })
+    try {
+      if (navigator?.share) {
+        await navigator.share({
+          title: 'Practica progress',
+          text: shareText,
+          url: shareUrl,
+        })
+        setShareStatus('Shared')
+        reportClientEvent('progress_card_shared', {
+          action: 'progress_card_shared',
+          channel: 'native_share',
+          session_id: justSavedSession?.id || '',
+        })
+        return
+      }
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(textWithUrl)
+        setShareStatus('Copied')
+        reportClientEvent('progress_card_shared', {
+          action: 'progress_card_shared',
+          channel: 'clipboard',
+          session_id: justSavedSession?.id || '',
+        })
+        return
+      }
+      throw new Error('Sharing is not available in this browser')
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        setShareStatus('')
+        return
+      }
+      setShareStatus('Could not share')
+      reportClientEvent('progress_card_share_failed', {
+        action: 'progress_card_share_failed',
+        reason: error?.message || 'unknown',
+        session_id: justSavedSession?.id || '',
+      })
+    }
   }
 
   useEffect(() => {
@@ -157,49 +203,28 @@ export default function ProgressView({
           </p>
         </div>
 
-        <section className="rounded-2xl border border-gray-900 bg-gray-950 p-4 text-white shadow-sm sm:p-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wide text-white/55">Next tiny proof</p>
-              <h3 className="mt-1 text-xl font-semibold tracking-tight">
-                {todayLoop.proofRecordedToday
-                  ? 'You showed up today.'
-                  : (nextSkillName ? `Continue ${nextSkillName}` : 'Capture one small rep')}
-              </h3>
-              <p className="mt-2 text-sm text-white/70">{primaryActionDetail}</p>
-            </div>
-            <button
-              type="button"
-              onClick={handlePrimaryRecord}
-              className="inline-flex w-full items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-gray-950 transition-colors hover:bg-gray-100 sm:w-auto"
-            >
-              {primaryActionLabel}
-            </button>
-          </div>
-          {overview.proofCount > 0 ? (
-            <div className="mt-4 grid grid-cols-3 gap-2 border-t border-white/10 pt-4 text-center">
-              <div>
-                <p className="text-lg font-semibold">{overview.proofCount}</p>
-                <p className="text-[11px] text-white/55">proofs</p>
-              </div>
-              <div>
-                <p className="text-lg font-semibold">{overview.uniqueDayCount}</p>
-                <p className="text-[11px] text-white/55">proof days</p>
-              </div>
-              <div>
-                <p className="text-lg font-semibold">{overview.proofsLast7Days}</p>
-                <p className="text-[11px] text-white/55">recent</p>
-              </div>
-            </div>
-          ) : null}
-        </section>
-
         {justSavedSession ? (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-            <p className="text-sm font-medium text-emerald-900">Done for today?</p>
-            <p className="mt-1 text-sm text-emerald-800">
-              Your proof is saved. Tap it to watch, or come back tomorrow for another take.
-            </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-medium text-emerald-900">Done for today?</p>
+                <p className="mt-1 text-sm text-emerald-800">
+                  Your proof is saved. Tap it to watch, or record another skill when useful.
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {shareStatus ? (
+                  <span className="text-xs font-medium text-emerald-800">{shareStatus}</span>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={handleShareProgressCard}
+                  className="inline-flex items-center justify-center rounded-full border border-emerald-700/20 bg-white px-3 py-2 text-xs font-semibold text-emerald-950 transition-colors hover:bg-emerald-100"
+                >
+                  Share progress card
+                </button>
+              </div>
+            </div>
           </div>
         ) : null}
 
@@ -252,8 +277,8 @@ export default function ProgressView({
             {taggedSummaries.length > 0 ? (
               <div className="space-y-3">
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Skills</p>
-                  <p className="mt-0.5 text-xs text-gray-500">Pick up where your latest proofs left off.</p>
+                  <p className="text-sm font-medium text-gray-900">Recent skills</p>
+                  <p className="mt-0.5 text-xs text-gray-500">Open one when you want continuity, or record something different.</p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {taggedSummaries.map((summary) => (
