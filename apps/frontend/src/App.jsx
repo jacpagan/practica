@@ -269,7 +269,7 @@ function AppContent() {
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-4 min-w-0">
             <button onClick={goProgress} className="inline-flex items-center" aria-label="Practica home">
-              <BrandLogo className="h-6 w-auto max-w-[160px]" />
+              <BrandLogo className="h-7 w-auto max-w-[184px]" />
             </button>
             <button
               onClick={goProgress}
