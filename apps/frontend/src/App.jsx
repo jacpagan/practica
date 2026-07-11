@@ -29,6 +29,7 @@ import { ToastProvider, useToast } from './components/Toast'
 import { ConfirmProvider, useConfirm } from './components/ConfirmDialog'
 import AuthForm from './components/AuthForm'
 import SessionUpload from './components/SessionUpload'
+import BrandLogo from './components/BrandLogo'
 // Inline header create buttons to avoid any chance of circular init
 const SessionDetail = React.lazy(() => import('./components/SessionDetail'))
 const ProgressView = React.lazy(() => import('./components/ProgressView'))
@@ -267,8 +268,8 @@ function AppContent() {
       <header className={`${view === 'detail' ? 'hidden' : isImmersiveMobileView ? 'hidden sm:block' : ''} border-b border-gray-100 bg-white px-4 py-4 sm:px-6`}>
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-4 min-w-0">
-            <button onClick={goProgress} className="text-lg font-semibold text-gray-900 tracking-tight">
-              Practica
+            <button onClick={goProgress} className="inline-flex items-center" aria-label="Practica home">
+              <BrandLogo className="h-5 w-auto max-w-[132px]" />
             </button>
             <button
               onClick={goProgress}

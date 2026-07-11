@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useAuth } from '../auth'
 import { reportClientError } from '../utils'
+import BrandLogo from './BrandLogo'
 import { useToast } from './Toast'
 
 function AuthForm({
@@ -58,7 +59,11 @@ function AuthForm({
   return (
     <div className={embedded ? 'w-full' : 'min-h-screen bg-white flex items-center justify-center px-4'}>
       <div className={`w-full max-w-sm ${embedded ? 'rounded-2xl border border-gray-200 bg-white px-6 py-6 shadow-sm' : ''}`}>
-        <h1 className="text-2xl font-semibold text-gray-900 text-center mb-1">{title}</h1>
+        {title === 'Practica' ? (
+          <BrandLogo className="mx-auto mb-3 h-8 w-auto max-w-[220px]" />
+        ) : (
+          <h1 className="text-2xl font-semibold text-gray-900 text-center mb-1">{title}</h1>
+        )}
 
         <p className="text-sm text-gray-400 text-center mb-8">{subtitle}</p>
         {!embedded ? (

@@ -1,4 +1,5 @@
 import React from 'react'
+import BrandLogo from './BrandLogo'
 
 function PrivacyPage({ onBack = null, signedIn = false }) {
   return (
@@ -11,6 +12,7 @@ function PrivacyPage({ onBack = null, signedIn = false }) {
         ) : null}
 
         <div className="space-y-3">
+          <BrandLogo className="h-6 w-auto max-w-[160px]" />
           <p className="text-xs uppercase tracking-wide text-gray-500">Privacy</p>
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Your private proof archive</h1>
           <p className="text-sm text-gray-600">Practica is built to keep your proofs private by default. You control what gets recorded, organized, and stored in your archive.</p>
