@@ -244,6 +244,42 @@ export const buildProgressShareText = ({
   ].join(' ')
 }
 
+export const buildSkillShareText = ({
+  skillName = '',
+  proofCount = 0,
+  proofDays = 0,
+  latestProofAt = '',
+  appName = 'Practica',
+} = {}) => {
+  const name = String(skillName || '').trim() || 'this skill'
+  const count = Number(proofCount || 0)
+  const days = Number(proofDays || 0)
+  const proofLabel = count === 1 ? 'proof' : 'proofs'
+  const dayLabel = days === 1 ? 'proof day' : 'proof days'
+  const latest = latestProofAt ? ` Latest proof: ${fmtDate(latestProofAt)}.` : ''
+
+  return [
+    `${name}: ${count} ${proofLabel} across ${days} ${dayLabel}.${latest}`,
+    `${appName}: private video proof for building skills one rep at a time.`,
+  ].join(' ')
+}
+
+export const buildProofShareText = ({
+  session = null,
+  appName = 'Practica',
+} = {}) => {
+  const title = String(session?.title || '').trim() || 'Proof'
+  const skill = String(session?.practice_series || '').trim()
+  const dateValue = session?.recorded_at || session?.created_at || ''
+  const dateText = dateValue ? ` on ${fmtDate(dateValue)}` : ''
+  const skillText = skill ? ` for ${skill}` : ''
+
+  return [
+    `Logged "${title}"${skillText}${dateText}.`,
+    `${appName}: private video proof for building skills one rep at a time.`,
+  ].join(' ')
+}
+
 export const buildPracticeProgressInsight = ({
   proofCount = 0,
   proofsLast7Days = 0,

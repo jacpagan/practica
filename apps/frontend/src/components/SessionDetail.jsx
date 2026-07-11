@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { fmtTimer, reportClientEvent, sessionPosterUrl, sessionVideoSources, videoUrl } from '../utils'
+import { buildProofShareText, fmtTimer, reportClientEvent, sessionPosterUrl, sessionVideoSources, videoUrl } from '../utils'
 import { useConfirm } from './ConfirmDialog'
 import { useToast } from './Toast'
 import SkillField from './SkillField'
@@ -93,6 +93,7 @@ function SessionDetail({
   const [videoPlaying, setVideoPlaying] = useState(false)
   const [videoFit, setVideoFit] = useState(() => readVideoFitMode())
   const [controlsVisible, setControlsVisible] = useState(true)
+  const [shareStatus, setShareStatus] = useState('')
   const gestureRef = useRef(null)
   const pagerOffsetRef = useRef(0)
   const controlsHideTimerRef = useRef(null)
@@ -395,6 +396,62 @@ function SessionDetail({
     event.stopPropagation()
     revealControls()
     detailsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+  }
+
+  const handleShareProof = async () => {
+    const shareText = buildProofShareText({ session })
+    const shareUrl = (() => {
+      try {
+        return window.location.href || window.location.origin || 'https://practica.jpagan.com'
+      } catch {
+        return 'https://practica.jpagan.com'
+      }
+    })()
+    const textWithUrl = `${shareText}\n${shareUrl}`
+    setShareStatus('')
+    reportClientEvent('proof_card_share_started', {
+      action: 'proof_card_share_started',
+      session_id: session?.id || '',
+      skill_name: session?.practice_series || '',
+    })
+    try {
+      if (navigator?.share) {
+        await navigator.share({
+          title: session?.title || 'Practica proof',
+          text: shareText,
+          url: shareUrl,
+        })
+        setShareStatus('Shared')
+        reportClientEvent('proof_card_shared', {
+          action: 'proof_card_shared',
+          channel: 'native_share',
+          session_id: session?.id || '',
+        })
+        return
+      }
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(textWithUrl)
+        setShareStatus('Copied')
+        reportClientEvent('proof_card_shared', {
+          action: 'proof_card_shared',
+          channel: 'clipboard',
+          session_id: session?.id || '',
+        })
+        return
+      }
+      throw new Error('Sharing is not available in this browser')
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        setShareStatus('')
+        return
+      }
+      setShareStatus('Could not share')
+      reportClientEvent('proof_card_share_failed', {
+        action: 'proof_card_share_failed',
+        reason: error?.message || 'unknown',
+        session_id: session?.id || '',
+      })
+    }
   }
 
   const resetGesture = () => {
@@ -846,6 +903,16 @@ function SessionDetail({
                     {session.duration_seconds ? fmtTimer(session.duration_seconds) : null}
                   </p>
                 ) : null}
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleShareProof}
+                    className="inline-flex items-center justify-center rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-900 transition-colors hover:bg-gray-50"
+                  >
+                    Share proof card
+                  </button>
+                  {shareStatus ? <span className="text-xs font-medium text-gray-500">{shareStatus}</span> : null}
+                </div>
               </div>
 
               {justUploaded ? (

@@ -5,7 +5,7 @@ globalThis.window = {
   location: { hostname: 'localhost' },
 }
 
-const { buildPracticeProgressInsight, buildProgressShareText, calculatePracticeProgress } = await import('./utils.js')
+const { buildPracticeProgressInsight, buildProgressShareText, buildProofShareText, buildSkillShareText, calculatePracticeProgress } = await import('./utils.js')
 
 test('calculatePracticeProgress marks when a proof was recorded today', () => {
   const today = new Date()
@@ -95,4 +95,33 @@ test('buildProgressShareText summarizes progress without exposing private media'
   assert.match(text, /3 proofs in the last 7 days/)
   assert.match(text, /private video proof/)
   assert.doesNotMatch(text, /private\/proof\.mp4/)
+})
+
+test('buildSkillShareText summarizes a skill without exposing proof media', () => {
+  const text = buildSkillShareText({
+    skillName: 'Hack Squat',
+    proofCount: 14,
+    proofDays: 6,
+    latestProofAt: '2026-07-10T12:00:00Z',
+  })
+
+  assert.match(text, /Hack Squat: 14 proofs across 6 proof days/)
+  assert.match(text, /Latest proof:/)
+  assert.match(text, /private video proof/)
+  assert.doesNotMatch(text, /mp4|media|processed/)
+})
+
+test('buildProofShareText summarizes one proof without exposing private media', () => {
+  const text = buildProofShareText({
+    session: {
+      title: 'Top set',
+      practice_series: 'Hack Squat',
+      recorded_at: '2026-07-10T12:00:00Z',
+      video_file: '/media/private/proof.mp4',
+    },
+  })
+
+  assert.match(text, /Logged "Top set" for Hack Squat/)
+  assert.match(text, /private video proof/)
+  assert.doesNotMatch(text, /media\/private|proof\.mp4/)
 })

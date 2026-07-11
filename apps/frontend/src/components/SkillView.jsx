@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import SessionListItem from './SessionListItem'
 import SkillPickerModal from './SkillPickerModal'
 import { useToast } from './Toast'
+import { buildSkillShareText, reportClientEvent, toLocalDateKey } from '../utils'
 
 const formatCompactDateTime = (value) => {
   const date = new Date(value)
@@ -14,6 +15,7 @@ const formatCompactDateTime = (value) => {
 function SkillView({ skillName = '', sessions = [], sessionsLoading = false, token = '', onBack, onOpenSession, onRecord }) {
   const [renamingSkill, setRenamingSkill] = useState('')
   const [saving, setSaving] = useState(false)
+  const [shareStatus, setShareStatus] = useState('')
   const toast = useToast()
   const skillOptions = useMemo(() => {
     const byCanonicalName = new Map()
@@ -38,6 +40,76 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
   }, [skillName, sessions])
 
   const latestSession = skillSessions[0] || null
+  const skillProofDays = useMemo(() => {
+    const days = new Set()
+    skillSessions.forEach((session) => {
+      const key = toLocalDateKey(session.recorded_at || session.created_at)
+      if (key) days.add(key)
+    })
+    return days.size
+  }, [skillSessions])
+  const skillShareText = useMemo(() => buildSkillShareText({
+    skillName,
+    proofCount: skillSessions.length,
+    proofDays: skillProofDays,
+    latestProofAt: latestSession?.recorded_at || latestSession?.created_at || '',
+  }), [latestSession, skillName, skillProofDays, skillSessions.length])
+
+  const handleShareSkill = async () => {
+    const shareUrl = (() => {
+      try {
+        return window.location.href || window.location.origin || 'https://practica.jpagan.com'
+      } catch {
+        return 'https://practica.jpagan.com'
+      }
+    })()
+    const textWithUrl = `${skillShareText}\n${shareUrl}`
+    setShareStatus('')
+    reportClientEvent('skill_card_share_started', {
+      action: 'skill_card_share_started',
+      skill_name: skillName,
+      proof_count: skillSessions.length,
+      proof_days: skillProofDays,
+    })
+    try {
+      if (navigator?.share) {
+        await navigator.share({
+          title: `${skillName || 'Skill'} progress`,
+          text: skillShareText,
+          url: shareUrl,
+        })
+        setShareStatus('Shared')
+        reportClientEvent('skill_card_shared', {
+          action: 'skill_card_shared',
+          channel: 'native_share',
+          skill_name: skillName,
+        })
+        return
+      }
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(textWithUrl)
+        setShareStatus('Copied')
+        reportClientEvent('skill_card_shared', {
+          action: 'skill_card_shared',
+          channel: 'clipboard',
+          skill_name: skillName,
+        })
+        return
+      }
+      throw new Error('Sharing is not available in this browser')
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        setShareStatus('')
+        return
+      }
+      setShareStatus('Could not share')
+      reportClientEvent('skill_card_share_failed', {
+        action: 'skill_card_share_failed',
+        reason: error?.message || 'unknown',
+        skill_name: skillName,
+      })
+    }
+  }
 
   if (sessionsLoading) {
     return (
@@ -78,13 +150,27 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
                 : 'No proofs yet'}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => onRecord?.(skillName)}
-            className="inline-flex w-full items-center justify-center rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-gray-800 sm:w-auto"
-          >
-            Record next proof
-          </button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <button
+              type="button"
+              onClick={() => onRecord?.(skillName)}
+              className="inline-flex w-full items-center justify-center rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-gray-800 sm:w-auto"
+            >
+              Record for this skill
+            </button>
+            {skillSessions.length > 0 ? (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleShareSkill}
+                  className="inline-flex w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-900 transition-colors hover:bg-gray-50 sm:w-auto"
+                >
+                  Share skill card
+                </button>
+                {shareStatus ? <span className="text-xs font-medium text-gray-500">{shareStatus}</span> : null}
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {skillSessions.length === 0 ? (
