@@ -277,7 +277,7 @@ export default function ProgressView({
             {taggedSummaries.length > 0 ? (
               <div className="space-y-3">
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Recent skills</p>
+                  <p className="text-sm font-medium text-gray-900">Skills</p>
                   <p className="mt-0.5 text-xs text-gray-500">Open one when you want continuity, or record something different.</p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
