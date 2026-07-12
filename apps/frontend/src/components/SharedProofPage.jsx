@@ -17,6 +17,35 @@ function SharedHeader() {
   )
 }
 
+function formatProofDate(value) {
+  if (!value) return ''
+  try {
+    return new Date(value).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  } catch {
+    return ''
+  }
+}
+
+function SharedCta() {
+  return (
+    <section className="border-t border-gray-100 py-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-gray-950">Build your own proof archive</p>
+          <p className="mt-1 text-sm text-gray-500">Record the work, keep the evidence, share only what you choose.</p>
+        </div>
+        <a href="/today" className="inline-flex items-center justify-center rounded-full bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800">
+          Open Practica
+        </a>
+      </div>
+    </section>
+  )
+}
+
 function SharedVideo({ session }) {
   const sources = useMemo(() => sessionVideoSources(session), [session])
   const poster = sessionPosterUrl(session)
@@ -83,6 +112,7 @@ export function SharedProofPage({ shareToken = '' }) {
             </div>
             <SharedVideo session={session} />
             {session?.description ? <p className="text-sm leading-6 text-gray-600">{session.description}</p> : null}
+            <SharedCta />
           </div>
         )}
       </main>
@@ -110,6 +140,14 @@ export function SharedSkillPage({ shareToken = '' }) {
     return () => { cancelled = true }
   }, [shareToken])
 
+  const sessions = state.sessions
+  const latestSession = sessions[0] || null
+  const olderSessions = sessions.slice(1)
+  const proofCount = state.skill?.proof_count || sessions.length
+  const proofDays = state.skill?.proof_days || 0
+  const ownerName = state.skill?.owner_display_name || 'Someone'
+  const skillName = state.skill?.name || 'this skill'
+
   return (
     <div className="min-h-screen bg-white">
       <SharedHeader />
@@ -122,29 +160,48 @@ export function SharedSkillPage({ shareToken = '' }) {
             <p className="mt-1 text-sm text-gray-500">{state.error}</p>
           </div>
         ) : (
-          <div className="space-y-5">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Shared skill</p>
-              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-gray-950">{state.skill?.name || 'Practica skill'}</h1>
-              <p className="mt-2 text-sm text-gray-500">
-                {state.skill?.proof_count || state.sessions.length} proofs
-                {state.skill?.proof_days ? ` across ${state.skill.proof_days} proof days` : ''}
-                {state.skill?.owner_display_name ? ` · ${state.skill.owner_display_name}` : ''}
-              </p>
-            </div>
-            <div className="space-y-4">
-              {state.sessions.map((session) => (
-                <article key={session.id} className="rounded-2xl border border-gray-200 p-3 sm:p-4">
-                  <div className="mb-3">
-                    <h2 className="text-sm font-semibold text-gray-950">{session.title || 'Practica proof'}</h2>
-                    <p className="mt-1 text-xs text-gray-500">
-                      {session.recorded_at ? new Date(session.recorded_at).toLocaleString(undefined, { hour12: undefined }) : ''}
-                    </p>
+          <div className="space-y-8">
+            <section className="space-y-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Shared skill</p>
+                <h1 className="mt-2 text-3xl font-semibold tracking-tight text-gray-950 sm:text-4xl">
+                  {ownerName} shared {proofCount} {proofCount === 1 ? 'proof' : 'proofs'} of {skillName}
+                </h1>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-gray-500">
+                  {latestSession ? `Latest proof recorded ${formatProofDate(latestSession.recorded_at)}.` : 'This skill share is ready.'}
+                  {proofDays ? ` ${proofDays} ${proofDays === 1 ? 'proof day' : 'proof days'} included.` : ''}
+                </p>
+              </div>
+              {latestSession ? (
+                <article className="rounded-2xl border border-gray-900 bg-gray-950 p-3 text-white shadow-sm sm:p-4">
+                  <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-white/50">Watch newest proof first</p>
+                      <h2 className="mt-1 text-lg font-semibold">{latestSession.title || 'Practica proof'}</h2>
+                    </div>
+                    <p className="text-xs text-white/55">{formatProofDate(latestSession.recorded_at)}</p>
                   </div>
-                  <SharedVideo session={session} />
+                  <SharedVideo session={latestSession} />
                 </article>
-              ))}
-            </div>
+              ) : null}
+            </section>
+            {olderSessions.length ? (
+              <section className="space-y-3">
+                <h2 className="text-sm font-semibold text-gray-950">Earlier proofs</h2>
+                <div className="space-y-4">
+                  {olderSessions.map((session) => (
+                    <article key={session.id} className="rounded-2xl border border-gray-200 p-3 sm:p-4">
+                      <div className="mb-3">
+                        <h3 className="text-sm font-semibold text-gray-950">{session.title || 'Practica proof'}</h3>
+                        <p className="mt-1 text-xs text-gray-500">{formatProofDate(session.recorded_at)}</p>
+                      </div>
+                      <SharedVideo session={session} />
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+            <SharedCta />
           </div>
         )}
       </main>
