@@ -7,6 +7,7 @@ from rest_framework import serializers
 from .models import (
     Profile, Session, Chapter, VideoFeedback,
     SessionAsset,
+    ProofChallengeResponse,
     ReviewLink,
     SkillShareLink,
     ReviewRequest,
@@ -235,6 +236,7 @@ class SessionSerializer(serializers.ModelSerializer):
     chapters = ChapterSerializer(many=True, read_only=True)
     video_feedback = VideoFeedbackSerializer(many=True, read_only=True)
     active_review_link = serializers.SerializerMethodField()
+    challenge_responses = serializers.SerializerMethodField()
     tag_names = serializers.SerializerMethodField()
     chapter_count = serializers.SerializerMethodField()
     video_feedback_count = serializers.SerializerMethodField()
@@ -263,7 +265,7 @@ class SessionSerializer(serializers.ModelSerializer):
                   'ml_training_consent_revoked_at', 'ml_training_consent_revocation_source',
                   'tag_names', 'assets',
                   'chapters', 'video_feedback', 'active_review_link', 'chapter_count', 'video_feedback_count', 'owner',
-                  'can_edit']
+                  'challenge_responses', 'can_edit']
         read_only_fields = [
             'id', 'recorded_at', 'created_at', 'updated_at',
             'ml_training_enabled', 'ml_training_consent_source', 'ml_training_consent_at',
@@ -291,6 +293,20 @@ class SessionSerializer(serializers.ModelSerializer):
         if not link:
             return None
         return ReviewLinkSerializer(link, context=self.context).data
+
+    def get_challenge_responses(self, obj):
+        user = self._request_user()
+        if not user or not (user.is_staff or obj.user_id == user.id):
+            return []
+
+        responses = obj.challenge_responses_received.select_related(
+            'responder',
+            'responder__profile',
+            'response_session',
+            'response_session__user',
+            'response_session__user__profile',
+        ).prefetch_related('response_session__assets').order_by('-created_at')
+        return ProofChallengeResponseSerializer(responses, many=True, context=self.context).data
 
     def get_owner(self, obj):
         if obj.user:
@@ -374,6 +390,21 @@ class PublicSessionSerializer(serializers.ModelSerializer):
 
     def get_poster_image_url(self, obj):
         return _session_poster_asset_url(obj, self.context)
+
+
+class ProofChallengeResponseSerializer(serializers.ModelSerializer):
+    responder_display_name = serializers.SerializerMethodField()
+    response_session = PublicSessionSerializer(read_only=True)
+
+    class Meta:
+        model = ProofChallengeResponse
+        fields = ['id', 'responder_display_name', 'response_session', 'created_at']
+        read_only_fields = fields
+
+    def get_responder_display_name(self, obj):
+        if hasattr(obj.responder, 'profile') and obj.responder.profile.display_name:
+            return obj.responder.profile.display_name
+        return obj.responder.username
 
 
 class ReviewLinkSerializer(serializers.ModelSerializer):

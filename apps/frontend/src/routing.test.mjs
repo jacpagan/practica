@@ -17,8 +17,10 @@ test('parseRoute keeps progress aliases on the Today view', () => {
 })
 
 test('parseRoute keeps challenge recorder skill context', () => {
-  const route = parseRoute('/record', '?skill=Shoulder%20press')
+  const route = parseRoute('/record', '?skill=Shoulder%20press&challenge=review-token-123')
 
   assert.equal(route.view, 'record')
   assert.equal(route.seriesName, 'Shoulder press')
+  assert.equal(route.challengeToken, 'review-token-123')
+  assert.equal(routePath(route), '/record?skill=Shoulder+press&challenge=review-token-123')
 })

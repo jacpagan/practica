@@ -8,7 +8,7 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
-from videos.models import ProductEventLog, Profile, ReviewLink, ReviewRequest, Session, SkillShareLink, VideoFeedback
+from videos.models import ProductEventLog, Profile, ProofChallengeResponse, ReviewLink, ReviewRequest, Session, SkillShareLink, VideoFeedback
 
 
 class ReviewFeedbackApiTests(APITestCase):
@@ -406,6 +406,57 @@ class ReviewFeedbackApiTests(APITestCase):
         self.assertEqual(response.data['sessions'][0]['id'], self.session.id)
         returned_ids = {item['id'] for item in response.data['sessions']}
         self.assertNotIn(other_session.id, returned_ids)
+
+    def test_other_account_can_register_challenge_response_proof(self):
+        response_session = Session.objects.create(
+            user=self.reviewer,
+            title='My shoulder press response',
+            practice_series='Shoulder press',
+            video_file='sessions/reviewer-response.mp4',
+            processing_status=Session.STATUS_READY,
+        )
+        self._auth(self.reviewer)
+
+        response = self.client.post(
+            f'/api/review/{self.link.token}/responses/',
+            {'response_session_id': response_session.id},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['response_session']['id'], response_session.id)
+        self.assertEqual(response.data['responder_display_name'], 'Helpful Reviewer')
+        challenge_response = ProofChallengeResponse.objects.get()
+        self.assertEqual(challenge_response.source_session_id, self.session.id)
+        self.assertEqual(challenge_response.response_session_id, response_session.id)
+        self.assertEqual(challenge_response.responder_id, self.reviewer.id)
+
+        event_names = set(ProductEventLog.objects.values_list('event_name', flat=True))
+        self.assertIn('proof_challenge_response_created', event_names)
+
+    def test_source_owner_can_see_challenge_responses_on_proof_detail(self):
+        response_session = Session.objects.create(
+            user=self.reviewer,
+            title='My shoulder press response',
+            practice_series='Shoulder press',
+            video_file='sessions/reviewer-response.mp4',
+            processing_status=Session.STATUS_READY,
+        )
+        ProofChallengeResponse.objects.create(
+            challenge_link=self.link,
+            source_session=self.session,
+            responder=self.reviewer,
+            response_session=response_session,
+        )
+        self._auth(self.owner)
+
+        response = self.client.get(f'/api/sessions/{self.session.id}/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['challenge_responses']), 1)
+        challenge_response = response.data['challenge_responses'][0]
+        self.assertEqual(challenge_response['response_session']['id'], response_session.id)
+        self.assertEqual(challenge_response['responder_display_name'], 'Helpful Reviewer')
 
     def test_owner_can_revoke_private_share_link_via_delete_share_route(self):
         self._auth(self.owner)

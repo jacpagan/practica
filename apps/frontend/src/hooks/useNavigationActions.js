@@ -6,6 +6,7 @@ export const useNavigationActions = ({
   confirm,
   currentPathRef,
   setRouteDate,
+  setRouteChallengeToken,
   setRouteSeriesName,
   setRouteSessionId,
   setView,
@@ -16,13 +17,14 @@ export const useNavigationActions = ({
     setRouteSessionId(nextRoute.sessionId ?? null)
     setRouteSeriesName(nextRoute.seriesName || '')
     setRouteDate(nextRoute.date || '')
+    setRouteChallengeToken(nextRoute.challengeToken || '')
     const path = routePath(nextRoute)
     const current = window.location.pathname + (window.location.search || '')
     if (path !== current) {
       if (replace) window.history.replaceState(null, '', path)
       else window.history.pushState(null, '', path)
     }
-  }, [setRouteDate, setRouteSeriesName, setRouteSessionId, setView])
+  }, [setRouteChallengeToken, setRouteDate, setRouteSeriesName, setRouteSessionId, setView])
 
   const requestAbortActiveUpload = useCallback(() => {
     try { uploadGuardRef.current.abort?.() } catch {}

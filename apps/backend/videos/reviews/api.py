@@ -8,12 +8,12 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from videos.models import FeedbackTemplate, ReviewLink, ReviewRequest, ReviewerInvite, ReviewerRosterMembership, Session, SkillShareLink, VideoFeedback
+from videos.models import FeedbackTemplate, ProofChallengeResponse, ReviewLink, ReviewRequest, ReviewerInvite, ReviewerRosterMembership, Session, SkillShareLink, VideoFeedback
 from videos.reviews.presentation import public_review_request_preview, review_request_forbidden_response
 from videos.reviews.queries import filter_review_requests_for_role, review_request_visible_to_user, reviewer_can_respond, visible_review_requests_qs
 from videos.reviews.services import claim_reviewer_invite_by_code, create_review_request, create_reviewer_invite, mark_review_request_viewed, revoke_reviewer_invite, transition_review_request_status
 from videos.reviews.services import mark_review_request_opened, mark_review_request_responded
-from videos.serializers import FeedbackTemplateSerializer, MemberConnectionSerializer, PublicSessionSerializer, ReviewerInviteSerializer, ReviewLinkSerializer, ReviewRequestSerializer, ReviewVideoFeedbackSerializer, SkillShareLinkSerializer, UserSummarySerializer
+from videos.serializers import FeedbackTemplateSerializer, MemberConnectionSerializer, ProofChallengeResponseSerializer, PublicSessionSerializer, ReviewerInviteSerializer, ReviewLinkSerializer, ReviewRequestSerializer, ReviewVideoFeedbackSerializer, SkillShareLinkSerializer, UserSummarySerializer
 from videos.services.feedback_video_processing import prepare_feedback_video_upload
 from videos.telemetry import log_product_event
 from videos.video_uploads import is_allowed_video_upload
@@ -391,6 +391,54 @@ def review_link_feedback(request, token):
         request,
         session=link.session,
         review_request=review_request,
+    )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def review_link_challenge_response(request, token):
+    link, error_reason = _resolve_review_link(token)
+    if error_reason:
+        return _review_link_error_response(error_reason)
+
+    raw_session_id = request.data.get('response_session_id') or request.data.get('session_id')
+    try:
+        response_session_id = int(raw_session_id)
+    except (TypeError, ValueError):
+        return Response({'error': 'response_session_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    response_session = Session.objects.filter(pk=response_session_id, user=request.user).first()
+    if not response_session:
+        return Response({'error': 'Response proof not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    existing = ProofChallengeResponse.objects.filter(response_session=response_session).first()
+    if existing:
+        if existing.challenge_link_id != link.id:
+            return Response(
+                {'error': 'This proof is already a response to another challenge.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return Response(ProofChallengeResponseSerializer(existing, context={'request': request}).data, status=status.HTTP_200_OK)
+
+    challenge_response = ProofChallengeResponse.objects.create(
+        challenge_link=link,
+        source_session=link.session,
+        responder=request.user,
+        response_session=response_session,
+    )
+    log_product_event(
+        logger,
+        request,
+        event_name='proof_challenge_response_created',
+        extra={
+            'action': 'proof_challenge_response_created',
+            'source_session_id': link.session_id,
+            'response_session_id': response_session.id,
+        },
+    )
+    return Response(
+        ProofChallengeResponseSerializer(challenge_response, context={'request': request}).data,
+        status=status.HTTP_201_CREATED,
     )
 
 

@@ -387,6 +387,26 @@ class SkillShareLink(models.Model):
         return f"SkillShareLink {self.token} owner={self.owner_id} skill={self.practice_series}"
 
 
+class ProofChallengeResponse(models.Model):
+    """A member-owned proof recorded in response to a shared proof challenge."""
+
+    challenge_link = models.ForeignKey(ReviewLink, on_delete=models.CASCADE, related_name='challenge_responses')
+    source_session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='challenge_responses_received')
+    responder = models.ForeignKey(User, on_delete=models.CASCADE, related_name='proof_challenge_responses')
+    response_session = models.OneToOneField(Session, on_delete=models.CASCADE, related_name='challenge_response_submission')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['source_session', 'created_at'], name='challenge_source_created_idx'),
+            models.Index(fields=['responder', 'created_at'], name='challenge_resp_created_idx'),
+        ]
+
+    def __str__(self):
+        return f"ProofChallengeResponse source={self.source_session_id} response={self.response_session_id}"
+
+
 class ReviewerRosterMembership(models.Model):
     """A lightweight trusted-reviewer relationship for repeat async feedback workflows."""
 

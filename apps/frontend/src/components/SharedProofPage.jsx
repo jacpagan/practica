@@ -32,8 +32,12 @@ function formatProofDate(value) {
 
 function SharedCta({ session = null, mode = 'archive' }) {
   const skill = String(session?.practice_series || '').trim()
-  const recordHref = skill ? `/record?skill=${encodeURIComponent(skill)}` : '/record'
   const isChallenge = mode === 'challenge'
+  const recordParams = new URLSearchParams()
+  if (skill) recordParams.set('skill', skill)
+  if (session?.share_token) recordParams.set('challenge', session.share_token)
+  const recordQuery = recordParams.toString()
+  const recordHref = recordQuery ? `/record?${recordQuery}` : '/record'
   return (
     <section className="border-t border-gray-100 py-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -121,7 +125,7 @@ export function SharedProofPage({ shareToken = '' }) {
             </div>
             <SharedVideo session={session} />
             {session?.description ? <p className="text-sm leading-6 text-gray-600">{session.description}</p> : null}
-            <SharedCta session={session} mode="challenge" />
+            <SharedCta session={{ ...session, share_token: shareToken }} mode="challenge" />
           </div>
         )}
       </main>

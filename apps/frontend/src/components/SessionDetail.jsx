@@ -59,6 +59,35 @@ function IconFillFrame({ className = 'h-5 w-5' }) {
   )
 }
 
+function ChallengeResponseCard({ response }) {
+  const responseSession = response?.response_session
+  const sources = sessionVideoSources(responseSession)
+  const poster = sessionPosterUrl(responseSession)
+  if (!responseSession) return null
+
+  return (
+    <article className="rounded-2xl border border-gray-200 bg-white p-3">
+      <div className="mb-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Response proof</p>
+        <h3 className="mt-1 text-sm font-semibold text-gray-950">{responseSession.title || 'Challenge response'}</h3>
+        <p className="mt-1 text-xs text-gray-500">
+          {response.responder_display_name ? `${response.responder_display_name} · ` : ''}
+          {responseSession.recorded_at ? new Date(responseSession.recorded_at).toLocaleString(undefined, { hour12: undefined }) : ''}
+        </p>
+      </div>
+      {sources.length ? (
+        <video className="aspect-video w-full rounded-xl bg-black object-contain" controls playsInline preload="metadata" poster={poster || undefined}>
+          {sources.map((src) => <source key={src} src={src} />)}
+        </video>
+      ) : (
+        <div className="flex aspect-video items-center justify-center rounded-xl bg-gray-100 text-sm text-gray-500">
+          Response playback is not available yet.
+        </div>
+      )}
+    </article>
+  )
+}
+
 function SessionDetail({
   session: initialSession,
   sessions = [],
@@ -99,6 +128,7 @@ function SessionDetail({
   const controlsHideTimerRef = useRef(null)
   const authHeaders = useMemo(() => (token ? { Authorization: `Token ${token}` } : {}), [token])
   const canEdit = Boolean(session?.can_edit)
+  const challengeResponses = Array.isArray(session?.challenge_responses) ? session.challenge_responses : []
   const returnRouteView = String(returnRoute?.view || '').trim()
   const returnsToSkill = returnRouteView === 'skill' && String(returnRoute?.seriesName || '').trim().length > 0
   const backLabel = returnsToSkill ? 'Back to skill' : 'Back to progress'
@@ -962,6 +992,22 @@ function SessionDetail({
               ) : null}
 
               {session.description ? <p className="text-sm text-gray-600">{session.description}</p> : null}
+
+              {challengeResponses.length ? (
+                <section className="space-y-3 rounded-2xl border border-gray-100 bg-gray-50 p-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Challenge responses</p>
+                    <h2 className="mt-1 text-sm font-semibold text-gray-950">
+                      {challengeResponses.length} {challengeResponses.length === 1 ? 'person recorded' : 'people recorded'} their version
+                    </h2>
+                  </div>
+                  <div className="space-y-3">
+                    {challengeResponses.map((response) => (
+                      <ChallengeResponseCard key={response.id} response={response} />
+                    ))}
+                  </div>
+                </section>
+              ) : null}
 
               {session.processing_status === 'failed' ? (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">

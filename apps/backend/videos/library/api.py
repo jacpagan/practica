@@ -85,6 +85,8 @@ class SessionViewSet(SessionMediaActionsMixin, viewsets.ModelViewSet):
         qs = visible_sessions_qs(self.request.user).prefetch_related(
             'chapters', 'chapters__exercise',
             'video_feedback', 'video_feedback__user', 'video_feedback__user__profile',
+            'challenge_responses_received', 'challenge_responses_received__responder', 'challenge_responses_received__responder__profile',
+            'challenge_responses_received__response_session', 'challenge_responses_received__response_session__assets',
             'last_seen_by', 'tags', 'assets',
         ).select_related('user', 'user__profile')
 

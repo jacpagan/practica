@@ -2,6 +2,7 @@ export const parseRoute = (pathname, search = '') => {
   const params = new URLSearchParams(search || '')
   const date = (params.get('date') || '').trim()
   const skill = (params.get('skill') || '').trim()
+  const challengeToken = (params.get('challenge') || '').trim()
   if (pathname === '/' || pathname === '/today') {
     return { view: 'progress', sessionId: null, date }
   }
@@ -17,7 +18,7 @@ export const parseRoute = (pathname, search = '') => {
     return { view: 'progress', sessionId: null, date }
   }
   if (pathname === '/upload') return { view: 'upload', sessionId: null }
-  if (pathname === '/record' || pathname === '/recording') return { view: 'record', sessionId: null, seriesName: skill }
+  if (pathname === '/record' || pathname === '/recording') return { view: 'record', sessionId: null, seriesName: skill, challengeToken }
   const seriesMatch = pathname.match(/^\/(skill|series)\/(.+)$/)
   if (seriesMatch) return { view: 'skill', sessionId: null, seriesName: decodeURIComponent(seriesMatch[2]) }
   const sessionMatch = pathname.match(/^\/sessions\/(\d+)$/)
@@ -25,7 +26,7 @@ export const parseRoute = (pathname, search = '') => {
   return { view: 'progress', sessionId: null, date }
 }
 
-export const routePath = ({ view, sessionId, seriesName, date, shareToken }) => {
+export const routePath = ({ view, sessionId, seriesName, date, shareToken, challengeToken }) => {
   if (view === 'sharedProof' && shareToken) return `/r/${encodeURIComponent(shareToken)}`
   if (view === 'sharedSkill' && shareToken) return `/s/${encodeURIComponent(shareToken)}`
   if (view === 'privacy') return '/privacy'
@@ -33,7 +34,13 @@ export const routePath = ({ view, sessionId, seriesName, date, shareToken }) => 
     return date ? `/today?date=${encodeURIComponent(date)}` : '/today'
   }
   if (view === 'upload') return '/upload'
-  if (view === 'record') return '/record'
+  if (view === 'record') {
+    const params = new URLSearchParams()
+    if (seriesName) params.set('skill', seriesName)
+    if (challengeToken) params.set('challenge', challengeToken)
+    const query = params.toString()
+    return query ? `/record?${query}` : '/record'
+  }
   if (view === 'skill' && seriesName) return `/skill/${encodeURIComponent(seriesName)}`
   if (view === 'detail' && sessionId) return `/sessions/${sessionId}`
   if (view === 'calendar') return '/today'

@@ -25,6 +25,7 @@ import { useUploadReturnRouting } from './hooks/useUploadReturnRouting'
 import { useUserMenuActions } from './hooks/useUserMenuActions'
 import { useViewDataRefresh } from './hooks/useViewDataRefresh'
 import { parseRoute, routePath } from './routing'
+import { reportClientEvent } from './utils'
 import { ToastProvider, useToast } from './components/Toast'
 import { ConfirmProvider, useConfirm } from './components/ConfirmDialog'
 import AuthForm from './components/AuthForm'
@@ -48,6 +49,7 @@ function AppContent() {
   const [routeSessionId, setRouteSessionId] = useState(initialRoute.sessionId)
   const [routeSeriesName, setRouteSeriesName] = useState(initialRoute.seriesName || '')
   const [routeDate, setRouteDate] = useState(initialRoute.date || '')
+  const [routeChallengeToken, setRouteChallengeToken] = useState(initialRoute.challengeToken || '')
   const [routeShareToken] = useState(initialRoute.shareToken || '')
   const [selectedSession, setSelectedSession] = useState(null)
   const [sessions, setSessions] = useState([])
@@ -57,6 +59,7 @@ function AppContent() {
   const [justUploadedSessionId, setJustUploadedSessionId] = useState(null)
   const [justUploadedSession, setJustUploadedSession] = useState(null)
   const [pendingPracticeSeries, setPendingPracticeSeries] = useState(initialRoute.seriesName || '')
+  const [pendingChallengeToken, setPendingChallengeToken] = useState(initialRoute.challengeToken || '')
   const [pendingUploadReturnRoute, setPendingUploadReturnRoute] = useState({
     view: initialRoute.view === 'skill' && initialRoute.seriesName ? 'skill' : 'progress',
     sessionId: null,
@@ -79,6 +82,7 @@ function AppContent() {
       seriesName: routeSeriesName,
       date: routeDate,
       shareToken: routeShareToken,
+      challengeToken: routeChallengeToken,
     },
   })
 
@@ -92,6 +96,7 @@ function AppContent() {
     confirm,
     currentPathRef,
     setRouteDate,
+    setRouteChallengeToken,
     setRouteSeriesName,
     setRouteSessionId,
     setView,
@@ -105,6 +110,7 @@ function AppContent() {
     routeDate,
     routeSeriesName,
     routeSessionId,
+    routeChallengeToken,
     view,
   })
 
@@ -116,6 +122,7 @@ function AppContent() {
       seriesName: routeSeriesName,
       date: routeDate,
       shareToken: routeShareToken,
+      challengeToken: routeChallengeToken,
     },
   })
 
@@ -201,6 +208,49 @@ function AppContent() {
     setPendingUploadReturnRoute,
     setSelectedSession,
   })
+
+  useEffect(() => {
+    if (view !== 'record') return
+    setPendingPracticeSeries(routeSeriesName || '')
+    setPendingChallengeToken(routeChallengeToken || '')
+  }, [routeChallengeToken, routeSeriesName, view])
+
+  const registerChallengeResponse = useCallback(async (session) => {
+    const challengeToken = String(pendingChallengeToken || '').trim()
+    if (!challengeToken || !session?.id || !token) return
+    try {
+      const response = await fetch(`/api/review/${encodeURIComponent(challengeToken)}/responses/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Token ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ response_session_id: session.id }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data?.error || 'Could not attach challenge response')
+      toast.success('Challenge response saved')
+      reportClientEvent('proof_challenge_response_registered', {
+        action: 'proof_challenge_response_registered',
+        session_id: session.id,
+      })
+    } catch (error) {
+      toast.error(error?.message || 'Could not attach challenge response')
+      reportClientEvent('proof_challenge_response_register_failed', {
+        action: 'proof_challenge_response_register_failed',
+        session_id: session?.id || '',
+        reason: error?.message || 'unknown',
+      })
+    } finally {
+      setPendingChallengeToken('')
+      setRouteChallengeToken('')
+    }
+  }, [pendingChallengeToken, toast, token])
+
+  const handleProofUploadComplete = useCallback(async (session) => {
+    await registerChallengeResponse(session)
+    handleUploadComplete(session)
+  }, [handleUploadComplete, registerChallengeResponse])
 
   useViewDataRefresh({
     loadSessions,
@@ -372,7 +422,7 @@ function AppContent() {
           <SessionUpload
             token={token}
             skillOptions={skillOptions}
-            onComplete={handleUploadComplete}
+            onComplete={handleProofUploadComplete}
             onCancel={({ bypassUploadGuard = false } = {}) => {
               const nextRoute = pendingUploadReturnRoute?.view
                 ? pendingUploadReturnRoute
@@ -397,10 +447,12 @@ function AppContent() {
             sessions={sessions}
             onCancel={() => {
               setPendingPracticeSeries('')
+              setPendingChallengeToken('')
+              setRouteChallengeToken('')
               setPendingUploadReturnRoute({ view: 'progress', sessionId: null, seriesName: '' })
               goProgress()
             }}
-            onComplete={handleUploadComplete}
+            onComplete={handleProofUploadComplete}
           />
         )}
 
