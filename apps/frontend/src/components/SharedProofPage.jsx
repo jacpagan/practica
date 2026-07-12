@@ -7,7 +7,7 @@ function SharedHeader() {
     <header className="border-b border-gray-100 bg-white px-4 py-4 sm:px-6">
       <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
         <a href="/today" className="inline-flex items-center" aria-label="Practica home">
-          <BrandLogo className="h-auto w-[180px] sm:h-9 sm:w-auto" />
+          <BrandLogo variant="header" />
         </a>
         <a href="/today" className="rounded-full bg-gray-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800">
           Open Practica

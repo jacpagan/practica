@@ -60,7 +60,7 @@ function AuthForm({
     <div className={embedded ? 'w-full' : 'min-h-screen bg-white flex items-center justify-center px-4'}>
       <div className={`w-full max-w-sm ${embedded ? 'rounded-2xl border border-gray-200 bg-white px-6 py-6 shadow-sm' : ''}`}>
         {title === 'Practica' ? (
-          <BrandLogo className="mx-auto mb-3 h-8 w-auto max-w-[220px]" />
+          <BrandLogo variant="auth" className="mx-auto mb-3" />
         ) : (
           <h1 className="text-2xl font-semibold text-gray-900 text-center mb-1">{title}</h1>
         )}
