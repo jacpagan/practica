@@ -426,7 +426,7 @@ export default function ProgressView({
                     onClick={() => updateArchiveMode('all')}
                     className={`rounded-full px-3 py-2 text-xs font-semibold transition-colors ${archiveMode === 'all' ? 'bg-gray-900 text-white' : 'border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
                   >
-                    Full archive {sessions.length}
+                    All proofs {sessions.length}
                   </button>
                 </div>
 
