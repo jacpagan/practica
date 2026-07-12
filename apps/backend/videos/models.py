@@ -366,6 +366,27 @@ class ReviewLink(models.Model):
         return f"ReviewLink {self.token} session={self.session_id} active={self.is_active}"
 
 
+class SkillShareLink(models.Model):
+    """A time-limited private link for one member-owned skill archive."""
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='skill_share_links')
+    token = models.CharField(max_length=40, unique=True)
+    practice_series = models.CharField(max_length=200, db_index=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_skill_share_links')
+    expires_at = models.DateTimeField()
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_accessed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['owner', 'practice_series', 'created_at'], name='skillshare_owner_series_idx'),
+        ]
+
+    def __str__(self):
+        return f"SkillShareLink {self.token} owner={self.owner_id} skill={self.practice_series}"
+
+
 class ReviewerRosterMembership(models.Model):
     """A lightweight trusted-reviewer relationship for repeat async feedback workflows."""
 

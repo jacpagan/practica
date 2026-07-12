@@ -56,14 +56,6 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
   }), [latestSession, skillName, skillProofDays, skillSessions.length])
 
   const handleShareSkill = async () => {
-    const shareUrl = (() => {
-      try {
-        return window.location.href || window.location.origin || 'https://practica.jpagan.com'
-      } catch {
-        return 'https://practica.jpagan.com'
-      }
-    })()
-    const textWithUrl = `${skillShareText}\n${shareUrl}`
     setShareStatus('')
     reportClientEvent('skill_card_share_started', {
       action: 'skill_card_share_started',
@@ -72,6 +64,28 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
       proof_days: skillProofDays,
     })
     try {
+      setShareStatus('Preparing link')
+      const response = await fetch('/api/sessions/skill-shares/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Token ${token}` } : {}),
+        },
+        body: JSON.stringify({ practice_series: skillName }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(data?.error || 'Could not create a share link')
+      }
+      const shareUrl = data?.url || (() => {
+        try {
+          return `${window.location.origin}/s/${data?.token || ''}`
+        } catch {
+          return `https://practica.jpagan.com/s/${data?.token || ''}`
+        }
+      })()
+      const textWithUrl = `${skillShareText}\n${shareUrl}`
+      setShareStatus('')
       if (navigator?.share) {
         await navigator.share({
           title: `${skillName || 'Skill'} progress`,

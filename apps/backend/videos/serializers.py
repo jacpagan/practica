@@ -8,6 +8,7 @@ from .models import (
     Profile, Session, Chapter, VideoFeedback,
     SessionAsset,
     ReviewLink,
+    SkillShareLink,
     ReviewRequest,
     ReviewRequestEvent,
     ReviewerRosterMembership,
@@ -390,6 +391,23 @@ class ReviewLinkSerializer(serializers.ModelSerializer):
             base = base.replace('http://', 'https://', 1)
         base = base.rstrip('/')
         return f"{base}/r/{obj.token}"
+
+
+class SkillShareLinkSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SkillShareLink
+        fields = ['token', 'practice_series', 'expires_at', 'is_active', 'url']
+        read_only_fields = ['token', 'practice_series', 'expires_at', 'is_active', 'url']
+
+    def get_url(self, obj):
+        request = self.context.get('request')
+        base = request.build_absolute_uri('/') if request else '/'
+        if not settings.DEBUG and base.startswith('http://'):
+            base = base.replace('http://', 'https://', 1)
+        base = base.rstrip('/')
+        return f"{base}/s/{obj.token}"
 
 
 class ReviewVideoFeedbackSerializer(serializers.ModelSerializer):

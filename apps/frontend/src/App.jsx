@@ -34,6 +34,8 @@ import BrandLogo from './components/BrandLogo'
 const SessionDetail = React.lazy(() => import('./components/SessionDetail'))
 const ProgressView = React.lazy(() => import('./components/ProgressView'))
 const SkillView = React.lazy(() => import('./components/SkillView'))
+const SharedProofPage = React.lazy(() => import('./components/SharedProofPage').then((module) => ({ default: module.SharedProofPage })))
+const SharedSkillPage = React.lazy(() => import('./components/SharedProofPage').then((module) => ({ default: module.SharedSkillPage })))
 import PrivacyPage from './components/PrivacyPage'
 const RecorderPage = React.lazy(() => import('./components/RecorderPage'))
 
@@ -46,6 +48,7 @@ function AppContent() {
   const [routeSessionId, setRouteSessionId] = useState(initialRoute.sessionId)
   const [routeSeriesName, setRouteSeriesName] = useState(initialRoute.seriesName || '')
   const [routeDate, setRouteDate] = useState(initialRoute.date || '')
+  const [routeShareToken] = useState(initialRoute.shareToken || '')
   const [selectedSession, setSelectedSession] = useState(null)
   const [sessions, setSessions] = useState([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
@@ -75,6 +78,7 @@ function AppContent() {
       sessionId: routeSessionId,
       seriesName: routeSeriesName,
       date: routeDate,
+      shareToken: routeShareToken,
     },
   })
 
@@ -111,6 +115,7 @@ function AppContent() {
       sessionId: routeSessionId,
       seriesName: routeSeriesName,
       date: routeDate,
+      shareToken: routeShareToken,
     },
   })
 
@@ -248,6 +253,22 @@ function AppContent() {
           <span>Loading</span>
         </div>
       </div>
+    )
+  }
+
+  if (view === 'sharedProof') {
+    return (
+      <React.Suspense fallback={<div className="px-4 py-6 text-sm text-gray-500">Loading shared proof</div>}>
+        <SharedProofPage shareToken={routeShareToken} />
+      </React.Suspense>
+    )
+  }
+
+  if (view === 'sharedSkill') {
+    return (
+      <React.Suspense fallback={<div className="px-4 py-6 text-sm text-gray-500">Loading shared skill</div>}>
+        <SharedSkillPage shareToken={routeShareToken} />
+      </React.Suspense>
     )
   }
 

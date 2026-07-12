@@ -7,6 +7,10 @@ export const parseRoute = (pathname, search = '') => {
   if (pathname.startsWith('/requests') || pathname.startsWith('/review/')) {
     return { view: 'progress', sessionId: null, date }
   }
+  const proofShareMatch = pathname.match(/^\/r\/([^/]+)$/)
+  if (proofShareMatch) return { view: 'sharedProof', sessionId: null, shareToken: decodeURIComponent(proofShareMatch[1]) }
+  const skillShareMatch = pathname.match(/^\/s\/([^/]+)$/)
+  if (skillShareMatch) return { view: 'sharedSkill', sessionId: null, shareToken: decodeURIComponent(skillShareMatch[1]) }
   if (pathname === '/privacy') return { view: 'privacy', sessionId: null }
   if (pathname === '/progress' || pathname === '/archive' || pathname === '/evidence' || pathname === '/calendar' || pathname === '/library' || pathname === '/threads') {
     return { view: 'progress', sessionId: null, date }
@@ -20,7 +24,9 @@ export const parseRoute = (pathname, search = '') => {
   return { view: 'progress', sessionId: null, date }
 }
 
-export const routePath = ({ view, sessionId, seriesName, date }) => {
+export const routePath = ({ view, sessionId, seriesName, date, shareToken }) => {
+  if (view === 'sharedProof' && shareToken) return `/r/${encodeURIComponent(shareToken)}`
+  if (view === 'sharedSkill' && shareToken) return `/s/${encodeURIComponent(shareToken)}`
   if (view === 'privacy') return '/privacy'
   if (view === 'progress' || view === 'archive' || view === 'evidence' || view === 'threads' || view === 'today') {
     return date ? `/today?date=${encodeURIComponent(date)}` : '/today'

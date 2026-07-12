@@ -20,6 +20,7 @@ from videos.library.api import SessionViewSet
 from videos.reviews.api import (
     ReviewRequestViewSet,
     review_link_info,
+    skill_share_link_info,
     review_link_feedback,
     review_request_feedback,
     feedback_inbox,
@@ -91,6 +92,7 @@ urlpatterns = [
     path('api/product-events/insights/', product_event_insights_view, name='product_event_insights'),
     path('api/review/<slug:token>/', review_link_info, name='review_link_info'),
     path('api/review/<slug:token>/feedback/', review_link_feedback, name='review_link_feedback'),
+    path('api/share/skill/<slug:token>/', skill_share_link_info, name='skill_share_link_info'),
     path('api/review-requests/<int:request_id>/feedback/', review_request_feedback, name='review_request_feedback'),
     path('api/inbox/', feedback_inbox, name='feedback_inbox'),
     path('api/reviewer-invites/', reviewer_invites, name='reviewer_invites'),

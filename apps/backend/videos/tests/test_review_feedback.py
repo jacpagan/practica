@@ -8,7 +8,7 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
-from videos.models import ProductEventLog, Profile, ReviewLink, ReviewRequest, Session, VideoFeedback
+from videos.models import ProductEventLog, Profile, ReviewLink, ReviewRequest, Session, SkillShareLink, VideoFeedback
 
 
 class ReviewFeedbackApiTests(APITestCase):
@@ -353,6 +353,59 @@ class ReviewFeedbackApiTests(APITestCase):
         event_names = set(ProductEventLog.objects.values_list('event_name', flat=True))
         self.assertIn('session_share_created', event_names)
         self.assertIn('session_share_reused', event_names)
+
+    def test_owner_can_create_and_reuse_skill_share_link(self):
+        Session.objects.create(
+            user=self.owner,
+            title='Second shoulder proof',
+            practice_series='Shoulder press',
+            video_file='sessions/shoulder-2.mp4',
+            processing_status=Session.STATUS_READY,
+        )
+        self.session.practice_series = 'Shoulder press'
+        self.session.save(update_fields=['practice_series'])
+        self._auth(self.owner)
+
+        first = self.client.post('/api/sessions/skill-shares/', {'practice_series': 'Shoulder press'}, format='json')
+        second = self.client.post('/api/sessions/skill-shares/', {'practice_series': 'Shoulder press'}, format='json')
+
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
+        self.assertEqual(first.data['token'], second.data['token'])
+        self.assertIn('/s/', first.data['url'])
+
+        event_names = set(ProductEventLog.objects.values_list('event_name', flat=True))
+        self.assertIn('skill_share_created', event_names)
+        self.assertIn('skill_share_reused', event_names)
+
+    def test_other_account_can_open_skill_share_link_without_owning_sessions(self):
+        self.session.practice_series = 'Shoulder press'
+        self.session.save(update_fields=['practice_series'])
+        other_session = Session.objects.create(
+            user=self.reviewer,
+            title='Reviewer private shoulder proof',
+            practice_series='Shoulder press',
+            video_file='sessions/reviewer-shoulder.mp4',
+            processing_status=Session.STATUS_READY,
+        )
+        link = SkillShareLink.objects.create(
+            owner=self.owner,
+            token='skill-share-token-123',
+            practice_series='Shoulder press',
+            created_by=self.owner,
+            expires_at=timezone.now() + timedelta(days=7),
+            is_active=True,
+        )
+        self._auth(self.reviewer)
+
+        response = self.client.get(f'/api/share/skill/{link.token}/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['skill']['name'], 'Shoulder press')
+        self.assertEqual(response.data['skill']['proof_count'], 1)
+        self.assertEqual(response.data['sessions'][0]['id'], self.session.id)
+        returned_ids = {item['id'] for item in response.data['sessions']}
+        self.assertNotIn(other_session.id, returned_ids)
 
     def test_owner_can_revoke_private_share_link_via_delete_share_route(self):
         self._auth(self.owner)

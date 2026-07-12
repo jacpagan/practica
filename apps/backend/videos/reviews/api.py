@@ -8,12 +8,12 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from videos.models import FeedbackTemplate, ReviewLink, ReviewRequest, ReviewerInvite, ReviewerRosterMembership, Session, VideoFeedback
+from videos.models import FeedbackTemplate, ReviewLink, ReviewRequest, ReviewerInvite, ReviewerRosterMembership, Session, SkillShareLink, VideoFeedback
 from videos.reviews.presentation import public_review_request_preview, review_request_forbidden_response
 from videos.reviews.queries import filter_review_requests_for_role, review_request_visible_to_user, reviewer_can_respond, visible_review_requests_qs
 from videos.reviews.services import claim_reviewer_invite_by_code, create_review_request, create_reviewer_invite, mark_review_request_viewed, revoke_reviewer_invite, transition_review_request_status
 from videos.reviews.services import mark_review_request_opened, mark_review_request_responded
-from videos.serializers import FeedbackTemplateSerializer, MemberConnectionSerializer, PublicSessionSerializer, ReviewerInviteSerializer, ReviewLinkSerializer, ReviewRequestSerializer, ReviewVideoFeedbackSerializer, UserSummarySerializer
+from videos.serializers import FeedbackTemplateSerializer, MemberConnectionSerializer, PublicSessionSerializer, ReviewerInviteSerializer, ReviewLinkSerializer, ReviewRequestSerializer, ReviewVideoFeedbackSerializer, SkillShareLinkSerializer, UserSummarySerializer
 from videos.services.feedback_video_processing import prepare_feedback_video_upload
 from videos.telemetry import log_product_event
 from videos.video_uploads import is_allowed_video_upload
@@ -68,6 +68,41 @@ def _review_link_error_response(reason):
             'code': details['code'],
         },
         status=details['status'],
+    )
+
+
+def _resolve_skill_share_link(token):
+    normalized_token = str(token or '').strip()
+    if not normalized_token:
+        return None, 'invalid'
+
+    link = SkillShareLink.objects.select_related(
+        'owner',
+        'owner__profile',
+    ).filter(token=normalized_token).first()
+    if not link:
+        return None, 'invalid'
+    if not link.is_active:
+        return None, 'revoked'
+    if link.expires_at <= timezone.now():
+        return None, 'expired'
+    return link, None
+
+
+def _skill_share_link_error_response(reason):
+    if reason == 'expired':
+        return Response(
+            {'error': 'This skill share link has expired.', 'code': 'skill_share_expired'},
+            status=status.HTTP_410_GONE,
+        )
+    if reason == 'revoked':
+        return Response(
+            {'error': 'This skill share link has been turned off.', 'code': 'skill_share_revoked'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    return Response(
+        {'error': 'This skill share link does not exist.', 'code': 'skill_share_invalid'},
+        status=status.HTTP_404_NOT_FOUND,
     )
 
 
@@ -288,6 +323,37 @@ def review_link_info(request, token):
         payload['reviewer_invite'] = ReviewerInviteSerializer(claimed_invite, context={'request': request}).data
     if claim_error:
         payload['claim_error'] = claim_error
+    return Response(payload)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def skill_share_link_info(request, token):
+    link, error_reason = _resolve_skill_share_link(token)
+    if error_reason:
+        return _skill_share_link_error_response(error_reason)
+
+    SkillShareLink.objects.filter(pk=link.pk).update(last_accessed_at=timezone.now())
+    link.refresh_from_db(fields=['last_accessed_at'])
+    sessions = Session.objects.filter(
+        user=link.owner,
+        practice_series=link.practice_series,
+        processing_status=Session.STATUS_READY,
+    ).prefetch_related('assets').order_by('-recorded_at', '-id')
+    proof_days = sessions.datetimes('recorded_at', 'day').count()
+    owner_name = link.owner.username
+    if hasattr(link.owner, 'profile') and link.owner.profile.display_name:
+        owner_name = link.owner.profile.display_name
+    payload = {
+        'skill': {
+            'name': link.practice_series,
+            'proof_count': sessions.count(),
+            'proof_days': proof_days,
+            'owner_display_name': owner_name,
+        },
+        'link': SkillShareLinkSerializer(link, context={'request': request}).data,
+        'sessions': PublicSessionSerializer(sessions, many=True, context={'request': request}).data,
+    }
     return Response(payload)
 
 

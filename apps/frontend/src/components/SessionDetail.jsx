@@ -400,14 +400,6 @@ function SessionDetail({
 
   const handleShareProof = async () => {
     const shareText = buildProofShareText({ session })
-    const shareUrl = (() => {
-      try {
-        return window.location.href || window.location.origin || 'https://practica.jpagan.com'
-      } catch {
-        return 'https://practica.jpagan.com'
-      }
-    })()
-    const textWithUrl = `${shareText}\n${shareUrl}`
     setShareStatus('')
     reportClientEvent('proof_card_share_started', {
       action: 'proof_card_share_started',
@@ -415,6 +407,24 @@ function SessionDetail({
       skill_name: session?.practice_series || '',
     })
     try {
+      setShareStatus('Preparing link')
+      const response = await fetch(`/api/sessions/${session.id}/share/`, {
+        method: 'POST',
+        headers: authHeaders,
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(data?.error || 'Could not create a share link')
+      }
+      const shareUrl = data?.url || (() => {
+        try {
+          return `${window.location.origin}/r/${data?.token || ''}`
+        } catch {
+          return `https://practica.jpagan.com/r/${data?.token || ''}`
+        }
+      })()
+      const textWithUrl = `${shareText}\n${shareUrl}`
+      setShareStatus('')
       if (navigator?.share) {
         await navigator.share({
           title: session?.title || 'Practica proof',

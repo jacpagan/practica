@@ -14,9 +14,9 @@ from rest_framework.response import Response
 from videos.media.api import SessionMediaActionsMixin
 from videos.media.services import maybe_refresh_session_processing, normalized_client_upload_id, start_processing_pipeline
 from videos.media.uploads import attach_tags_to_session, parse_tag_names
-from videos.models import Chapter, Exercise, ReviewLink, ReviewRequest, ReviewRequestEvent, Session, SessionAsset, SessionLastSeen, Tag, VideoFeedback
+from videos.models import Chapter, Exercise, ReviewLink, ReviewRequest, ReviewRequestEvent, Session, SessionAsset, SessionLastSeen, SkillShareLink, Tag, VideoFeedback
 from videos.services.ml_training import build_dataset_snapshot, normalize_label, normalize_source, record_session_suggestion_feedback, suggest_session_thread
-from videos.serializers import ChapterSerializer, ReviewLinkSerializer, ReviewVideoFeedbackSerializer, SessionListSerializer, SessionSerializer
+from videos.serializers import ChapterSerializer, ReviewLinkSerializer, ReviewVideoFeedbackSerializer, SessionListSerializer, SessionSerializer, SkillShareLinkSerializer
 from videos.services.feedback_video_processing import prepare_feedback_video_upload
 from videos.telemetry import record_product_event
 from videos.video_uploads import is_allowed_video_upload
@@ -427,6 +427,56 @@ class SessionViewSet(SessionMediaActionsMixin, viewsets.ModelViewSet):
             path='/api/sessions/:id/share/',
         )
         return Response(ReviewLinkSerializer(link, context={'request': request}).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['post'], url_path='skill-shares')
+    def create_skill_share_link(self, request):
+        practice_series = str(request.data.get('practice_series', '') or '').strip()
+        if not practice_series:
+            return Response({'error': 'Choose a skill before sharing.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        ready_sessions = Session.objects.filter(
+            user=request.user,
+            practice_series=practice_series,
+            processing_status=Session.STATUS_READY,
+        )
+        if not ready_sessions.exists():
+            return Response(
+                {'error': 'This skill needs at least one playback-ready proof before it can be shared.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        existing_link = SkillShareLink.objects.filter(
+            owner=request.user,
+            practice_series=practice_series,
+            is_active=True,
+            expires_at__gt=timezone.now(),
+        ).order_by('-created_at').first()
+        if existing_link:
+            record_product_event(
+                event_name='skill_share_reused',
+                path='/api/sessions/skill-shares/',
+                user=request.user,
+                is_authenticated=True,
+                extra={'action': 'skill_share_create', 'skill_name': practice_series},
+            )
+            return Response(SkillShareLinkSerializer(existing_link, context={'request': request}).data, status=status.HTTP_200_OK)
+
+        link = SkillShareLink.objects.create(
+            owner=request.user,
+            token=secrets.token_urlsafe(16),
+            practice_series=practice_series,
+            created_by=request.user,
+            expires_at=timezone.now() + timedelta(days=7),
+            is_active=True,
+        )
+        record_product_event(
+            event_name='skill_share_created',
+            path='/api/sessions/skill-shares/',
+            user=request.user,
+            is_authenticated=True,
+            extra={'action': 'skill_share_create', 'skill_name': practice_series},
+        )
+        return Response(SkillShareLinkSerializer(link, context={'request': request}).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'], url_path='share/revoke')
     def revoke_share_link(self, request, pk=None):
