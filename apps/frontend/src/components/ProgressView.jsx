@@ -398,9 +398,13 @@ export default function ProgressView({
               className="rounded-2xl border border-gray-200 bg-white px-4 py-3"
             >
               <summary className="cursor-pointer list-none text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors">
-                Archive cleanup
+                Full archive
               </summary>
               <div className="mt-4 space-y-4 border-t border-gray-100 pt-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Archive cleanup</p>
+                  <p className="mt-0.5 text-xs text-gray-500">Filter uncategorized proofs, assign skills, and return to the same spot after watching.</p>
+                </div>
                 {overviewParts.length > 0 ? (
                   <p className="text-sm text-gray-600">{overviewParts.join(' · ')}</p>
                 ) : null}
