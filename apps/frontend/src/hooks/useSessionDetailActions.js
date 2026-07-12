@@ -32,13 +32,14 @@ export const useSessionDetailActions = ({
     openSessionById(session.id)
   }, [openSessionById, routeSeriesName, setDetailReturnRoute, setJustUploadedSession, setJustUploadedSessionId, setOpenRecorderOnUpload, view])
 
-  const goBack = useCallback(() => {
+  const goBack = useCallback(async () => {
     const fallback = { view: 'progress', sessionId: null, seriesName: '' }
     const route = detailReturnRoute?.view
       ? detailReturnRoute
       : fallback
     saveProgressScrollRestore(route)
-    navigate(route)
+    const accepted = await navigate(route)
+    if (accepted === false) return
     setSelectedSession(null)
     setJustUploadedSessionId(null)
     setJustUploadedSession?.(null)

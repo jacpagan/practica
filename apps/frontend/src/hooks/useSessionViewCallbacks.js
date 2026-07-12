@@ -14,12 +14,12 @@ export const useSessionViewCallbacks = ({
     )))
   }, [setSelectedSession, setSessions])
 
-  const onDetailSessionDelete = useCallback((sessionId, returnRoute = null) => {
+  const onDetailSessionDelete = useCallback(async (sessionId, returnRoute = null) => {
     setSessions((current) => current.filter((item) => item.id !== sessionId))
     setSelectedSession(null)
     const route = returnRoute?.view ? returnRoute : { view: 'progress', sessionId: null }
     saveProgressScrollRestore(route)
-    navigate(route, { replace: true })
+    await navigate(route, { replace: true })
   }, [navigate, setSelectedSession, setSessions])
 
   return {

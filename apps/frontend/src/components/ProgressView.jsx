@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import SessionListItem from './SessionListItem'
 import ActivityCalendar from './ActivityCalendar'
 import SkillSummaryCard from './SkillSummaryCard'
@@ -31,6 +31,7 @@ export default function ProgressView({
   const restoreAttemptRef = useRef(false)
   const [shareStatus, setShareStatus] = useState('')
   const [archiveOpen, setArchiveOpen] = useState(() => readArchiveCleanupOpen())
+  const [pendingScrollRestore, setPendingScrollRestore] = useState(null)
   const [skillDraft, setSkillDraft] = useState({ session: null, value: '', saving: false })
 
   const overview = useMemo(() => calculatePracticeProgress(sessions), [sessions])
@@ -202,14 +203,40 @@ export default function ProgressView({
     restoreAttemptRef.current = true
     setArchiveOpen(pendingRestore.archiveOpen)
     saveArchiveCleanupOpen(pendingRestore.archiveOpen)
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        try {
-          window.scrollTo({ top: pendingRestore.scrollY, behavior: 'auto' })
-        } catch {}
-      })
-    })
+    setPendingScrollRestore(pendingRestore)
   }, [sessionsLoading, sessions.length])
+
+  useLayoutEffect(() => {
+    if (!pendingScrollRestore) return undefined
+    let cancelled = false
+    let attempts = 0
+    const targetScrollY = Math.max(0, Number(pendingScrollRestore.scrollY) || 0)
+
+    const restore = () => {
+      if (cancelled) return
+      attempts += 1
+      try {
+        const doc = document.documentElement
+        const maxScrollY = Math.max(0, doc.scrollHeight - window.innerHeight)
+        const nextScrollY = Math.min(targetScrollY, maxScrollY)
+        window.scrollTo({ top: nextScrollY, behavior: 'auto' })
+        const currentScrollY = window.scrollY || doc.scrollTop || 0
+        const needsMoreHeight = maxScrollY < targetScrollY
+        const missedTarget = Math.abs(currentScrollY - nextScrollY) > 8
+        if ((needsMoreHeight || missedTarget) && attempts < 30) {
+          window.setTimeout(restore, 50)
+          return
+        }
+      } catch {}
+      setPendingScrollRestore(null)
+    }
+
+    const frameId = window.requestAnimationFrame(restore)
+    return () => {
+      cancelled = true
+      window.cancelAnimationFrame(frameId)
+    }
+  }, [pendingScrollRestore, archiveOpen, sessions.length])
 
   useEffect(() => {
     if (sessionsLoading || !token) return
