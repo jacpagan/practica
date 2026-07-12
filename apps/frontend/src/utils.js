@@ -280,6 +280,21 @@ export const buildProofShareText = ({
   ].join(' ')
 }
 
+export const buildProofChallengeText = ({
+  session = null,
+  appName = 'Practica',
+} = {}) => {
+  const title = String(session?.title || '').trim() || 'this proof'
+  const skill = String(session?.practice_series || '').trim()
+  const challengeTarget = skill || title
+
+  return [
+    `I recorded ${challengeTarget}. Can you record your version?`,
+    `Watch my proof, then respond with your own.`,
+    `${appName}: private video proof for building skills together.`,
+  ].join(' ')
+}
+
 export const buildPracticeProgressInsight = ({
   proofCount = 0,
   proofsLast7Days = 0,

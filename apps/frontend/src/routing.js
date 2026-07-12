@@ -1,6 +1,7 @@
 export const parseRoute = (pathname, search = '') => {
   const params = new URLSearchParams(search || '')
   const date = (params.get('date') || '').trim()
+  const skill = (params.get('skill') || '').trim()
   if (pathname === '/' || pathname === '/today') {
     return { view: 'progress', sessionId: null, date }
   }
@@ -16,7 +17,7 @@ export const parseRoute = (pathname, search = '') => {
     return { view: 'progress', sessionId: null, date }
   }
   if (pathname === '/upload') return { view: 'upload', sessionId: null }
-  if (pathname === '/record' || pathname === '/recording') return { view: 'record', sessionId: null }
+  if (pathname === '/record' || pathname === '/recording') return { view: 'record', sessionId: null, seriesName: skill }
   const seriesMatch = pathname.match(/^\/(skill|series)\/(.+)$/)
   if (seriesMatch) return { view: 'skill', sessionId: null, seriesName: decodeURIComponent(seriesMatch[2]) }
   const sessionMatch = pathname.match(/^\/sessions\/(\d+)$/)

@@ -15,3 +15,10 @@ test('parseRoute keeps progress aliases on the Today view', () => {
   assert.equal(parseRoute('/archive').view, 'progress')
   assert.equal(parseRoute('/today').view, 'progress')
 })
+
+test('parseRoute keeps challenge recorder skill context', () => {
+  const route = parseRoute('/record', '?skill=Shoulder%20press')
+
+  assert.equal(route.view, 'record')
+  assert.equal(route.seriesName, 'Shoulder press')
+})

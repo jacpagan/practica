@@ -30,16 +30,25 @@ function formatProofDate(value) {
   }
 }
 
-function SharedCta() {
+function SharedCta({ session = null, mode = 'archive' }) {
+  const skill = String(session?.practice_series || '').trim()
+  const recordHref = skill ? `/record?skill=${encodeURIComponent(skill)}` : '/record'
+  const isChallenge = mode === 'challenge'
   return (
     <section className="border-t border-gray-100 py-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-semibold text-gray-950">Build your own proof archive</p>
-          <p className="mt-1 text-sm text-gray-500">Record the work, keep the evidence, share only what you choose.</p>
+          <p className="text-sm font-semibold text-gray-950">
+            {isChallenge ? 'Record your version' : 'Build your own proof archive'}
+          </p>
+          <p className="mt-1 text-sm text-gray-500">
+            {isChallenge
+              ? 'Keep your response private by default, then share it back if you choose.'
+              : 'Record the work, keep the evidence, share only what you choose.'}
+          </p>
         </div>
-        <a href="/today" className="inline-flex items-center justify-center rounded-full bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800">
-          Open Practica
+        <a href={isChallenge ? recordHref : '/today'} className="inline-flex items-center justify-center rounded-full bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800">
+          {isChallenge ? 'Record your version' : 'Open Practica'}
         </a>
       </div>
     </section>
@@ -112,7 +121,7 @@ export function SharedProofPage({ shareToken = '' }) {
             </div>
             <SharedVideo session={session} />
             {session?.description ? <p className="text-sm leading-6 text-gray-600">{session.description}</p> : null}
-            <SharedCta />
+            <SharedCta session={session} mode="challenge" />
           </div>
         )}
       </main>

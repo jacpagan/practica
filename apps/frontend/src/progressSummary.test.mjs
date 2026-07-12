@@ -5,7 +5,7 @@ globalThis.window = {
   location: { hostname: 'localhost' },
 }
 
-const { buildPracticeProgressInsight, buildProgressShareText, buildProofShareText, buildSkillShareText, calculatePracticeProgress } = await import('./utils.js')
+const { buildPracticeProgressInsight, buildProgressShareText, buildProofChallengeText, buildProofShareText, buildSkillShareText, calculatePracticeProgress } = await import('./utils.js')
 
 test('calculatePracticeProgress marks when a proof was recorded today', () => {
   const today = new Date()
@@ -123,5 +123,20 @@ test('buildProofShareText summarizes one proof without exposing private media', 
 
   assert.match(text, /Logged "Top set" for Hack Squat/)
   assert.match(text, /private video proof/)
+  assert.doesNotMatch(text, /media\/private|proof\.mp4/)
+})
+
+test('buildProofChallengeText invites a response without exposing private media', () => {
+  const text = buildProofChallengeText({
+    session: {
+      title: 'Top set',
+      practice_series: 'Hack Squat',
+      video_file: '/media/private/proof.mp4',
+    },
+  })
+
+  assert.match(text, /I recorded Hack Squat/)
+  assert.match(text, /Can you record your version/)
+  assert.match(text, /respond with your own/)
   assert.doesNotMatch(text, /media\/private|proof\.mp4/)
 })

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { buildProofShareText, fmtTimer, reportClientEvent, sessionPosterUrl, sessionVideoSources, videoUrl } from '../utils'
+import { buildProofChallengeText, buildProofShareText, fmtTimer, reportClientEvent, sessionPosterUrl, sessionVideoSources, videoUrl } from '../utils'
 import { useConfirm } from './ConfirmDialog'
 import { useToast } from './Toast'
 import SkillField from './SkillField'
@@ -398,42 +398,45 @@ function SessionDetail({
     detailsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
   }
 
-  const handleShareProof = async () => {
-    const shareText = buildProofShareText({ session })
+  const createProofShareUrl = async () => {
+    const response = await fetch(`/api/sessions/${session.id}/share/`, {
+      method: 'POST',
+      headers: authHeaders,
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error(data?.error || 'Could not create a share link')
+    }
+    return data?.url || (() => {
+      try {
+        return `${window.location.origin}/r/${data?.token || ''}`
+      } catch {
+        return `https://practica.jpagan.com/r/${data?.token || ''}`
+      }
+    })()
+  }
+
+  const shareProofLink = async ({ text, title, startedAction, sharedAction, failedAction }) => {
     setShareStatus('')
-    reportClientEvent('proof_card_share_started', {
-      action: 'proof_card_share_started',
+    reportClientEvent(startedAction, {
+      action: startedAction,
       session_id: session?.id || '',
       skill_name: session?.practice_series || '',
     })
     try {
       setShareStatus('Preparing link')
-      const response = await fetch(`/api/sessions/${session.id}/share/`, {
-        method: 'POST',
-        headers: authHeaders,
-      })
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) {
-        throw new Error(data?.error || 'Could not create a share link')
-      }
-      const shareUrl = data?.url || (() => {
-        try {
-          return `${window.location.origin}/r/${data?.token || ''}`
-        } catch {
-          return `https://practica.jpagan.com/r/${data?.token || ''}`
-        }
-      })()
-      const textWithUrl = `${shareText}\n${shareUrl}`
+      const shareUrl = await createProofShareUrl()
+      const textWithUrl = `${text}\n${shareUrl}`
       setShareStatus('')
       if (navigator?.share) {
         await navigator.share({
-          title: session?.title || 'Practica proof',
-          text: shareText,
+          title,
+          text,
           url: shareUrl,
         })
         setShareStatus('Shared')
-        reportClientEvent('proof_card_shared', {
-          action: 'proof_card_shared',
+        reportClientEvent(sharedAction, {
+          action: sharedAction,
           channel: 'native_share',
           session_id: session?.id || '',
         })
@@ -442,8 +445,8 @@ function SessionDetail({
       if (navigator?.clipboard?.writeText) {
         await navigator.clipboard.writeText(textWithUrl)
         setShareStatus('Copied')
-        reportClientEvent('proof_card_shared', {
-          action: 'proof_card_shared',
+        reportClientEvent(sharedAction, {
+          action: sharedAction,
           channel: 'clipboard',
           session_id: session?.id || '',
         })
@@ -456,12 +459,32 @@ function SessionDetail({
         return
       }
       setShareStatus('Could not share')
-      reportClientEvent('proof_card_share_failed', {
-        action: 'proof_card_share_failed',
+      reportClientEvent(failedAction, {
+        action: failedAction,
         reason: error?.message || 'unknown',
         session_id: session?.id || '',
       })
     }
+  }
+
+  const handleShareProof = async () => {
+    await shareProofLink({
+      text: buildProofShareText({ session }),
+      title: session?.title || 'Practica proof',
+      startedAction: 'proof_card_share_started',
+      sharedAction: 'proof_card_shared',
+      failedAction: 'proof_card_share_failed',
+    })
+  }
+
+  const handleChallengeProof = async () => {
+    await shareProofLink({
+      text: buildProofChallengeText({ session }),
+      title: `Practica challenge: ${session?.practice_series || session?.title || 'record your version'}`,
+      startedAction: 'proof_challenge_share_started',
+      sharedAction: 'proof_challenge_shared',
+      failedAction: 'proof_challenge_share_failed',
+    })
   }
 
   const resetGesture = () => {
@@ -913,13 +936,20 @@ function SessionDetail({
                     {session.duration_seconds ? fmtTimer(session.duration_seconds) : null}
                   </p>
                 ) : null}
-                <div className="mt-3 flex items-center gap-2">
+                <div className="mt-3 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={handleShareProof}
                     className="inline-flex items-center justify-center rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-900 transition-colors hover:bg-gray-50"
                   >
                     Share proof card
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleChallengeProof}
+                    className="inline-flex items-center justify-center rounded-full bg-gray-900 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-gray-800"
+                  >
+                    Challenge someone
                   </button>
                   {shareStatus ? <span className="text-xs font-medium text-gray-500">{shareStatus}</span> : null}
                 </div>
