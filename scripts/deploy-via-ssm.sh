@@ -187,6 +187,12 @@ fi
 # Keep supporting services up while preparing the next backend image.
 compose -f docker-compose.prod.yml up -d db redis
 
+# Free stale Docker layers before pulling the next backend image. Running
+# containers and their images are kept; volumes are not pruned here.
+docker container prune -f || true
+docker image prune -af || true
+docker builder prune -af || true
+
 # Build or pull next backend image, then run prep work before cutting over traffic.
 if [ -n "${BACKEND_IMAGE:-}" ]; then
   docker pull "$BACKEND_IMAGE"
