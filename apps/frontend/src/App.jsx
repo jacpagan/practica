@@ -344,7 +344,7 @@ function AppContent() {
       <header className={`${view === 'detail' ? 'hidden' : isImmersiveMobileView ? 'hidden sm:block' : ''} border-b border-gray-100 bg-white px-4 py-4 sm:px-6`}>
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-4 min-w-0">
-            <button onClick={goProgress} className="inline-flex items-center" aria-label="Practica home">
+            <button onClick={goProgress} className="inline-flex items-center focus:outline-none" aria-label="Practica home">
               <BrandLogo variant="header" />
             </button>
             <button
