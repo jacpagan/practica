@@ -1,5 +1,7 @@
 import { useCallback } from 'react'
 
+import { saveProgressScrollRestore } from '../progressReturnState'
+
 export const useSessionViewCallbacks = ({
   navigate,
   setSelectedSession,
@@ -16,12 +18,8 @@ export const useSessionViewCallbacks = ({
     setSessions((current) => current.filter((item) => item.id !== sessionId))
     setSelectedSession(null)
     const route = returnRoute?.view ? returnRoute : { view: 'progress', sessionId: null }
+    saveProgressScrollRestore(route)
     navigate(route, { replace: true })
-    if (route.view === 'progress' && Number.isFinite(Number(route.scrollY))) {
-      window.setTimeout(() => {
-        try { window.scrollTo({ top: Number(route.scrollY), behavior: 'auto' }) } catch {}
-      }, 0)
-    }
   }, [navigate, setSelectedSession, setSessions])
 
   return {

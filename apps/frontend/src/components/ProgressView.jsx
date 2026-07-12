@@ -6,6 +6,7 @@ import VideoThumbnail from './VideoThumbnail'
 import SkillField from './SkillField'
 import { useToast } from './Toast'
 import { buildSkillSummaries } from '../progressActivity'
+import { consumeProgressScrollRestore, readArchiveCleanupOpen, saveArchiveCleanupOpen } from '../progressReturnState'
 import { buildProgressShareText, calculatePracticeProgress, fmtDate, reportClientEvent, toLocalDateKey } from '../utils'
 
 const formatCompactDateTime = (value) => {
@@ -14,17 +15,6 @@ const formatCompactDateTime = (value) => {
   const dayPart = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
   const timePart = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
   return `${dayPart} · ${timePart}`
-}
-
-const ARCHIVE_CLEANUP_STATE_KEY = 'practica.archive.cleanup.v1'
-
-const readArchiveCleanupState = () => {
-  try {
-    const parsed = JSON.parse(window.sessionStorage.getItem(ARCHIVE_CLEANUP_STATE_KEY) || '{}')
-    return Boolean(parsed.open)
-  } catch {
-    return false
-  }
 }
 
 export default function ProgressView({
@@ -38,8 +28,9 @@ export default function ProgressView({
 }) {
   const toast = useToast()
   const highlightRef = useRef(null)
+  const restoreAttemptRef = useRef(false)
   const [shareStatus, setShareStatus] = useState('')
-  const [archiveOpen, setArchiveOpen] = useState(() => readArchiveCleanupState())
+  const [archiveOpen, setArchiveOpen] = useState(() => readArchiveCleanupOpen())
   const [skillDraft, setSkillDraft] = useState({ session: null, value: '', saving: false })
 
   const overview = useMemo(() => calculatePracticeProgress(sessions), [sessions])
@@ -149,11 +140,7 @@ export default function ProgressView({
   })
 
   const saveArchiveCleanupState = (nextOpen = archiveOpen) => {
-    try {
-      window.sessionStorage.setItem(ARCHIVE_CLEANUP_STATE_KEY, JSON.stringify({
-        open: Boolean(nextOpen),
-      }))
-    } catch {}
+    saveArchiveCleanupOpen(nextOpen)
   }
 
   const updateArchiveOpen = (nextOpen) => {
@@ -207,6 +194,22 @@ export default function ProgressView({
     if (!justSavedSession || !highlightRef.current) return
     highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [justSavedSession?.id])
+
+  useEffect(() => {
+    if (sessionsLoading || restoreAttemptRef.current) return
+    const pendingRestore = consumeProgressScrollRestore()
+    if (!pendingRestore) return
+    restoreAttemptRef.current = true
+    setArchiveOpen(pendingRestore.archiveOpen)
+    saveArchiveCleanupOpen(pendingRestore.archiveOpen)
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        try {
+          window.scrollTo({ top: pendingRestore.scrollY, behavior: 'auto' })
+        } catch {}
+      })
+    })
+  }, [sessionsLoading, sessions.length])
 
   useEffect(() => {
     if (sessionsLoading || !token) return

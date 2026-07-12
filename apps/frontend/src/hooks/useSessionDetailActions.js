@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 
 import { reportClientEvent } from '../utils'
+import { saveProgressScrollRestore } from '../progressReturnState'
 
 export const useSessionDetailActions = ({
   calendarMonthCacheRef,
@@ -36,12 +37,8 @@ export const useSessionDetailActions = ({
     const route = detailReturnRoute?.view
       ? detailReturnRoute
       : fallback
+    saveProgressScrollRestore(route)
     navigate(route)
-    if (route.view === 'progress' && Number.isFinite(Number(route.scrollY))) {
-      window.setTimeout(() => {
-        try { window.scrollTo({ top: Number(route.scrollY), behavior: 'auto' }) } catch {}
-      }, 0)
-    }
     setSelectedSession(null)
     setJustUploadedSessionId(null)
     setJustUploadedSession?.(null)
