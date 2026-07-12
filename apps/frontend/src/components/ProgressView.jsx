@@ -21,12 +21,9 @@ const ARCHIVE_CLEANUP_STATE_KEY = 'practica.archive.cleanup.v1'
 const readArchiveCleanupState = () => {
   try {
     const parsed = JSON.parse(window.sessionStorage.getItem(ARCHIVE_CLEANUP_STATE_KEY) || '{}')
-    return {
-      open: Boolean(parsed.open),
-      mode: parsed.mode === 'uncategorized' ? 'uncategorized' : 'all',
-    }
+    return Boolean(parsed.open)
   } catch {
-    return { open: false, mode: 'all' }
+    return false
   }
 }
 
@@ -42,8 +39,7 @@ export default function ProgressView({
   const toast = useToast()
   const highlightRef = useRef(null)
   const [shareStatus, setShareStatus] = useState('')
-  const [archiveOpen, setArchiveOpen] = useState(() => readArchiveCleanupState().open)
-  const [archiveMode, setArchiveMode] = useState(() => readArchiveCleanupState().mode)
+  const [archiveOpen, setArchiveOpen] = useState(() => readArchiveCleanupState())
   const [skillDraft, setSkillDraft] = useState({ session: null, value: '', saving: false })
 
   const overview = useMemo(() => calculatePracticeProgress(sessions), [sessions])
@@ -150,26 +146,19 @@ export default function ProgressView({
       try { return window.scrollY || 0 } catch { return 0 }
     })(),
     archiveOpen,
-    archiveMode,
   })
 
-  const saveArchiveCleanupState = (nextOpen = archiveOpen, nextMode = archiveMode) => {
+  const saveArchiveCleanupState = (nextOpen = archiveOpen) => {
     try {
       window.sessionStorage.setItem(ARCHIVE_CLEANUP_STATE_KEY, JSON.stringify({
         open: Boolean(nextOpen),
-        mode: nextMode === 'uncategorized' ? 'uncategorized' : 'all',
       }))
     } catch {}
   }
 
   const updateArchiveOpen = (nextOpen) => {
     setArchiveOpen(nextOpen)
-    saveArchiveCleanupState(nextOpen, archiveMode)
-  }
-
-  const updateArchiveMode = (nextMode) => {
-    setArchiveMode(nextMode)
-    saveArchiveCleanupState(archiveOpen, nextMode)
+    saveArchiveCleanupState(nextOpen)
   }
 
   const openSkillDraft = (session) => {
@@ -401,10 +390,6 @@ export default function ProgressView({
                 Full archive
               </summary>
               <div className="mt-4 space-y-4 border-t border-gray-100 pt-4">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Archive cleanup</p>
-                  <p className="mt-0.5 text-xs text-gray-500">Filter uncategorized proofs, assign skills, and return to the same spot after watching.</p>
-                </div>
                 {overviewParts.length > 0 ? (
                   <p className="text-sm text-gray-600">{overviewParts.join(' · ')}</p>
                 ) : null}
@@ -413,31 +398,13 @@ export default function ProgressView({
                 ) : null}
                 <ActivityCalendar sessions={sessions} />
 
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => updateArchiveMode('uncategorized')}
-                    className={`rounded-full px-3 py-2 text-xs font-semibold transition-colors ${archiveMode === 'uncategorized' ? 'bg-gray-900 text-white' : 'border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
-                  >
-                    Uncategorized {ungroupedItems.length}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateArchiveMode('all')}
-                    className={`rounded-full px-3 py-2 text-xs font-semibold transition-colors ${archiveMode === 'all' ? 'bg-gray-900 text-white' : 'border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
-                  >
-                    All proofs {sessions.length}
-                  </button>
-                </div>
-
-                {archiveMode === 'uncategorized' ? (
+                {ungroupedItems.length ? (
                   <div className="space-y-3">
                     <div>
                       <p className="text-sm font-medium text-gray-900">Uncategorized proofs</p>
-                      <p className="mt-0.5 text-xs text-gray-500">Watch, delete, or assign a skill without losing your place.</p>
                     </div>
                     <div className="space-y-3">
-                      {ungroupedItems.length ? ungroupedItems.map((session) => (
+                      {ungroupedItems.map((session) => (
                         <SessionListItem
                           key={session.id}
                           session={session}
@@ -449,16 +416,10 @@ export default function ProgressView({
                           prefetch
                           minimal
                         />
-                      )) : (
-                        <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-6 text-sm text-gray-500">
-                          No uncategorized proofs left.
-                        </div>
-                      )}
+                      ))}
                     </div>
                   </div>
-                ) : null}
-
-                {archiveMode === 'all' ? (
+                ) : (
                   <div className="space-y-3">
                     <p className="text-sm font-medium text-gray-900">All proofs</p>
                     <div className="space-y-3">
@@ -478,7 +439,7 @@ export default function ProgressView({
                       ))}
                     </div>
                   </div>
-                ) : null}
+                )}
               </div>
             </details>
           </>
