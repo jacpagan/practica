@@ -3,6 +3,8 @@ import SessionListItem from './SessionListItem'
 import ActivityCalendar from './ActivityCalendar'
 import SkillSummaryCard from './SkillSummaryCard'
 import VideoThumbnail from './VideoThumbnail'
+import SkillField from './SkillField'
+import { useToast } from './Toast'
 import { buildSkillSummaries } from '../progressActivity'
 import { buildProgressShareText, calculatePracticeProgress, fmtDate, reportClientEvent, toLocalDateKey } from '../utils'
 
@@ -14,6 +16,20 @@ const formatCompactDateTime = (value) => {
   return `${dayPart} · ${timePart}`
 }
 
+const ARCHIVE_CLEANUP_STATE_KEY = 'practica.archive.cleanup.v1'
+
+const readArchiveCleanupState = () => {
+  try {
+    const parsed = JSON.parse(window.sessionStorage.getItem(ARCHIVE_CLEANUP_STATE_KEY) || '{}')
+    return {
+      open: Boolean(parsed.open),
+      mode: parsed.mode === 'uncategorized' ? 'uncategorized' : 'all',
+    }
+  } catch {
+    return { open: false, mode: 'all' }
+  }
+}
+
 export default function ProgressView({
   sessions = [],
   sessionsLoading = false,
@@ -21,14 +37,23 @@ export default function ProgressView({
   highlightSession = null,
   onOpenSession,
   onOpenSkill,
+  onSessionUpdate,
 }) {
+  const toast = useToast()
   const highlightRef = useRef(null)
   const [shareStatus, setShareStatus] = useState('')
+  const [archiveOpen, setArchiveOpen] = useState(() => readArchiveCleanupState().open)
+  const [archiveMode, setArchiveMode] = useState(() => readArchiveCleanupState().mode)
+  const [skillDraft, setSkillDraft] = useState({ session: null, value: '', saving: false })
 
   const overview = useMemo(() => calculatePracticeProgress(sessions), [sessions])
   const skillSummaries = useMemo(() => buildSkillSummaries(sessions), [sessions])
   const taggedSummaries = useMemo(() => skillSummaries.filter((item) => !item.isUngrouped), [skillSummaries])
   const ungroupedSummary = useMemo(() => skillSummaries.find((item) => item.isUngrouped) || null, [skillSummaries])
+  const skillOptions = useMemo(() => (
+    Array.from(new Set(taggedSummaries.map((item) => String(item.skillName || '').trim()).filter(Boolean)))
+  ), [taggedSummaries])
+  const ungroupedItems = ungroupedSummary?.items || []
   const todayKey = useMemo(() => toLocalDateKey(new Date()), [])
   const todaySessions = useMemo(() => (
     sessions
@@ -117,6 +142,78 @@ export default function ProgressView({
     }
   }
 
+  const progressReturnRoute = () => ({
+    view: 'progress',
+    sessionId: null,
+    seriesName: '',
+    scrollY: (() => {
+      try { return window.scrollY || 0 } catch { return 0 }
+    })(),
+    archiveOpen,
+    archiveMode,
+  })
+
+  const saveArchiveCleanupState = (nextOpen = archiveOpen, nextMode = archiveMode) => {
+    try {
+      window.sessionStorage.setItem(ARCHIVE_CLEANUP_STATE_KEY, JSON.stringify({
+        open: Boolean(nextOpen),
+        mode: nextMode === 'uncategorized' ? 'uncategorized' : 'all',
+      }))
+    } catch {}
+  }
+
+  const updateArchiveOpen = (nextOpen) => {
+    setArchiveOpen(nextOpen)
+    saveArchiveCleanupState(nextOpen, archiveMode)
+  }
+
+  const updateArchiveMode = (nextMode) => {
+    setArchiveMode(nextMode)
+    saveArchiveCleanupState(archiveOpen, nextMode)
+  }
+
+  const openSkillDraft = (session) => {
+    setSkillDraft({ session, value: session?.practice_series || '', saving: false })
+  }
+
+  const closeSkillDraft = () => {
+    if (skillDraft.saving) return
+    setSkillDraft({ session: null, value: '', saving: false })
+  }
+
+  const saveSkillDraft = async () => {
+    const session = skillDraft.session
+    if (!token || !session?.id) return
+    const nextSkill = String(skillDraft.value || '').trim()
+    if (!nextSkill) {
+      toast.error('Add a skill name first')
+      return
+    }
+    setSkillDraft((current) => ({ ...current, saving: true }))
+    try {
+      const res = await fetch(`/api/sessions/${session.id}/`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Token ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: session.title || 'Proof',
+          practice_series: nextSkill,
+          description: session.description || '',
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Could not update skill')
+      onSessionUpdate?.(data)
+      setSkillDraft({ session: null, value: '', saving: false })
+      toast.success(`Added to ${nextSkill}`)
+    } catch (error) {
+      setSkillDraft((current) => ({ ...current, saving: false }))
+      toast.error(error?.message || 'Could not update skill')
+    }
+  }
+
   useEffect(() => {
     if (!justSavedSession || !highlightRef.current) return
     highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -164,7 +261,10 @@ export default function ProgressView({
       key={session.id}
       ref={highlighted ? highlightRef : null}
       type="button"
-      onClick={() => onOpenSession?.(session, { view: 'progress', sessionId: null, seriesName: '' })}
+      onClick={() => {
+        saveArchiveCleanupState()
+        onOpenSession?.(session, progressReturnRoute())
+      }}
       className={`w-full rounded-2xl border overflow-hidden text-left transition-colors ${
         highlighted
           ? 'border-emerald-400 bg-emerald-50/70 ring-2 ring-emerald-200 hover:bg-emerald-50'
@@ -247,7 +347,7 @@ export default function ProgressView({
             {!overview.proofRecordedToday && latestSession ? (
               <button
                 type="button"
-                onClick={() => onOpenSession?.(latestSession, { view: 'progress', sessionId: null, seriesName: '' })}
+                onClick={() => onOpenSession?.(latestSession, progressReturnRoute())}
                 className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-left hover:bg-gray-50 transition-colors"
               >
                 <p className="text-xs text-gray-500">Last proof</p>
@@ -266,7 +366,7 @@ export default function ProgressView({
                   <SessionListItem
                     key={session.id}
                     session={session}
-                    onOpen={() => onOpenSession?.(session, { view: 'progress', sessionId: null, seriesName: '' })}
+                    onOpen={() => onOpenSession?.(session, progressReturnRoute())}
                     prefetch
                     minimal
                   />
@@ -292,9 +392,13 @@ export default function ProgressView({
               </div>
             ) : null}
 
-            <details className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
+            <details
+              open={archiveOpen}
+              onToggle={(event) => updateArchiveOpen(event.currentTarget.open)}
+              className="rounded-2xl border border-gray-200 bg-white px-4 py-3"
+            >
               <summary className="cursor-pointer list-none text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors">
-                Full archive
+                Archive cleanup
               </summary>
               <div className="mt-4 space-y-4 border-t border-gray-100 pt-4">
                 {overviewParts.length > 0 ? (
@@ -305,15 +409,65 @@ export default function ProgressView({
                 ) : null}
                 <ActivityCalendar sessions={sessions} />
 
-                {ungroupedSummary ? (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => updateArchiveMode('uncategorized')}
+                    className={`rounded-full px-3 py-2 text-xs font-semibold transition-colors ${archiveMode === 'uncategorized' ? 'bg-gray-900 text-white' : 'border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                  >
+                    Uncategorized {ungroupedItems.length}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateArchiveMode('all')}
+                    className={`rounded-full px-3 py-2 text-xs font-semibold transition-colors ${archiveMode === 'all' ? 'bg-gray-900 text-white' : 'border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                  >
+                    Full archive {sessions.length}
+                  </button>
+                </div>
+
+                {archiveMode === 'uncategorized' ? (
                   <div className="space-y-3">
-                    <p className="text-sm font-medium text-gray-900">Other proofs</p>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Uncategorized proofs</p>
+                      <p className="mt-0.5 text-xs text-gray-500">Watch, delete, or assign a skill without losing your place.</p>
+                    </div>
                     <div className="space-y-3">
-                      {ungroupedSummary.items.map((session) => (
+                      {ungroupedItems.length ? ungroupedItems.map((session) => (
                         <SessionListItem
                           key={session.id}
                           session={session}
-                          onOpen={() => onOpenSession?.(session, { view: 'progress', sessionId: null, seriesName: '' })}
+                          onOpen={() => {
+                            saveArchiveCleanupState()
+                            onOpenSession?.(session, progressReturnRoute())
+                          }}
+                          onChangeSkill={() => openSkillDraft(session)}
+                          prefetch
+                          minimal
+                        />
+                      )) : (
+                        <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-6 text-sm text-gray-500">
+                          No uncategorized proofs left.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {archiveMode === 'all' ? (
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium text-gray-900">All proofs</p>
+                    <div className="space-y-3">
+                      {sessions.map((session) => (
+                        <SessionListItem
+                          key={session.id}
+                          session={session}
+                          showSeries
+                          onOpen={() => {
+                            saveArchiveCleanupState()
+                            onOpenSession?.(session, progressReturnRoute())
+                          }}
+                          onChangeSkill={() => openSkillDraft(session)}
                           prefetch
                           minimal
                         />
@@ -326,6 +480,45 @@ export default function ProgressView({
           </>
         )}
       </div>
+
+      {skillDraft.session ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 px-4 py-4 sm:items-center" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-xl">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Assign skill</p>
+              <h3 className="mt-1 text-lg font-semibold text-gray-950">{skillDraft.session.title || 'Proof'}</h3>
+              <p className="mt-1 text-sm text-gray-500">Add this proof to a skill so it stops showing in Uncategorized.</p>
+            </div>
+            <div className="mt-4">
+              <SkillField
+                value={skillDraft.value}
+                onChange={(value) => setSkillDraft((current) => ({ ...current, value }))}
+                options={skillOptions}
+                disabled={skillDraft.saving}
+                placeholder="Type or choose a skill"
+              />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeSkillDraft}
+                disabled={skillDraft.saving}
+                className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveSkillDraft}
+                disabled={skillDraft.saving}
+                className="rounded-full bg-gray-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+              >
+                {skillDraft.saving ? 'Saving' : 'Save skill'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

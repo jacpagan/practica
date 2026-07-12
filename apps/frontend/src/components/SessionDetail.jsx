@@ -129,6 +129,22 @@ function SessionDetail({
   const authHeaders = useMemo(() => (token ? { Authorization: `Token ${token}` } : {}), [token])
   const canEdit = Boolean(session?.can_edit)
   const challengeResponses = Array.isArray(session?.challenge_responses) ? session.challenge_responses : []
+  const nextUncategorizedSession = useMemo(() => {
+    const currentId = Number(session?.id)
+    const currentTime = new Date(session?.recorded_at || session?.created_at || 0).getTime() || 0
+    const uncategorized = (Array.isArray(sessions) ? sessions : [])
+      .filter((item) => item?.id && Number(item.id) !== currentId && !String(item.practice_series || '').trim())
+      .sort((left, right) => {
+        const leftTime = new Date(left.recorded_at || left.created_at || 0).getTime() || 0
+        const rightTime = new Date(right.recorded_at || right.created_at || 0).getTime() || 0
+        return rightTime - leftTime
+      })
+    if (!uncategorized.length) return null
+    return uncategorized.find((item) => {
+      const itemTime = new Date(item.recorded_at || item.created_at || 0).getTime() || 0
+      return itemTime < currentTime
+    }) || uncategorized[0]
+  }, [session?.created_at, session?.id, session?.recorded_at, sessions])
   const returnRouteView = String(returnRoute?.view || '').trim()
   const returnsToSkill = returnRouteView === 'skill' && String(returnRoute?.seriesName || '').trim().length > 0
   const backLabel = returnsToSkill ? 'Back to skill' : 'Back to progress'
@@ -171,7 +187,7 @@ function SessionDetail({
     confirm,
     toast,
     onSessionUpdate,
-    onSessionDelete,
+    onSessionDelete: (sessionId) => onSessionDelete?.(sessionId, returnRoute),
     setSession,
     playbackSources,
     videoRef,
@@ -426,6 +442,11 @@ function SessionDetail({
     event.stopPropagation()
     revealControls()
     detailsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+  }
+
+  const handleOpenNextUncategorized = () => {
+    if (!nextUncategorizedSession) return
+    onOpenSession?.(nextUncategorizedSession, returnRoute || { view: 'progress', sessionId: null, seriesName: '' })
   }
 
   const createProofShareUrl = async () => {
@@ -983,6 +1004,16 @@ function SessionDetail({
                   </button>
                   {shareStatus ? <span className="text-xs font-medium text-gray-500">{shareStatus}</span> : null}
                 </div>
+                {nextUncategorizedSession ? (
+                  <button
+                    type="button"
+                    onClick={handleOpenNextUncategorized}
+                    className="mt-3 inline-flex items-center justify-center rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-900 transition-colors hover:bg-gray-50"
+                  >
+                    Next uncategorized
+                  </button>
+                ) : null}
+                <p className="mt-2 text-xs text-gray-500">Challenge responses show up on this proof after someone records their version.</p>
               </div>
 
               {justUploaded ? (

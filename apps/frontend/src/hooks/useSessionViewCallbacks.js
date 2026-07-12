@@ -12,10 +12,16 @@ export const useSessionViewCallbacks = ({
     )))
   }, [setSelectedSession, setSessions])
 
-  const onDetailSessionDelete = useCallback((sessionId) => {
+  const onDetailSessionDelete = useCallback((sessionId, returnRoute = null) => {
     setSessions((current) => current.filter((item) => item.id !== sessionId))
     setSelectedSession(null)
-    navigate({ view: 'progress', sessionId: null }, { replace: true })
+    const route = returnRoute?.view ? returnRoute : { view: 'progress', sessionId: null }
+    navigate(route, { replace: true })
+    if (route.view === 'progress' && Number.isFinite(Number(route.scrollY))) {
+      window.setTimeout(() => {
+        try { window.scrollTo({ top: Number(route.scrollY), behavior: 'auto' }) } catch {}
+      }, 0)
+    }
   }, [navigate, setSelectedSession, setSessions])
 
   return {

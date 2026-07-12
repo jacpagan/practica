@@ -37,6 +37,11 @@ export const useSessionDetailActions = ({
       ? detailReturnRoute
       : fallback
     navigate(route)
+    if (route.view === 'progress' && Number.isFinite(Number(route.scrollY))) {
+      window.setTimeout(() => {
+        try { window.scrollTo({ top: Number(route.scrollY), behavior: 'auto' }) } catch {}
+      }, 0)
+    }
     setSelectedSession(null)
     setJustUploadedSessionId(null)
     setJustUploadedSession?.(null)

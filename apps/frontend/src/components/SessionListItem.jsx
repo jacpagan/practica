@@ -20,14 +20,14 @@ export default function SessionListItem({ session, onOpen, showSeries = false, h
   const recordedAtLabel = formatCompactDateTime(recordedAt)
   const metadataLabel = hasDuration ? `${recordedAtLabel} • ${fmtTimer(durationSeconds)}` : recordedAtLabel
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      onMouseEnter={() => { if (prefetch) prefetchSession(session.id) }}
-      className={`w-full text-left rounded-2xl border px-4 py-4 hover:bg-gray-50 transition-colors ${highlight ? 'border-gray-900 bg-gray-50/50' : 'border-gray-200'}`}
-    >
+    <div className={`w-full rounded-2xl border px-4 py-4 transition-colors ${highlight ? 'border-gray-900 bg-gray-50/50' : 'border-gray-200'}`}>
       <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3 min-w-0">
+        <button
+          type="button"
+          onClick={onOpen}
+          onMouseEnter={() => { if (prefetch) prefetchSession(session.id) }}
+          className="flex min-w-0 flex-1 items-start gap-3 text-left"
+        >
           <VideoThumbnail session={session} variant="poster" className="relative w-24 h-16 rounded-xl shrink-0" />
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -49,19 +49,19 @@ export default function SessionListItem({ session, onOpen, showSeries = false, h
             <p className="text-sm font-medium text-gray-900 mt-2 line-clamp-1">{session.title || 'Untitled'}</p>
             <p className="text-xs text-gray-500 mt-1">{metadataLabel}</p>
           </div>
-            </div>
-            <div className="text-right shrink-0 space-y-2">
-              {onChangeSkill ? (
-                <button
-                  type="button"
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChangeSkill?.() }}
-                  className="text-[11px] px-2.5 py-1.5 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50"
-                >
-                  {session.practice_series ? 'Change skill' : 'Add to skill'}
-                </button>
-              ) : null}
-            </div>
+        </button>
+        <div className="text-right shrink-0 space-y-2">
+          {onChangeSkill ? (
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChangeSkill?.() }}
+              className="text-[11px] px-2.5 py-1.5 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50"
+            >
+              {session.practice_series ? 'Change skill' : 'Add skill'}
+            </button>
+          ) : null}
+        </div>
       </div>
-    </button>
+    </div>
   )
 }

@@ -293,6 +293,11 @@ function AppContent() {
     setSelectedSession,
     setSessions,
   })
+  const onProgressSessionUpdate = useCallback((sessionData) => {
+    setSessions((current) => current.map((item) => (
+      item.id === sessionData.id ? { ...item, ...sessionData } : item
+    )))
+  }, [setSessions])
   const isImmersiveMobileView = view === 'record' || view === 'detail'
 
   if (loading) {
@@ -400,6 +405,7 @@ function AppContent() {
             highlightSession={justUploadedSession}
             onOpenSession={openSession}
             onOpenSkill={goSkill}
+            onSessionUpdate={onProgressSessionUpdate}
           />
         )}
 
