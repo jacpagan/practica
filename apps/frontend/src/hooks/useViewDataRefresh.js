@@ -8,6 +8,7 @@ export const useViewDataRefresh = ({
   useEffect(() => {
     if (!user) return
     if (view === 'privacy') return
+    if (view === 'internalMetrics') return
     loadSessions()
   }, [
     loadSessions,

@@ -13,6 +13,7 @@ from videos.views import (
     user_search_view,
     client_error_view,
     product_event_insights_view,
+    internal_metrics_view,
     invite_codes, invite_code_detail,
     favicon,
 )
@@ -91,6 +92,7 @@ urlpatterns = [
     path('api/users/search/', user_search_view, name='user_search'),
     path('api/client-errors/', client_error_view, name='client_error'),
     path('api/product-events/insights/', product_event_insights_view, name='product_event_insights'),
+    path('api/internal/metrics/', internal_metrics_view, name='internal_metrics'),
     path('api/review/<slug:token>/', review_link_info, name='review_link_info'),
     path('api/review/<slug:token>/feedback/', review_link_feedback, name='review_link_feedback'),
     path('api/review/<slug:token>/responses/', review_link_challenge_response, name='review_link_challenge_response'),

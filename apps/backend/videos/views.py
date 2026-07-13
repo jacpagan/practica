@@ -16,7 +16,7 @@ from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
 
-from .models import ProductEventLog, SignupInviteCode
+from .models import ProductEventLog, Session, SignupInviteCode
 from .serializers import (
     UserSerializer, RegisterSerializer,
     SignupInviteCodeSerializer,
@@ -268,6 +268,152 @@ def product_event_insights_view(request):
         'top_paths': top_paths,
         'recent_events': recent_events,
         'upload_summary': upload_summary,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def internal_metrics_view(request):
+    if not request.user.is_staff:
+        return Response({'error': 'Not allowed'}, status=status.HTTP_403_FORBIDDEN)
+
+    now = timezone.now()
+    day_ago = now - timezone.timedelta(days=1)
+    seven_days_ago = now - timezone.timedelta(days=7)
+    thirty_days_ago = now - timezone.timedelta(days=30)
+
+    sessions_qs = Session.objects.select_related('user').all()
+    events_qs = ProductEventLog.objects.select_related('user').all()
+
+    def session_count_since(threshold):
+        return sessions_qs.filter(recorded_at__gte=threshold).count()
+
+    def active_user_count_since(threshold):
+        session_user_ids = set(
+            sessions_qs
+            .filter(recorded_at__gte=threshold, user__isnull=False)
+            .values_list('user_id', flat=True)
+        )
+        event_user_ids = set(
+            events_qs
+            .filter(created_at__gte=threshold, user__isnull=False)
+            .values_list('user_id', flat=True)
+        )
+        return len(session_user_ids | event_user_ids)
+
+    upload_event_names = [
+        'session_upload_started',
+        'session_upload_succeeded',
+        'session_upload_failed',
+        'session_upload_aborted',
+        'session_upload_paused',
+    ]
+    upload_events = list(
+        events_qs
+        .filter(created_at__gte=thirty_days_ago, event_name__in=upload_event_names)
+        .values('event_name', 'extra_json')
+    )
+    upload_counts = Counter(row['event_name'] for row in upload_events)
+    upload_bytes = 0
+    upload_durations_ms = []
+    upload_failure_codes = Counter()
+    for row in upload_events:
+        extra = row.get('extra_json') if isinstance(row.get('extra_json'), dict) else {}
+        if row['event_name'] == 'session_upload_succeeded':
+            size = extra.get('file_size_bytes')
+            if isinstance(size, int) and size > 0:
+                upload_bytes += size
+            duration = extra.get('duration_ms')
+            if isinstance(duration, int) and duration >= 0:
+                upload_durations_ms.append(duration)
+        if row['event_name'] == 'session_upload_failed':
+            upload_failure_codes[str(extra.get('code') or 'unknown')] += 1
+
+    first_sessions = {}
+    repeat_users_1d = set()
+    repeat_users_7d = set()
+    for item in sessions_qs.filter(user__isnull=False).order_by('user_id', 'recorded_at').values('user_id', 'recorded_at'):
+        user_id = item['user_id']
+        recorded_at = item['recorded_at']
+        if not user_id or not recorded_at:
+            continue
+        first_at = first_sessions.get(user_id)
+        if first_at is None:
+            first_sessions[user_id] = recorded_at
+            continue
+        if recorded_at <= first_at + timezone.timedelta(days=1):
+            repeat_users_1d.add(user_id)
+        if recorded_at <= first_at + timezone.timedelta(days=7):
+            repeat_users_7d.add(user_id)
+
+    latest_events = list(
+        events_qs
+        .values('event_name', 'path', 'is_authenticated', 'extra_json', 'created_at', 'user__username')
+        .order_by('-created_at')[:12]
+    )
+    latest_proofs = list(
+        sessions_qs
+        .values('id', 'title', 'practice_series', 'processing_status', 'recorded_at', 'user__username')
+        .order_by('-recorded_at')[:12]
+    )
+
+    return Response({
+        'generated_at': now.isoformat(),
+        'people': {
+            'total_users': User.objects.count(),
+            'staff_users': User.objects.filter(is_staff=True).count(),
+            'users_with_proofs': sessions_qs.filter(user__isnull=False).values('user_id').distinct().count(),
+            'active_24h': active_user_count_since(day_ago),
+            'active_7d': active_user_count_since(seven_days_ago),
+            'active_30d': active_user_count_since(thirty_days_ago),
+        },
+        'proofs': {
+            'total': sessions_qs.count(),
+            'last_24h': session_count_since(day_ago),
+            'last_7d': session_count_since(seven_days_ago),
+            'last_30d': session_count_since(thirty_days_ago),
+            'ready': sessions_qs.filter(processing_status=Session.STATUS_READY).count(),
+            'processing': sessions_qs.filter(processing_status=Session.STATUS_PROCESSING).count(),
+            'failed': sessions_qs.filter(processing_status=Session.STATUS_FAILED).count(),
+        },
+        'uploads_30d': {
+            'started': upload_counts.get('session_upload_started', 0),
+            'succeeded': upload_counts.get('session_upload_succeeded', 0),
+            'failed': upload_counts.get('session_upload_failed', 0),
+            'paused': upload_counts.get('session_upload_paused', 0),
+            'aborted': upload_counts.get('session_upload_aborted', 0),
+            'success_file_bytes': upload_bytes,
+            'avg_success_duration_ms': int(sum(upload_durations_ms) / len(upload_durations_ms)) if upload_durations_ms else 0,
+            'top_failure_codes': [{'code': code, 'count': count} for code, count in upload_failure_codes.most_common(6)],
+        },
+        'retention': {
+            'users_with_first_proof': len(first_sessions),
+            'repeat_within_1d': len(repeat_users_1d),
+            'repeat_within_7d': len(repeat_users_7d),
+        },
+        'skills': {
+            'top': list(
+                sessions_qs
+                .exclude(practice_series='')
+                .values('practice_series')
+                .annotate(count=Count('id'))
+                .order_by('-count', 'practice_series')[:10]
+            ),
+            'tagged_proofs': sessions_qs.exclude(practice_series='').count(),
+            'untagged_proofs': sessions_qs.filter(practice_series='').count(),
+        },
+        'events_30d': {
+            'total': events_qs.filter(created_at__gte=thirty_days_ago).count(),
+            'top': list(
+                events_qs
+                .filter(created_at__gte=thirty_days_ago)
+                .values('event_name')
+                .annotate(count=Count('id'))
+                .order_by('-count', 'event_name')[:10]
+            ),
+        },
+        'latest_events': latest_events,
+        'latest_proofs': latest_proofs,
     })
 
 

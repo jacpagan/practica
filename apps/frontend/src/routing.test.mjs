@@ -16,6 +16,13 @@ test('parseRoute keeps progress aliases on the Today view', () => {
   assert.equal(parseRoute('/today').view, 'progress')
 })
 
+test('parseRoute keeps internal metrics route', () => {
+  const route = parseRoute('/internal/metrics')
+
+  assert.equal(route.view, 'internalMetrics')
+  assert.equal(routePath(route), '/internal/metrics')
+})
+
 test('parseRoute keeps challenge recorder skill context', () => {
   const route = parseRoute('/record', '?skill=Shoulder%20press&challenge=review-token-123')
 

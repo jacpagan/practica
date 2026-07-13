@@ -35,6 +35,7 @@ import BrandLogo from './components/BrandLogo'
 const SessionDetail = React.lazy(() => import('./components/SessionDetail'))
 const ProgressView = React.lazy(() => import('./components/ProgressView'))
 const SkillView = React.lazy(() => import('./components/SkillView'))
+const InternalMetrics = React.lazy(() => import('./components/InternalMetrics'))
 const SharedProofPage = React.lazy(() => import('./components/SharedProofPage').then((module) => ({ default: module.SharedProofPage })))
 const SharedSkillPage = React.lazy(() => import('./components/SharedProofPage').then((module) => ({ default: module.SharedSkillPage })))
 import PrivacyPage from './components/PrivacyPage'
@@ -374,6 +375,14 @@ function AppContent() {
               <button onClick={goPrivacy} className="hidden text-xs text-gray-400 hover:text-gray-600 transition-colors sm:inline">
                 Privacy
               </button>
+              {user.is_staff ? (
+                <button
+                  onClick={() => navigate({ view: 'internalMetrics', sessionId: null })}
+                  className="hidden text-xs text-gray-400 hover:text-gray-600 transition-colors sm:inline"
+                >
+                  Metrics
+                </button>
+              ) : null}
               <span className="hidden sm:inline text-xs text-gray-400">{user.display_name || user.username}</span>
               <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
                 Log out
@@ -395,6 +404,14 @@ function AppContent() {
 
         {view === 'privacy' && (
           <PrivacyPage signedIn onBack={goProgress} />
+        )}
+
+        {view === 'internalMetrics' && (
+          <InternalMetrics
+            token={token}
+            user={user}
+            onBack={goProgress}
+          />
         )}
 
         {view === 'progress' && (

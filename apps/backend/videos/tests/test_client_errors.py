@@ -1,9 +1,11 @@
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from videos.models import ProductEventLog
+from videos.models import ProductEventLog, Session
 
 
 class ClientErrorTelemetryTests(APITestCase):
@@ -166,3 +168,58 @@ class ClientErrorTelemetryTests(APITestCase):
         self.assertEqual(summary['top_failure_statuses'][0]['count'], 2)
         self.assertEqual(summary['top_failure_phases'][0]['phase'], 'resuming')
         self.assertEqual(summary['top_failure_phases'][0]['count'], 2)
+
+    def test_internal_metrics_requires_staff(self):
+        user = User.objects.create_user(username='metrics-member', password='test-pass')
+        self.client.force_authenticate(user=user)
+
+        response = self.client.get('/api/internal/metrics/')
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_internal_metrics_returns_core_loop_counts_for_staff(self):
+        staff = User.objects.create_user(username='metrics-admin', password='test-pass', is_staff=True)
+        member = User.objects.create_user(username='metrics-member', password='test-pass')
+        first_at = timezone.now() - timedelta(days=5)
+        second_at = first_at + timedelta(hours=6)
+        first = Session.objects.create(
+            user=member,
+            title='First proof',
+            practice_series='Pushups',
+            processing_status=Session.STATUS_READY,
+        )
+        second = Session.objects.create(
+            user=member,
+            title='Second proof',
+            practice_series='Pushups',
+            processing_status=Session.STATUS_READY,
+        )
+        Session.objects.filter(pk=first.pk).update(recorded_at=first_at)
+        Session.objects.filter(pk=second.pk).update(recorded_at=second_at)
+        ProductEventLog.objects.create(
+            event_name='session_upload_succeeded',
+            user=member,
+            is_authenticated=True,
+            extra_json={'file_size_bytes': 1000, 'duration_ms': 500, 'upload_mode': 'single'},
+        )
+        ProductEventLog.objects.create(
+            event_name='session_upload_failed',
+            user=member,
+            is_authenticated=True,
+            extra_json={'code': 'network_error', 'upload_mode': 'single'},
+        )
+
+        self.client.force_authenticate(user=staff)
+        response = self.client.get('/api/internal/metrics/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['people']['total_users'], 2)
+        self.assertEqual(response.data['people']['users_with_proofs'], 1)
+        self.assertEqual(response.data['proofs']['total'], 2)
+        self.assertEqual(response.data['proofs']['ready'], 2)
+        self.assertEqual(response.data['uploads_30d']['succeeded'], 1)
+        self.assertEqual(response.data['uploads_30d']['failed'], 1)
+        self.assertEqual(response.data['uploads_30d']['success_file_bytes'], 1000)
+        self.assertEqual(response.data['retention']['repeat_within_1d'], 1)
+        self.assertEqual(response.data['skills']['top'][0]['practice_series'], 'Pushups')
+        self.assertEqual(response.data['skills']['top'][0]['count'], 2)

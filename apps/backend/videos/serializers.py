@@ -72,8 +72,9 @@ class UserSerializer(serializers.ModelSerializer):
             'username',
             'email',
             'display_name',
+            'is_staff',
         ]
-        read_only_fields = ['id']
+        read_only_fields = ['id', 'is_staff']
 
     def get_display_name(self, obj):
         if hasattr(obj, 'profile') and obj.profile.display_name:
