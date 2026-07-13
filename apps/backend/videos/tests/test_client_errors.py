@@ -208,12 +208,28 @@ class ClientErrorTelemetryTests(APITestCase):
             is_authenticated=True,
             extra_json={'code': 'network_error', 'upload_mode': 'single'},
         )
+        qa_user = User.objects.create_user(username='qa_student_123', password='test-pass')
+        qa_session = Session.objects.create(
+            user=qa_user,
+            title='QA proof',
+            practice_series='QA skill',
+            processing_status=Session.STATUS_READY,
+        )
+        Session.objects.filter(pk=qa_session.pk).update(recorded_at=timezone.now())
+        inactive_user = User.objects.create_user(username='inactive-user', password='test-pass', is_active=False)
+        Session.objects.create(
+            user=inactive_user,
+            title='Inactive proof',
+            practice_series='Inactive skill',
+            processing_status=Session.STATUS_READY,
+        )
 
         self.client.force_authenticate(user=staff)
         response = self.client.get('/api/internal/metrics/')
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['people']['total_users'], 2)
+        self.assertEqual(response.data['filters']['excluded_test_users'], 2)
         self.assertEqual(response.data['people']['users_with_proofs'], 1)
         self.assertEqual(response.data['proofs']['total'], 2)
         self.assertEqual(response.data['proofs']['ready'], 2)

@@ -282,9 +282,16 @@ def internal_metrics_view(request):
     seven_days_ago = now - timezone.timedelta(days=7)
     thirty_days_ago = now - timezone.timedelta(days=30)
 
-    sessions_qs = Session.objects.select_related('user').all()
-    events_qs = ProductEventLog.objects.select_related('user').all()
-    users_qs = User.objects.all()
+    excluded_user_q = (
+        Q(is_active=False)
+        | Q(username__startswith='qa_')
+        | Q(username__startswith='smoke_')
+        | Q(username__startswith='prod_e2e_')
+    )
+    users_qs = User.objects.exclude(excluded_user_q)
+    excluded_user_ids = set(User.objects.filter(excluded_user_q).values_list('id', flat=True))
+    sessions_qs = Session.objects.select_related('user').exclude(user_id__in=excluded_user_ids)
+    events_qs = ProductEventLog.objects.select_related('user').exclude(user_id__in=excluded_user_ids)
 
     def session_count_since(threshold):
         return sessions_qs.filter(recorded_at__gte=threshold).count()
@@ -471,6 +478,11 @@ def internal_metrics_view(request):
 
     return Response({
         'generated_at': now.isoformat(),
+        'filters': {
+            'excluded_test_users': len(excluded_user_ids),
+            'excluded_prefixes': ['qa_', 'smoke_', 'prod_e2e_'],
+            'inactive_users_excluded': True,
+        },
         'people': {
             'total_users': users_qs.count(),
             'staff_users': users_qs.filter(is_staff=True).count(),
