@@ -35,6 +35,7 @@ import BrandLogo from './components/BrandLogo'
 const SessionDetail = React.lazy(() => import('./components/SessionDetail'))
 const ProgressView = React.lazy(() => import('./components/ProgressView'))
 const SkillView = React.lazy(() => import('./components/SkillView'))
+const FirstProofOnboarding = React.lazy(() => import('./components/FirstProofOnboarding'))
 const InternalMetrics = React.lazy(() => import('./components/InternalMetrics'))
 const SharedProofPage = React.lazy(() => import('./components/SharedProofPage').then((module) => ({ default: module.SharedProofPage })))
 const SharedSkillPage = React.lazy(() => import('./components/SharedProofPage').then((module) => ({ default: module.SharedSkillPage })))
@@ -285,6 +286,7 @@ function AppContent() {
   } = usePrimaryNavigation({ navigate })
 
   const progressNavActive = view === 'progress' || view === 'skill' || view === 'detail'
+  const showFirstProofOnboarding = view === 'progress' && !sessionsLoading && sessions.length === 0 && !justUploadedSession
 
   const {
     onDetailSessionDelete,
@@ -414,7 +416,18 @@ function AppContent() {
           />
         )}
 
-        {view === 'progress' && (
+        {view === 'progress' && showFirstProofOnboarding && (
+          <FirstProofOnboarding
+            user={user}
+            skillOptions={skillOptions}
+            onStartFirstProof={(skillName) => startRecord({
+              skillName,
+              returnRoute: { view: 'progress', sessionId: null, seriesName: '' },
+            })}
+          />
+        )}
+
+        {view === 'progress' && !showFirstProofOnboarding && (
           <ProgressView
             sessions={sessions}
             sessionsLoading={sessionsLoading}

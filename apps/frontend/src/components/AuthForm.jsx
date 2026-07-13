@@ -25,7 +25,7 @@ function AuthForm({
   const [loading, setLoading] = useState(false)
 
   const title = contextTitle || 'Practica'
-  const subtitle = contextSubtitle || 'Private video proof for building skills one rep at a time.'
+  const subtitle = contextSubtitle || 'Pick one skill. Save one proof. Compare the next one.'
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -68,9 +68,9 @@ function AuthForm({
         <p className="text-sm text-gray-400 text-center mb-8">{subtitle}</p>
         {!embedded ? (
           <div className="mb-6 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-center">
-            <p className="text-sm font-medium text-gray-900">Pick. Record. See progress. Repeat.</p>
+            <p className="text-sm font-medium text-gray-900">Start with one short proof.</p>
             <p className="mt-1 text-xs leading-5 text-gray-500">
-              A private proof archive for habits, lifts, music, rehab, sports, and everyday practice.
+              Choose what you are practicing, record a baseline, then come back when there is something to compare.
             </p>
           </div>
         ) : null}
