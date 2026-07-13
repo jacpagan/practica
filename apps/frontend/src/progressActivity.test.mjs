@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { buildActivityWeeks, buildProofCountByDay, buildRecommendedNextSkill, buildSkillSummaries, buildTodayLoopState } from './progressActivity.js'
+import { buildActivityWeeks, buildLatestSkillComparison, buildProofCountByDay, buildRecommendedNextSkill, buildSkillSummaries, buildTodayLoopState } from './progressActivity.js'
 
 test('buildProofCountByDay aggregates proofs per local day', () => {
   const sessions = [
@@ -43,6 +43,29 @@ test('buildRecommendedNextSkill selects the most recent tagged skill', () => {
   assert.equal(recommended.skillName, 'Drumming')
   assert.equal(recommended.proofCount, 2)
   assert.equal(recommended.proofDayCount, 2)
+})
+
+test('buildLatestSkillComparison returns latest and previous proofs with days apart', () => {
+  const comparison = buildLatestSkillComparison([
+    { id: 1, recorded_at: '2099-01-01T09:00:00Z' },
+    { id: 2, recorded_at: '2099-01-04T09:00:00Z' },
+    { id: 3, recorded_at: '2099-01-03T09:00:00Z' },
+  ])
+
+  assert.equal(comparison.hasComparison, true)
+  assert.equal(comparison.latest.id, 2)
+  assert.equal(comparison.previous.id, 3)
+  assert.equal(comparison.daysApart, 1)
+})
+
+test('buildLatestSkillComparison handles a first proof without comparison', () => {
+  const comparison = buildLatestSkillComparison([
+    { id: 1, recorded_at: '2099-01-01T09:00:00Z' },
+  ])
+
+  assert.equal(comparison.hasComparison, false)
+  assert.equal(comparison.latest.id, 1)
+  assert.equal(comparison.previous, null)
 })
 
 test('buildTodayLoopState describes the empty first-proof state', () => {

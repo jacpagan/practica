@@ -208,6 +208,13 @@ class ClientErrorTelemetryTests(APITestCase):
             is_authenticated=True,
             extra_json={'code': 'network_error', 'upload_mode': 'single'},
         )
+        noisy_session = Session.objects.create(
+            user=member,
+            title='Noisy proof',
+            practice_series='Test',
+            processing_status=Session.STATUS_READY,
+        )
+        Session.objects.filter(pk=noisy_session.pk).update(recorded_at=timezone.now())
         qa_user = User.objects.create_user(username='qa_student_123', password='test-pass')
         qa_session = Session.objects.create(
             user=qa_user,
@@ -250,3 +257,6 @@ class ClientErrorTelemetryTests(APITestCase):
         self.assertEqual(response.data['skills']['top'][0]['practice_series'], 'Pushups')
         self.assertEqual(response.data['skills']['top'][0]['count'], 2)
         self.assertEqual(response.data['skills']['top'][0]['user_count'], 1)
+        self.assertEqual(response.data['skills']['excluded_noisy_proofs'], 1)
+        self.assertNotIn('Test', [row['practice_series'] for row in response.data['skills']['top']])
+        self.assertNotIn('Noisy proof', [row['title'] for row in response.data['latest_proofs']])

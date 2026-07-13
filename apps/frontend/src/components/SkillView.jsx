@@ -2,7 +2,9 @@ import React, { useMemo, useState } from 'react'
 import SessionListItem from './SessionListItem'
 import SkillPickerModal from './SkillPickerModal'
 import ActivityCalendar from './ActivityCalendar'
+import VideoThumbnail from './VideoThumbnail'
 import { useToast } from './Toast'
+import { buildLatestSkillComparison } from '../progressActivity'
 import { buildSkillShareText, reportClientEvent, toLocalDateKey } from '../utils'
 
 const formatCompactDateTime = (value) => {
@@ -11,6 +13,32 @@ const formatCompactDateTime = (value) => {
   const dayPart = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
   const timePart = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
   return `${dayPart} · ${timePart}`
+}
+
+function CompareProofCard({ label, session, onOpen }) {
+  if (!session) {
+    return (
+      <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-gray-400">{label}</p>
+        <p className="mt-8 text-sm text-gray-500">No proof yet</p>
+      </div>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen?.(session)}
+      className="overflow-hidden rounded-xl border border-gray-200 bg-white text-left transition-colors hover:border-gray-300"
+    >
+      <VideoThumbnail session={session} variant="poster" className="aspect-video w-full bg-black" />
+      <div className="p-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-gray-400">{label}</p>
+        <p className="mt-1 truncate text-sm font-semibold text-gray-950">{session.title || 'Proof'}</p>
+        <p className="mt-1 text-xs text-gray-500">{formatCompactDateTime(session.recorded_at || session.created_at)}</p>
+      </div>
+    </button>
+  )
 }
 
 function SkillView({ skillName = '', sessions = [], sessionsLoading = false, token = '', onBack, onOpenSession, onRecord }) {
@@ -41,6 +69,7 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
   }, [skillName, sessions])
 
   const latestSession = skillSessions[0] || null
+  const comparison = useMemo(() => buildLatestSkillComparison(skillSessions), [skillSessions])
   const skillProofDays = useMemo(() => {
     const days = new Set()
     skillSessions.forEach((session) => {
@@ -196,6 +225,34 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
         ) : (
           <>
             <ActivityCalendar sessions={skillSessions} />
+
+            <div className="rounded-2xl border border-gray-200 bg-white p-4">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-gray-950">Latest vs previous</p>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {comparison.hasComparison
+                      ? `${comparison.daysApart} ${comparison.daysApart === 1 ? 'day' : 'days'} between these proofs.`
+                      : 'Your next proof will create the first comparison.'}
+                  </p>
+                </div>
+                {comparison.hasComparison ? (
+                  <p className="text-xs text-gray-400">What changed?</p>
+                ) : null}
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <CompareProofCard
+                  label="Latest"
+                  session={comparison.latest}
+                  onOpen={(session) => onOpenSession?.(session, { view: 'skill', sessionId: null, seriesName: skillName })}
+                />
+                <CompareProofCard
+                  label="Previous"
+                  session={comparison.previous}
+                  onOpen={(session) => onOpenSession?.(session, { view: 'skill', sessionId: null, seriesName: skillName })}
+                />
+              </div>
+            </div>
 
             <div className="space-y-3">
               {skillSessions.map((session) => (

@@ -288,9 +288,16 @@ def internal_metrics_view(request):
         | Q(username__startswith='smoke_')
         | Q(username__startswith='prod_e2e_')
     )
+    excluded_skill_q = (
+        Q(practice_series__iexact='test')
+        | Q(practice_series__iexact='test hello')
+        | Q(practice_series__istartswith='qa ')
+        | Q(practice_series__istartswith='prod e2e')
+    )
     users_qs = User.objects.exclude(excluded_user_q)
     excluded_user_ids = set(User.objects.filter(excluded_user_q).values_list('id', flat=True))
-    sessions_qs = Session.objects.select_related('user').exclude(user_id__in=excluded_user_ids)
+    base_sessions_qs = Session.objects.select_related('user').exclude(user_id__in=excluded_user_ids)
+    sessions_qs = base_sessions_qs.exclude(excluded_skill_q)
     events_qs = ProductEventLog.objects.select_related('user').exclude(user_id__in=excluded_user_ids)
 
     def session_count_since(threshold):
@@ -482,6 +489,7 @@ def internal_metrics_view(request):
             'excluded_test_users': len(excluded_user_ids),
             'excluded_prefixes': ['qa_', 'smoke_', 'prod_e2e_'],
             'inactive_users_excluded': True,
+            'excluded_skill_names': ['Test', 'Test Hello'],
         },
         'people': {
             'total_users': users_qs.count(),
@@ -545,6 +553,7 @@ def internal_metrics_view(request):
             'top': skill_rows,
             'tagged_proofs': sessions_qs.exclude(practice_series='').count(),
             'untagged_proofs': sessions_qs.filter(practice_series='').count(),
+            'excluded_noisy_proofs': base_sessions_qs.filter(excluded_skill_q).count(),
         },
         'cohorts': list(sorted(signup_cohorts.values(), key=lambda row: row['cohort'], reverse=True)),
         'users': user_rows,

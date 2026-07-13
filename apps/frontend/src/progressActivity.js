@@ -112,6 +112,27 @@ export const buildRecommendedNextSkill = (sessions = []) => {
   }
 }
 
+export const buildLatestSkillComparison = (sessions = []) => {
+  const sorted = (Array.isArray(sessions) ? sessions : [])
+    .filter((session) => session?.id || session?.recorded_at || session?.created_at)
+    .slice()
+    .sort((left, right) => sessionTimestamp(right) - sessionTimestamp(left))
+  const latest = sorted[0] || null
+  const previous = sorted[1] || null
+  const latestAt = sessionTimestamp(latest)
+  const previousAt = sessionTimestamp(previous)
+  const daysApart = latestAt && previousAt
+    ? Math.max(0, Math.round((latestAt - previousAt) / 86400000))
+    : null
+
+  return {
+    latest,
+    previous,
+    hasComparison: Boolean(latest && previous),
+    daysApart,
+  }
+}
+
 export const buildTodayLoopState = (sessions = [], today = new Date()) => {
   const sorted = (Array.isArray(sessions) ? sessions : [])
     .filter((session) => session?.id || session?.recorded_at || session?.created_at)

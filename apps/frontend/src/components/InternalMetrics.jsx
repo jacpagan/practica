@@ -258,9 +258,10 @@ export default function InternalMetrics({ token = '', user = null, onBack }) {
             </Section>
 
             <Section title="Skills">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <StatCard label="Tagged proofs" value={formatNumber(data.skills?.tagged_proofs)} />
                 <StatCard label="Untagged proofs" value={formatNumber(data.skills?.untagged_proofs)} />
+                <StatCard label="Noisy proofs hidden" value={formatNumber(data.skills?.excluded_noisy_proofs)} detail="Test and QA-style skills" />
               </div>
               <MiniTable
                 rows={data.skills?.top || []}
