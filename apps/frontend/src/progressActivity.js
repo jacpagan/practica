@@ -112,6 +112,28 @@ export const buildRecommendedNextSkill = (sessions = []) => {
   }
 }
 
+export const buildRepeatComparisonTarget = (sessions = []) => {
+  const sorted = (Array.isArray(sessions) ? sessions : [])
+    .filter((session) => String(session?.practice_series || '').trim())
+    .slice()
+    .sort((left, right) => sessionTimestamp(right) - sessionTimestamp(left))
+
+  const latest = sorted[0] || null
+  if (!latest) return null
+
+  const skillName = String(latest.practice_series || '').trim()
+  const matching = sorted.filter((session) => String(session?.practice_series || '').trim().toLowerCase() === skillName.toLowerCase())
+  const previous = matching[1] || null
+
+  return {
+    skillName,
+    latest,
+    previous,
+    proofCount: matching.length,
+    canCompare: Boolean(previous),
+  }
+}
+
 export const buildTodayLoopState = (sessions = [], today = new Date()) => {
   const sorted = (Array.isArray(sessions) ? sessions : [])
     .filter((session) => session?.id || session?.recorded_at || session?.created_at)
@@ -122,6 +144,7 @@ export const buildTodayLoopState = (sessions = [], today = new Date()) => {
   const todaySessions = sorted.filter((session) => toLocalDateKey(session?.recorded_at || session?.created_at) === todayKey)
   const proofDayCount = new Set(sorted.map((session) => toLocalDateKey(session?.recorded_at || session?.created_at)).filter(Boolean)).size
   const recommendedSkill = buildRecommendedNextSkill(sorted)
+  const repeatComparison = buildRepeatComparisonTarget(sorted)
 
   return {
     status: sorted.length === 0 ? 'empty' : (todaySessions.length > 0 ? 'done_today' : 'ready_today'),
@@ -130,6 +153,7 @@ export const buildTodayLoopState = (sessions = [], today = new Date()) => {
     todayLatest: todaySessions[0] || null,
     latestSession: sorted[0] || null,
     recommendedSkill,
+    repeatComparison,
     nextSkillName: recommendedSkill?.skillName || '',
     totalProofCount: sorted.length,
     proofDayCount,

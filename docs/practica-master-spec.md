@@ -74,7 +74,7 @@ That wedge is narrow on purpose. It is easier to explain, recruit, and charge fo
 - school or institution administration
 - billing and subscriptions
 - public marketplace mechanics
-- rich comparison tooling beyond proof/history organization
+- heavy comparison tooling that requires scoring, writing, or setup
 - email or push-notification delivery infrastructure
 
 ## Core Loop
@@ -85,7 +85,7 @@ The core loop is:
 2. do a tiny action
 3. record proof
 4. tag the skill if useful
-5. see progress and insight from the evidence
+5. compare the newest proof with recent proof from the same skill when useful
 6. repeat when ready, with the same skill or a different one
 
 This loop is the product. Everything else should support it.
@@ -101,7 +101,7 @@ When the metronome is on, the recorder plays a simple click track (BPM, time sig
 3. A member can tag proofs across multiple skills or habits.
 4. A member can see effort-based progress where each saved proof counts.
 5. A member can get useful interpretation from their own practice data.
-6. A member can continue the loop with another take.
+6. A member can continue the loop with another take from the same skill and compare against prior proof.
 
 ## Roles And Access Model
 
@@ -125,6 +125,7 @@ Practica is already strongest at:
 - playback-ready takes
 - private proof history
 - repeatable progress tracking
+- low-friction same-skill comparison
 - quick record and save loops
 
 The current product does **not** require AI or ML to work or to generate revenue.
@@ -160,7 +161,7 @@ Current gaps:
 
 ### Next
 
-- deepen progress feedback
+- make same-skill repeat and comparison obvious
 - make recent skills and proof tagging clearer
 - shape pricing around real use
 

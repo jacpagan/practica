@@ -5,7 +5,7 @@ import SkillSummaryCard from './SkillSummaryCard'
 import VideoThumbnail from './VideoThumbnail'
 import SkillField from './SkillField'
 import { useToast } from './Toast'
-import { buildSkillSummaries } from '../progressActivity'
+import { buildRepeatComparisonTarget, buildSkillSummaries } from '../progressActivity'
 import { consumeProgressScrollRestore, readArchiveCleanupOpen, saveArchiveCleanupOpen } from '../progressReturnState'
 import { buildProgressShareText, calculatePracticeProgress, fmtDate, reportClientEvent, toLocalDateKey } from '../utils'
 
@@ -24,6 +24,7 @@ export default function ProgressView({
   highlightSession = null,
   onOpenSession,
   onOpenSkill,
+  onRecord,
   onSessionUpdate,
 }) {
   const toast = useToast()
@@ -36,6 +37,7 @@ export default function ProgressView({
 
   const overview = useMemo(() => calculatePracticeProgress(sessions), [sessions])
   const skillSummaries = useMemo(() => buildSkillSummaries(sessions), [sessions])
+  const repeatComparison = useMemo(() => buildRepeatComparisonTarget(sessions), [sessions])
   const taggedSummaries = useMemo(() => skillSummaries.filter((item) => !item.isUngrouped), [skillSummaries])
   const ungroupedSummary = useMemo(() => skillSummaries.find((item) => item.isUngrouped) || null, [skillSummaries])
   const skillOptions = useMemo(() => (
@@ -376,6 +378,62 @@ export default function ProgressView({
                   {latestSession.practice_series ? ` · ${latestSession.practice_series}` : ''}
                 </p>
               </button>
+            ) : null}
+
+            {repeatComparison ? (
+              <div className="rounded-2xl border border-gray-900 bg-white p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Repeat and compare</p>
+                    <h3 className="mt-1 text-lg font-semibold text-gray-950">Record {repeatComparison.skillName} again</h3>
+                    <p className="mt-1 text-sm text-gray-600">
+                      {repeatComparison.canCompare
+                        ? 'Use the last take as your reference. No notes needed.'
+                        : 'One more take gives you something to compare.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onRecord?.(repeatComparison.skillName)}
+                    className="inline-flex w-full items-center justify-center rounded-xl bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-gray-800 sm:w-auto"
+                  >
+                    Record again
+                  </button>
+                </div>
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => onOpenSession?.(repeatComparison.latest, progressReturnRoute())}
+                    className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50 text-left transition-colors hover:bg-gray-100"
+                  >
+                    <VideoThumbnail session={repeatComparison.latest} variant="poster" className="h-32 w-full bg-black object-cover" />
+                    <div className="p-3">
+                      <p className="text-xs font-medium text-gray-500">Latest</p>
+                      <p className="mt-1 truncate text-sm font-semibold text-gray-900">{repeatComparison.latest?.title || 'Proof'}</p>
+                      <p className="mt-0.5 text-xs text-gray-500">{formatCompactDateTime(repeatComparison.latest?.recorded_at || repeatComparison.latest?.created_at)}</p>
+                    </div>
+                  </button>
+                  {repeatComparison.previous ? (
+                    <button
+                      type="button"
+                      onClick={() => onOpenSession?.(repeatComparison.previous, progressReturnRoute())}
+                      className="overflow-hidden rounded-xl border border-gray-200 bg-gray-50 text-left transition-colors hover:bg-gray-100"
+                    >
+                      <VideoThumbnail session={repeatComparison.previous} variant="poster" className="h-32 w-full bg-black object-cover" />
+                      <div className="p-3">
+                        <p className="text-xs font-medium text-gray-500">Previous</p>
+                        <p className="mt-1 truncate text-sm font-semibold text-gray-900">{repeatComparison.previous?.title || 'Proof'}</p>
+                        <p className="mt-0.5 text-xs text-gray-500">{formatCompactDateTime(repeatComparison.previous?.recorded_at || repeatComparison.previous?.created_at)}</p>
+                      </div>
+                    </button>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4">
+                      <p className="text-sm font-medium text-gray-900">Next comparison slot</p>
+                      <p className="mt-1 text-sm text-gray-500">After this take, Practica can show today beside the earlier one.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             ) : null}
 
             {todaySessions.length > 1 ? (
