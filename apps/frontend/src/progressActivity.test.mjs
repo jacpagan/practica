@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { buildActivityWeeks, buildProofCountByDay, buildRecommendedNextSkill, buildRepeatComparisonTarget, buildSkillSummaries, buildTodayLoopState } from './progressActivity.js'
+import { buildActivityWeeks, buildProofCountByDay, buildRecommendedNextSkill, buildSkillSummaries, buildTodayLoopState } from './progressActivity.js'
 
 test('buildProofCountByDay aggregates proofs per local day', () => {
   const sessions = [
@@ -45,32 +45,6 @@ test('buildRecommendedNextSkill selects the most recent tagged skill', () => {
   assert.equal(recommended.proofDayCount, 2)
 })
 
-test('buildRepeatComparisonTarget points to the latest skill and previous matching proof', () => {
-  const target = buildRepeatComparisonTarget([
-    { id: 1, practice_series: 'Pushups', recorded_at: '2099-01-01T09:00:00Z' },
-    { id: 2, practice_series: 'Squats', recorded_at: '2099-01-04T09:00:00Z' },
-    { id: 3, practice_series: 'Pushups', recorded_at: '2099-01-05T09:00:00Z' },
-    { id: 4, practice_series: '', recorded_at: '2099-01-06T09:00:00Z' },
-  ])
-
-  assert.equal(target.skillName, 'Pushups')
-  assert.equal(target.latest.id, 3)
-  assert.equal(target.previous.id, 1)
-  assert.equal(target.proofCount, 2)
-  assert.equal(target.canCompare, true)
-})
-
-test('buildRepeatComparisonTarget still suggests repeating when there is no previous match', () => {
-  const target = buildRepeatComparisonTarget([
-    { id: 1, practice_series: 'Pushups', recorded_at: '2099-01-01T09:00:00Z' },
-  ])
-
-  assert.equal(target.skillName, 'Pushups')
-  assert.equal(target.latest.id, 1)
-  assert.equal(target.previous, null)
-  assert.equal(target.canCompare, false)
-})
-
 test('buildTodayLoopState describes the empty first-proof state', () => {
   const state = buildTodayLoopState([], new Date('2099-01-03T12:00:00'))
 
@@ -102,5 +76,4 @@ test('buildTodayLoopState marks today complete without adding streak pressure', 
   assert.equal(state.proofRecordedToday, true)
   assert.equal(state.todayProofCount, 1)
   assert.equal(state.nextSkillName, 'Breathing')
-  assert.equal(state.repeatComparison.skillName, 'Breathing')
 })
