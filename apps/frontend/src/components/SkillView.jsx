@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import SessionListItem from './SessionListItem'
 import SkillPickerModal from './SkillPickerModal'
+import ActivityCalendar from './ActivityCalendar'
 import { useToast } from './Toast'
 import { buildSkillShareText, reportClientEvent, toLocalDateKey } from '../utils'
 
@@ -193,18 +194,22 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
             <p className="text-xs text-gray-500 mt-1">Record now, then Practica will keep it in your private archive.</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {skillSessions.map((session) => (
-              <SessionListItem
-                key={session.id}
-                session={session}
-                onOpen={() => onOpenSession?.(session, { view: 'skill', sessionId: null, seriesName: skillName })}
-                highlight={session.isLatest}
-                latestLabel={session.isLatest ? 'Latest' : ''}
-                minimal
-              />
-            ))}
-          </div>
+          <>
+            <ActivityCalendar sessions={skillSessions} />
+
+            <div className="space-y-3">
+              {skillSessions.map((session) => (
+                <SessionListItem
+                  key={session.id}
+                  session={session}
+                  onOpen={() => onOpenSession?.(session, { view: 'skill', sessionId: null, seriesName: skillName })}
+                  highlight={session.isLatest}
+                  latestLabel={session.isLatest ? 'Latest' : ''}
+                  minimal
+                />
+              ))}
+            </div>
+          </>
         )}
 
         <SkillPickerModal
