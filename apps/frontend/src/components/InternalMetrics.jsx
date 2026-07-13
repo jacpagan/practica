@@ -58,6 +58,26 @@ function Section({ title, children }) {
   )
 }
 
+function InsightStrip({ children }) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function InsightItem({ label, value, detail }) {
+  return (
+    <div>
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-400">{label}</p>
+      <p className="mt-1 text-xl font-semibold tracking-tight text-gray-950">{value}</p>
+      <p className="mt-1 text-xs text-gray-500">{detail}</p>
+    </div>
+  )
+}
+
 function MiniTable({ rows = [], columns = [], empty = 'No data yet.' }) {
   if (!rows.length) {
     return <div className="rounded-xl border border-dashed border-gray-200 p-4 text-sm text-gray-500">{empty}</div>
@@ -111,7 +131,10 @@ export default function InternalMetrics({ token = '', user = null, onBack }) {
   }, [token])
 
   const data = state.data || {}
-  const repeatBase = data.retention?.users_with_first_proof || 0
+  const activationBase = data.smart?.activation?.signups || 0
+  const repeatBase = data.smart?.repeat?.activated_users || 0
+  const uploadStarted = data.uploads_30d?.started || 0
+  const uploadSucceeded = data.uploads_30d?.succeeded || 0
   const proofReadyDetail = useMemo(() => {
     const ready = data.proofs?.ready || 0
     const failed = data.proofs?.failed || 0
@@ -135,9 +158,9 @@ export default function InternalMetrics({ token = '', user = null, onBack }) {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Internal</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-gray-950">Metrics</h1>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-gray-950">SMART Product Metrics</h1>
             <p className="mt-1 text-sm text-gray-500">
-              Database-backed product metrics. No AWS access required.
+              User activation, repeat behavior, proof frequency, and upload friction. No AWS access required.
             </p>
           </div>
           <button type="button" onClick={onBack} className="text-sm text-gray-500 hover:text-gray-900">Back to Today</button>
@@ -153,27 +176,69 @@ export default function InternalMetrics({ token = '', user = null, onBack }) {
 
         {data.generated_at ? (
           <>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard label="Total users" value={formatNumber(data.people?.total_users)} detail={`${formatNumber(data.people?.active_7d)} active 7d`} />
-              <StatCard label="Proofs saved" value={formatNumber(data.proofs?.total)} detail={`${formatNumber(data.proofs?.last_7d)} in last 7d`} />
-              <StatCard label="Upload success 30d" value={formatNumber(data.uploads_30d?.succeeded)} detail={`${formatNumber(data.uploads_30d?.failed)} failed`} />
-              <StatCard label="Repeat within 7d" value={formatPercent(data.retention?.repeat_within_7d, repeatBase)} detail={`${formatNumber(data.retention?.repeat_within_7d)} of ${formatNumber(repeatBase)} users`} />
-            </div>
+            <InsightStrip>
+              <InsightItem
+                label="Activation"
+                value={formatPercent(data.smart?.activation?.activated_users, activationBase)}
+                detail={`${formatNumber(data.smart?.activation?.activated_users)} of ${formatNumber(activationBase)} users saved proof`}
+              />
+              <InsightItem
+                label="Repeat"
+                value={formatPercent(data.smart?.repeat?.repeat_users, repeatBase)}
+                detail={`${formatNumber(data.smart?.repeat?.repeat_users)} users saved 2+ proofs`}
+              />
+              <InsightItem
+                label="Frequency"
+                value={formatNumber(data.smart?.frequency?.proofs_30d)}
+                detail={`${formatNumber(data.smart?.frequency?.proof_active_30d)} proof-active users in 30d`}
+              />
+              <InsightItem
+                label="Upload Reliability"
+                value={formatPercent(uploadSucceeded, uploadStarted)}
+                detail={`${formatNumber(uploadSucceeded)} succeeded, ${formatNumber(data.uploads_30d?.failed)} failed in 30d`}
+              />
+            </InsightStrip>
 
-            <Section title="People">
+            <Section title="Users">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <StatCard label="Active 24h" value={formatNumber(data.people?.active_24h)} />
-                <StatCard label="Active 30d" value={formatNumber(data.people?.active_30d)} />
-                <StatCard label="Users with proofs" value={formatNumber(data.people?.users_with_proofs)} />
+                <StatCard label="Total users" value={formatNumber(data.people?.total_users)} detail={`${formatNumber(data.people?.staff_users)} staff/admin`} />
+                <StatCard label="Not activated" value={formatNumber(data.people?.zero_proof_users)} detail="Signed up, no proof saved" />
+                <StatCard label="Dormant" value={formatNumber(data.people?.dormant_users)} detail="Saved proof, none in 30d" />
+              </div>
+              <MiniTable
+                rows={data.users || []}
+                columns={[
+                  { key: 'username', label: 'User' },
+                  { key: 'status', label: 'Status' },
+                  { key: 'proof_count', label: 'Proofs', render: (row) => formatNumber(row.proof_count) },
+                  { key: 'skill_count', label: 'Skills', render: (row) => formatNumber(row.skill_count) },
+                  { key: 'primary_skill', label: 'Primary skill', render: (row) => row.primary_skill || 'None yet' },
+                  { key: 'latest_proof_at', label: 'Latest proof', render: (row) => row.latest_proof_at ? formatDateTime(row.latest_proof_at) : 'None' },
+                ]}
+                empty="No users yet."
+              />
+            </Section>
+
+            <Section title="Core Loop Quality">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <StatCard label="Avg days to first proof" value={`${formatNumber(data.smart?.activation?.avg_days_to_first_proof)}d`} detail="Signup to first saved proof" />
+                <StatCard label="Avg proofs per activated user" value={formatNumber(data.smart?.frequency?.avg_proofs_per_activated_user)} detail={proofReadyDetail} />
+                <StatCard label="Repeat within 7d" value={formatPercent(data.smart?.repeat?.repeat_within_7d, repeatBase)} detail={`${formatNumber(data.smart?.repeat?.repeat_within_7d)} users`} />
               </div>
             </Section>
 
-            <Section title="Core Loop">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <StatCard label="Proofs 24h" value={formatNumber(data.proofs?.last_24h)} detail={proofReadyDetail} />
-                <StatCard label="Proofs 30d" value={formatNumber(data.proofs?.last_30d)} />
-                <StatCard label="Repeat within 1d" value={formatPercent(data.retention?.repeat_within_1d, repeatBase)} detail={`${formatNumber(data.retention?.repeat_within_1d)} users`} />
-              </div>
+            <Section title="Signup Cohorts">
+              <MiniTable
+                rows={data.cohorts || []}
+                columns={[
+                  { key: 'cohort', label: 'Month' },
+                  { key: 'users', label: 'Users', render: (row) => formatNumber(row.users) },
+                  { key: 'activated_users', label: 'Activated', render: (row) => `${formatNumber(row.activated_users)} (${formatPercent(row.activated_users, row.users)})` },
+                  { key: 'repeat_users', label: 'Repeat', render: (row) => `${formatNumber(row.repeat_users)} (${formatPercent(row.repeat_users, row.activated_users)})` },
+                  { key: 'proofs', label: 'Proofs', render: (row) => formatNumber(row.proofs) },
+                ]}
+                empty="No signup cohorts yet."
+              />
             </Section>
 
             <Section title="Uploads">
@@ -202,19 +267,10 @@ export default function InternalMetrics({ token = '', user = null, onBack }) {
                 columns={[
                   { key: 'practice_series', label: 'Skill' },
                   { key: 'count', label: 'Proofs', render: (row) => formatNumber(row.count) },
+                  { key: 'user_count', label: 'Users', render: (row) => formatNumber(row.user_count) },
+                  { key: 'latest_recorded_at', label: 'Latest', render: (row) => row.latest_recorded_at ? formatDateTime(row.latest_recorded_at) : '' },
                 ]}
                 empty="No tagged skills yet."
-              />
-            </Section>
-
-            <Section title="Events">
-              <MiniTable
-                rows={data.events_30d?.top || []}
-                columns={[
-                  { key: 'event_name', label: 'Event' },
-                  { key: 'count', label: 'Count', render: (row) => formatNumber(row.count) },
-                ]}
-                empty="No events in the last 30 days."
               />
             </Section>
 
@@ -228,19 +284,6 @@ export default function InternalMetrics({ token = '', user = null, onBack }) {
                   { key: 'recorded_at', label: 'Recorded', render: (row) => formatDateTime(row.recorded_at) },
                 ]}
                 empty="No proofs yet."
-              />
-            </Section>
-
-            <Section title="Latest Events">
-              <MiniTable
-                rows={data.latest_events || []}
-                columns={[
-                  { key: 'event_name', label: 'Event' },
-                  { key: 'user__username', label: 'User', render: (row) => row.user__username || 'Anonymous' },
-                  { key: 'path', label: 'Path' },
-                  { key: 'created_at', label: 'Time', render: (row) => formatDateTime(row.created_at) },
-                ]}
-                empty="No events yet."
               />
             </Section>
           </>

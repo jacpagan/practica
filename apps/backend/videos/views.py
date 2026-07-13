@@ -284,6 +284,7 @@ def internal_metrics_view(request):
 
     sessions_qs = Session.objects.select_related('user').all()
     events_qs = ProductEventLog.objects.select_related('user').all()
+    users_qs = User.objects.all()
 
     def session_count_since(threshold):
         return sessions_qs.filter(recorded_at__gte=threshold).count()
@@ -346,11 +347,122 @@ def internal_metrics_view(request):
         if recorded_at <= first_at + timezone.timedelta(days=7):
             repeat_users_7d.add(user_id)
 
-    latest_events = list(
-        events_qs
-        .values('event_name', 'path', 'is_authenticated', 'extra_json', 'created_at', 'user__username')
-        .order_by('-created_at')[:12]
+    user_rows = []
+    first_proof_by_user = {}
+    latest_proof_by_user = {}
+    proofs_by_user = Counter()
+    skills_by_user = {}
+    for item in sessions_qs.filter(user__isnull=False).order_by('user_id', 'recorded_at').values('user_id', 'practice_series', 'recorded_at'):
+        user_id = item['user_id']
+        recorded_at = item['recorded_at']
+        if not user_id or not recorded_at:
+            continue
+        first_proof_by_user.setdefault(user_id, recorded_at)
+        latest_proof_by_user[user_id] = recorded_at
+        proofs_by_user[user_id] += 1
+        skill = (item.get('practice_series') or '').strip()
+        if skill:
+            skills_by_user.setdefault(user_id, Counter())[skill] += 1
+
+    activated_user_ids = set(first_proof_by_user)
+    repeat_user_ids = {user_id for user_id, count in proofs_by_user.items() if count >= 2}
+    active_30d_proof_user_ids = {
+        user_id
+        for user_id, recorded_at in latest_proof_by_user.items()
+        if recorded_at >= thirty_days_ago
+    }
+    dormant_user_ids = activated_user_ids - active_30d_proof_user_ids
+    zero_proof_user_count = users_qs.exclude(id__in=activated_user_ids).count()
+    avg_proofs_per_activated_user = (
+        round(sessions_qs.filter(user_id__in=activated_user_ids).count() / len(activated_user_ids), 1)
+        if activated_user_ids else 0
     )
+    avg_days_to_first_proof_values = []
+    users_by_id = {user.id: user for user in users_qs}
+    for user_id, first_at in first_proof_by_user.items():
+        user = users_by_id.get(user_id)
+        if user and user.date_joined and first_at:
+            avg_days_to_first_proof_values.append(max((first_at - user.date_joined).total_seconds() / 86400, 0))
+    avg_days_to_first_proof = (
+        round(sum(avg_days_to_first_proof_values) / len(avg_days_to_first_proof_values), 1)
+        if avg_days_to_first_proof_values else 0
+    )
+
+    for user in users_qs.order_by('-date_joined'):
+        proof_count = proofs_by_user[user.id]
+        latest_at = latest_proof_by_user.get(user.id)
+        skill_counts = skills_by_user.get(user.id, Counter())
+        primary_skill = ''
+        if skill_counts:
+            primary_skill = skill_counts.most_common(1)[0][0]
+        if proof_count >= 2:
+            status_label = 'repeat'
+        elif proof_count == 1:
+            status_label = 'activated'
+        else:
+            status_label = 'not_started'
+        if proof_count and latest_at and latest_at < thirty_days_ago:
+            status_label = 'dormant'
+        user_rows.append({
+            'id': user.id,
+            'username': user.username,
+            'is_staff': user.is_staff,
+            'is_superuser': user.is_superuser,
+            'is_active': user.is_active,
+            'date_joined': user.date_joined.isoformat() if user.date_joined else None,
+            'last_login': user.last_login.isoformat() if user.last_login else None,
+            'proof_count': proof_count,
+            'skill_count': len(skill_counts),
+            'primary_skill': primary_skill,
+            'first_proof_at': first_proof_by_user.get(user.id).isoformat() if first_proof_by_user.get(user.id) else None,
+            'latest_proof_at': latest_at.isoformat() if latest_at else None,
+            'days_since_latest_proof': (now - latest_at).days if latest_at else None,
+            'status': status_label,
+        })
+
+    signup_cohorts = {}
+    for user in users_qs:
+        cohort_key = user.date_joined.strftime('%Y-%m') if user.date_joined else 'unknown'
+        cohort = signup_cohorts.setdefault(cohort_key, {
+            'cohort': cohort_key,
+            'users': 0,
+            'activated_users': 0,
+            'repeat_users': 0,
+            'proofs': 0,
+        })
+        cohort['users'] += 1
+        if user.id in activated_user_ids:
+            cohort['activated_users'] += 1
+        if user.id in repeat_user_ids:
+            cohort['repeat_users'] += 1
+        cohort['proofs'] += proofs_by_user[user.id]
+
+    skill_rows = []
+    skill_user_sets = {}
+    for item in sessions_qs.exclude(practice_series='').values('practice_series', 'user_id', 'recorded_at'):
+        skill = item['practice_series']
+        entry = skill_user_sets.setdefault(skill, {'users': set(), 'latest_recorded_at': None})
+        if item['user_id']:
+            entry['users'].add(item['user_id'])
+        recorded_at = item['recorded_at']
+        if recorded_at and (entry['latest_recorded_at'] is None or recorded_at > entry['latest_recorded_at']):
+            entry['latest_recorded_at'] = recorded_at
+    for row in (
+        sessions_qs
+        .exclude(practice_series='')
+        .values('practice_series')
+        .annotate(count=Count('id'))
+        .order_by('-count', 'practice_series')[:10]
+    ):
+        skill_meta = skill_user_sets.get(row['practice_series'], {'users': set(), 'latest_recorded_at': None})
+        latest_at = skill_meta['latest_recorded_at']
+        skill_rows.append({
+            'practice_series': row['practice_series'],
+            'count': row['count'],
+            'user_count': len(skill_meta['users']),
+            'latest_recorded_at': latest_at.isoformat() if latest_at else None,
+        })
+
     latest_proofs = list(
         sessions_qs
         .values('id', 'title', 'practice_series', 'processing_status', 'recorded_at', 'user__username')
@@ -360,18 +472,23 @@ def internal_metrics_view(request):
     return Response({
         'generated_at': now.isoformat(),
         'people': {
-            'total_users': User.objects.count(),
-            'staff_users': User.objects.filter(is_staff=True).count(),
-            'users_with_proofs': sessions_qs.filter(user__isnull=False).values('user_id').distinct().count(),
+            'total_users': users_qs.count(),
+            'staff_users': users_qs.filter(is_staff=True).count(),
+            'users_with_proofs': len(activated_user_ids),
+            'zero_proof_users': zero_proof_user_count,
+            'repeat_users': len(repeat_user_ids),
+            'dormant_users': len(dormant_user_ids),
             'active_24h': active_user_count_since(day_ago),
             'active_7d': active_user_count_since(seven_days_ago),
             'active_30d': active_user_count_since(thirty_days_ago),
+            'proof_active_30d': len(active_30d_proof_user_ids),
         },
         'proofs': {
             'total': sessions_qs.count(),
             'last_24h': session_count_since(day_ago),
             'last_7d': session_count_since(seven_days_ago),
             'last_30d': session_count_since(thirty_days_ago),
+            'avg_per_activated_user': avg_proofs_per_activated_user,
             'ready': sessions_qs.filter(processing_status=Session.STATUS_READY).count(),
             'processing': sessions_qs.filter(processing_status=Session.STATUS_PROCESSING).count(),
             'failed': sessions_qs.filter(processing_status=Session.STATUS_FAILED).count(),
@@ -386,33 +503,39 @@ def internal_metrics_view(request):
             'avg_success_duration_ms': int(sum(upload_durations_ms) / len(upload_durations_ms)) if upload_durations_ms else 0,
             'top_failure_codes': [{'code': code, 'count': count} for code, count in upload_failure_codes.most_common(6)],
         },
+        'smart': {
+            'activation': {
+                'signups': users_qs.count(),
+                'activated_users': len(activated_user_ids),
+                'zero_proof_users': zero_proof_user_count,
+                'avg_days_to_first_proof': avg_days_to_first_proof,
+            },
+            'repeat': {
+                'activated_users': len(activated_user_ids),
+                'repeat_users': len(repeat_user_ids),
+                'repeat_within_1d': len(repeat_users_1d),
+                'repeat_within_7d': len(repeat_users_7d),
+                'dormant_users': len(dormant_user_ids),
+            },
+            'frequency': {
+                'proofs_7d': session_count_since(seven_days_ago),
+                'proofs_30d': session_count_since(thirty_days_ago),
+                'proof_active_30d': len(active_30d_proof_user_ids),
+                'avg_proofs_per_activated_user': avg_proofs_per_activated_user,
+            },
+        },
         'retention': {
             'users_with_first_proof': len(first_sessions),
             'repeat_within_1d': len(repeat_users_1d),
             'repeat_within_7d': len(repeat_users_7d),
         },
         'skills': {
-            'top': list(
-                sessions_qs
-                .exclude(practice_series='')
-                .values('practice_series')
-                .annotate(count=Count('id'))
-                .order_by('-count', 'practice_series')[:10]
-            ),
+            'top': skill_rows,
             'tagged_proofs': sessions_qs.exclude(practice_series='').count(),
             'untagged_proofs': sessions_qs.filter(practice_series='').count(),
         },
-        'events_30d': {
-            'total': events_qs.filter(created_at__gte=thirty_days_ago).count(),
-            'top': list(
-                events_qs
-                .filter(created_at__gte=thirty_days_ago)
-                .values('event_name')
-                .annotate(count=Count('id'))
-                .order_by('-count', 'event_name')[:10]
-            ),
-        },
-        'latest_events': latest_events,
+        'cohorts': list(sorted(signup_cohorts.values(), key=lambda row: row['cohort'], reverse=True)),
+        'users': user_rows,
         'latest_proofs': latest_proofs,
     })
 
