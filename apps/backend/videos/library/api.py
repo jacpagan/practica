@@ -14,9 +14,9 @@ from rest_framework.response import Response
 from videos.media.api import SessionMediaActionsMixin
 from videos.media.services import maybe_refresh_session_processing, normalized_client_upload_id, start_processing_pipeline
 from videos.media.uploads import attach_tags_to_session, parse_tag_names
-from videos.models import Chapter, Exercise, ReviewLink, ReviewRequest, ReviewRequestEvent, Session, SessionAsset, SessionLastSeen, SkillShareLink, Tag, VideoFeedback
+from videos.models import Chapter, Exercise, ReviewLink, ReviewRequest, ReviewRequestEvent, Session, SessionAsset, SessionLastSeen, SessionProofResult, SkillShareLink, Tag, VideoFeedback
 from videos.services.ml_training import build_dataset_snapshot, normalize_label, normalize_source, record_session_suggestion_feedback, suggest_session_thread
-from videos.serializers import ChapterSerializer, ReviewLinkSerializer, ReviewVideoFeedbackSerializer, SessionListSerializer, SessionSerializer, SkillShareLinkSerializer
+from videos.serializers import ChapterSerializer, ReviewLinkSerializer, ReviewVideoFeedbackSerializer, SessionListSerializer, SessionProofResultSerializer, SessionSerializer, SkillShareLinkSerializer
 from videos.services.feedback_video_processing import prepare_feedback_video_upload
 from videos.telemetry import record_product_event
 from videos.video_uploads import is_allowed_video_upload
@@ -88,7 +88,7 @@ class SessionViewSet(SessionMediaActionsMixin, viewsets.ModelViewSet):
             'challenge_responses_received', 'challenge_responses_received__responder', 'challenge_responses_received__responder__profile',
             'challenge_responses_received__response_session', 'challenge_responses_received__response_session__assets',
             'last_seen_by', 'tags', 'assets',
-        ).select_related('user', 'user__profile')
+        ).select_related('user', 'user__profile', 'proof_result')
 
         tag = self.request.query_params.get('tag')
         if tag:
@@ -223,6 +223,35 @@ class SessionViewSet(SessionMediaActionsMixin, viewsets.ModelViewSet):
         if not can_edit_session(self.request.user, instance):
             raise PermissionDenied("You can only delete your own sessions.")
         instance.delete()
+
+    @action(detail=True, methods=['put', 'patch'], url_path='proof-result')
+    def proof_result(self, request, pk=None):
+        session = self.get_object()
+        if not can_edit_session(request.user, session):
+            raise PermissionDenied("You can only score your own proofs.")
+
+        result = getattr(session, 'proof_result', None)
+        serializer = SessionProofResultSerializer(
+            result,
+            data=request.data,
+            partial=request.method == 'PATCH',
+            context={'request': request},
+        )
+        serializer.is_valid(raise_exception=True)
+        proof_result = serializer.save(session=session, source=SessionProofResult.SOURCE_SELF)
+        _record_session_product_event(
+            event_name='proof_result_saved',
+            session=session,
+            extra={
+                'action': 'proof_result_saved',
+                'drill_name': proof_result.drill_name,
+                'metric_name': proof_result.metric_name,
+                'ranking_direction': proof_result.ranking_direction,
+            },
+            path='/api/sessions/:id/proof-result/',
+        )
+        session.refresh_from_db()
+        return Response(SessionSerializer(session, context={'request': request}).data)
 
     @action(detail=False, methods=['post'], url_path='threads/rename')
     def rename_thread(self, request):

@@ -4,7 +4,7 @@ import SkillPickerModal from './SkillPickerModal'
 import ActivityCalendar from './ActivityCalendar'
 import VideoThumbnail from './VideoThumbnail'
 import { useToast } from './Toast'
-import { buildLatestSkillComparison } from '../progressActivity'
+import { buildDrillSummaries, buildLatestSkillComparison } from '../progressActivity'
 import { buildSkillShareText, reportClientEvent, toLocalDateKey } from '../utils'
 
 const formatCompactDateTime = (value) => {
@@ -13,6 +13,12 @@ const formatCompactDateTime = (value) => {
   const dayPart = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
   const timePart = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
   return `${dayPart} · ${timePart}`
+}
+
+const formatResultValue = (value) => {
+  const number = Number(value)
+  if (!Number.isFinite(number)) return ''
+  return Number.isInteger(number) ? String(number) : number.toFixed(2).replace(/\.?0+$/, '')
 }
 
 function CompareProofCard({ label, session, onOpen }) {
@@ -70,6 +76,7 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
 
   const latestSession = skillSessions[0] || null
   const comparison = useMemo(() => buildLatestSkillComparison(skillSessions), [skillSessions])
+  const drillSummaries = useMemo(() => buildDrillSummaries(skillSessions), [skillSessions])
   const skillProofDays = useMemo(() => {
     const days = new Set()
     skillSessions.forEach((session) => {
@@ -253,6 +260,45 @@ function SkillView({ skillName = '', sessions = [], sessionsLoading = false, tok
                 />
               </div>
             </div>
+
+            {drillSummaries.length ? (
+              <section className="rounded-2xl border border-gray-200 bg-white p-4">
+                <div>
+                  <p className="text-sm font-semibold text-gray-950">Drills</p>
+                  <p className="mt-1 text-sm text-gray-500">Best proof per drill from your saved results.</p>
+                </div>
+                <div className="mt-4 divide-y divide-gray-100">
+                  {drillSummaries.map((drill) => {
+                    const bestResult = drill.best?.proof_result || {}
+                    const value = formatResultValue(bestResult.value)
+                    const unit = String(bestResult.unit || drill.unit || '').trim()
+                    const metric = String(bestResult.metric_name || drill.metricName || '').trim()
+                    return (
+                      <button
+                        type="button"
+                        key={drill.drillName}
+                        onClick={() => onOpenSession?.(drill.best, { view: 'skill', sessionId: null, seriesName: skillName })}
+                        className="flex w-full items-center justify-between gap-3 py-3 text-left transition-colors hover:bg-gray-50"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-medium text-gray-950">{drill.drillName}</span>
+                          <span className="mt-1 block text-xs text-gray-500">
+                            {drill.proofCount} {drill.proofCount === 1 ? 'proof' : 'proofs'}
+                            {drill.latest ? ` · latest ${formatCompactDateTime(drill.latest.recorded_at || drill.latest.created_at)}` : ''}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-right">
+                          <span className="block text-sm font-semibold text-gray-950">
+                            {value ? `${value}${unit ? ` ${unit}` : ''}` : 'Best proof'}
+                          </span>
+                          <span className="mt-1 block text-xs text-gray-500">{metric || 'Result'}</span>
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+            ) : null}
 
             <div className="space-y-3">
               {skillSessions.map((session) => (

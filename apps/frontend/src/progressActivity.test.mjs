@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { buildActivityWeeks, buildLatestSkillComparison, buildProofCountByDay, buildRecommendedNextSkill, buildSkillSummaries, buildTodayLoopState } from './progressActivity.js'
+import { buildActivityWeeks, buildDrillSummaries, buildLatestSkillComparison, buildProofCountByDay, buildRecommendedNextSkill, buildSkillSummaries, buildTodayLoopState } from './progressActivity.js'
 
 test('buildProofCountByDay aggregates proofs per local day', () => {
   const sessions = [
@@ -66,6 +66,38 @@ test('buildLatestSkillComparison handles a first proof without comparison', () =
   assert.equal(comparison.hasComparison, false)
   assert.equal(comparison.latest.id, 1)
   assert.equal(comparison.previous, null)
+})
+
+test('buildDrillSummaries returns best proof per drill', () => {
+  const summaries = buildDrillSummaries([
+    {
+      id: 1,
+      recorded_at: '2099-01-01T09:00:00Z',
+      proof_result: { drill_name: '120 single stroke rolls', metric_name: 'clean reps', value: '72.00', unit: 'reps', ranking_direction: 'higher' },
+    },
+    {
+      id: 2,
+      recorded_at: '2099-01-02T09:00:00Z',
+      proof_result: { drill_name: '120 single stroke rolls', metric_name: 'clean reps', value: '84.00', unit: 'reps', ranking_direction: 'higher' },
+    },
+    {
+      id: 3,
+      recorded_at: '2099-01-03T09:00:00Z',
+      proof_result: { drill_name: 'incline pushups', metric_name: 'time', value: '41.00', unit: 'seconds', ranking_direction: 'lower' },
+    },
+    {
+      id: 4,
+      recorded_at: '2099-01-04T09:00:00Z',
+      proof_result: { drill_name: 'incline pushups', metric_name: 'time', value: '38.00', unit: 'seconds', ranking_direction: 'lower' },
+    },
+  ])
+
+  assert.equal(summaries.length, 2)
+  assert.equal(summaries[0].drillName, 'incline pushups')
+  assert.equal(summaries[0].best.id, 4)
+  assert.equal(summaries[1].drillName, '120 single stroke rolls')
+  assert.equal(summaries[1].best.id, 2)
+  assert.equal(summaries[1].proofCount, 2)
 })
 
 test('buildTodayLoopState describes the empty first-proof state', () => {

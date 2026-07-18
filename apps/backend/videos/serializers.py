@@ -7,6 +7,7 @@ from rest_framework import serializers
 from .models import (
     Profile, Session, Chapter, VideoFeedback,
     SessionAsset,
+    SessionProofResult,
     ProofChallengeResponse,
     ReviewLink,
     SkillShareLink,
@@ -233,6 +234,25 @@ class ChapterSerializer(serializers.ModelSerializer):
 
 
 
+class SessionProofResultSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SessionProofResult
+        fields = [
+            'id', 'drill_name', 'metric_name', 'value', 'unit',
+            'target_value', 'target_unit', 'ranking_direction', 'source',
+            'note', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'source', 'created_at', 'updated_at']
+
+    def validate(self, attrs):
+        drill_name = str(attrs.get('drill_name', getattr(self.instance, 'drill_name', '')) or '').strip()
+        metric_name = str(attrs.get('metric_name', getattr(self.instance, 'metric_name', '')) or '').strip()
+        value = attrs.get('value', getattr(self.instance, 'value', None))
+        if (drill_name or metric_name) and value is None:
+            raise serializers.ValidationError({'value': 'Add a result value for this proof.'})
+        return attrs
+
+
 class SessionSerializer(serializers.ModelSerializer):
     chapters = ChapterSerializer(many=True, read_only=True)
     video_feedback = VideoFeedbackSerializer(many=True, read_only=True)
@@ -252,6 +272,7 @@ class SessionSerializer(serializers.ModelSerializer):
     resolution = serializers.SerializerMethodField()
     client_upload_id = serializers.CharField(write_only=True, required=False, allow_blank=True)
     timing_metadata = serializers.JSONField(required=False, allow_null=True)
+    proof_result = SessionProofResultSerializer(read_only=True)
 
     class Meta:
         model = Session
@@ -264,7 +285,7 @@ class SessionSerializer(serializers.ModelSerializer):
                   'client_upload_id',
                   'ml_training_enabled', 'ml_training_consent_source', 'ml_training_consent_at',
                   'ml_training_consent_revoked_at', 'ml_training_consent_revocation_source',
-                  'tag_names', 'assets',
+                  'tag_names', 'assets', 'proof_result',
                   'chapters', 'video_feedback', 'active_review_link', 'chapter_count', 'video_feedback_count', 'owner',
                   'challenge_responses', 'can_edit']
         read_only_fields = [
@@ -346,6 +367,7 @@ class SessionListSerializer(serializers.ModelSerializer):
     processing_error = serializers.CharField(read_only=True)
     poster_image_url = serializers.SerializerMethodField()
     resolution = serializers.SerializerMethodField()
+    proof_result = SessionProofResultSerializer(read_only=True)
 
     class Meta:
         model = Session
@@ -353,7 +375,7 @@ class SessionListSerializer(serializers.ModelSerializer):
                   'duration_seconds', 'timing_metadata', 'recorded_at', 'created_at',
                   'processing_status', 'processing_job_id', 'processing_error',
                   'poster_image_url', 'resolution', 'video_feedback_count',
-                  'can_edit']
+                  'proof_result', 'can_edit']
         read_only_fields = ['id', 'recorded_at', 'created_at']
 
     def get_video_feedback_count(self, obj):

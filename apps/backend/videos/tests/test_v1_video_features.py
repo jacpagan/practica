@@ -10,7 +10,7 @@ from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from videos.models import ProductEventLog, Profile, Session, SessionAsset, VideoFeedback
+from videos.models import ProductEventLog, Profile, Session, SessionAsset, SessionProofResult, VideoFeedback
 from videos.services.media_pipeline import _create_job_settings, sync_mediaconvert_session
 
 
@@ -87,6 +87,64 @@ class V1VideoFeaturesTests(APITestCase):
         self.assertIn('video_file', detail_response.data)
         self.assertEqual(len(detail_response.data['assets']), 1)
         self.assertTrue(detail_response.data['assets'][0]['url'].endswith('/processed/sessions/1/proxy/video_proxy.mp4'))
+
+    def test_owner_can_save_proof_result_for_session(self):
+        session = self._create_session(user=self.owner, title='Single stroke proof')
+        self.client.force_authenticate(user=self.owner)
+
+        response = self.client.put(
+            f'/api/sessions/{session.id}/proof-result/',
+            {
+                'drill_name': '120 single stroke rolls',
+                'metric_name': 'clean reps',
+                'value': '84',
+                'unit': 'reps',
+                'target_value': '100',
+                'target_unit': 'reps',
+                'ranking_direction': 'higher',
+                'note': 'Cleaner hands near the end.',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['proof_result']['drill_name'], '120 single stroke rolls')
+        self.assertEqual(response.data['proof_result']['value'], '84.00')
+        result = SessionProofResult.objects.get(session=session)
+        self.assertEqual(result.source, SessionProofResult.SOURCE_SELF)
+
+    def test_other_user_cannot_save_proof_result(self):
+        session = self._create_session(user=self.owner)
+        self.client.force_authenticate(user=self.viewer)
+
+        response = self.client.put(
+            f'/api/sessions/{session.id}/proof-result/',
+            {'drill_name': 'Incline pushups', 'metric_name': 'reps', 'value': '12'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertFalse(SessionProofResult.objects.filter(session=session).exists())
+
+    def test_session_list_and_detail_include_proof_result(self):
+        session = self._create_session(user=self.owner, title='Incline pushup proof')
+        SessionProofResult.objects.create(
+            session=session,
+            drill_name='Incline pushups',
+            metric_name='clean reps',
+            value='18',
+            unit='reps',
+        )
+        self.client.force_authenticate(user=self.owner)
+
+        list_response = self.client.get('/api/sessions/')
+        detail_response = self.client.get(f'/api/sessions/{session.id}/')
+
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(detail_response.status_code, status.HTTP_200_OK)
+        payload = list_response.data if isinstance(list_response.data, list) else list_response.data.get('results', [])
+        self.assertEqual(payload[0]['proof_result']['drill_name'], 'Incline pushups')
+        self.assertEqual(detail_response.data['proof_result']['value'], '18.00')
 
     def test_video_feedback_requires_video(self):
         session = self._create_session(user=self.owner)

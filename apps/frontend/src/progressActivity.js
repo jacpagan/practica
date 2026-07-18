@@ -133,6 +133,63 @@ export const buildLatestSkillComparison = (sessions = []) => {
   }
 }
 
+const resultValue = (session) => {
+  const raw = session?.proof_result?.value
+  if (raw === null || raw === undefined || raw === '') return null
+  const value = Number(raw)
+  return Number.isFinite(value) ? value : null
+}
+
+const isBetterResult = (candidate, currentBest) => {
+  if (!currentBest) return true
+  const candidateValue = resultValue(candidate)
+  const currentValue = resultValue(currentBest)
+  if (candidateValue === null) return false
+  if (currentValue === null) return true
+  const direction = String(candidate?.proof_result?.ranking_direction || 'higher')
+  if (direction === 'lower') return candidateValue < currentValue
+  return candidateValue > currentValue
+}
+
+export const buildDrillSummaries = (sessions = []) => {
+  const grouped = new Map()
+  ;(Array.isArray(sessions) ? sessions : []).forEach((session) => {
+    const result = session?.proof_result
+    const drillName = String(result?.drill_name || '').trim()
+    if (!drillName || resultValue(session) === null) return
+    const key = drillName.toLocaleLowerCase()
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        drillName,
+        proofCount: 0,
+        latest: null,
+        best: null,
+        metricName: String(result?.metric_name || '').trim(),
+        unit: String(result?.unit || '').trim(),
+        rankingDirection: String(result?.ranking_direction || 'higher'),
+      })
+    }
+    const summary = grouped.get(key)
+    summary.proofCount += 1
+    const sessionTime = sessionTimestamp(session)
+    if (!summary.latest || sessionTime > sessionTimestamp(summary.latest)) summary.latest = session
+    if (isBetterResult(session, summary.best)) {
+      summary.best = session
+      summary.metricName = String(result?.metric_name || '').trim()
+      summary.unit = String(result?.unit || '').trim()
+      summary.rankingDirection = String(result?.ranking_direction || 'higher')
+    }
+  })
+
+  return Array.from(grouped.values())
+    .sort((left, right) => {
+      const leftTime = sessionTimestamp(left.latest)
+      const rightTime = sessionTimestamp(right.latest)
+      if (rightTime !== leftTime) return rightTime - leftTime
+      return left.drillName.localeCompare(right.drillName)
+    })
+}
+
 export const buildTodayLoopState = (sessions = [], today = new Date()) => {
   const sorted = (Array.isArray(sessions) ? sessions : [])
     .filter((session) => session?.id || session?.recorded_at || session?.created_at)

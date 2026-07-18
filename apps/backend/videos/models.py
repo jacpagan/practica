@@ -224,6 +224,54 @@ class SessionAsset(models.Model):
         return f"SessionAsset session={self.session_id} type={self.asset_type}"
 
 
+class SessionProofResult(models.Model):
+    """Member-scored result data for one proof."""
+
+    DIRECTION_HIGHER = 'higher'
+    DIRECTION_LOWER = 'lower'
+    DIRECTION_RATED = 'rated'
+    DIRECTION_CHOICES = [
+        (DIRECTION_HIGHER, 'Higher is better'),
+        (DIRECTION_LOWER, 'Lower is better'),
+        (DIRECTION_RATED, 'Rated'),
+    ]
+
+    SOURCE_SELF = 'self'
+    SOURCE_PEER = 'peer'
+    SOURCE_REVIEWER = 'reviewer'
+    SOURCE_AI = 'ai'
+    SOURCE_CHOICES = [
+        (SOURCE_SELF, 'Self'),
+        (SOURCE_PEER, 'Peer'),
+        (SOURCE_REVIEWER, 'Reviewer'),
+        (SOURCE_AI, 'AI'),
+    ]
+
+    session = models.OneToOneField(Session, on_delete=models.CASCADE, related_name='proof_result')
+    drill_name = models.CharField(max_length=200, blank=True, db_index=True)
+    metric_name = models.CharField(max_length=120, blank=True)
+    value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    unit = models.CharField(max_length=40, blank=True)
+    target_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    target_unit = models.CharField(max_length=40, blank=True)
+    ranking_direction = models.CharField(max_length=16, choices=DIRECTION_CHOICES, default=DIRECTION_HIGHER)
+    source = models.CharField(max_length=16, choices=SOURCE_CHOICES, default=SOURCE_SELF)
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['drill_name', 'metric_name', '-updated_at']
+        indexes = [
+            models.Index(fields=['drill_name', 'metric_name']),
+            models.Index(fields=['ranking_direction']),
+        ]
+
+    def __str__(self):
+        label = self.drill_name or self.metric_name or 'proof result'
+        return f"{label} for session={self.session_id}"
+
+
 class MultipartSessionUpload(models.Model):
     """Tracks direct-to-S3 multipart uploads before a private take is created."""
 
@@ -623,7 +671,7 @@ class MLDatasetSnapshot(models.Model):
     class Meta:
         ordering = ['-created_at', '-id']
         indexes = [
-            models.Index(fields=['snapshot_version', 'created_at']),
+            models.Index(fields=['snapshot_version', 'created_at'], name='mlsnap_ver_created_idx'),
         ]
 
     def __str__(self):
@@ -660,8 +708,8 @@ class MLModelSuggestion(models.Model):
     class Meta:
         ordering = ['-created_at', '-id']
         indexes = [
-            models.Index(fields=['session', 'created_at']),
-            models.Index(fields=['model_name', 'model_version']),
+            models.Index(fields=['session', 'created_at'], name='mlsugg_session_created_idx'),
+            models.Index(fields=['model_name', 'model_version'], name='mlsugg_model_version_idx'),
         ]
 
     def __str__(self):

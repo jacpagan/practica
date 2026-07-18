@@ -17,6 +17,20 @@ const VIDEO_OBJECT_CLASS = {
   fit: 'object-contain',
 }
 
+const proofResultDraftFromSession = (session) => {
+  const result = session?.proof_result || {}
+  return {
+    drill_name: result.drill_name || '',
+    metric_name: result.metric_name || '',
+    value: result.value === null || result.value === undefined ? '' : String(result.value),
+    unit: result.unit || '',
+    target_value: result.target_value === null || result.target_value === undefined ? '' : String(result.target_value),
+    target_unit: result.target_unit || '',
+    ranking_direction: result.ranking_direction || 'higher',
+    note: result.note || '',
+  }
+}
+
 function IconPlay({ className = 'h-6 w-6' }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -123,6 +137,8 @@ function SessionDetail({
   const [videoFit, setVideoFit] = useState(() => readVideoFitMode())
   const [controlsVisible, setControlsVisible] = useState(true)
   const [shareStatus, setShareStatus] = useState('')
+  const [proofResultDraft, setProofResultDraft] = useState(() => proofResultDraftFromSession(initialSession))
+  const [savingProofResult, setSavingProofResult] = useState(false)
   const gestureRef = useRef(null)
   const pagerOffsetRef = useRef(0)
   const controlsHideTimerRef = useRef(null)
@@ -538,6 +554,48 @@ function SessionDetail({
     })
   }
 
+  const setProofResultField = (field, value) => {
+    setProofResultDraft((current) => ({ ...current, [field]: value }))
+  }
+
+  const saveProofResult = async () => {
+    if (!session?.id || !canEdit) return
+    setSavingProofResult(true)
+    try {
+      const payload = {
+        drill_name: proofResultDraft.drill_name.trim(),
+        metric_name: proofResultDraft.metric_name.trim(),
+        value: proofResultDraft.value === '' ? null : proofResultDraft.value,
+        unit: proofResultDraft.unit.trim(),
+        target_value: proofResultDraft.target_value === '' ? null : proofResultDraft.target_value,
+        target_unit: proofResultDraft.target_unit.trim(),
+        ranking_direction: proofResultDraft.ranking_direction || 'higher',
+        note: proofResultDraft.note.trim(),
+      }
+      const response = await fetch(`/api/sessions/${session.id}/proof-result/`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
+        body: JSON.stringify(payload),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        const detail = data?.value?.[0] || data?.non_field_errors?.[0] || data?.error || 'Could not save proof result'
+        throw new Error(detail)
+      }
+      setSession((current) => ({ ...(current || session), ...data, local_preview_url: current?.local_preview_url || data?.local_preview_url }))
+      setProofResultDraft(proofResultDraftFromSession(data))
+      onSessionUpdate?.(data)
+      toast.success('Proof result saved')
+    } catch (error) {
+      toast.error(error?.message || 'Could not save proof result')
+    } finally {
+      setSavingProofResult(false)
+    }
+  }
+
   const resetGesture = () => {
     gestureRef.current = null
   }
@@ -704,6 +762,7 @@ function SessionDetail({
 
   useEffect(() => {
     setSession(initialSession)
+    setProofResultDraft(proofResultDraftFromSession(initialSession))
   }, [initialSession])
 
   useEffect(() => () => {
@@ -1023,6 +1082,99 @@ function SessionDetail({
               ) : null}
 
               {session.description ? <p className="text-sm text-gray-600">{session.description}</p> : null}
+
+              <section className="space-y-3 rounded-2xl border border-gray-100 bg-gray-50 p-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Proof result</p>
+                  <h2 className="mt-1 text-sm font-semibold text-gray-950">Rank this moment inside the skill</h2>
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <input
+                    type="text"
+                    value={proofResultDraft.drill_name}
+                    onChange={(event) => setProofResultField('drill_name', event.target.value)}
+                    placeholder="Drill, e.g. 120 single stroke rolls"
+                    disabled={!canEdit}
+                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500 sm:col-span-2"
+                  />
+                  <input
+                    type="text"
+                    value={proofResultDraft.metric_name}
+                    onChange={(event) => setProofResultField('metric_name', event.target.value)}
+                    placeholder="Metric, e.g. clean reps"
+                    disabled={!canEdit}
+                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
+                  />
+                  <div className="grid grid-cols-[minmax(0,1fr)_5rem] gap-2">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="any"
+                      value={proofResultDraft.value}
+                      onChange={(event) => setProofResultField('value', event.target.value)}
+                      placeholder="Result"
+                      disabled={!canEdit}
+                      className="min-w-0 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
+                    />
+                    <input
+                      type="text"
+                      value={proofResultDraft.unit}
+                      onChange={(event) => setProofResultField('unit', event.target.value)}
+                      placeholder="unit"
+                      disabled={!canEdit}
+                      className="min-w-0 rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
+                    />
+                  </div>
+                  <select
+                    value={proofResultDraft.ranking_direction}
+                    onChange={(event) => setProofResultField('ranking_direction', event.target.value)}
+                    disabled={!canEdit}
+                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
+                  >
+                    <option value="higher">Higher is better</option>
+                    <option value="lower">Lower is better</option>
+                    <option value="rated">Rating</option>
+                  </select>
+                  <div className="grid grid-cols-[minmax(0,1fr)_5rem] gap-2">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="any"
+                      value={proofResultDraft.target_value}
+                      onChange={(event) => setProofResultField('target_value', event.target.value)}
+                      placeholder="Goal"
+                      disabled={!canEdit}
+                      className="min-w-0 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
+                    />
+                    <input
+                      type="text"
+                      value={proofResultDraft.target_unit}
+                      onChange={(event) => setProofResultField('target_unit', event.target.value)}
+                      placeholder="unit"
+                      disabled={!canEdit}
+                      className="min-w-0 rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
+                    />
+                  </div>
+                  <textarea
+                    value={proofResultDraft.note}
+                    onChange={(event) => setProofResultField('note', event.target.value)}
+                    rows={2}
+                    placeholder="What made this proof better or different?"
+                    disabled={!canEdit}
+                    className="resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500 sm:col-span-2"
+                  />
+                </div>
+                {canEdit ? (
+                  <button
+                    type="button"
+                    onClick={saveProofResult}
+                    disabled={savingProofResult}
+                    className="inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    {savingProofResult ? 'Saving...' : 'Save proof result'}
+                  </button>
+                ) : null}
+              </section>
 
               {challengeResponses.length ? (
                 <section className="space-y-3 rounded-2xl border border-gray-100 bg-gray-50 p-3">
