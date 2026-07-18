@@ -19,16 +19,27 @@ const VIDEO_OBJECT_CLASS = {
 
 const proofResultDraftFromSession = (session) => {
   const result = session?.proof_result || {}
+  const value = result.value === null || result.value === undefined ? '' : String(result.value)
+  const unit = result.unit || ''
   return {
     drill_name: result.drill_name || '',
     metric_name: result.metric_name || '',
-    value: result.value === null || result.value === undefined ? '' : String(result.value),
-    unit: result.unit || '',
+    value,
+    unit,
+    result_entry: [value, unit].filter(Boolean).join(' '),
     target_value: result.target_value === null || result.target_value === undefined ? '' : String(result.target_value),
     target_unit: result.target_unit || '',
     ranking_direction: result.ranking_direction || 'higher',
     note: result.note || '',
   }
+}
+
+const parseResultEntry = (entry) => {
+  const normalized = String(entry || '').trim()
+  if (!normalized) return { value: '', unit: '' }
+  const match = normalized.match(/^(-?\d+(?:\.\d+)?)(?:\s*(.*))?$/)
+  if (!match) return { value: normalized, unit: '' }
+  return { value: match[1], unit: String(match[2] || '').trim() }
 }
 
 function IconPlay({ className = 'h-6 w-6' }) {
@@ -145,6 +156,24 @@ function SessionDetail({
   const authHeaders = useMemo(() => (token ? { Authorization: `Token ${token}` } : {}), [token])
   const canEdit = Boolean(session?.can_edit)
   const challengeResponses = Array.isArray(session?.challenge_responses) ? session.challenge_responses : []
+  const recentDrillOptions = useMemo(() => {
+    const currentSeries = String(session?.practice_series || '').trim()
+    const byName = new Map()
+    ;(Array.isArray(sessions) ? sessions : []).forEach((item) => {
+      const itemSeries = String(item?.practice_series || '').trim()
+      if (currentSeries && itemSeries !== currentSeries) return
+      const drillName = String(item?.proof_result?.drill_name || '').trim()
+      if (!drillName) return
+      const key = drillName.toLocaleLowerCase()
+      const itemTime = new Date(item?.recorded_at || item?.created_at || 0).getTime() || 0
+      const current = byName.get(key)
+      if (!current || itemTime > current.time) byName.set(key, { name: drillName, time: itemTime })
+    })
+    return Array.from(byName.values())
+      .sort((left, right) => right.time - left.time)
+      .slice(0, 4)
+      .map((item) => item.name)
+  }, [session?.practice_series, sessions])
   const nextUncategorizedSession = useMemo(() => {
     const currentId = Number(session?.id)
     const currentTime = new Date(session?.recorded_at || session?.created_at || 0).getTime() || 0
@@ -562,11 +591,12 @@ function SessionDetail({
     if (!session?.id || !canEdit) return
     setSavingProofResult(true)
     try {
+      const parsedResult = parseResultEntry(proofResultDraft.result_entry || proofResultDraft.value)
       const payload = {
         drill_name: proofResultDraft.drill_name.trim(),
-        metric_name: proofResultDraft.metric_name.trim(),
-        value: proofResultDraft.value === '' ? null : proofResultDraft.value,
-        unit: proofResultDraft.unit.trim(),
+        metric_name: proofResultDraft.metric_name.trim() || 'result',
+        value: parsedResult.value === '' ? null : parsedResult.value,
+        unit: (parsedResult.unit || proofResultDraft.unit).trim(),
         target_value: proofResultDraft.target_value === '' ? null : proofResultDraft.target_value,
         target_unit: proofResultDraft.target_unit.trim(),
         ranking_direction: proofResultDraft.ranking_direction || 'higher',
@@ -1085,85 +1115,94 @@ function SessionDetail({
 
               <section className="space-y-3 rounded-2xl border border-gray-100 bg-gray-50 p-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Proof result</p>
-                  <h2 className="mt-1 text-sm font-semibold text-gray-950">Rank this moment inside the skill</h2>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Result</p>
+                  <h2 className="mt-1 text-sm font-semibold text-gray-950">What did this proof show?</h2>
                 </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {recentDrillOptions.length ? (
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {recentDrillOptions.map((drillName) => (
+                      <button
+                        type="button"
+                        key={drillName}
+                        onClick={() => setProofResultField('drill_name', drillName)}
+                        disabled={!canEdit}
+                        className="shrink-0 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        {drillName}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                <div className="grid grid-cols-1 gap-2">
                   <input
                     type="text"
                     value={proofResultDraft.drill_name}
                     onChange={(event) => setProofResultField('drill_name', event.target.value)}
-                    placeholder="Drill, e.g. 120 single stroke rolls"
+                    placeholder="Drill"
                     disabled={!canEdit}
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500 sm:col-span-2"
+                    className="rounded-lg border border-gray-200 bg-white px-3 py-3 text-base text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
                   />
                   <input
                     type="text"
-                    value={proofResultDraft.metric_name}
-                    onChange={(event) => setProofResultField('metric_name', event.target.value)}
-                    placeholder="Metric, e.g. clean reps"
+                    inputMode="decimal"
+                    value={proofResultDraft.result_entry}
+                    onChange={(event) => setProofResultField('result_entry', event.target.value)}
+                    placeholder="Result, e.g. 84 reps"
                     disabled={!canEdit}
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
-                  />
-                  <div className="grid grid-cols-[minmax(0,1fr)_5rem] gap-2">
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      step="any"
-                      value={proofResultDraft.value}
-                      onChange={(event) => setProofResultField('value', event.target.value)}
-                      placeholder="Result"
-                      disabled={!canEdit}
-                      className="min-w-0 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
-                    />
-                    <input
-                      type="text"
-                      value={proofResultDraft.unit}
-                      onChange={(event) => setProofResultField('unit', event.target.value)}
-                      placeholder="unit"
-                      disabled={!canEdit}
-                      className="min-w-0 rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
-                    />
-                  </div>
-                  <select
-                    value={proofResultDraft.ranking_direction}
-                    onChange={(event) => setProofResultField('ranking_direction', event.target.value)}
-                    disabled={!canEdit}
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
-                  >
-                    <option value="higher">Higher is better</option>
-                    <option value="lower">Lower is better</option>
-                    <option value="rated">Rating</option>
-                  </select>
-                  <div className="grid grid-cols-[minmax(0,1fr)_5rem] gap-2">
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      step="any"
-                      value={proofResultDraft.target_value}
-                      onChange={(event) => setProofResultField('target_value', event.target.value)}
-                      placeholder="Goal"
-                      disabled={!canEdit}
-                      className="min-w-0 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
-                    />
-                    <input
-                      type="text"
-                      value={proofResultDraft.target_unit}
-                      onChange={(event) => setProofResultField('target_unit', event.target.value)}
-                      placeholder="unit"
-                      disabled={!canEdit}
-                      className="min-w-0 rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
-                    />
-                  </div>
-                  <textarea
-                    value={proofResultDraft.note}
-                    onChange={(event) => setProofResultField('note', event.target.value)}
-                    rows={2}
-                    placeholder="What made this proof better or different?"
-                    disabled={!canEdit}
-                    className="resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500 sm:col-span-2"
+                    className="rounded-lg border border-gray-200 bg-white px-3 py-3 text-base text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
                   />
                 </div>
+                <details className="rounded-xl border border-gray-200 bg-white px-3 py-2">
+                  <summary className="cursor-pointer list-none text-sm font-medium text-gray-500">Details</summary>
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <input
+                      type="text"
+                      value={proofResultDraft.metric_name}
+                      onChange={(event) => setProofResultField('metric_name', event.target.value)}
+                      placeholder="Metric"
+                      disabled={!canEdit}
+                      className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
+                    />
+                    <select
+                      value={proofResultDraft.ranking_direction}
+                      onChange={(event) => setProofResultField('ranking_direction', event.target.value)}
+                      disabled={!canEdit}
+                      className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
+                    >
+                      <option value="higher">Higher is better</option>
+                      <option value="lower">Lower is better</option>
+                      <option value="rated">Rating</option>
+                    </select>
+                    <div className="grid grid-cols-[minmax(0,1fr)_5rem] gap-2 sm:col-span-2">
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="any"
+                        value={proofResultDraft.target_value}
+                        onChange={(event) => setProofResultField('target_value', event.target.value)}
+                        placeholder="Goal"
+                        disabled={!canEdit}
+                        className="min-w-0 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
+                      />
+                      <input
+                        type="text"
+                        value={proofResultDraft.target_unit}
+                        onChange={(event) => setProofResultField('target_unit', event.target.value)}
+                        placeholder="unit"
+                        disabled={!canEdit}
+                        className="min-w-0 rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500"
+                      />
+                    </div>
+                    <textarea
+                      value={proofResultDraft.note}
+                      onChange={(event) => setProofResultField('note', event.target.value)}
+                      rows={2}
+                      placeholder="Note"
+                      disabled={!canEdit}
+                      className="resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-400 disabled:bg-gray-100 disabled:text-gray-500 sm:col-span-2"
+                    />
+                  </div>
+                </details>
                 {canEdit ? (
                   <button
                     type="button"
@@ -1171,7 +1210,7 @@ function SessionDetail({
                     disabled={savingProofResult}
                     className="inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
                   >
-                    {savingProofResult ? 'Saving...' : 'Save proof result'}
+                    {savingProofResult ? 'Saving...' : 'Save result'}
                   </button>
                 ) : null}
               </section>
