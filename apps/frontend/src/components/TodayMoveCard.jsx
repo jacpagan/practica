@@ -9,11 +9,11 @@ export default function TodayMoveCard({ completed = false, onTryMove }) {
     const today = new Date()
     let startedOn = localDateStamp(today)
     try {
-      const storageKey = 'practica.program.everyday_mobility.started_on.v1'
+      const storageKey = 'practica.program.dragon_tiger_dogfood.started_on.v1'
       startedOn = window.localStorage.getItem(storageKey) || startedOn
       if (!window.localStorage.getItem(storageKey)) window.localStorage.setItem(storageKey, startedOn)
     } catch {
-      // Storage can be unavailable in private browsing; the exercise still works.
+      // Storage can be unavailable in private browsing; the practice still works.
     }
     return getProgramMove(startedOn, today)
   }, [])
@@ -22,7 +22,7 @@ export default function TodayMoveCard({ completed = false, onTryMove }) {
     reportClientEvent('today_move_started', {
       action: 'today_move_started',
       move_slug: move.slug,
-      program: 'everyday_mobility',
+      program: 'dragon_tiger_dogfood',
     })
     onTryMove?.(move)
   }
@@ -36,7 +36,7 @@ export default function TodayMoveCard({ completed = false, onTryMove }) {
         <div className="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-emerald-400/20 blur-3xl" />
         <div className="relative">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300">Today’s move</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300">Today’s practice</p>
             <p className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs text-white/75">
               Day {move.dayNumber} of {move.programLength}
             </p>
@@ -68,9 +68,9 @@ export default function TodayMoveCard({ completed = false, onTryMove }) {
             onClick={start}
             className="mt-6 inline-flex w-full items-center justify-center rounded-full bg-white px-5 py-4 text-base font-semibold text-gray-950 transition-transform hover:scale-[1.01] active:scale-[0.99]"
           >
-            {completed ? 'Try it once more' : 'Try today’s move'}
+            {completed ? 'Practice it once more' : 'Start today’s practice'}
           </button>
-          <p className="mt-3 text-center text-[11px] text-white/45">Your recording stays private. Stop if you feel pain.</p>
+          <p className="mt-3 text-center text-[11px] text-white/45">Dogfood pilot · Your recording stays private.</p>
         </div>
       </div>
     </section>
