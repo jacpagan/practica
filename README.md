@@ -2,22 +2,31 @@
 
 Practica is a Django + React application built around one idea:
 
-> Practica is a private skill game where one person does a tiny action, records proof, and sees progress over time.
+> Practica helps a student make the time between lessons count.
 
-The product is strongest when it helps someone:
+The initial design partnership is intentionally specific: **Jose + Dorothy + Qigong**.
 
-- pick one habit or skill,
-- do one small action today,
-- record proof quickly,
-- see effort-based progress where each saved proof matters,
-- and come back tomorrow.
+The product is strongest when it helps a teacher give a student one clear thing to practice, helps the student actually practice it between lessons, captures private video evidence, and lets the teacher use that evidence to make the next correction and lesson more valuable.
+
+## Core Loop
+
+1. Teacher teaches.
+2. Teacher assigns a small practice, optionally with a reference video and focused cues.
+3. Student sees Today's Practice.
+4. Student practices and records private video evidence.
+5. Practica organizes completion and progress.
+6. Teacher quickly reviews relevant evidence.
+7. Teacher leaves a focused correction or next-practice instruction.
+8. Student practices again with that correction.
+
+During the initial pilot, this loop is the product.
 
 ## Product Docs
 
-- `docs/practica-master-spec.md`: single source of truth for product direction, current-state product behavior, and roadmap
-- `docs/habits.md`: distilled habits memo for product decisions and daily skill loops
-- `docs/revenue-brief.md`: business prompt for who pays, why, and what to build for revenue
-- `docs/tdd-strategy.md`: focused test strategy for the proof and progress loop
+- `docs/practica-master-spec.md`: single source of truth for product direction, current-state behavior, pilot, and roadmap
+- `docs/habits.md`: supporting memo for practice and return loops
+- `docs/revenue-brief.md`: supporting business and monetization thinking; defer to the master spec when it conflicts
+- `docs/tdd-strategy.md`: focused test strategy
 - `docs/local-dev-playbook.md`: cheapest safe day-to-day local development workflow
 - `docs/release-checklist.md`: step-by-step release checklist from local change to production verification
 - `docs/README.md`: documentation index
@@ -26,19 +35,49 @@ The product is strongest when it helps someone:
 
 ### Core product truth
 
-Practica is a private skill game.
+Practica is a lightweight bridge between lessons.
 
-The archive belongs to the member, the video stays central, and progress is the main product.
+The student's practice remains private by default, video stays central, teacher guidance stays lightweight, and progress comes from real practice evidence over time.
 
-### Commercial shape
+### Initial validation
 
-The first commercial offer should stay narrow:
+The first real-world pilot is Jose + Dorothy + Qigong.
 
-- one member,
-- one habit or skill,
-- one daily proof loop.
+The central question is:
 
-That shape is the simplest path to a paid product.
+> Does Practica make the student practice more effectively between lessons and make the next lesson more valuable for both student and teacher?
+
+Only after that loop works should the product generalize to additional students, teachers, and disciplines.
+
+## What We Are Building Now
+
+- simple teacher-assigned practice
+- optional reference video and focused cues
+- no-choice Today's Practice experience
+- fast private recording and saving
+- evidence associated with an assignment
+- lightweight teacher review
+- focused correction / next-practice feedback
+- simple practice progress
+
+## Not Now
+
+- public social feeds
+- followers or leaderboards
+- public marketplace mechanics
+- heavy LMS or school administration
+- giant exercise libraries
+- AI posture scoring
+- automated movement judgment
+- AI-first monetization
+
+## Product Rule
+
+Before prioritizing a feature, ask:
+
+> Does this help Jose practice better between sessions with Dorothy, or help Dorothy teach Jose better without adding unreasonable work?
+
+If not, it belongs in the backlog during the pilot.
 
 ## Quick Start
 
@@ -115,16 +154,16 @@ cd apps/frontend && npm run build
 
 ### Backend
 
-- Django 6.x + Django REST Framework (versions unpinned in `requirements.txt`; resolve with your venv)
+- Django 6.x + Django REST Framework
 - SQLite when running the API outside Docker without `DATABASE_URL`; PostgreSQL via Docker Compose locally and in production
 - S3-backed uploads when `AWS_STORAGE_BUCKET_NAME` is set
-- Media processing pipeline for playback-ready sessions
+- media processing pipeline for playback-ready sessions
 
 ### Frontend
 
 - React 18 + Vite
 - Tailwind CSS
-- Route-driven SPA around Today, Record, Progress, and proof detail surfaces
+- route-driven SPA around Today, Record, Progress, and proof/session detail surfaces
 
 ### Infrastructure
 
@@ -136,7 +175,7 @@ cd apps/frontend && npm run build
 
 - **`main`** is the production branch; completed work is integrated there (see **`AGENTS.md`** for release policy).
 - Production deploys run through **`.github/workflows/deploy-ssm.yml`** (GitHub Actions → AWS SSM → EC2).
-- Optional diagnostics: **`.github/workflows/debug-ssm-prod.yml`** (SSM shell on the prod instance; production environment).
+- Optional diagnostics: **`.github/workflows/debug-ssm-prod.yml`**.
 
 ## Security Notes
 
