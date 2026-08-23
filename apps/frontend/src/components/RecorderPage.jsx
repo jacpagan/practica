@@ -7,11 +7,13 @@ import { MAX_RECORDER_DURATION_SECONDS, createSessionUpload, isLikelyVideoFile, 
 import { useAuth } from '../auth'
 import { useToast } from './Toast'
 
-const seriesBasedTitle = (seriesName = '') => {
+const seriesBasedTitle = (seriesName = '', practicePrompt = '') => {
   const normalizedSeries = String(seriesName || '').trim()
+  const normalizedPrompt = String(practicePrompt || '').trim()
   const now = new Date()
   const pad = (n) => String(n).padStart(2, '0')
   const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
+  if (normalizedPrompt) return `${normalizedPrompt} - proof - ${stamp}`
   if (!normalizedSeries) return `proof - ${stamp}`
   return `${normalizedSeries} - proof - ${stamp}`
 }
@@ -20,12 +22,14 @@ export default function RecorderPage({
   onCancel,
   onComplete,
   practiceSeries = '',
+  practicePrompt = '',
   skillOptions = [],
   sessions = [],
 }) {
   const { token } = useAuth()
   const toast = useToast()
   const contextSkill = String(practiceSeries || '').trim()
+  const contextPrompt = String(practicePrompt || '').trim()
   const [file, setFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState('')
   const [selectedSkill, setSelectedSkill] = useState(contextSkill)
@@ -93,7 +97,7 @@ export default function RecorderPage({
   const handleSave = async ({ skillName = selectedSkill, auto = false } = {}) => {
     if (!file || !token) return
     const series = String(skillName || '').trim()
-    const title = seriesBasedTitle(series)
+    const title = seriesBasedTitle(series, contextPrompt)
     setIsUploading(true)
     setProgress(0)
     setSaveError('')
@@ -110,7 +114,7 @@ export default function RecorderPage({
         payload: {
           title,
           practice_series: series,
-          description: '',
+          description: contextPrompt,
           timing_metadata: timingMetadataRef.current,
         },
         videoFile: file,
@@ -191,7 +195,7 @@ export default function RecorderPage({
         </div>
         {contextSkill ? (
           <p className="fixed top-[max(0.75rem,env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-40 sm:hidden text-xs text-white/90 rounded-full border border-white/25 bg-black/45 px-3 py-1.5 backdrop-blur">
-            {contextSkill}
+            {contextPrompt || contextSkill}
           </p>
         ) : null}
 

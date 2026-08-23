@@ -80,6 +80,8 @@ test('Progress view shows grouped proofs for signed-in members', async ({ page }
   await page.goto('/progress')
 
   await expect(page.getByRole('heading', { name: 'Today', exact: true })).toBeVisible()
+  await expect(page.getByText('Today’s move')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Try it once more' })).toBeVisible()
   await expect(page.getByText("Today's proof").first()).toBeVisible()
   await expect(page.getByText('Activity & overview')).toHaveCount(0)
   await expect(page.getByText('Full archive')).toBeVisible()

@@ -4,6 +4,7 @@ import ActivityCalendar from './ActivityCalendar'
 import SkillSummaryCard from './SkillSummaryCard'
 import VideoThumbnail from './VideoThumbnail'
 import SkillField from './SkillField'
+import TodayMoveCard from './TodayMoveCard'
 import { useToast } from './Toast'
 import { buildSkillSummaries } from '../progressActivity'
 import { consumeProgressScrollRestore, readArchiveCleanupOpen, saveArchiveCleanupOpen } from '../progressReturnState'
@@ -24,6 +25,7 @@ export default function ProgressView({
   highlightSession = null,
   onOpenSession,
   onOpenSkill,
+  onTryTodayMove,
   onSessionUpdate,
 }) {
   const toast = useToast()
@@ -321,6 +323,8 @@ export default function ProgressView({
                   : 'Your archive starts with one take.'}
           </p>
         </div>
+
+        <TodayMoveCard completed={overview.proofRecordedToday} onTryMove={onTryTodayMove} />
 
         {justSavedSession ? (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">

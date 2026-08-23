@@ -65,6 +65,7 @@ That wedge is narrow on purpose. It is easier to explain, recruit, and charge fo
 - lightweight insights that turn proof data into useful interpretation
 - Record / Progress navigation
 - private authenticated legacy review flows where already shipped
+- a tiny scheduled mobility pilot that places one ready-to-record movement on Today
 
 ### Out of scope today
 
@@ -155,6 +156,7 @@ Current gaps:
 ### Now
 
 - remove friction from pick/do/record/progress
+- test a no-choice `Today’s move -> record -> see progress -> repeat` entry loop
 - measure the proof loop
 - learn what members will pay for
 

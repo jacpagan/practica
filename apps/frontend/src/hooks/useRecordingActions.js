@@ -8,17 +8,19 @@ export const useRecordingActions = ({
   setJustUploadedSessionId,
   setOpenRecorderOnUpload,
   setPendingPracticeSeries,
+  setPendingPracticePrompt,
   setPendingUploadReturnRoute,
   setSelectedSession,
 }) => {
-  const startRecord = useCallback(({ skillName = '', returnRoute = null } = {}) => {
+  const startRecord = useCallback(({ skillName = '', practicePrompt = '', returnRoute = null } = {}) => {
     setSelectedSession(null)
     setJustUploadedSessionId(null)
     setJustUploadedSession?.(null)
     setOpenRecorderOnUpload(false)
     setPendingPracticeSeries(String(skillName || '').trim())
+    setPendingPracticePrompt(String(practicePrompt || '').trim())
     setPendingUploadReturnRoute(returnRoute || resolveUploadReturnRoute({ practiceSeries: skillName }))
-    navigate({ view: 'record', sessionId: null })
+    navigate({ view: 'record', sessionId: null, seriesName: String(skillName || '').trim() })
   }, [
     navigate,
     resolveUploadReturnRoute,
@@ -26,6 +28,7 @@ export const useRecordingActions = ({
     setJustUploadedSessionId,
     setOpenRecorderOnUpload,
     setPendingPracticeSeries,
+    setPendingPracticePrompt,
     setPendingUploadReturnRoute,
     setSelectedSession,
   ])
@@ -47,6 +50,7 @@ export const useRecordingActions = ({
     setJustUploadedSessionId(null)
     setJustUploadedSession?.(null)
     setPendingPracticeSeries('')
+    setPendingPracticePrompt('')
     setPendingUploadReturnRoute(currentReturnRoute)
     setOpenRecorderOnUpload(false)
     navigate({ view: 'record', sessionId: null })
@@ -57,6 +61,7 @@ export const useRecordingActions = ({
     setJustUploadedSessionId,
     setOpenRecorderOnUpload,
     setPendingPracticeSeries,
+    setPendingPracticePrompt,
     setPendingUploadReturnRoute,
     setSelectedSession,
   ])

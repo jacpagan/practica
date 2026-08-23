@@ -26,6 +26,7 @@ import { useUserMenuActions } from './hooks/useUserMenuActions'
 import { useViewDataRefresh } from './hooks/useViewDataRefresh'
 import { parseRoute, routePath } from './routing'
 import { reportClientEvent } from './utils'
+import { mobilityPracticeDraft } from './todayMove'
 import { ToastProvider, useToast } from './components/Toast'
 import { ConfirmProvider, useConfirm } from './components/ConfirmDialog'
 import AuthForm from './components/AuthForm'
@@ -61,6 +62,7 @@ function AppContent() {
   const [justUploadedSessionId, setJustUploadedSessionId] = useState(null)
   const [justUploadedSession, setJustUploadedSession] = useState(null)
   const [pendingPracticeSeries, setPendingPracticeSeries] = useState(initialRoute.seriesName || '')
+  const [pendingPracticePrompt, setPendingPracticePrompt] = useState('')
   const [pendingChallengeToken, setPendingChallengeToken] = useState(initialRoute.challengeToken || '')
   const [pendingUploadReturnRoute, setPendingUploadReturnRoute] = useState({
     view: initialRoute.view === 'skill' && initialRoute.seriesName ? 'skill' : 'progress',
@@ -207,6 +209,7 @@ function AppContent() {
     setJustUploadedSessionId,
     setOpenRecorderOnUpload,
     setPendingPracticeSeries,
+    setPendingPracticePrompt,
     setPendingUploadReturnRoute,
     setSelectedSession,
   })
@@ -419,9 +422,8 @@ function AppContent() {
         {view === 'progress' && showFirstProofOnboarding && (
           <FirstProofOnboarding
             user={user}
-            skillOptions={skillOptions}
-            onStartFirstProof={(skillName) => startRecord({
-              skillName,
+            onStartFirstProof={(move) => startRecord({
+              ...mobilityPracticeDraft(move),
               returnRoute: { view: 'progress', sessionId: null, seriesName: '' },
             })}
           />
@@ -435,6 +437,10 @@ function AppContent() {
             highlightSession={justUploadedSession}
             onOpenSession={openSession}
             onOpenSkill={goSkill}
+            onTryTodayMove={(move) => startRecord({
+              ...mobilityPracticeDraft(move),
+              returnRoute: { view: 'progress', sessionId: null, seriesName: '' },
+            })}
             onSessionUpdate={onProgressSessionUpdate}
           />
         )}
@@ -479,10 +485,12 @@ function AppContent() {
         {view === 'record' && (
           <RecorderPage
             practiceSeries={pendingPracticeSeries}
+            practicePrompt={pendingPracticePrompt}
             skillOptions={skillOptions}
             sessions={sessions}
             onCancel={() => {
               setPendingPracticeSeries('')
+              setPendingPracticePrompt('')
               setPendingChallengeToken('')
               setRouteChallengeToken('')
               setPendingUploadReturnRoute({ view: 'progress', sessionId: null, seriesName: '' })
