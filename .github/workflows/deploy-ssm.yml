@@ -145,32 +145,68 @@ jobs:
           PUBLIC_STABLE_SUCCESSES: 3
         run: bash scripts/deploy-via-ssm.sh
 
+      - name: Verify exact production SHA
+        id: production_sha
+        env:
+          EXPECTED_SHA: ${{ steps.ref.outputs.ref }}
+        run: |
+          set -euo pipefail
+          expected="$EXPECTED_SHA"
+          if [ "$expected" = "main" ]; then
+            expected="$GITHUB_SHA"
+          fi
+
+          echo "Waiting for production /version to report $expected"
+          actual=""
+          for i in $(seq 1 60); do
+            payload=$(curl -fsS --max-time 10 -H 'Cache-Control: no-cache' "https://practica.jpagan.com/version?verify=${GITHUB_RUN_ID}-${i}" 2>/dev/null || true)
+            actual=$(printf '%s' "$payload" | python3 -c 'import json,sys
+try:
+ print((json.load(sys.stdin).get("sha") or "").strip())
+except Exception:
+ print("")')
+            if [ "$actual" = "$expected" ]; then
+              echo "Production verified at $actual"
+              echo "sha=$actual" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Attempt $i: production=${actual:-unavailable}; expected=$expected"
+            sleep 5
+          done
+
+          echo "::error::Production SHA mismatch. expected=$expected actual=${actual:-unavailable}"
+          exit 1
+
       - name: Deployment summary
         if: always()
         run: |
           COMMIT_SHA="${GITHUB_SHA}"
           DEPLOYED_REF="${{ steps.ref.outputs.ref }}"
+          VERIFIED_SHA="${{ steps.production_sha.outputs.sha }}"
           SSM_COMMAND_ID="${{ steps.send_ssm.outputs.command_id }}"
           SSM_STATUS="${{ steps.send_ssm.outputs.ssm_status }}"
           [ -z "$SSM_COMMAND_ID" ] && SSM_COMMAND_ID="n/a"
           [ -z "$SSM_STATUS" ] && SSM_STATUS="n/a"
+          [ -z "$VERIFIED_SHA" ] && VERIFIED_SHA="NOT VERIFIED"
 
           echo "Deploy summary:"
           echo "commit_sha=$COMMIT_SHA"
           echo "deployed_ref=$DEPLOYED_REF"
+          echo "production_sha=$VERIFIED_SHA"
           echo "backend_image=${{ steps.backend_image.outputs.image_uri }}"
           echo "ssm_command_id=$SSM_COMMAND_ID"
           echo "ssm_status=$SSM_STATUS"
-          echo "health_gate=backend+public required"
+          echo "health_gate=backend+public+exact-sha required"
 
           {
             echo "### Production Deploy Summary"
             echo "- Commit SHA: \`$COMMIT_SHA\`"
             echo "- Deployed ref: \`$DEPLOYED_REF\`"
+            echo "- Verified production SHA: \`$VERIFIED_SHA\`"
             echo "- Backend image: \`${{ steps.backend_image.outputs.image_uri }}\`"
             echo "- SSM command id: \`$SSM_COMMAND_ID\`"
             echo "- SSM status: \`$SSM_STATUS\`"
-            echo "- Health gate: \`backend + public health required\`"
+            echo "- Health gate: \`backend + public + exact production SHA required\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Notify Slack on deploy failure
