@@ -8,52 +8,94 @@ If any other Practica doc conflicts with this one, this file wins.
 
 ## One-Line Thesis
 
-Practica is a private skill game where one person does a tiny action, records proof, and sees progress over time.
+Practica helps a student make the time between lessons count.
+
+## Initial Design Partner
+
+The first concrete product-design loop is Jose + Dorothy + Qigong.
+
+This is intentionally specific. We will learn from a real teacher and a real student before generalizing the product.
+
+## Core Problem
+
+A teacher may see a student for an hour, give corrections and suggest practice, then have little visibility into what happens before the next lesson. The student may forget what to practice, practice inconsistently, or repeat a movement incorrectly without realizing it.
+
+Practica should make the time between lessons useful without turning the teacher into a full-time administrator.
+
+## Core Loop
+
+1. Teacher teaches the student.
+2. Teacher assigns a small, concrete practice, optionally with a short reference video and one or two cues.
+3. Student opens Practica and immediately sees what to practice today.
+4. Student practices and records private video proof.
+5. Practica records completion and organizes the student's practice history.
+6. Teacher can quickly review relevant practice evidence.
+7. Teacher leaves a focused correction or identifies what to work on next.
+8. That correction informs the student's next practice.
+9. Repeat.
+
+This loop is the product during the pilot.
+
+## Pilot Success Question
+
+Does Practica make the student practice more effectively between lessons and make the next lesson more valuable for both student and teacher?
+
+For the initial pilot, ask specifically:
+
+- Does Jose practice more consistently between sessions with Dorothy?
+- Does Jose remember what Dorothy asked him to work on?
+- Can Dorothy understand Jose's between-session progress without reviewing too much material?
+- Does Dorothy arrive at the next lesson with better information about what Jose needs?
+- Does the product save Dorothy time or improve the quality of her teaching?
+
+## Product Principles
+
+- private by default
+- video first
+- practice between lessons is the center of the product
+- teacher guidance should be lightweight
+- student recording should be extremely fast
+- one clear practice is better than a complicated curriculum
+- corrections should lead naturally to the next practice
+- progress should come from real evidence over time
+- low pressure
+- no streak pressure
+- every practice counts
 
 ## What Practica Is
 
-- private by default
-- member-led
-- member-owned proof archive
-- video-first
-- progress-first
-- many skills or habits over time, one proof at a time
+- a lightweight bridge between lessons
+- a private practice recorder and archive
+- a way for a teacher to assign focused between-session practice
+- a way for a student to remember what to do today
+- a way for teacher and student to see progress over time
+- initially validated through movement practice, beginning with Qigong
 
 ## What Practica Is Not
 
-- a public social app
+- a public social network
 - a public marketplace
 - a heavy LMS
 - a school administration system
-- an AI-first revenue product
-- a teacher-first workflow product
+- an AI-first product
+- an automated replacement for a teacher
+- a giant exercise catalog
 
-## Revenue Truth
+## Initial Roles
 
-Practica does not need AI or ML to start earning revenue.
+### Student
 
-Revenue should come from the loop itself:
+The student owns their private practice archive, sees assigned practice, records sessions, and tracks progress.
 
-- private capture
-- immediate proof
-- progress feedback
-- repeat usage over time
+### Teacher
 
-If model-assisted features are added later, they should support the loop by reducing friction or improving usefulness. They are not the commercial foundation.
+The teacher can assign a focused practice, provide a reference or cue, review relevant evidence, and leave a focused correction.
 
-## Wedge
-
-The initial wedge is:
-
-- one person
-- any habit or skill
-- one proof loop at a time
-
-That wedge is narrow on purpose. It is easier to explain, recruit, and charge for than broad “all embodied learning” positioning.
+The teacher experience must remain lightweight. Practica should not create a large administrative burden.
 
 ## Current Product Scope
 
-### In scope today
+### Already useful foundations
 
 - invite-only account creation
 - private session upload and recording
@@ -62,159 +104,136 @@ That wedge is narrow on purpose. It is easier to explain, recruit, and charge fo
 - optional skill or habit tags per proof
 - session detail and metadata editing
 - progress summaries from completed proof events
-- lightweight insights that turn proof data into useful interpretation
+- lightweight insights from practice data
 - Record / Progress navigation
-- private authenticated legacy review flows where already shipped
+- private authenticated legacy review flows
 - a tiny scheduled mobility pilot that places one ready-to-record movement on Today
 
-### Out of scope today
+These pieces should be reused where they strengthen the teacher -> assignment -> student practice -> review -> correction loop.
+
+### Product gaps for the Jose + Dorothy pilot
+
+- teacher can create or assign a simple practice
+- assignment can include a short reference video and focused cues
+- student has a no-choice Today view showing the assigned practice
+- student can record the practice with minimal friction
+- practice evidence is clearly associated with the assignment
+- teacher has a fast way to review the student's relevant practice
+- teacher can leave a focused correction or next-practice instruction
+- student sees that correction when practicing again
+- simple weekly summary such as practices completed and minutes practiced
+
+### Out of scope during the pilot
 
 - public discovery
 - public profiles or social feeds
-- anonymous feedback access
-- school or institution administration
-- billing and subscriptions
-- public marketplace mechanics
-- rich comparison tooling beyond proof/history organization
-- email or push-notification delivery infrastructure
+- marketplace mechanics
+- leaderboards
+- follower systems
+- broad institutional administration
+- giant program libraries
+- AI posture scoring
+- automated movement judgment
+- rep-counting as a core product requirement
+- complex analytics
+- native mobile apps
 
-## Core Loop
+## Feature Filter
 
-The core loop is:
+During the Jose + Dorothy pilot, no feature should be prioritized unless it measurably improves the teacher-student practice loop.
 
-1. pick what to record
-2. do a tiny action
-3. record proof
-4. tag the skill if useful
-5. see progress and insight from the evidence
-6. repeat when ready, with the same skill or a different one
+Before building a feature, ask:
 
-This loop is the product. Everything else should support it.
+> Does this help Jose practice better between sessions with Dorothy, or help Dorothy teach Jose better without adding unreasonable work?
 
-## Recorder Metronome
+If the answer is no, put it in the backlog.
 
-When the metronome is on, the recorder plays a simple click track (BPM, time signature, count-in) mixed into the recording. There is no beat scoring or timing judgment UI — proof is the video, not a game score.
+## AI Position
 
-## Product Goals Supported Today
+Practica does not need AI or ML to prove the core value.
 
-1. A member can create a private proof take reliably.
-2. A member can revisit prior takes in a private archive.
-3. A member can tag proofs across multiple skills or habits.
-4. A member can see effort-based progress where each saved proof counts.
-5. A member can get useful interpretation from their own practice data.
-6. A member can continue the loop with another take.
+AI may later help summarize practice, reduce review burden, find relevant moments, or provide other assistance. It should not replace teacher judgment, and it is not required for the initial pilot.
 
-## Roles And Access Model
+## Four-Week Pilot
 
-- `member`: any authenticated person.
-- `skill owner`: the member who owns the proof archive and skill tags.
-- `reviewer`: a dormant workflow-context label for legacy review flows.
-- `teacher`: a dormant workflow-context label, not a primary product identity.
+### Week 1 — Assignment and practice
 
-Rules:
+Dorothy assigns Jose a small practice. Jose uses Practica to remember it, practice it, and record evidence.
 
-- sessions are private to their owner unless explicitly shared
-- progress data is derived from the member’s own proof history
-- dormant review flows remain private to the owner, the assigned reviewer, or staff if they are touched
-- teacher and student language is legacy workflow language, not the primary product frame
+### Week 2 — Review and correction
 
-## Current Technical Snapshot
+Dorothy reviews relevant practice evidence and leaves a focused correction. Jose uses that correction in the next practice.
 
-Practica is already strongest at:
+### Week 3 — Additional students
 
-- private capture
-- playback-ready takes
-- private proof history
-- repeatable progress tracking
-- quick record and save loops
+If the loop is useful for Dorothy and Jose, invite 2–3 additional students chosen by Dorothy and observe where the workflow breaks.
 
-The current product does **not** require AI or ML to work or to generate revenue.
+### Week 4 — Value and willingness to pay
 
-The current delivery state is still `Now`, with the biggest risks centered on:
-
-- friction inside the proof loop
-- clarity of the Record / Progress surfaces
-- consistency and reliability
-- measurement of the habit loop
-
-Current shipped baseline:
-
-- private upload and playback exist
-- legacy review flows still exist in the backend
-- session history and routing exist
-- the shell can be refocused around proof and progress
-
-Current gaps:
-
-- Record / Progress surfaces are still being aligned
-- game-like progress needs clearer framing
-- billing and monetization do not exist yet
-- mobile native app does not exist
+Review usage and interview Dorothy and participating students. Determine whether the product saves time, improves practice or teaching, and whether either side would pay for the experience.
 
 ## Now / Next / Later
 
 ### Now
 
-- remove friction from pick/do/record/progress
-- test a no-choice `Today’s move -> record -> see progress -> repeat` entry loop
-- measure the proof loop
-- learn what members will pay for
+- make the Jose + Dorothy loop work end to end
+- preserve and reuse existing private recording and progress infrastructure
+- remove friction from Today's Practice -> Record -> Save
+- implement the smallest useful assignment and teacher-review workflow
+- run the four-week Qigong pilot
+- measure practice completion and qualitative teaching value
 
 ### Next
 
-- deepen progress feedback
-- make recent skills and proof tagging clearer
-- shape pricing around real use
+- improve teacher review efficiency
+- improve before/after progress visibility
+- test with a few additional movement teachers and students
+- determine who pays and shape pricing around observed value
 
 ### Later
 
-- richer comparison
-- deeper analytics
+- expand to adjacent teacher-student practices such as Tai Chi, Feldenkrais, yoga, Pilates, personal training, music, golf, or tennis if the underlying loop generalizes
+- richer comparisons and analytics
+- carefully chosen AI assistance
 - billing infrastructure
-- institutional or public expansion
+- broader commercial expansion
 
-## Product Principles
+## Current Technical Snapshot
 
-- private by default
-- video first
-- member-led
-- proof before anything else
-- progress through repetition
-- data should create value and insight
-- low pressure
-- tiny actions
-- every effort matters
-- no streak pressure
-- fun enough to return tomorrow
+Practica already has strong foundations in private capture, playback-ready takes, private history, and progress tracking. The immediate engineering goal is not to replace those foundations but to connect them into the between-session teacher-student loop.
 
 ## Naming Guidance
 
-Preferred language:
+Preferred product language:
 
-- member
-- skill
-- proof
-- practice proof
+- student
+- teacher
+- practice
+- today's practice
+- assignment
+- practice video
+- correction
 - progress
 - private archive
 
-Allowed workflow language:
+Avoid positioning Practica primarily as:
 
-- reviewer
-- teacher
-- student
-- review request
-- reviewer inbox
+- a social network
+- an AI coach
+- a marketplace
+- an LMS
+- a generic habit tracker
 
-Avoid:
+## Decision Process
 
-- public marketplace framing
-- role-heavy institutional framing
-- AI-first positioning for revenue
-- teacher-first positioning as the primary story
+Product decisions should follow this loop:
+
+Conversation and observation -> Master Spec -> code -> real-world pilot -> feedback -> Master Spec -> next change.
+
+The master spec should change when real evidence from the pilot changes our understanding of the product.
 
 ## Doc Policy
 
 All other Practica product docs are supporting references or retired snapshots.
 
-Use this file and `docs/README.md` as the only places to find the current truth.
+Use this file and `docs/README.md` as the primary places to find the current product truth.
