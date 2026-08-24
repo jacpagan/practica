@@ -160,11 +160,7 @@ jobs:
           actual=""
           for i in $(seq 1 60); do
             payload=$(curl -fsS --max-time 10 -H 'Cache-Control: no-cache' "https://practica.jpagan.com/version?verify=${GITHUB_RUN_ID}-${i}" 2>/dev/null || true)
-            actual=$(printf '%s' "$payload" | python3 -c 'import json,sys
-try:
- print((json.load(sys.stdin).get("sha") or "").strip())
-except Exception:
- print("")')
+            actual=$(PAYLOAD="$payload" python3 -c 'import json, os; print((json.loads(os.environ.get("PAYLOAD", "{}") or "{}").get("sha") or "").strip())' 2>/dev/null || true)
             if [ "$actual" = "$expected" ]; then
               echo "Production verified at $actual"
               echo "sha=$actual" >> "$GITHUB_OUTPUT"
