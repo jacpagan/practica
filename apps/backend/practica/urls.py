@@ -8,19 +8,37 @@ from django.http import JsonResponse
 from rest_framework.routers import DefaultRouter
 from videos.views import (
     health_check,
-    ready_check, register_view, login_view, me_view, user_search_view,
-    client_error_view, product_event_insights_view, internal_metrics_view,
-    invite_codes, invite_code_detail, favicon,
+    ready_check,
+    register_view, login_view, me_view,
+    user_search_view,
+    client_error_view,
+    product_event_insights_view,
+    internal_metrics_view,
+    invite_codes, invite_code_detail,
+    favicon,
 )
 from videos.library.api import SessionViewSet
 from videos.reviews.api import (
-    ReviewRequestViewSet, review_link_info, review_link_challenge_response,
-    skill_share_link_info, review_link_feedback, review_request_feedback,
-    feedback_inbox, reviewer_invites, reviewer_invite_detail,
-    reviewer_invite_claim, member_connections, feedback_insights,
-    feedback_templates, feedback_template_detail, reviewer_inbox,
-    reviewer_connections, reviewer_roster, reviewer_insights,
-    reviewer_templates, reviewer_template_detail,
+    ReviewRequestViewSet,
+    review_link_info,
+    review_link_challenge_response,
+    skill_share_link_info,
+    review_link_feedback,
+    review_request_feedback,
+    feedback_inbox,
+    reviewer_invites,
+    reviewer_invite_detail,
+    reviewer_invite_claim,
+    member_connections,
+    feedback_insights,
+    feedback_templates,
+    feedback_template_detail,
+    reviewer_inbox,
+    reviewer_connections,
+    reviewer_roster,
+    reviewer_insights,
+    reviewer_templates,
+    reviewer_template_detail,
 )
 
 router = DefaultRouter()
@@ -34,6 +52,7 @@ def spa_index(request):
         body = resp.content.decode('utf-8')
         sha = os.getenv('DEPLOYED_GIT_SHA', '')
         if sha:
+            # Inject build SHA for client telemetry and diagnostics
             injection = (
                 f'\n    <meta name="practica:sha" content="{sha}" />\n'
                 f'    <script>window.__DEPLOYED_GIT_SHA = "{sha}";</script>\n'
@@ -42,6 +61,7 @@ def spa_index(request):
         resp.content = body.encode('utf-8')
     except Exception:
         pass
+    # Prevent caching of index.html so users pick up the newest manifest/assets
     resp['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     resp['Pragma'] = 'no-cache'
     resp['Expires'] = '0'
@@ -64,9 +84,12 @@ def version_view(request):
     return JsonResponse({
         'sha': sha,
         'frontend_sha': frontend_sha,
-        'frontend_matches_backend': bool(sha and frontend_sha and sha == frontend_sha),
+        'frontend_matches_backend': bool(
+            sha and frontend_sha and sha == frontend_sha
+        ),
         'built_at': built_at,
     })
+
 
 urlpatterns = [
     path(settings.ADMIN_URL, admin.site.urls),
@@ -110,5 +133,7 @@ if settings.DEBUG:
 
 if settings.FRONTEND_DIR.exists():
     urlpatterns += [
-        re_path(r'^(?!api/|admin/|health/|static/|media/|assets/).*$', spa_index, name='spa'),
+        re_path(r'^(?!api/|admin/|health/|static/|media/|assets/).*$',
+                spa_index,
+                name='spa'),
     ]
