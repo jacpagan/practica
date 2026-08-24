@@ -12,7 +12,7 @@ ENV VITE_MINIFY=terser
 ENV VITE_SOURCEMAP=
 ARG FRONTEND_BUILD_SHA=dev
 ENV FRONTEND_BUILD_SHA=$FRONTEND_BUILD_SHA
-RUN npm run build
+RUN npm run build && printf '%s\n' "$FRONTEND_BUILD_SHA" > dist/build-sha.txt
 
 # 2) Build backend image with Python
 FROM python:3.11-slim
