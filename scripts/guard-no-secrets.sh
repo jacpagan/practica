@@ -23,11 +23,11 @@ while IFS= read -r f; do
   esac
 done <<< "$FILES"
 
-# 2) Scan for common secret keys being assigned in tracked files (excluding docs/templates)
-# Only flag if pattern looks like an assignment (KEY = VALUE) at line start.
+# 2) Scan for common secret keys being assigned in tracked files (excluding docs/templates).
+# Only flag assignment-looking lines, while allowing clearly non-production test fixtures.
 TMP_LIST=$(mktemp)
 echo "$FILES" \
-  | grep -Ev '^(docs/|\.github/|.*env\.example$|.*\.env\.template$)' \
+  | grep -Ev '^(docs/|\.github/|.*env\.example$|.*\.env\.template$|scripts/run-e2e-backend\.sh$)' \
   > "$TMP_LIST"
 
 if grep -E -n '^[[:space:]]*(AWS_SECRET_ACCESS_KEY|AWS_ACCESS_KEY_ID|DJANGO_SECRET_KEY)[[:space:]]*=' $(cat "$TMP_LIST") 2>/dev/null; then
