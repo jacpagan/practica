@@ -1,4 +1,5 @@
 name: Deploy via SSM
+run-name: "Production release • ${{ github.sha }}"
 
 # Solo mode release strategy:
 # - main -> production only
