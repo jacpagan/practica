@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { MOBILITY_MOVES, getProgramMove, getTodayMove, localDateStamp, mobilityPracticeDraft } from './todayMove.js'
+import { MOBILITY_MOVES, MOBILITY_PROGRAM_NAME, getProgramMove, getTodayMove, localDateStamp, mobilityPracticeDraft } from './todayMove.js'
 
 test('today move is deterministic for the same local calendar day', () => {
   const morning = getTodayMove(new Date(2026, 7, 22, 8, 0))
@@ -17,7 +17,7 @@ test('today move advances on the following day', () => {
 
 test('mobility draft groups the program while preserving the daily prompt', () => {
   assert.deepEqual(mobilityPracticeDraft({ title: 'Cat–cow' }), {
-    skillName: 'Everyday Mobility',
+    skillName: MOBILITY_PROGRAM_NAME,
     practicePrompt: 'Cat–cow',
   })
 })

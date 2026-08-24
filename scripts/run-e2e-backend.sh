@@ -27,4 +27,4 @@ export ALLOWED_HOSTS="127.0.0.1,localhost"
 export DEBUG=1
 
 "$PYTHON_BIN" manage.py migrate --noinput
-"$PYTHON_BIN" manage.py runserver 127.0.0.1:${PORT}
+"$PYTHON_BIN" manage.py runserver --noreload 127.0.0.1:${PORT}
