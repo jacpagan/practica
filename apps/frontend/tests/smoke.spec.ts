@@ -102,7 +102,7 @@ test('Progress view shows grouped proofs for signed-in members', async ({ page }
   await expect(page.getByRole('heading', { name: 'Dragon and Tiger Qigong' })).toBeVisible()
   await expect(page.getByText('Learned from Dorothy')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Log', exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Record' })).toBeVisible()
+  await expect(page.getByRole('main').getByRole('button', { name: 'Record', exact: true })).toBeVisible()
   await expect(page.getByText("Today's proof").first()).toBeVisible()
   await expect(page.getByText('Activity & overview')).toHaveCount(0)
   await expect(page.getByText('Full archive')).toBeVisible()
