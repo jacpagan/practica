@@ -101,7 +101,7 @@ test('Progress view shows grouped proofs for signed-in members', async ({ page }
   await expect(page.getByText('Today’s routine')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Dragon and Tiger Qigong' })).toBeVisible()
   await expect(page.getByText('Learned from Dorothy')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Log' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Log', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Record' })).toBeVisible()
   await expect(page.getByText("Today's proof").first()).toBeVisible()
   await expect(page.getByText('Activity & overview')).toHaveCount(0)
@@ -143,7 +143,7 @@ test('Journal lets a signed-in member manage private routines', async ({ page })
 
   await page.goto('/journal')
   await expect(page.getByRole('heading', { name: 'Build proof for future you' })).toBeVisible()
-  await expect(page.getByText('Drum Rudiments')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Drum Rudiments' })).toBeVisible()
   await expect(page.getByText('Learned from Jimmy')).toBeVisible()
   await expect(page.getByPlaceholder(/Learned from/)).toBeVisible()
 })
@@ -180,6 +180,14 @@ test('Progress is the default signed-in home without dashboard chrome', async ({
 
   await page.route('**/api/sessions/', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(sessions) })
+  })
+
+  await page.route('**/api/routines/?today=1', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/journal-entries/?start_date=*&end_date=*', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
   })
 
   await page.goto('/')
@@ -882,6 +890,14 @@ test('Upload retries once after network interruption and reuses idempotency key'
         code: 'direct_uploads_not_configured',
       }),
     })
+  })
+
+  await page.route('**/api/routines/?today=1', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/journal-entries/?start_date=*&end_date=*', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
   })
 
   await page.goto('/upload')

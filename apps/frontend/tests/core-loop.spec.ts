@@ -138,6 +138,14 @@ async function installSignedInUploadMocks(page) {
     await route.continue()
   })
 
+  await page.route('**/api/routines/?today=1', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.route('**/api/journal-entries/?start_date=*&end_date=*', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
   await page.route('**/api/sessions/multipart/initiate/', async (route) => {
     await route.fulfill({
       status: 201,
