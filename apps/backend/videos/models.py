@@ -272,6 +272,128 @@ class SessionProofResult(models.Model):
         return f"{label} for session={self.session_id}"
 
 
+class Routine(models.Model):
+    """A private member-owned routine for repeatable proof and journal entries."""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='routines')
+    name = models.CharField(max_length=160)
+    category = models.CharField(max_length=80, blank=True, db_index=True)
+    purpose = models.TextField(blank=True)
+    learned_from = models.CharField(max_length=160, blank=True)
+    is_default = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True, db_index=True)
+    is_today = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['category', 'name']
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'name'], name='routine_user_name_uniq'),
+            models.UniqueConstraint(fields=['user'], condition=models.Q(is_today=True), name='routine_one_today_per_user'),
+        ]
+        indexes = [
+            models.Index(fields=['user', 'is_active']),
+            models.Index(fields=['user', 'category']),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.user})"
+
+
+class RoutineItem(models.Model):
+    """One repeatable action inside a routine."""
+
+    routine = models.ForeignKey(Routine, on_delete=models.CASCADE, related_name='items')
+    name = models.CharField(max_length=160)
+    default_unit = models.CharField(max_length=40, blank=True)
+    default_target_quantity = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['sort_order', 'name']
+        constraints = [
+            models.UniqueConstraint(fields=['routine', 'name'], name='routine_item_routine_name_uniq'),
+        ]
+
+    def __str__(self):
+        return f"{self.routine.name}: {self.name}"
+
+
+class JournalEntry(models.Model):
+    """A private non-video proof entry for food, therapy, classes, habits, and fitness."""
+
+    TYPE_MEAL = 'meal'
+    TYPE_RECIPE = 'recipe'
+    TYPE_LESSON_NOTE = 'lesson_note'
+    TYPE_FITNESS = 'fitness'
+    TYPE_HABIT = 'habit'
+    TYPE_THERAPY = 'therapy'
+    TYPE_CLASS_NOTE = 'class_note'
+    TYPE_CHOICES = [
+        (TYPE_MEAL, 'Meal'),
+        (TYPE_RECIPE, 'Recipe'),
+        (TYPE_LESSON_NOTE, 'Lesson note'),
+        (TYPE_FITNESS, 'Fitness'),
+        (TYPE_HABIT, 'Habit'),
+        (TYPE_THERAPY, 'Therapy'),
+        (TYPE_CLASS_NOTE, 'Class note'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='journal_entries')
+    routine = models.ForeignKey(Routine, on_delete=models.SET_NULL, null=True, blank=True, related_name='journal_entries')
+    routine_item = models.ForeignKey(RoutineItem, on_delete=models.SET_NULL, null=True, blank=True, related_name='journal_entries')
+    entry_type = models.CharField(max_length=24, choices=TYPE_CHOICES, default=TYPE_HABIT, db_index=True)
+    title = models.CharField(max_length=200)
+    category = models.CharField(max_length=80, blank=True, db_index=True)
+    metric_name = models.CharField(max_length=160, blank=True, db_index=True)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    unit = models.CharField(max_length=40, blank=True)
+    notes = models.TextField(blank=True)
+    occurred_at = models.DateTimeField(default=timezone.now, db_index=True)
+    tags = models.ManyToManyField(Tag, blank=True, related_name='journal_entries')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-occurred_at', '-id']
+        indexes = [
+            models.Index(fields=['user', 'occurred_at']),
+            models.Index(fields=['user', 'entry_type', 'occurred_at']),
+            models.Index(fields=['user', 'category', 'occurred_at']),
+        ]
+
+    def __str__(self):
+        return self.title
+
+
+class JournalAttachment(models.Model):
+    """A private media/file attachment for a journal entry."""
+
+    TYPE_IMAGE = 'image'
+    TYPE_VIDEO = 'video'
+    TYPE_DOCUMENT = 'document'
+    TYPE_CHOICES = [
+        (TYPE_IMAGE, 'Image'),
+        (TYPE_VIDEO, 'Video'),
+        (TYPE_DOCUMENT, 'Document'),
+    ]
+
+    entry = models.ForeignKey(JournalEntry, on_delete=models.CASCADE, related_name='attachments')
+    file = models.FileField(upload_to='journal_attachments/')
+    media_type = models.CharField(max_length=16, choices=TYPE_CHOICES)
+    caption = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'id']
+
+    def __str__(self):
+        return f"{self.media_type} attachment for entry={self.entry_id}"
+
+
 class MultipartSessionUpload(models.Model):
     """Tracks direct-to-S3 multipart uploads before a private take is created."""
 

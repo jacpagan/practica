@@ -8,6 +8,10 @@ from .models import (
     Profile, Session, Chapter, VideoFeedback,
     SessionAsset,
     SessionProofResult,
+    Routine,
+    RoutineItem,
+    JournalEntry,
+    JournalAttachment,
     ProofChallengeResponse,
     ReviewLink,
     SkillShareLink,
@@ -250,6 +254,95 @@ class SessionProofResultSerializer(serializers.ModelSerializer):
         value = attrs.get('value', getattr(self.instance, 'value', None))
         if (drill_name or metric_name) and value is None:
             raise serializers.ValidationError({'value': 'Add a result value for this proof.'})
+        return attrs
+
+
+class RoutineItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RoutineItem
+        fields = [
+            'id', 'routine', 'name', 'default_unit', 'default_target_quantity',
+            'sort_order', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class RoutineSerializer(serializers.ModelSerializer):
+    items = RoutineItemSerializer(many=True, read_only=True)
+    entry_count = serializers.IntegerField(read_only=True, default=0)
+
+    class Meta:
+        model = Routine
+        fields = [
+            'id', 'name', 'category', 'purpose', 'learned_from', 'is_default', 'is_active', 'is_today',
+            'entry_count', 'items', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'is_default', 'is_today', 'entry_count', 'created_at', 'updated_at']
+
+
+class JournalAttachmentSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = JournalAttachment
+        fields = ['id', 'media_type', 'caption', 'file', 'url', 'created_at']
+        read_only_fields = ['id', 'media_type', 'url', 'created_at']
+        extra_kwargs = {
+            'file': {'write_only': True},
+        }
+
+    def get_url(self, obj):
+        file_value = getattr(obj, 'file', None)
+        key = str(getattr(file_value, 'name', '') or '').strip()
+        if not key:
+            return ''
+        try:
+            raw_url = file_value.url
+        except Exception:
+            raw_url = key
+        normalized = _normalize_storage_url(raw_url, key=key)
+        request = self.context.get('request')
+        if request and normalized.startswith('/'):
+            return request.build_absolute_uri(normalized)
+        return normalized
+
+
+class JournalEntrySerializer(serializers.ModelSerializer):
+    attachments = JournalAttachmentSerializer(many=True, read_only=True)
+    routine_name = serializers.CharField(source='routine.name', read_only=True, default='')
+    routine_item_name = serializers.CharField(source='routine_item.name', read_only=True, default='')
+    tag_names = serializers.SerializerMethodField()
+
+    class Meta:
+        model = JournalEntry
+        fields = [
+            'id', 'routine', 'routine_item', 'routine_name', 'routine_item_name',
+            'entry_type', 'title', 'category', 'metric_name', 'quantity', 'unit',
+            'notes', 'occurred_at', 'tag_names', 'attachments', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'routine_name', 'routine_item_name', 'tag_names', 'attachments', 'created_at', 'updated_at']
+
+    def get_tag_names(self, obj):
+        return [tag.name for tag in obj.tags.all()]
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
+        routine = attrs.get('routine', getattr(self.instance, 'routine', None))
+        routine_item = attrs.get('routine_item', getattr(self.instance, 'routine_item', None))
+
+        if routine and user and routine.user_id != user.id:
+            raise serializers.ValidationError({'routine': 'Choose one of your own routines.'})
+
+        if routine_item and user and routine_item.routine.user_id != user.id:
+            raise serializers.ValidationError({'routine_item': 'Choose one of your own routine items.'})
+
+        if routine and routine_item and routine_item.routine_id != routine.id:
+            raise serializers.ValidationError({'routine_item': 'Routine item must belong to the selected routine.'})
+
+        if routine_item and not routine:
+            attrs['routine'] = routine_item.routine
+
         return attrs
 
 

@@ -18,6 +18,7 @@ from videos.views import (
     favicon,
 )
 from videos.library.api import SessionViewSet
+from videos.journal_api import JournalEntryViewSet, RoutineItemViewSet, RoutineViewSet
 from videos.reviews.api import (
     ReviewRequestViewSet,
     review_link_info,
@@ -43,6 +44,9 @@ from videos.reviews.api import (
 
 router = DefaultRouter()
 router.register(r'sessions', SessionViewSet, basename='session')
+router.register(r'routines', RoutineViewSet, basename='routine')
+router.register(r'routine-items', RoutineItemViewSet, basename='routine-item')
+router.register(r'journal-entries', JournalEntryViewSet, basename='journal-entry')
 router.register(r'review-requests', ReviewRequestViewSet, basename='review-request')
 
 

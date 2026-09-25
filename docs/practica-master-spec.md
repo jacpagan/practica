@@ -8,33 +8,32 @@ If any other Practica doc conflicts with this one, this file wins.
 
 ## One-Line Thesis
 
-Practica helps a student make the time between lessons count.
+Practica helps one person turn meaningful practice into private proof and visible progress.
 
 ## Initial Design Partner
 
-The first concrete product-design loop is Jose + Dorothy + Qigong.
+The first concrete product-design loop is Jose practicing Dorothy's Qigong teaching.
 
-This is intentionally specific. We will learn from a real teacher and a real student before generalizing the product.
+Jose is the only required product user during the first pilot. Dorothy may assign an exercise directly, or Jose may assign himself an exercise he already learned from Dorothy. Teacher participation in Practica is optional.
 
 ## Core Problem
 
-A teacher may see a student for an hour, give corrections and suggest practice, then have little visibility into what happens before the next lesson. The student may forget what to practice, practice inconsistently, or repeat a movement incorrectly without realizing it.
+A person learns meaningful exercises and habits from teachers, clinicians, coaches, or experience, then forgets what to practice or loses evidence of the work between lessons and appointments.
 
-Practica should make the time between lessons useful without turning the teacher into a full-time administrator.
+Practica should make that work easy to resume, record, and understand without requiring the person who taught it to operate another platform.
 
 ## Core Loop
 
-1. Teacher teaches the student.
-2. Teacher assigns a small, concrete practice, optionally with a short reference video and one or two cues.
-3. Student opens Practica and immediately sees what to practice today.
-4. Student practices and records private video proof.
-5. Practica records completion and organizes the student's practice history.
-6. Teacher can quickly review relevant practice evidence.
-7. Teacher leaves a focused correction or identifies what to work on next.
-8. That correction informs the student's next practice.
-9. Repeat.
+1. A member chooses a meaningful routine or recalls something a teacher taught them.
+2. The member selects one routine for Today.
+3. Practica shows one clear set of actions without requiring another person's account.
+4. The member practices and records private proof as video, photo, count, or note.
+5. Practica organizes the member's proof and makes progress visible.
+6. The member may privately review it or selectively show relevant evidence to a trusted teacher, clinician, or coach.
+7. Any correction or lesson becomes the next self-assigned practice.
+8. Repeat.
 
-This loop is the product during the pilot.
+This solo-capable loop is the product during the pilot. Direct teacher assignment is an optional later convenience, not a dependency.
 
 ## Pilot Success Question
 
@@ -44,9 +43,8 @@ For the initial pilot, ask specifically:
 
 - Does Jose practice more consistently between sessions with Dorothy?
 - Does Jose remember what Dorothy asked him to work on?
-- Can Dorothy understand Jose's between-session progress without reviewing too much material?
-- Does Dorothy arrive at the next lesson with better information about what Jose needs?
-- Does the product save Dorothy time or improve the quality of her teaching?
+- Can Jose bring a useful, selective summary or proof to Dorothy without requiring her to learn Practica?
+- Does the next lesson begin with better information about what Jose practiced and wants to ask?
 
 ## Product Principles
 
@@ -54,6 +52,8 @@ For the initial pilot, ask specifically:
 - video first
 - practice between lessons is the center of the product
 - teacher guidance should be lightweight
+- teachers and coaches should not need accounts for the member to benefit
+- the member controls assignments, provenance, and sharing
 - student recording should be extremely fast
 - one clear practice is better than a complicated curriculum
 - corrections should lead naturally to the next practice
@@ -66,9 +66,9 @@ For the initial pilot, ask specifically:
 
 - a lightweight bridge between lessons
 - a private practice recorder and archive
-- a way for a teacher to assign focused between-session practice
-- a way for a student to remember what to do today
-- a way for teacher and student to see progress over time
+- a way for a member to self-assign focused practice from prior teaching
+- a way to remember what to do today and who taught it
+- a way to see progress over time and selectively share relevant evidence
 - initially validated through movement practice, beginning with Qigong
 
 ## What Practica Is Not
@@ -83,13 +83,13 @@ For the initial pilot, ask specifically:
 
 ## Initial Roles
 
-### Student
+### Member
 
-The student owns their private practice archive, sees assigned practice, records sessions, and tracks progress.
+The member owns their private practice archive, creates or selects routines, records proof, and tracks progress.
 
 ### Teacher
 
-The teacher can assign a focused practice, provide a reference or cue, review relevant evidence, and leave a focused correction.
+The teacher can continue teaching outside Practica. The member records who taught an exercise and can selectively show relevant evidence. A teacher account may later support direct assignments and corrections when the teacher wants it.
 
 The teacher experience must remain lightweight. Practica should not create a large administrative burden.
 
@@ -113,14 +113,13 @@ These pieces should be reused where they strengthen the teacher -> assignment ->
 
 ### Product gaps for the Jose + Dorothy pilot
 
-- teacher can create or assign a simple practice
+- member can create and self-assign a simple practice
 - assignment can include a short reference video and focused cues
 - student has a no-choice Today view showing the assigned practice
 - student can record the practice with minimal friction
 - practice evidence is clearly associated with the assignment
-- teacher has a fast way to review the student's relevant practice
-- teacher can leave a focused correction or next-practice instruction
-- student sees that correction when practicing again
+- member can prepare a focused view or export for a trusted teacher
+- optional correction capture can inform the next self-assigned practice
 - simple weekly summary such as practices completed and minutes practiced
 
 ### Out of scope during the pilot
@@ -140,11 +139,11 @@ These pieces should be reused where they strengthen the teacher -> assignment ->
 
 ## Feature Filter
 
-During the Jose + Dorothy pilot, no feature should be prioritized unless it measurably improves the teacher-student practice loop.
+During the Jose + Dorothy pilot, no feature should be prioritized unless it measurably improves Jose's private practice loop or makes the next lesson more useful without burdening Dorothy.
 
 Before building a feature, ask:
 
-> Does this help Jose practice better between sessions with Dorothy, or help Dorothy teach Jose better without adding unreasonable work?
+> Does this help Jose practice better between sessions, preserve what Dorothy taught, or improve the next lesson without requiring Dorothy to operate Practica?
 
 If the answer is no, put it in the backlog.
 
@@ -176,7 +175,8 @@ Review usage and interview Dorothy and participating students. Determine whether
 
 ### Now
 
-- make the Jose + Dorothy loop work end to end
+- make Jose's solo-capable Dorothy/Qigong loop work end to end
+- ship custom routines, learned-from provenance, private journal proof, and a member-selected Today routine
 - preserve and reuse existing private recording and progress infrastructure
 - remove friction from Today's Practice -> Record -> Save
 - implement the smallest useful assignment and teacher-review workflow

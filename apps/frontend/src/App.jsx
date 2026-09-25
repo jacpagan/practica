@@ -26,7 +26,6 @@ import { useUserMenuActions } from './hooks/useUserMenuActions'
 import { useViewDataRefresh } from './hooks/useViewDataRefresh'
 import { parseRoute, routePath } from './routing'
 import { reportClientEvent } from './utils'
-import { mobilityPracticeDraft } from './todayMove'
 import { ToastProvider, useToast } from './components/Toast'
 import { ConfirmProvider, useConfirm } from './components/ConfirmDialog'
 import AuthForm from './components/AuthForm'
@@ -36,8 +35,8 @@ import BrandLogo from './components/BrandLogo'
 const SessionDetail = React.lazy(() => import('./components/SessionDetail'))
 const ProgressView = React.lazy(() => import('./components/ProgressView'))
 const SkillView = React.lazy(() => import('./components/SkillView'))
-const FirstProofOnboarding = React.lazy(() => import('./components/FirstProofOnboarding'))
 const InternalMetrics = React.lazy(() => import('./components/InternalMetrics'))
+const JournalView = React.lazy(() => import('./components/JournalView'))
 const SharedProofPage = React.lazy(() => import('./components/SharedProofPage').then((module) => ({ default: module.SharedProofPage })))
 const SharedSkillPage = React.lazy(() => import('./components/SharedProofPage').then((module) => ({ default: module.SharedSkillPage })))
 import PrivacyPage from './components/PrivacyPage'
@@ -289,7 +288,7 @@ function AppContent() {
   } = usePrimaryNavigation({ navigate })
 
   const progressNavActive = view === 'progress' || view === 'skill' || view === 'detail'
-  const showFirstProofOnboarding = view === 'progress' && !sessionsLoading && sessions.length === 0 && !justUploadedSession
+  const journalNavActive = view === 'journal'
 
   const {
     onDetailSessionDelete,
@@ -359,6 +358,12 @@ function AppContent() {
             >
               Today
             </button>
+            <button
+              onClick={() => navigate({ view: 'journal', sessionId: null })}
+              className={`inline-flex text-sm px-3 py-1.5 rounded-full border transition-colors ${journalNavActive ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:text-gray-900'}`}
+            >
+              Journal
+            </button>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <button
@@ -419,17 +424,11 @@ function AppContent() {
           />
         )}
 
-        {view === 'progress' && showFirstProofOnboarding && (
-          <FirstProofOnboarding
-            user={user}
-            onStartFirstProof={(move) => startRecord({
-              ...mobilityPracticeDraft(move),
-              returnRoute: { view: 'progress', sessionId: null, seriesName: '' },
-            })}
-          />
+        {view === 'journal' && (
+          <JournalView token={token} />
         )}
 
-        {view === 'progress' && !showFirstProofOnboarding && (
+        {view === 'progress' && (
           <ProgressView
             sessions={sessions}
             sessionsLoading={sessionsLoading}
@@ -437,8 +436,10 @@ function AppContent() {
             highlightSession={justUploadedSession}
             onOpenSession={openSession}
             onOpenSkill={goSkill}
-            onTryTodayMove={(move) => startRecord({
-              ...mobilityPracticeDraft(move),
+            onOpenJournal={() => navigate({ view: 'journal', sessionId: null })}
+            onRecordRoutineItem={(routine, item) => startRecord({
+              skillName: routine.name,
+              practicePrompt: item.name,
               returnRoute: { view: 'progress', sessionId: null, seriesName: '' },
             })}
             onSessionUpdate={onProgressSessionUpdate}

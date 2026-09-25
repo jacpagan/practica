@@ -77,15 +77,75 @@ test('Progress view shows grouped proofs for signed-in members', async ({ page }
   await page.route('**/api/sessions/**', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(sessions) })
   })
+  await page.route('**/api/routines/?today=1', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{
+        id: 7,
+        name: 'Dragon and Tiger Qigong',
+        category: 'Qigong',
+        purpose: 'Practice what Dorothy taught you.',
+        learned_from: 'Dorothy',
+        is_today: true,
+        items: [{ id: 71, name: 'Movement 1', default_unit: 'reps', default_target_quantity: '1.00' }],
+      }]),
+    })
+  })
+  await page.route('**/api/journal-entries/?start_date=*&end_date=*', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
   await page.goto('/progress')
 
   await expect(page.getByRole('heading', { name: 'Today', exact: true })).toBeVisible()
-  await expect(page.getByText('Today’s practice')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Try it once more' })).toBeVisible()
+  await expect(page.getByText('Today’s routine')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Dragon and Tiger Qigong' })).toBeVisible()
+  await expect(page.getByText('Learned from Dorothy')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Log' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Record' })).toBeVisible()
   await expect(page.getByText("Today's proof").first()).toBeVisible()
   await expect(page.getByText('Activity & overview')).toHaveCount(0)
   await expect(page.getByText('Full archive')).toBeVisible()
   await expect(page.getByRole('button', { name: /Groove Lab 1 proof/ })).toBeVisible()
+})
+
+test('Journal lets a signed-in member manage private routines', async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem('token', 'smoke-token'))
+  await page.route('**/api/auth/me/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 1, username: 'smoke_member', display_name: 'Smoke Member' }),
+    })
+  })
+  await page.route('**/api/sessions/', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+  await page.route('**/api/routines/', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{
+        id: 8,
+        name: 'Drum Rudiments',
+        category: 'Drums',
+        purpose: 'Keep the exercises alive.',
+        learned_from: 'Jimmy',
+        is_default: true,
+        is_today: true,
+        items: [{ id: 81, name: 'Flam taps', default_unit: 'minutes', default_target_quantity: null }],
+      }]),
+    })
+  })
+  await page.route('**/api/journal-entries/', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
+
+  await page.goto('/journal')
+  await expect(page.getByRole('heading', { name: 'Build proof for future you' })).toBeVisible()
+  await expect(page.getByText('Drum Rudiments')).toBeVisible()
+  await expect(page.getByText('Learned from Jimmy')).toBeVisible()
+  await expect(page.getByPlaceholder(/Learned from/)).toBeVisible()
 })
 
 test('Progress is the default signed-in home without dashboard chrome', async ({ page }) => {

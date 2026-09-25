@@ -23,6 +23,13 @@ test('parseRoute keeps internal metrics route', () => {
   assert.equal(routePath(route), '/internal/metrics')
 })
 
+test('parseRoute keeps the private journal route', () => {
+  const route = parseRoute('/journal')
+
+  assert.equal(route.view, 'journal')
+  assert.equal(routePath(route), '/journal')
+})
+
 test('parseRoute keeps challenge recorder skill context', () => {
   const route = parseRoute('/record', '?skill=Shoulder%20press&challenge=review-token-123')
 

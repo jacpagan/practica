@@ -4,7 +4,7 @@ import ActivityCalendar from './ActivityCalendar'
 import SkillSummaryCard from './SkillSummaryCard'
 import VideoThumbnail from './VideoThumbnail'
 import SkillField from './SkillField'
-import TodayMoveCard from './TodayMoveCard'
+import TodayRoutineCard from './TodayRoutineCard'
 import { useToast } from './Toast'
 import { buildSkillSummaries } from '../progressActivity'
 import { consumeProgressScrollRestore, readArchiveCleanupOpen, saveArchiveCleanupOpen } from '../progressReturnState'
@@ -25,7 +25,8 @@ export default function ProgressView({
   highlightSession = null,
   onOpenSession,
   onOpenSkill,
-  onTryTodayMove,
+  onOpenJournal,
+  onRecordRoutineItem,
   onSessionUpdate,
 }) {
   const toast = useToast()
@@ -324,7 +325,7 @@ export default function ProgressView({
           </p>
         </div>
 
-        <TodayMoveCard completed={overview.proofRecordedToday} onTryMove={onTryTodayMove} />
+        <TodayRoutineCard token={token} sessions={sessions} onOpenJournal={onOpenJournal} onRecord={onRecordRoutineItem} />
 
         {justSavedSession ? (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">

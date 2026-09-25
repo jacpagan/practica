@@ -1,6 +1,7 @@
 from django.contrib import admin
 from .models import (
     Profile, Session, Chapter, VideoFeedback, MultipartSessionUpload, SessionAsset,
+    Routine, RoutineItem, JournalEntry, JournalAttachment,
     SessionLastSeen,
     SignupInviteCode,
     ProductEventLog,
@@ -8,6 +9,16 @@ from .models import (
     ReviewRequest, ReviewRequestEvent, ReviewerRosterMembership, FeedbackTemplate,
     MLDatasetSnapshot, MLModelSuggestion,
 )
+
+
+class RoutineItemInline(admin.TabularInline):
+    model = RoutineItem
+    extra = 0
+
+
+class JournalAttachmentInline(admin.TabularInline):
+    model = JournalAttachment
+    extra = 0
 
 
 class ChapterInline(admin.TabularInline):
@@ -53,6 +64,39 @@ class SessionAdmin(admin.ModelAdmin):
     search_fields = ['title', 'practice_series', 'description']
     list_filter = ['user', 'processing_status']
     inlines = [ChapterInline, VideoFeedbackInline]
+
+
+@admin.register(Routine)
+class RoutineAdmin(admin.ModelAdmin):
+    list_display = ['name', 'category', 'user', 'is_default', 'is_active', 'is_today', 'updated_at']
+    list_filter = ['category', 'is_default', 'is_active', 'is_today']
+    search_fields = ['name', 'purpose', 'learned_from', 'user__username']
+    raw_id_fields = ['user']
+    inlines = [RoutineItemInline]
+
+
+@admin.register(RoutineItem)
+class RoutineItemAdmin(admin.ModelAdmin):
+    list_display = ['name', 'routine', 'default_unit', 'default_target_quantity', 'sort_order']
+    search_fields = ['name', 'routine__name', 'routine__user__username']
+    raw_id_fields = ['routine']
+
+
+@admin.register(JournalEntry)
+class JournalEntryAdmin(admin.ModelAdmin):
+    list_display = ['title', 'entry_type', 'category', 'user', 'routine', 'quantity', 'unit', 'occurred_at']
+    list_filter = ['entry_type', 'category', 'occurred_at']
+    search_fields = ['title', 'notes', 'metric_name', 'user__username']
+    raw_id_fields = ['user', 'routine', 'routine_item']
+    inlines = [JournalAttachmentInline]
+
+
+@admin.register(JournalAttachment)
+class JournalAttachmentAdmin(admin.ModelAdmin):
+    list_display = ['id', 'entry', 'media_type', 'caption', 'created_at']
+    list_filter = ['media_type', 'created_at']
+    search_fields = ['caption', 'entry__title', 'entry__user__username']
+    raw_id_fields = ['entry']
 
 
 @admin.register(Chapter)
