@@ -22,6 +22,7 @@ export default function TodayRoutineCard({ token, sessions = [], onOpenJournal, 
   const [loading, setLoading] = useState(true)
   const [savingItemId, setSavingItemId] = useState(null)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const today = useMemo(() => toLocalDateKey(new Date()), [])
   const authHeaders = useMemo(() => ({ Authorization: `Token ${token}` }), [token])
 
@@ -80,6 +81,7 @@ export default function TodayRoutineCard({ token, sessions = [], onOpenJournal, 
     if (!routine || savingItemId) return
     setSavingItemId(item.id)
     setError('')
+    setNotice('')
     try {
       const payload = {
         routine: routine.id,
@@ -103,6 +105,7 @@ export default function TodayRoutineCard({ token, sessions = [], onOpenJournal, 
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data?.detail || 'Could not save proof')
       setEntries((current) => [data, ...current])
+      setNotice(`Saved · ${item.name}`)
     } catch (saveError) {
       setError(saveError?.message || 'Could not save proof')
     } finally {
@@ -111,15 +114,15 @@ export default function TodayRoutineCard({ token, sessions = [], onOpenJournal, 
   }
 
   if (loading) {
-    return <div className="min-h-48 rounded-lg border border-gray-200 bg-white p-5 text-sm text-gray-500">Loading today’s routine</div>
+    return <div className="min-h-48 border-y border-gray-200 py-6 text-sm text-gray-400">Loading today’s routine</div>
   }
 
   if (!routine) {
     return (
-      <section className="rounded-lg border border-dashed border-gray-300 bg-white p-6">
+      <section className="border-y border-gray-200 py-8">
         <h2 className="text-lg font-semibold text-gray-950">Choose what matters today</h2>
         <p className="mt-1 text-sm text-gray-500">Pick one of your routines or create your own.</p>
-        <button type="button" onClick={onOpenJournal} className="mt-4 rounded-full bg-gray-950 px-4 py-2 text-sm font-medium text-white">
+        <button type="button" onClick={onOpenJournal} className="mt-4 bg-gray-950 px-4 py-2 text-sm font-medium text-white">
           Open routines
         </button>
       </section>
@@ -127,62 +130,62 @@ export default function TodayRoutineCard({ token, sessions = [], onOpenJournal, 
   }
 
   const completedCount = (routine.items || []).filter((item) => countsByItem[item.id] || videoCountsByItem[item.id]).length
+  const incompleteItems = (routine.items || []).filter((item) => !(countsByItem[item.id] || videoCountsByItem[item.id]))
+  const completedItems = (routine.items || []).filter((item) => countsByItem[item.id] || videoCountsByItem[item.id])
+
+  const renderRoutineItem = (item, completed = false) => {
+    const proofCount = (countsByItem[item.id] || 0) + (videoCountsByItem[item.id] || 0)
+    return (
+      <div key={item.id} className={`flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between ${completed ? 'opacity-60' : ''}`}>
+        <div className="min-w-0">
+          <div className="flex items-center gap-3">
+            <span className={`h-2.5 w-2.5 shrink-0 rounded-full border ${completed ? 'border-emerald-700 bg-emerald-700' : 'border-gray-300'}`} aria-hidden="true" />
+            <p className="font-medium text-gray-950">{item.name}</p>
+          </div>
+          {item.default_target_quantity || item.default_unit || proofCount ? (
+            <p className="mt-1 pl-5 text-xs text-gray-400">
+              {[item.default_target_quantity, item.default_unit, proofCount ? `${proofCount} today` : ''].filter(Boolean).join(' · ')}
+            </p>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 gap-4 pl-5 sm:pl-0">
+          <button type="button" onClick={() => logItem(item)} disabled={Boolean(savingItemId)} className="text-sm font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 disabled:opacity-40">
+            {savingItemId === item.id ? 'Saving' : 'Log'}
+          </button>
+          <button type="button" onClick={() => onRecord?.(routine, item)} className="text-sm text-gray-500 hover:text-gray-950">Record</button>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <section className="overflow-hidden rounded-lg border border-gray-200 bg-gray-950 text-white shadow-sm">
-      <div className="flex flex-col gap-4 border-b border-white/10 px-5 py-5 sm:flex-row sm:items-start sm:justify-between">
+    <section className="border-y border-gray-200">
+      <div className="flex flex-col gap-4 py-6 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase text-emerald-300">Today’s routine</p>
-          <h2 className="mt-1 text-2xl font-semibold">{routine.name}</h2>
-          {routine.learned_from ? <p className="mt-1 text-sm text-white/60">Learned from {routine.learned_from}</p> : null}
-          {routine.purpose ? <p className="mt-3 max-w-2xl text-sm text-white/70">{routine.purpose}</p> : null}
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-gray-400">Today’s routine</p>
+          <h2 className="mt-2 text-2xl font-semibold text-gray-950">{routine.name}</h2>
+          {routine.learned_from ? <p className="mt-1 text-sm text-gray-500">Learned from {routine.learned_from}</p> : null}
+          {routine.purpose ? <p className="mt-3 max-w-2xl text-sm leading-6 text-gray-600">{routine.purpose}</p> : null}
         </div>
-        <button type="button" onClick={onOpenJournal} className="self-start rounded-full border border-white/20 px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10">
-          Change
+        <button type="button" onClick={onOpenJournal} className="self-start text-xs text-gray-400 underline decoration-gray-200 underline-offset-4 hover:text-gray-950">
+          Change routine
         </button>
       </div>
 
-      {error ? <div className="border-b border-red-300/20 bg-red-400/10 px-5 py-3 text-sm text-red-100">{error}</div> : null}
+      {error ? <div className="border-t border-red-200 py-3 text-sm text-red-700">{error}</div> : null}
+      {notice ? <div className="border-t border-emerald-100 py-3 text-sm text-emerald-800">{notice}</div> : null}
 
-      <div className="divide-y divide-white/10">
-        {(routine.items || []).map((item) => {
-          const proofCount = (countsByItem[item.id] || 0) + (videoCountsByItem[item.id] || 0)
-          return (
-            <div key={item.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="font-medium text-white">{item.name}</p>
-                  {proofCount ? <span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-xs font-medium text-emerald-200">Logged {proofCount}x</span> : null}
-                </div>
-                {item.default_target_quantity || item.default_unit ? (
-                  <p className="mt-1 text-xs text-white/50">{item.default_target_quantity || ''} {item.default_unit || ''}</p>
-                ) : null}
-              </div>
-              <div className="flex shrink-0 gap-2">
-                <button
-                  type="button"
-                  onClick={() => logItem(item)}
-                  disabled={Boolean(savingItemId)}
-                  className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-gray-950 disabled:opacity-50"
-                >
-                  {savingItemId === item.id ? 'Saving' : 'Log'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onRecord?.(routine, item)}
-                  className="rounded-full border border-white/25 px-4 py-2 text-xs font-semibold text-white hover:bg-white/10"
-                >
-                  Record
-                </button>
-              </div>
-            </div>
-          )
-        })}
-      </div>
+      <div className="divide-y divide-gray-100">{incompleteItems.map((item) => renderRoutineItem(item))}</div>
+      {completedItems.length ? (
+        <details className="border-t border-gray-200 py-4">
+          <summary className="cursor-pointer list-none text-sm text-gray-500">Completed today · {completedCount}</summary>
+          <div className="mt-2 divide-y divide-gray-100">{completedItems.map((item) => renderRoutineItem(item, true))}</div>
+        </details>
+      ) : null}
 
-      <div className="flex items-center justify-between bg-white/5 px-5 py-3 text-xs text-white/55">
-        <span>{completedCount} of {(routine.items || []).length} actions logged today</span>
-        <span>Private by default</span>
+      <div className="flex items-center justify-between border-t border-gray-100 py-3 text-xs text-gray-400">
+        <span>{completedCount} of {(routine.items || []).length} complete</span>
+        <span>Private</span>
       </div>
     </section>
   )

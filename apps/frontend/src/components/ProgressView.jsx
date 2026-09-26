@@ -22,14 +22,17 @@ export default function ProgressView({
   sessions = [],
   sessionsLoading = false,
   token = '',
+  surface = 'today',
   highlightSession = null,
   onOpenSession,
   onOpenSkill,
   onOpenJournal,
+  onOpenProgress,
   onRecordRoutineItem,
   onSessionUpdate,
 }) {
   const toast = useToast()
+  const isProgressSurface = surface === 'progress'
   const highlightRef = useRef(null)
   const restoreAttemptRef = useRef(false)
   const [shareStatus, setShareStatus] = useState('')
@@ -134,7 +137,7 @@ export default function ProgressView({
   }
 
   const progressReturnRoute = () => ({
-    view: 'progress',
+    view: isProgressSurface ? 'archive' : 'progress',
     sessionId: null,
     seriesName: '',
     scrollY: (() => {
@@ -145,11 +148,6 @@ export default function ProgressView({
 
   const saveArchiveCleanupState = (nextOpen = archiveOpen) => {
     saveArchiveCleanupOpen(nextOpen)
-  }
-
-  const updateArchiveOpen = (nextOpen) => {
-    setArchiveOpen(nextOpen)
-    saveArchiveCleanupState(nextOpen)
   }
 
   const openSkillDraft = (session) => {
@@ -269,15 +267,6 @@ export default function ProgressView({
     )
   }
 
-  const overviewParts = []
-  if (overview.proofCount > 0) {
-    overviewParts.push(`${overview.proofCount} ${overview.proofCount === 1 ? 'proof' : 'proofs'}`)
-    overviewParts.push(`${overview.uniqueDayCount} ${overview.uniqueDayCount === 1 ? 'day' : 'days'} with proof`)
-    if (overview.skillCount > 0) {
-      overviewParts.push(`${overview.skillCount} ${overview.skillCount === 1 ? 'skill' : 'skills'}`)
-    }
-  }
-
   const renderProofCard = (session, label, { highlighted = false } = {}) => (
     <button
       key={session.id}
@@ -287,14 +276,14 @@ export default function ProgressView({
         saveArchiveCleanupState()
         onOpenSession?.(session, progressReturnRoute())
       }}
-      className={`w-full rounded-2xl border overflow-hidden text-left transition-colors ${
+      className={`w-full overflow-hidden rounded-lg border text-left transition-colors ${
         highlighted
           ? 'border-emerald-400 bg-emerald-50/70 ring-2 ring-emerald-200 hover:bg-emerald-50'
           : 'border-gray-900 bg-gray-50/40 hover:bg-gray-50'
       }`}
     >
       <div className="flex items-stretch gap-0 sm:gap-4">
-        <VideoThumbnail session={session} variant="poster" className="relative w-28 shrink-0 bg-black sm:w-40 sm:rounded-l-2xl" />
+        <VideoThumbnail session={session} variant="poster" className="relative w-28 shrink-0 bg-black sm:w-40" />
         <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-4">
           <p className={`text-[11px] font-medium uppercase tracking-wide ${highlighted ? 'text-emerald-700' : 'text-gray-500'}`}>{label}</p>
           <p className="mt-1 truncate text-base font-semibold text-gray-900">{session.title || 'Proof'}</p>
@@ -308,182 +297,84 @@ export default function ProgressView({
   )
 
   return (
-    <div className="px-4 sm:px-6 py-6 pb-28">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div>
-          <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Today</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            {justSavedSession
-              ? 'Proof saved. You showed up today.'
-              : overview.proofRecordedToday
-                ? (todaySessions.length > 1
-                  ? `${todaySessions.length} proofs logged today.`
-                  : 'You showed up today.')
-                : sessions.length > 0
-                  ? 'Ready when you are.'
-                  : 'Your archive starts with one take.'}
-          </p>
-        </div>
-
-        <TodayRoutineCard token={token} sessions={sessions} onOpenJournal={onOpenJournal} onRecord={onRecordRoutineItem} />
-
-        {justSavedSession ? (
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-medium text-emerald-900">Done for today?</p>
-                <p className="mt-1 text-sm text-emerald-800">
-                  Your proof is saved. Tap it to watch, or record another skill when useful.
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                {shareStatus ? (
-                  <span className="text-xs font-medium text-emerald-800">{shareStatus}</span>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={handleShareProgressCard}
-                  className="inline-flex items-center justify-center rounded-full border border-emerald-700/20 bg-white px-3 py-2 text-xs font-semibold text-emerald-950 transition-colors hover:bg-emerald-100"
-                >
-                  Share progress card
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {sessions.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center">
-            <p className="text-sm text-gray-700">Record your first proof whenever you are ready.</p>
-          </div>
-        ) : (
+    <div className="px-4 py-8 pb-28 sm:px-6 sm:py-10">
+      <div className="mx-auto max-w-3xl space-y-10">
+        {isProgressSurface ? (
           <>
-            {todayLatest ? renderProofCard(
-              todayLatest,
-              justSavedSession?.id === todayLatest.id ? 'Just saved' : "Today's proof",
-              { highlighted: justSavedSession?.id === todayLatest.id },
-            ) : null}
+            <header className="border-b border-gray-200 pb-6">
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-gray-400">Private archive</p>
+              <h1 className="mt-2 text-3xl font-semibold text-gray-950">Progress</h1>
+              <p className="mt-2 text-sm text-gray-500">Evidence collected through practice, not performance.</p>
+            </header>
 
-            {justSavedSession && (!todayLatest || todayLatest.id !== justSavedSession.id) ? (
-              renderProofCard(justSavedSession, 'Just saved', { highlighted: true })
-            ) : null}
+            <section className="grid grid-cols-3 border-b border-gray-200 pb-8 text-center sm:text-left">
+              <div><p className="text-2xl font-semibold text-gray-950">{overview.proofCount}</p><p className="mt-1 text-xs text-gray-400">Proofs</p></div>
+              <div><p className="text-2xl font-semibold text-gray-950">{overview.uniqueDayCount}</p><p className="mt-1 text-xs text-gray-400">Practice days</p></div>
+              <div><p className="text-2xl font-semibold text-gray-950">{overview.skillCount}</p><p className="mt-1 text-xs text-gray-400">Skills</p></div>
+            </section>
 
-            {!overview.proofRecordedToday && latestSession ? (
-              <button
-                type="button"
-                onClick={() => onOpenSession?.(latestSession, progressReturnRoute())}
-                className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-left hover:bg-gray-50 transition-colors"
-              >
-                <p className="text-xs text-gray-500">Last proof</p>
-                <p className="mt-1 text-sm font-medium text-gray-900 truncate">{latestSession.title || 'Proof'}</p>
-                <p className="mt-0.5 text-xs text-gray-500">
-                  {formatCompactDateTime(latestSession.recorded_at || latestSession.created_at)}
-                  {latestSession.practice_series ? ` · ${latestSession.practice_series}` : ''}
-                </p>
-              </button>
-            ) : null}
+            {sessions.length ? <ActivityCalendar sessions={sessions} /> : null}
 
-            {todaySessions.length > 1 ? (
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-900">Earlier today</p>
-                {todaySessions.slice(1).map((session) => (
-                  <SessionListItem
-                    key={session.id}
-                    session={session}
-                    onOpen={() => onOpenSession?.(session, progressReturnRoute())}
-                    prefetch
-                    minimal
-                  />
-                ))}
-              </div>
-            ) : null}
-
-            {taggedSummaries.length > 0 ? (
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Skills</p>
-                  <p className="mt-0.5 text-xs text-gray-500">Open one when you want continuity, or record something different.</p>
+            {taggedSummaries.length ? (
+              <section className="space-y-4">
+                <div><h2 className="text-lg font-semibold text-gray-950">Skills</h2><p className="mt-1 text-sm text-gray-500">Open a thread to see how the work has changed.</p></div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {taggedSummaries.map((summary) => <SkillSummaryCard key={summary.skillKey} summary={summary} onOpenSkill={onOpenSkill} />)}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {taggedSummaries.map((summary) => (
-                    <SkillSummaryCard
-                      key={summary.skillKey}
-                      summary={summary}
-                      onOpenSkill={onOpenSkill}
-                    />
+              </section>
+            ) : null}
+
+            <section className="space-y-4">
+              <div className="flex items-end justify-between gap-4 border-b border-gray-200 pb-3">
+                <div><h2 className="text-lg font-semibold text-gray-950">Proof archive</h2>{overview.latestProofAt ? <p className="mt-1 text-xs text-gray-400">Latest {fmtDate(overview.latestProofAt)}</p> : null}</div>
+                {ungroupedItems.length ? <p className="text-xs text-gray-400">{ungroupedItems.length} uncategorized</p> : null}
+              </div>
+              {sessions.length ? (
+                <div className="divide-y divide-gray-100">
+                  {sessions.map((session) => (
+                    <div key={session.id} className="py-3">
+                      <SessionListItem session={session} showSeries onOpen={() => onOpenSession?.(session, progressReturnRoute())} onChangeSkill={() => openSkillDraft(session)} prefetch minimal />
+                    </div>
                   ))}
                 </div>
+              ) : <p className="py-8 text-sm text-gray-500">Your private archive begins with one proof.</p>}
+            </section>
+          </>
+        ) : (
+          <>
+            <header>
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-gray-400">Your practice</p>
+              <h1 className="mt-2 text-3xl font-semibold text-gray-950">Today</h1>
+              <p className="mt-2 text-sm text-gray-500">{justSavedSession ? 'Proof saved. You showed up today.' : overview.proofRecordedToday ? 'You showed up today.' : 'Begin with the next useful action.'}</p>
+            </header>
+
+            <TodayRoutineCard token={token} sessions={sessions} onOpenJournal={onOpenJournal} onRecord={onRecordRoutineItem} />
+
+            {justSavedSession ? (
+              <div className="flex flex-col gap-3 border-l-2 border-emerald-600 pl-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-gray-600">Your proof is safely in the archive.</p>
+                <div className="flex items-center gap-3">{shareStatus ? <span className="text-xs text-gray-500">{shareStatus}</span> : null}<button type="button" onClick={handleShareProgressCard} className="text-sm font-medium text-gray-950 underline decoration-gray-300 underline-offset-4">Share summary</button></div>
               </div>
             ) : null}
 
-            <details
-              open={archiveOpen}
-              onToggle={(event) => updateArchiveOpen(event.currentTarget.open)}
-              className="rounded-2xl border border-gray-200 bg-white px-4 py-3"
-            >
-              <summary className="cursor-pointer list-none text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors">
-                Full archive
-              </summary>
-              <div className="mt-4 space-y-4 border-t border-gray-100 pt-4">
-                {overviewParts.length > 0 ? (
-                  <p className="text-sm text-gray-600">{overviewParts.join(' · ')}</p>
-                ) : null}
-                {overview.latestProofAt ? (
-                  <p className="text-xs text-gray-500">Latest proof {fmtDate(overview.latestProofAt)}</p>
-                ) : null}
-                <ActivityCalendar sessions={sessions} />
-
-                {ungroupedItems.length ? (
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Uncategorized proofs</p>
-                    </div>
-                    <div className="space-y-3">
-                      {ungroupedItems.map((session) => (
-                        <SessionListItem
-                          key={session.id}
-                          session={session}
-                          onOpen={() => {
-                            saveArchiveCleanupState()
-                            onOpenSession?.(session, progressReturnRoute())
-                          }}
-                          onChangeSkill={() => openSkillDraft(session)}
-                          prefetch
-                          minimal
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <p className="text-sm font-medium text-gray-900">All proofs</p>
-                    <div className="space-y-3">
-                      {sessions.map((session) => (
-                        <SessionListItem
-                          key={session.id}
-                          session={session}
-                          showSeries
-                          onOpen={() => {
-                            saveArchiveCleanupState()
-                            onOpenSession?.(session, progressReturnRoute())
-                          }}
-                          onChangeSkill={() => openSkillDraft(session)}
-                          prefetch
-                          minimal
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </details>
+            {sessions.length === 0 ? (
+              <p className="border-t border-gray-200 py-8 text-sm text-gray-500">Record your first proof whenever you are ready.</p>
+            ) : (
+              <section className="space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-200 pb-3"><h2 className="text-sm font-medium text-gray-950">Recent proof</h2><button type="button" onClick={onOpenProgress} className="text-xs text-gray-500 hover:text-gray-950">View progress</button></div>
+                {todayLatest ? renderProofCard(todayLatest, justSavedSession?.id === todayLatest.id ? 'Just saved' : "Today's proof", { highlighted: justSavedSession?.id === todayLatest.id }) : null}
+                {justSavedSession && (!todayLatest || todayLatest.id !== justSavedSession.id) ? renderProofCard(justSavedSession, 'Just saved', { highlighted: true }) : null}
+                {!overview.proofRecordedToday && latestSession ? renderProofCard(latestSession, 'Last proof') : null}
+                {todaySessions.length > 1 ? <div className="divide-y divide-gray-100">{todaySessions.slice(1).map((session) => <div key={session.id} className="py-2"><SessionListItem session={session} onOpen={() => onOpenSession?.(session, progressReturnRoute())} prefetch minimal /></div>)}</div> : null}
+              </section>
+            )}
           </>
         )}
       </div>
 
       {skillDraft.session ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 px-4 py-4 sm:items-center" role="dialog" aria-modal="true">
-          <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-xl">
+          <div className="w-full max-w-md rounded-lg bg-white p-4 shadow-xl">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Assign skill</p>
               <h3 className="mt-1 text-lg font-semibold text-gray-950">{skillDraft.session.title || 'Proof'}</h3>

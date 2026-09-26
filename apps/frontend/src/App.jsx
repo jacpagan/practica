@@ -282,12 +282,14 @@ function AppContent() {
   })
 
   const {
+    goArchive,
     goProgress,
     goPrivacy,
     goSkill,
   } = usePrimaryNavigation({ navigate })
 
-  const progressNavActive = view === 'progress' || view === 'skill' || view === 'detail'
+  const todayNavActive = view === 'progress'
+  const progressNavActive = view === 'archive' || view === 'skill' || view === 'detail'
   const journalNavActive = view === 'journal'
 
   const {
@@ -348,21 +350,27 @@ function AppContent() {
       ) : null}
       <header className={`${view === 'detail' ? 'hidden' : isImmersiveMobileView ? 'hidden sm:block' : ''} border-b border-gray-100 bg-white px-4 py-4 sm:px-6`}>
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
-          <div className="flex items-center gap-4 min-w-0">
+          <div className="flex min-w-0 items-center gap-5">
             <button onClick={goProgress} className="inline-flex items-center focus:outline-none" aria-label="Practica home">
               <BrandLogo variant="header" />
             </button>
             <button
               onClick={goProgress}
-              className={`hidden sm:inline-flex text-sm px-3 py-1.5 rounded-full border transition-colors ${progressNavActive ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:text-gray-900'}`}
+              className={`hidden border-b py-1 text-sm transition-colors sm:inline-flex ${todayNavActive ? 'border-gray-950 text-gray-950' : 'border-transparent text-gray-400 hover:text-gray-800'}`}
             >
               Today
             </button>
             <button
               onClick={() => navigate({ view: 'journal', sessionId: null })}
-              className={`inline-flex text-sm px-3 py-1.5 rounded-full border transition-colors ${journalNavActive ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:text-gray-900'}`}
+              className={`hidden border-b py-1 text-sm transition-colors sm:inline-flex ${journalNavActive ? 'border-gray-950 text-gray-950' : 'border-transparent text-gray-400 hover:text-gray-800'}`}
             >
               Journal
+            </button>
+            <button
+              onClick={goArchive}
+              className={`hidden border-b py-1 text-sm transition-colors sm:inline-flex ${progressNavActive ? 'border-gray-950 text-gray-950' : 'border-transparent text-gray-400 hover:text-gray-800'}`}
+            >
+              Progress
             </button>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -428,7 +436,7 @@ function AppContent() {
           <JournalView token={token} />
         )}
 
-        {view === 'progress' && (
+        {(view === 'progress' || view === 'archive') && (
           <ProgressView
             sessions={sessions}
             sessionsLoading={sessionsLoading}
@@ -437,6 +445,8 @@ function AppContent() {
             onOpenSession={openSession}
             onOpenSkill={goSkill}
             onOpenJournal={() => navigate({ view: 'journal', sessionId: null })}
+            onOpenProgress={goArchive}
+            surface={view === 'archive' ? 'progress' : 'today'}
             onRecordRoutineItem={(routine, item) => startRecord({
               skillName: routine.name,
               practicePrompt: item.name,
@@ -520,6 +530,15 @@ function AppContent() {
         )}
         </React.Suspense>
       </main>
+      {!isImmersiveMobileView && view !== 'detail' ? (
+        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:hidden" aria-label="Primary">
+          <div className="mx-auto grid max-w-sm grid-cols-3">
+            <button type="button" onClick={goProgress} className={`text-sm ${todayNavActive ? 'font-semibold text-gray-950' : 'text-gray-400'}`}>Today</button>
+            <button type="button" onClick={() => navigate({ view: 'journal', sessionId: null })} className={`text-sm ${journalNavActive ? 'font-semibold text-gray-950' : 'text-gray-400'}`}>Journal</button>
+            <button type="button" onClick={goArchive} className={`text-sm ${progressNavActive ? 'font-semibold text-gray-950' : 'text-gray-400'}`}>Progress</button>
+          </div>
+        </nav>
+      ) : null}
     </div>
   )
 }

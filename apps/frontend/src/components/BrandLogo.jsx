@@ -2,7 +2,7 @@ import React from 'react'
 import practicaWordmark from '../assets/brand/practica-wordmark.png'
 
 const variantClasses = {
-  header: 'h-8 w-[190px] sm:h-10 sm:w-[235px]',
+  header: 'h-6 w-[140px] sm:h-10 sm:w-[235px]',
   auth: 'h-8 w-[190px] max-w-full',
   small: 'h-6 w-[140px]',
   compact: 'h-5 w-[118px]',

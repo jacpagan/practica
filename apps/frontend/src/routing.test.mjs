@@ -10,10 +10,11 @@ test('routePath uses today as the canonical progress surface', () => {
   assert.equal(routePath({ view: 'unknown', sessionId: null }), '/today')
 })
 
-test('parseRoute keeps progress aliases on the Today view', () => {
-  assert.equal(parseRoute('/progress').view, 'progress')
-  assert.equal(parseRoute('/archive').view, 'progress')
+test('parseRoute separates progress aliases from the Today view', () => {
+  assert.equal(parseRoute('/progress').view, 'archive')
+  assert.equal(parseRoute('/archive').view, 'archive')
   assert.equal(parseRoute('/today').view, 'progress')
+  assert.equal(routePath({ view: 'archive', sessionId: null }), '/progress')
 })
 
 test('parseRoute keeps internal metrics route', () => {

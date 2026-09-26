@@ -105,7 +105,7 @@ The teacher experience must remain lightweight. Practica should not create a lar
 - session detail and metadata editing
 - progress summaries from completed proof events
 - lightweight insights from practice data
-- Record / Progress navigation
+- Today / Journal / Progress navigation with Record as the primary capture action
 - private authenticated legacy review flows
 - a tiny scheduled mobility pilot that places one ready-to-record movement on Today
 

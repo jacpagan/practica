@@ -14,15 +14,15 @@ test('Library route (signed-out) shows Auth form without crashing', async ({ pag
   await page.goto('/library?date=2026-04-01')
   await expect(page.getByRole('button', { name: 'Log in' }).first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'Sign up' }).first()).toBeVisible()
-  // Legacy routes normalize to Today.
-  await expect(page).toHaveURL(/\/today/)
+  // Legacy archive routes normalize to Progress.
+  await expect(page).toHaveURL(/\/progress/)
   // Report link available and non-crashing
   await page.getByRole('button', { name: 'Report a problem' }).click()
   // No navigation expected.
-  await expect(page).toHaveURL(/\/today/)
+  await expect(page).toHaveURL(/\/progress/)
 })
 
-test('Progress view shows grouped proofs for signed-in members', async ({ page }) => {
+test('Today leads into private progress for signed-in members', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('token', 'smoke-token')
   })
@@ -95,7 +95,7 @@ test('Progress view shows grouped proofs for signed-in members', async ({ page }
   await page.route('**/api/journal-entries/?start_date=*&end_date=*', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
   })
-  await page.goto('/progress')
+  await page.goto('/today')
 
   await expect(page.getByRole('heading', { name: 'Today', exact: true })).toBeVisible()
   await expect(page.getByText('Today’s routine')).toBeVisible()
@@ -105,7 +105,12 @@ test('Progress view shows grouped proofs for signed-in members', async ({ page }
   await expect(page.getByRole('main').getByRole('button', { name: 'Record', exact: true })).toBeVisible()
   await expect(page.getByText("Today's proof").first()).toBeVisible()
   await expect(page.getByText('Activity & overview')).toHaveCount(0)
-  await expect(page.getByText('Full archive')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'View progress' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'View progress' }).click()
+  await expect(page).toHaveURL(/\/progress/)
+  await expect(page.getByRole('heading', { name: 'Progress', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Proof archive' })).toBeVisible()
   await expect(page.getByRole('button', { name: /Groove Lab 1 proof/ })).toBeVisible()
 })
 
@@ -142,10 +147,17 @@ test('Journal lets a signed-in member manage private routines', async ({ page })
   })
 
   await page.goto('/journal')
-  await expect(page.getByRole('heading', { name: 'Build proof for future you' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Journal', exact: true })).toBeVisible()
+  await page.getByRole('tab', { name: /Routines/ }).click()
   await expect(page.getByRole('heading', { name: 'Drum Rudiments' })).toBeVisible()
   await expect(page.getByText('Learned from Jimmy')).toBeVisible()
-  await expect(page.getByPlaceholder(/Learned from/)).toBeVisible()
+  await page.getByRole('button', { name: 'Edit' }).click()
+  await expect(page.getByRole('heading', { name: 'Edit routine' })).toBeVisible()
+  await expect(page.getByLabel('Action', { exact: true })).toHaveValue('Flam taps')
+  await page.getByRole('button', { name: 'Close' }).click()
+  await page.getByRole('button', { name: 'New routine' }).click()
+  await expect(page.getByRole('heading', { name: 'New routine' })).toBeVisible()
+  await expect(page.getByPlaceholder('Dorothy, Jimmy, or yourself')).toBeVisible()
 })
 
 test('Progress is the default signed-in home without dashboard chrome', async ({ page }) => {

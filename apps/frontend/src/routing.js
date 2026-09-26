@@ -17,7 +17,7 @@ export const parseRoute = (pathname, search = '') => {
   if (pathname === '/journal') return { view: 'journal', sessionId: null }
   if (pathname === '/internal/metrics') return { view: 'internalMetrics', sessionId: null }
   if (pathname === '/progress' || pathname === '/archive' || pathname === '/evidence' || pathname === '/calendar' || pathname === '/library' || pathname === '/threads') {
-    return { view: 'progress', sessionId: null, date }
+    return { view: 'archive', sessionId: null, date }
   }
   if (pathname === '/upload') return { view: 'upload', sessionId: null }
   if (pathname === '/record' || pathname === '/recording') return { view: 'record', sessionId: null, seriesName: skill, challengeToken }
@@ -34,7 +34,8 @@ export const routePath = ({ view, sessionId, seriesName, date, shareToken, chall
   if (view === 'privacy') return '/privacy'
   if (view === 'journal') return '/journal'
   if (view === 'internalMetrics') return '/internal/metrics'
-  if (view === 'progress' || view === 'archive' || view === 'evidence' || view === 'threads' || view === 'today') {
+  if (view === 'archive' || view === 'evidence' || view === 'threads') return '/progress'
+  if (view === 'progress' || view === 'today') {
     return date ? `/today?date=${encodeURIComponent(date)}` : '/today'
   }
   if (view === 'upload') return '/upload'
