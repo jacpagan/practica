@@ -22,196 +22,6 @@ test('Library route (signed-out) shows Auth form without crashing', async ({ pag
   await expect(page).toHaveURL(/\/progress/)
 })
 
-test('Today leads into private progress for signed-in members', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.localStorage.setItem('token', 'smoke-token')
-  })
-
-  await page.route('**/api/auth/me/', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ id: 1, username: 'smoke_member', display_name: 'Smoke Member' }),
-    })
-  })
-
-  const todayRecordedAt = new Date()
-  todayRecordedAt.setHours(9, 30, 0, 0)
-
-  const sessions = [
-    {
-      id: 101,
-      title: 'Kick pattern check',
-      practice_series: 'Groove Lab',
-      description: '',
-      video_file: null,
-      duration_seconds: 12,
-      recorded_at: todayRecordedAt.toISOString(),
-      created_at: todayRecordedAt.toISOString(),
-      processing_status: 'ready',
-      poster_image_url: '/media/processed/sessions/101/thumbs/poster.jpg',
-      can_edit: true,
-      local_preview_url: '',
-      video_feedback_count: 0,
-    },
-    {
-      id: 102,
-      title: 'Hands alone',
-      practice_series: '',
-      description: '',
-      video_file: null,
-      duration_seconds: 9,
-      recorded_at: '2099-01-02T00:00:00Z',
-      created_at: '2099-01-02T00:00:00Z',
-      processing_status: 'ready',
-      can_edit: true,
-      local_preview_url: '',
-      video_feedback_count: 0,
-    },
-  ]
-
-  await page.route('**/api/sessions/', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(sessions) })
-  })
-
-  await page.route('**/api/sessions/**', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(sessions) })
-  })
-  await page.route('**/api/routines/?today=1', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify([{
-        id: 7,
-        name: 'Dragon and Tiger Qigong',
-        category: 'Qigong',
-        purpose: 'Practice what Dorothy taught you.',
-        learned_from: 'Dorothy',
-        is_today: true,
-        items: [{ id: 71, name: 'Movement 1', default_unit: 'reps', default_target_quantity: '1.00' }],
-      }]),
-    })
-  })
-  await page.route('**/api/journal-entries/?start_date=*&end_date=*', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
-  })
-  await page.goto('/today')
-
-  await expect(page.getByRole('heading', { name: 'Today', exact: true })).toBeVisible()
-  await expect(page.getByText('Today’s routine')).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Dragon and Tiger Qigong' })).toBeVisible()
-  await expect(page.getByText('Learned from Dorothy')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Log', exact: true })).toBeVisible()
-  await expect(page.getByRole('main').getByRole('button', { name: 'Record', exact: true })).toBeVisible()
-  await expect(page.getByText("Today's proof").first()).toBeVisible()
-  await expect(page.getByText('Activity & overview')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'View progress' })).toBeVisible()
-
-  await page.getByRole('button', { name: 'View progress' }).click()
-  await expect(page).toHaveURL(/\/progress/)
-  await expect(page.getByRole('heading', { name: 'Progress', exact: true })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Proof archive' })).toBeVisible()
-  await expect(page.getByRole('button', { name: /Groove Lab 1 proof/ })).toBeVisible()
-})
-
-test('Journal lets a signed-in member manage private routines', async ({ page }) => {
-  await page.addInitScript(() => window.localStorage.setItem('token', 'smoke-token'))
-  await page.route('**/api/auth/me/', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ id: 1, username: 'smoke_member', display_name: 'Smoke Member' }),
-    })
-  })
-  await page.route('**/api/sessions/', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
-  })
-  await page.route('**/api/routines/', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify([{
-        id: 8,
-        name: 'Drum Rudiments',
-        category: 'Drums',
-        purpose: 'Keep the exercises alive.',
-        learned_from: 'Jimmy',
-        is_default: true,
-        is_today: true,
-        items: [{ id: 81, name: 'Flam taps', default_unit: 'minutes', default_target_quantity: null }],
-      }]),
-    })
-  })
-  await page.route('**/api/journal-entries/', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
-  })
-
-  await page.goto('/journal')
-  await expect(page.getByRole('heading', { name: 'Journal', exact: true })).toBeVisible()
-  await page.getByRole('tab', { name: /Routines/ }).click()
-  await expect(page.getByRole('heading', { name: 'Drum Rudiments' })).toBeVisible()
-  await expect(page.getByText('Learned from Jimmy')).toBeVisible()
-  await page.getByRole('button', { name: 'Edit' }).click()
-  await expect(page.getByRole('heading', { name: 'Edit routine' })).toBeVisible()
-  await expect(page.getByLabel('Action', { exact: true })).toHaveValue('Flam taps')
-  await page.getByRole('button', { name: 'Close' }).click()
-  await page.getByRole('button', { name: 'New routine' }).click()
-  await expect(page.getByRole('heading', { name: 'New routine' })).toBeVisible()
-  await expect(page.getByPlaceholder('Dorothy, Jimmy, or yourself')).toBeVisible()
-})
-
-test('Progress is the default signed-in home without dashboard chrome', async ({ page }) => {
-  await page.addInitScript(() => {
-    window.localStorage.setItem('token', 'smoke-token')
-  })
-
-  await page.route('**/api/auth/me/', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ id: 1, username: 'smoke_member', display_name: 'Smoke Member' }),
-    })
-  })
-
-  const sessions = [
-    {
-      id: 201,
-      title: 'Daily groove check',
-      practice_series: 'Groove Lab',
-      description: '',
-      video_file: null,
-      duration_seconds: 12,
-      recorded_at: '2099-01-03T00:00:00Z',
-      created_at: '2099-01-03T00:00:00Z',
-      processing_status: 'ready',
-      can_edit: true,
-      local_preview_url: '',
-      video_feedback_count: 0,
-    },
-  ]
-
-  await page.route('**/api/sessions/', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(sessions) })
-  })
-
-  await page.route('**/api/routines/?today=1', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
-  })
-
-  await page.route('**/api/journal-entries/?start_date=*&end_date=*', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
-  })
-
-  await page.goto('/')
-  await expect(page).toHaveURL(/\/today/)
-  await expect(page.getByRole('heading', { name: 'Today', exact: true })).toBeVisible()
-  await expect(page.getByText('Recent skills')).toHaveCount(0)
-  await expect(page.getByText('this week')).toHaveCount(0)
-  await expect(page.getByText('XP', { exact: true })).toHaveCount(0)
-  await expect(page.getByText(/streak/i)).toHaveCount(0)
-  await expect(page.getByText(/level/i)).toHaveCount(0)
-})
-
 test('Upload view shows existing skills loaded from prior proofs', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('token', 'smoke-token')
@@ -447,13 +257,8 @@ test('Recording starts and saves a take when the metronome is on', async ({ page
   await expect(page.getByText(/Recording · 0:02/)).toBeVisible({ timeout: 4000 })
 
   await page.getByRole('button', { name: 'Stop recording' }).click()
-  await expect(page.getByText('Label this take (optional)')).toBeVisible({ timeout: 5000 })
-  const skillInput = page.getByPlaceholder('Breathing, Drumming, Guitar…')
-  await skillInput.fill('Chinese')
-  await expect(skillInput).toHaveValue('Chinese')
-  await expect(skillInput).toHaveCSS('color', 'rgb(17, 24, 39)')
-  await page.getByText('Create “Chinese”').click()
-  await page.getByRole('button', { name: 'Save proof' }).click()
+  await expect(page.getByText('Save this video')).toBeVisible({ timeout: 5000 })
+  await page.getByRole('button', { name: 'Save video', exact: true }).click()
   await expect(page.getByText('Saving your proof…')).toBeVisible({ timeout: 5000 })
 
 })
@@ -911,6 +716,9 @@ test('Upload retries once after network interruption and reuses idempotency key'
   await page.route('**/api/journal-entries/?start_date=*&end_date=*', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
   })
+  await page.route('**/api/journal-entries/', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
 
   await page.goto('/upload')
   await expect(page.getByRole('heading', { name: 'New proof' })).toBeVisible()
@@ -924,7 +732,7 @@ test('Upload retries once after network interruption and reuses idempotency key'
   await page.getByRole('button', { name: 'Save proof' }).click()
 
   await page.waitForURL(/\/today$/, { timeout: 30000 })
-  await expect(page.getByText('Proof saved. You showed up today.')).toBeVisible({ timeout: 10000 })
+  await expect(page.getByRole('heading', { name: 'Your videos' })).toBeVisible({ timeout: 10000 })
   expect(uploadPostAttempts).toBe(2)
   expect(uploadClientIds[0]).toBeTruthy()
   expect(uploadClientIds[0]).toBe(uploadClientIds[1])

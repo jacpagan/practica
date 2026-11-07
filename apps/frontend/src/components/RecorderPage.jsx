@@ -235,51 +235,12 @@ export default function RecorderPage({
             </div>
             <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-4 sm:border-gray-200 sm:bg-white sm:text-gray-900">
               <div>
-                <h2 className="text-lg font-semibold text-white sm:text-gray-900">Label this take (optional)</h2>
-                <p className="mt-1 text-sm text-white/70 sm:text-gray-500">Pick a recent skill to keep today connected, type a new one, or save to your private archive.</p>
+                <h2 className="text-lg font-semibold text-white sm:text-gray-900">Save this video</h2>
+                <p className="mt-1 text-sm text-white/70 sm:text-gray-500">Watch your take, then save it to your private videos.</p>
               </div>
-              {recentSkills.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {recentSkills.map((skill) => (
-                    <button
-                      key={skill}
-                      type="button"
-                      onClick={() => chooseSkillAndSave(skill)}
-                      className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/20 transition-colors sm:border-gray-200 sm:bg-gray-50 sm:text-gray-900 sm:hover:bg-gray-100"
-                    >
-                      {skill}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-              <div className="pb-2">
-                <label className="block text-sm text-white/75 sm:text-gray-600 mb-1.5">Skill name</label>
-                <SkillField
-                  value={customSkill}
-                  onChange={setCustomSkill}
-                  options={skillOptions}
-                  placeholder="Breathing, Drumming, Guitar…"
-                />
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => chooseSkillAndSave(customSkill)}
-                  disabled={!customSkill.trim()}
-                  className="text-sm font-medium text-white bg-gray-900 rounded-lg px-4 py-2.5 hover:bg-gray-800 disabled:opacity-50 sm:bg-gray-900"
-                >
-                  Save proof
-                </button>
-                <button type="button" onClick={resetCapture} className="text-sm text-white/80 hover:text-white sm:text-gray-600 sm:hover:text-gray-900">
-                  Re-record
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSave({ skillName: '', auto: true })}
-                  className="text-sm text-white/60 hover:text-white sm:text-gray-500 sm:hover:text-gray-800"
-                >
-                  Save to private archive
-                </button>
+              <div className="flex items-center gap-4">
+                <button type="button" onClick={() => handleSave({ skillName: '', auto: true })} className="rounded-full bg-gray-900 px-5 py-3 text-sm font-medium text-white">Save video</button>
+                <button type="button" onClick={resetCapture} className="text-sm">Re-record</button>
               </div>
               {saveError ? <p className="text-sm text-red-400 sm:text-red-600">{saveError}</p> : null}
             </div>
