@@ -1,8 +1,6 @@
 import React, { useState } from 'react'
 import { useAuth } from '../auth'
-import { reportClientError } from '../utils'
 import BrandLogo from './BrandLogo'
-import { useToast } from './Toast'
 
 function AuthForm({
   initialMode = 'login',
@@ -14,7 +12,6 @@ function AuthForm({
   embedded = false,
 }) {
   const { login, register } = useAuth()
-  const toast = useToast()
   const normalizedInitialMode = initialMode === 'register' ? 'register' : 'login'
   const [mode, setMode] = useState(normalizedInitialMode)
   const [username, setUsername] = useState('')
@@ -48,14 +45,6 @@ function AuthForm({
     }
   }
 
-  const reportProblem = () => {
-    try {
-      const path = (window.location && (window.location.pathname + (window.location.search || ''))) || '/'
-      reportClientError({ source: 'UserReport', message: 'user_report', extra: { note: 'User pressed report', path } })
-      toast?.success?.('Thanks for the report')
-    } catch {}
-  }
-
   return (
     <div className={embedded ? 'w-full' : 'min-h-screen bg-white flex items-center justify-center px-4'}>
       <div className={`w-full max-w-sm ${embedded ? 'rounded-2xl border border-gray-200 bg-white px-6 py-6 shadow-sm' : ''}`}>
@@ -86,11 +75,6 @@ function AuthForm({
               </p>
           </div>
         ) : null}
-        <div className="flex items-center justify-center gap-3 mb-6">
-          <a href="/privacy" className="text-xs text-gray-500 hover:text-gray-900 transition-colors">Privacy</a>
-          <button type="button" onClick={reportProblem} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">Report a problem</button>
-        </div>
-
         {/* Tabs */}
         <div className="flex gap-1 mb-6 border-b border-gray-100">
           <button onClick={() => { setMode('login'); setError('') }}

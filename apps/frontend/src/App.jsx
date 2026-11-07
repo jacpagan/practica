@@ -378,9 +378,6 @@ function AppContent() {
               Record
             </button>
             <div className="flex items-center gap-2 sm:border-l sm:border-gray-100 sm:pl-3">
-              <button onClick={goPrivacy} className="hidden text-xs text-gray-400 hover:text-gray-600 transition-colors sm:inline">
-                Privacy
-              </button>
               {user.is_staff ? (
                 <button
                   onClick={() => navigate({ view: 'internalMetrics', sessionId: null })}
