@@ -16,10 +16,8 @@ test('Library route (signed-out) shows Auth form without crashing', async ({ pag
   await expect(page.getByRole('button', { name: 'Sign up' }).first()).toBeVisible()
   // Legacy archive routes normalize to Progress.
   await expect(page).toHaveURL(/\/progress/)
-  // Report link available and non-crashing
-  await page.getByRole('button', { name: 'Report a problem' }).click()
-  // No navigation expected.
-  await expect(page).toHaveURL(/\/progress/)
+  await expect(page.getByRole('button', { name: 'Report a problem' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Privacy', exact: true })).toHaveCount(0)
 })
 
 test('Upload view shows existing skills loaded from prior proofs', async ({ page }) => {
