@@ -1,5 +1,9 @@
 # Practica Master Spec
 
+## Current direction — November 7, 2026
+
+Practica is a simple private video app for any practice. Record or upload a video, play it back, and return to your video archive. The app does not need to know the activity. Qigong progression, routines, journal actions, prescribed exercises, and skill-specific programs are outside the active product. Existing recordings and private access remain protected. This direction supersedes the pilot and roadmap below.
+
 ## Status
 
 This is the single source of truth for Practica product direction, current-state product behavior, and roadmap.

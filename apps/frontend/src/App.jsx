@@ -33,7 +33,7 @@ import SessionUpload from './components/SessionUpload'
 import BrandLogo from './components/BrandLogo'
 // Inline header create buttons to avoid any chance of circular init
 const SessionDetail = React.lazy(() => import('./components/SessionDetail'))
-const ProgressView = React.lazy(() => import('./components/ProgressView'))
+const VideoLibrary = React.lazy(() => import('./components/VideoLibrary'))
 const SkillView = React.lazy(() => import('./components/SkillView'))
 const InternalMetrics = React.lazy(() => import('./components/InternalMetrics'))
 const JournalView = React.lazy(() => import('./components/JournalView'))
@@ -358,19 +358,7 @@ function AppContent() {
               onClick={goProgress}
               className={`hidden border-b py-1 text-sm transition-colors sm:inline-flex ${todayNavActive ? 'border-gray-950 text-gray-950' : 'border-transparent text-gray-400 hover:text-gray-800'}`}
             >
-              Today
-            </button>
-            <button
-              onClick={() => navigate({ view: 'journal', sessionId: null })}
-              className={`hidden border-b py-1 text-sm transition-colors sm:inline-flex ${journalNavActive ? 'border-gray-950 text-gray-950' : 'border-transparent text-gray-400 hover:text-gray-800'}`}
-            >
-              Journal
-            </button>
-            <button
-              onClick={goArchive}
-              className={`hidden border-b py-1 text-sm transition-colors sm:inline-flex ${progressNavActive ? 'border-gray-950 text-gray-950' : 'border-transparent text-gray-400 hover:text-gray-800'}`}
-            >
-              Progress
+              Videos
             </button>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -432,28 +420,8 @@ function AppContent() {
           />
         )}
 
-        {view === 'journal' && (
-          <JournalView token={token} />
-        )}
-
-        {(view === 'progress' || view === 'archive') && (
-          <ProgressView
-            sessions={sessions}
-            sessionsLoading={sessionsLoading}
-            token={token}
-            highlightSession={justUploadedSession}
-            onOpenSession={openSession}
-            onOpenSkill={goSkill}
-            onOpenJournal={() => navigate({ view: 'journal', sessionId: null })}
-            onOpenProgress={goArchive}
-            surface={view === 'archive' ? 'progress' : 'today'}
-            onRecordRoutineItem={(routine, item) => startRecord({
-              skillName: routine.name,
-              practicePrompt: item.name,
-              returnRoute: { view: 'progress', sessionId: null, seriesName: '' },
-            })}
-            onSessionUpdate={onProgressSessionUpdate}
-          />
+        {(view === 'progress' || view === 'archive' || view === 'journal') && (
+          <VideoLibrary sessions={sessions} loading={sessionsLoading} onRecord={openGlobalRecorder} onOpenSession={openSession} highlightSession={justUploadedSession} />
         )}
 
         {view === 'skill' && (
@@ -532,10 +500,9 @@ function AppContent() {
       </main>
       {!isImmersiveMobileView && view !== 'detail' ? (
         <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:hidden" aria-label="Primary">
-          <div className="mx-auto grid max-w-sm grid-cols-3">
-            <button type="button" onClick={goProgress} className={`text-sm ${todayNavActive ? 'font-semibold text-gray-950' : 'text-gray-400'}`}>Today</button>
-            <button type="button" onClick={() => navigate({ view: 'journal', sessionId: null })} className={`text-sm ${journalNavActive ? 'font-semibold text-gray-950' : 'text-gray-400'}`}>Journal</button>
-            <button type="button" onClick={goArchive} className={`text-sm ${progressNavActive ? 'font-semibold text-gray-950' : 'text-gray-400'}`}>Progress</button>
+          <div className="mx-auto flex max-w-sm justify-around">
+            <button type="button" onClick={goProgress} className="text-sm font-semibold text-gray-950">Videos</button>
+            <button type="button" onClick={openGlobalRecorder} className="text-sm text-gray-950">Record</button>
           </div>
         </nav>
       ) : null}
