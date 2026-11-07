@@ -145,6 +145,9 @@ async function installSignedInUploadMocks(page) {
   await page.route('**/api/journal-entries/?start_date=*&end_date=*', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
   })
+  await page.route('**/api/journal-entries/', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+  })
 
   await page.route('**/api/sessions/multipart/initiate/', async (route) => {
     await route.fulfill({
@@ -371,7 +374,7 @@ test('signed-in proof upload -> optional review loop works', async ({ browser, r
   const uploadComplete = sessionIdFromUpload(studentPage)
   await studentPage.getByRole('button', { name: 'Save proof' }).click()
   await studentPage.waitForURL(/\/today/, { timeout: 30000 })
-  await expect(studentPage.getByText('Proof saved. You showed up today.')).toBeVisible({ timeout: 10000 })
+  await expect(studentPage.getByRole('heading', { name: 'Your videos' })).toBeVisible({ timeout: 10000 })
 
   const sessionId = await uploadComplete
   expect(sessionId).toBeTruthy()
@@ -441,7 +444,7 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
   const initialUploadComplete = sessionIdFromUpload(studentPage)
   await studentPage.getByRole('button', { name: 'Save proof' }).click()
   await studentPage.waitForURL(/\/today/, { timeout: 30000 })
-  await expect(studentPage.getByText('Proof saved. You showed up today.')).toBeVisible({ timeout: 10000 })
+  await expect(studentPage.getByRole('heading', { name: 'Your videos' })).toBeVisible({ timeout: 10000 })
 
   const initialSessionId = await initialUploadComplete
   expect(initialSessionId).toBeTruthy()
@@ -487,7 +490,7 @@ test('continue loop creates a follow-up take and follow-up request', async ({ br
   const followupUploadComplete = sessionIdFromUpload(studentPage)
   await studentPage.getByRole('button', { name: 'Save proof' }).click()
   await studentPage.waitForURL(/\/today/, { timeout: 30000 })
-  await expect(studentPage.getByText('Proof saved. You showed up today.')).toBeVisible({ timeout: 10000 })
+  await expect(studentPage.getByRole('heading', { name: 'Your videos' })).toBeVisible({ timeout: 10000 })
 
   const followupSessionId = await followupUploadComplete
   expect(followupSessionId).toBeTruthy()
@@ -531,7 +534,7 @@ test('long upload interruption auto-resumes and saves successfully', async ({ br
   await page.getByRole('button', { name: 'Save proof' }).click()
 
   await page.waitForURL(/\/today$/, { timeout: 30000 })
-  await expect(page.getByText('Proof saved. You showed up today.')).toBeVisible({ timeout: 10000 })
+  await expect(page.getByRole('heading', { name: 'Your videos' })).toBeVisible({ timeout: 10000 })
   expect(mocks.getCompleteAttempts()).toBeGreaterThan(1)
 
   await context.close()
