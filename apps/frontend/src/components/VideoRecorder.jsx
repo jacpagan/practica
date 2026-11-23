@@ -646,7 +646,6 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   }, [playTickAt])
 
   const startMetronome = useCallback(async () => {
-    if (!streamRef.current) return
     await ensureAudioMix(streamRef.current)
     const audioContext = audioContextRef.current
     if (!audioContext) return
@@ -658,15 +657,12 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   }, [beatsPerBar, bpm, ensureAudioMix, stopMetronome])
 
   const toggleMetronome = useCallback(() => {
+    // Unlock audio directly in the click gesture, including before camera access.
+    if (!metronomeEnabled) ensureAudioMix(streamRef.current)
     setMetronomeEnabled((current) => !current)
-  }, [])
+  }, [ensureAudioMix, metronomeEnabled])
 
   useEffect(() => {
-    const captureActive = state === STATES.PREVIEWING || state === STATES.RECORDING
-    if (!captureActive) {
-      stopMetronome()
-      return undefined
-    }
     if (!metronomeEnabled) {
       stopMetronome()
       return undefined
@@ -677,8 +673,7 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
   }, [bpm, metronomeEnabled, startMetronome, state, stopMetronome])
 
   useEffect(() => {
-    const captureActive = state === STATES.PREVIEWING || state === STATES.RECORDING
-    if (captureActive && metronomeEnabled) {
+    if (metronomeEnabled) {
       startMetronomeLoop()
       return () => stopMetronomeLoop()
     }
@@ -1221,6 +1216,9 @@ function VideoRecorder({ onRecorded, onCancel, maxDuration = 60, autoUseOnStop =
       {/* ── IDLE STATE ── */}
       {state === STATES.IDLE && (
         <div className="h-full sm:aspect-video flex flex-col items-center justify-center gap-3 px-4">
+          <button type="button" onClick={toggleMetronome} className="rounded-xl bg-white/10 px-4 py-2 text-sm text-white">
+            {metronomeEnabled ? 'Stop metronome' : 'Listen to metronome'} · {bpm} BPM
+          </button>
           {error ? (
             <>
               <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
